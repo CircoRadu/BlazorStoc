@@ -1,8 +1,8 @@
 {
     "modules":  {
                     "ActivityImport":  {
-                                           "version":  "0.11.0",
-                                           "hash":  "fe8175b9e5de9adf497f3ef8faa8c4608928de56db076620139175ee6007ce61",
+                                           "version":  "0.12.0",
+                                           "hash":  "73af2f3f35074298b100ecbfa4b13ae31b4129b39c2ef081c5cb01ffbeedab83",
                                            "history":  [
                                                            {
                                                                "version":  "0.1.0",
@@ -73,6 +73,11 @@
                                                                "version":  "0.11.0",
                                                                "date":  "06.11.2026",
                                                                "note":  "Informatiile din tichet cu On/Off, destinatie si campuri suplimentare; recitirea tichetelor preluate"
+                                                           },
+                                                           {
+                                                               "version":  "0.12.0",
+                                                               "date":  "06.11.2026",
+                                                               "note":  "Tichet exemplu, nume editabile, verificarea structurii tichetelor si notificarea"
                                                            }
                                                        ]
                                        },
@@ -151,8 +156,8 @@
                                                  ]
                                  },
                     "Journal":  {
-                                    "version":  "1.4.8",
-                                    "hash":  "afaf91f79d91484c86662056d795e6c2297edaa3f87ac2147faaa89683591698",
+                                    "version":  "1.4.9",
+                                    "hash":  "90dacab146c42340a598597a837b4fc7a07e00c0fa3029484121fc039ff7f3ed",
                                     "history":  [
                                                     {
                                                         "version":  "1.0.0",
@@ -233,6 +238,11 @@
                                                         "version":  "1.4.8",
                                                         "date":  "06.11.2026",
                                                         "note":  "Actiunea Actualizare tichete ActivityApp preluate in filtrul jurnalului"
+                                                    },
+                                                    {
+                                                        "version":  "1.4.9",
+                                                        "date":  "06.11.2026",
+                                                        "note":  "Tichet exemplu, nume editabile, verificarea structurii tichetelor si notificarea"
                                                     }
                                                 ]
                                 },

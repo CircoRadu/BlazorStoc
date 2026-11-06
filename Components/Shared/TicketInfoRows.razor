@@ -3,10 +3,10 @@
 @* The pieces of information of a ticket of ActivityApp inside a <dl>: only the ones switched on in Setari -> Preluare ActivityApp (section 6), then the extra fields under the names the
    administrator gave them. Title and number are shown by the window itself (they are always taken). Without the import module everything is shown. ShowEmpty: an empty piece shows a dash
    (the review windows); without it an empty piece is left out (the window of the intervention). *@
-@if (visibility.Problem && (ShowEmpty || Problem.Length > 0)) { <dt>Problema</dt><dd class="review-text">@Show(Problem)</dd> }
-@if (visibility.Resolution && (ShowEmpty || Resolution.Length > 0)) { <dt>Rezolvarea</dt><dd class="review-text">@Show(Resolution)</dd> }
-@if (visibility.Report && (ShowEmpty || (Report.Length > 0 && Report != Resolution))) { <dt>@ReportLabel</dt><dd class="review-text">@Show(Report)</dd> }
-@if (visibility.Executor && (ShowEmpty || Executor.Length > 0)) { <dt>Executant</dt><dd>@Show(Executor)</dd> }
+@if (visibility.Problem && (ShowEmpty || Problem.Length > 0)) { <dt>@visibility.Name("problem", "Problema")</dt><dd class="review-text">@Show(Problem)</dd> }
+@if (visibility.Resolution && (ShowEmpty || Resolution.Length > 0)) { <dt>@visibility.Name("resolution", "Rezolvarea")</dt><dd class="review-text">@Show(Resolution)</dd> }
+@if (visibility.Report && (ShowEmpty || (Report.Length > 0 && Report != Resolution))) { <dt>@visibility.Name("report", ReportLabel)</dt><dd class="review-text">@Show(Report)</dd> }
+@if (visibility.Executor && (ShowEmpty || Executor.Length > 0)) { <dt>@visibility.Name("executor", "Executant")</dt><dd>@Show(Executor)</dd> }
 @foreach (var extra in visibility.Extras)
 {
     var value = Extras is not null && Extras.TryGetValue(extra.Key, out var found) ? found : "";

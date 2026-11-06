@@ -24,7 +24,7 @@ public sealed class MariaActivityTicketRefreshService(IConfiguration configurati
 {
     private const string View = "setari-import-activityapp.view", Run = "setari-import-activityapp.run", Gone = "gone";
 
-    private sealed record Row(long TicketId, string State, string TicketRead, int? InterventionId, string? SourceRead, string NotesItems, int? BeneficiaryId);
+    private sealed record Row(long TicketId, string State, string TicketRead, int? InterventionId, string? SourceRead, string NotesItems, int? BeneficiaryId, string NotesLabels = "");
 
     private static bool IsGone(string read) => ActivityFieldMap.Split(read).Contains(Gone);
 
@@ -40,7 +40,7 @@ public sealed class MariaActivityTicketRefreshService(IConfiguration configurati
     {
         await using var connection = await MariaDb.OpenAsync(configuration, cancellationToken).ConfigureAwait(false);
         await using var command = new MySqlCommand("""
-            SELECT t.ticket_id, t.state, t.fields_read, s.intervention_id, s.fields_read, s.notes_items, i.beneficiary_id
+            SELECT t.ticket_id, t.state, t.fields_read, s.intervention_id, s.fields_read, s.notes_items, i.beneficiary_id, s.notes_labels
             FROM activity_import_tickets t
             LEFT JOIN service_intervention_source s ON s.source_ticket_id = t.ticket_id
             LEFT JOIN service_interventions i ON i.id = s.intervention_id
@@ -50,7 +50,7 @@ public sealed class MariaActivityTicketRefreshService(IConfiguration configurati
         await using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
         while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
             rows.Add(new(reader.GetInt64(0), reader.GetString(1), reader.GetString(2), reader.IsDBNull(3) ? null : Convert.ToInt32(reader.GetValue(3)), reader.IsDBNull(4) ? null : reader.GetString(4),
-                reader.IsDBNull(5) ? "" : reader.GetString(5), reader.IsDBNull(6) ? null : Convert.ToInt32(reader.GetValue(6))));
+                reader.IsDBNull(5) ? "" : reader.GetString(5), reader.IsDBNull(6) ? null : Convert.ToInt32(reader.GetValue(6)), reader.IsDBNull(7) ? "" : reader.GetString(7)));
         return rows;
     }
 
@@ -167,15 +167,19 @@ public sealed class MariaActivityTicketRefreshService(IConfiguration configurati
     {
         var raw = ActivityTicketPlanner.SourceOf(before);
         var lines = new List<(string, string)>();
+        // The names written in front of the lines then (kept with the source record); without them the usual names.
+        var written = new Dictionary<string, string>();
+        if (row.NotesLabels.Length > 0) { try { written = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, string>>(row.NotesLabels) ?? written; } catch (System.Text.Json.JsonException) { } }
+        string LabelOf(string key, string usual) => written.TryGetValue(key, out var kept) ? kept : usual;
         foreach (var key in row.NotesItems.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
         {
             (string Label, string Value)? line = key switch
             {
-                ActivityFieldMap.Problem => ("Problemă", raw.Problem),
-                ActivityFieldMap.Resolution => ("Rezolvare", raw.Resolution),
-                ActivityFieldMap.Report => ("Raport original", raw.Report),
-                ActivityFieldMap.Executor => ("Executant", raw.Executor),
-                _ => map.ExtraOf(key) is { } extra ? (extra.Label, raw.Extras is not null && raw.Extras.TryGetValue(key, out var value) ? value : "") : null
+                ActivityFieldMap.Problem => (LabelOf(key, ActivityFieldMap.DefaultNoteLabel(key)), raw.Problem),
+                ActivityFieldMap.Resolution => (LabelOf(key, ActivityFieldMap.DefaultNoteLabel(key)), raw.Resolution),
+                ActivityFieldMap.Report => (LabelOf(key, ActivityFieldMap.DefaultNoteLabel(key)), raw.Report),
+                ActivityFieldMap.Executor => (LabelOf(key, ActivityFieldMap.DefaultNoteLabel(key)), raw.Executor),
+                _ => (written.TryGetValue(key, out var keptLabel) ? keptLabel : map.ExtraOf(key)?.Label) is { } extraLabel ? (extraLabel, raw.Extras is not null && raw.Extras.TryGetValue(key, out var value) ? value : "") : null
             };
             if (line is null) return null;
             if (line.Value.Value.Length > 0) lines.Add(line.Value);

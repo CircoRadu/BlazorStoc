@@ -1,0 +1,20 @@
+# Tichet exemplu ActivityApp
+Cautare: tichet exemplu activityapp coloane valori corespondenta campurilor tichet anterior observatii informatii
+
+Un tichet real din ActivityApp, cu toate coloanele tichetului și ale evenimentului care l-a închis și cu valorile lor, ca să vezi ce conține fiecare coloană când stabilești corespondența câmpurilor (Setări → Preluare date ActivityApp, secțiunea 6). Se deschide cu cel mai recent tichet finalizat al tipurilor alese. Nimic din tichet nu se păstrează în BlazorStoc; fiecare vizualizare apare în jurnal cu numărul tichetului.
+
+## Elemente
+### Fereastra
+- Tichet anterior | buton | Încarcă tichetul finalizat dinaintea celui afișat. Apasă-l până găsești un tichet cu destule date completate; se dezactivează la cel mai vechi.
+- Tichet mai nou | buton | Revine la tichetul afișat înainte, fără să-l citească din nou.
+- Ce primește fiecare informație | tabel | Valoarea pe care ar prelua-o fiecare informație (titlu, număr, problemă, rezolvare, raport original, executant, câmpurile suplimentare) din acest tichet, cu setările de pe ecran, chiar nesalvate, și unde ajunge (observații, câmp separat sau ambele).
+- Observațiile intervenției | text | Textul observațiilor așa cum ar fi scris la preluarea acestui tichet.
+- Tabelele Tickete și EvenimenteAgent | tabel | Toate coloanele, cu tipul și valoarea lor. La „Folosit pentru” vezi ce informație citește acum coloana.
+- Folosește pentru | listă | Alege coloana pentru o informație (din același tabel) sau ca nou câmp suplimentar. Alegerea completează tabelul din secțiunea 6; se salvează cu „Salvează corespondența”.
+- Închide | buton | Închide fereastra.
+
+## Flux: Cum aleg coloanele potrivite
+1. În secțiunea 6 apasă „Deschide un tichet exemplu”.
+2. Dacă tichetul are puține date, apasă „Tichet anterior” până găsești unul complet.
+3. Vezi în tabele ce coloană conține ce valoare și alege-o pentru informația potrivită.
+4. Verifică în „Ce primește fiecare informație” și în observații rezultatul, apoi închide fereastra și apasă „Salvează corespondența”.

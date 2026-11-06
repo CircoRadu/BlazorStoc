@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Components;
 using BlazorStoc.Components.Shared;
 using BlazorStoc.Modules.ActivityImport;
 using BlazorStoc.Services;
@@ -22,6 +23,103 @@ public static class ActivityFieldSettingsChecks
         Rebuild(check);
         Structure(check);
         Window(check);
+        Labels(check);
+        SampleRules(check);
+        StructureChange(check);
+        SampleWindow(check);
+    }
+
+    private static TicketSample Sample(long id = 9, string problem = "Nu merge aerul", string report = "Nu merge aerul\nAm schimbat filtrul", string executor = "Ion Pop", bool older = true) =>
+        new(id, "T-" + id, "Aer conditionat", new DateTime(2026, 10, 1, 8, 30, 0), [
+            new("Tickete", [new("ID", "bigint", id.ToString(), false), new("NumeTicket", "nvarchar", "T-" + id, true), new("Subject", "nvarchar", "Aer conditionat", true), new("DescriptionInternal", "nvarchar", problem, true),
+                new("Detalii", "nvarchar", "Alt text", true), new("ProcesatDe", "nvarchar", "Birou", true), new("Observatii", "nvarchar", "Poarta inchisa", true)]),
+            new("EvenimenteAgent", [new("DescriptionInternal", "nvarchar", report, true)])], executor, older);
+
+    private static void Labels(Action<bool, string> check)
+    {
+        ActivityFieldMap? Make(Dictionary<string, string> labels, out string? error, IEnumerable<ActivityExtraField>? extras = null) => ActivityFieldMap.Create(new Dictionary<string, string>(), null, null, extras, labels, out error);
+        var map = Make(new() { [ActivityFieldMap.Problem] = "Defect", [ActivityFieldMap.Executor] = "Tehnician", [ActivityFieldMap.Title] = "Altceva", [ActivityFieldMap.Report] = "Raportul original" }, out var error)!;
+        check(error is null && map.Labels.Count == 2 && map.LabelOf(ActivityFieldMap.Problem) == "Defect" && map.LabelOf(ActivityFieldMap.Report) == "Raportul original" && map.LabelOf(ActivityFieldMap.Title) == "Titlul tichetului"
+              && map.NoteLabelOf(ActivityFieldMap.Executor) == "Tehnician" && map.NoteLabelOf(ActivityFieldMap.Resolution) == "Rezolvare" && ActivityFieldMap.Empty.NoteLabelOf(ActivityFieldMap.Problem) == "Problemă",
+            "Ticket fields: the name of an optional piece can be chosen (the title and the number keep theirs, a name equal to the usual one is not kept) and the notes keep their usual names otherwise");
+        var again = ActivityFieldMap.FromJson(map.ToJson());
+        check(again.ToJson() == map.ToJson() && again.LabelOf(ActivityFieldMap.Problem) == "Defect" && ActivityFieldMap.FromJson("{\"V\":2,\"Columns\":{},\"Off\":[],\"Targets\":{},\"Extras\":[]}").Labels.Count == 0,
+            "Ticket fields: the names chosen survive being written and read back, and settings saved before names could be chosen are still read");
+        Make(new() { [ActivityFieldMap.Problem] = "Rezolvarea" }, out var clash);
+        Make(new() { [ActivityFieldMap.Problem] = "Nume", [ActivityFieldMap.Report] = "nume" }, out var twice);
+        Make(new() { [ActivityFieldMap.Problem] = new string('a', 61) }, out var longName);
+        Make(new() { [ActivityFieldMap.Problem] = "Observații" }, out var withExtra, [new ActivityExtraField("Tickete", "Observatii", "observații", "both")]);
+        check(new[] { clash, twice, longName, withExtra }.All(text => text is not null), "Ticket fields: a name used by another piece or extra field (capitals do not matter) or longer than 60 characters is refused");
+        var ticket = Ticket();
+        var text = ActivityTicketPlanner.Notes(ActivityTicketPlanner.SourceOf(ticket, map), map);
+        check(text.Contains("Defect: Nu merge aerul", StringComparison.Ordinal) && text.Contains("Tehnician: Ion Pop", StringComparison.Ordinal) && text.Contains("Rezolvare: Am schimbat filtrul", StringComparison.Ordinal) && !text.Contains("Problema:", StringComparison.Ordinal),
+            "Ticket fields: the notes carry the names chosen");
+        check(map.Describe().Contains("numit „Defect”", StringComparison.Ordinal), "Ticket fields: the journal names the renamed pieces");
+    }
+
+    private static void SampleRules(Action<bool, string> check)
+    {
+        var sample = Sample();
+        var preview = ActivityTicketSampleRules.Preview(sample, ActivityFieldMap.Empty);
+        string Value(string key) => preview.Items.Single(item => item.Key == key).Value;
+        check(preview.Items.Count == 6 && Value("problem") == "Nu merge aerul" && Value("resolution") == "Am schimbat filtrul" && Value("executor") == "Ion Pop" && Value("title") == "Aer conditionat" && Value("number") == "T-9"
+              && preview.Notes.Contains("Executant: Ion Pop", StringComparison.Ordinal) && preview.Notes.StartsWith("Preluat din ActivityApp, tichet T-9: Aer conditionat", StringComparison.Ordinal),
+            "Example ticket: with the default settings each piece gets its usual column, the executor comes from the agents of the event, and the notes are the ones the import would write");
+        var moved = ActivityFieldMap.Create(new Dictionary<string, string> { ["Tickete.DescriptionInternal"] = "Detalii" }, [ActivityFieldMap.Executor], null, [new ActivityExtraField("Tickete", "Observatii", "Observații client", "both")], out _)!;
+        var other = ActivityTicketSampleRules.Preview(sample, moved);
+        check(other.Items.Single(item => item.Key == "problem").Value == "Alt text" && other.Items.Single(item => item.Key == "executor").Target == "oprit" && other.Items.Single(item => item.Key == "executor").Value == ""
+              && other.Items.Single(item => item.Key == "x:Tickete.Observatii").Value == "Poarta inchisa" && !other.Notes.Contains("Executant", StringComparison.Ordinal) && other.Notes.Contains("Observatii client: Poarta inchisa", StringComparison.Ordinal),
+            "Example ticket: the preview follows the settings on the screen (another column, a piece switched off, an extra field)");
+        check(ActivityTicketSampleRules.Format(null) is null && ActivityTicketSampleRules.Format(new DateTime(2026, 10, 1, 8, 30, 0)) == "01.10.2026 08:30:00" && ActivityTicketSampleRules.Format(true) == "da" && ActivityTicketSampleRules.Format(new byte[3]) == "(conținut binar, 3 octeți)"
+              && ActivityTicketSampleRules.Format(12.5m) == "12.5" && ActivityTicketSampleRules.Format(new string('x', 5000))!.EndsWith("(text tăiat)", StringComparison.Ordinal),
+            "Example ticket: dates are written the way the application writes them, binary content is named and long text is cut");
+    }
+
+    private static void StructureChange(Action<bool, string> check)
+    {
+        IReadOnlyList<ActivityColumn> Columns(params (string Table, string Column, string Type)[] items) => [.. items.Select(item => new ActivityColumn(item.Table, item.Column, item.Type))];
+        var before = ActivityTicketStructure.Snapshot(Columns(("Tickete", "ID", "bigint"), ("Tickete", "Subject", "nvarchar"), ("Tickete", "NrMasina", "int"), ("EvenimenteAgent", "ID", "int"), ("Alta", "X", "int")));
+        var now = ActivityTicketStructure.Snapshot(Columns(("Tickete", "ID", "int"), ("Tickete", "Subject", "nvarchar"), ("Tickete", "NrMasina", "varchar"), ("Tickete", "Observatii", "nvarchar"), ("EvenimenteAgent", "ID", "int"), ("Alta", "Y", "int")));
+        check(before.Count == 4 && before.All(line => !line.StartsWith("Alta", StringComparison.Ordinal)), "Ticket structure: only the columns of the tickets and of their events are compared");
+        var diff = ActivityTicketStructure.Compare(before, now);
+        check(diff.Added.SequenceEqual(["Tickete.Observatii"]) && diff.Removed.Count == 0 && diff.Changed.Count == 1 && diff.Changed[0].StartsWith("Tickete.NrMasina", StringComparison.Ordinal) && diff.Any
+              && diff.Describe().Contains("coloane noi: Tickete.Observatii", StringComparison.Ordinal) && diff.Describe().Contains("coloane cu alt tip", StringComparison.Ordinal),
+            "Ticket structure: a column that is new or of another kind is noticed (bigint to int is not a change), and said in words");
+        var gone = ActivityTicketStructure.Compare(now, before);
+        check(gone.Removed.SequenceEqual(["Tickete.Observatii"]) && gone.Describe().Contains("coloane dispărute: Tickete.Observatii", StringComparison.Ordinal) && !ActivityTicketStructure.Compare(now, now).Any, "Ticket structure: a column that is gone is noticed, and the same structure is no change");
+        var state = new ActivityImportAlertState(null, "", 0, null, 0, null, 0, null, new DateTime(2026, 11, 6, 8, 0, 0, DateTimeKind.Utc), diff.Describe());
+        var instance = ActivityImportAlertSource.Instances(state).Single();
+        check(instance.ObjectId == ActivityImportAlertSource.TicketStructureId && instance.Values[ActivityImportAlertSource.ProblemName].Contains("structura tichetelor", StringComparison.Ordinal)
+              && instance.Values[ActivityImportAlertSource.DetailsName].Contains("Tickete.Observatii", StringComparison.Ordinal) && instance.Values[ActivityImportAlertSource.DetailsName].Contains("Corespondența verificată", StringComparison.Ordinal),
+            "Ticket structure: the notification names what changed and asks to check the correspondence of the fields");
+        check(ActivityImportAlertSource.Instances(state with { TicketStructureSince = null }).Count == 0, "Ticket structure: no change, no notification");
+    }
+
+    private static void SampleWindow(Action<bool, string> check)
+    {
+        using var context = new BunitContext();
+        context.Services.AddSingleton<IActivityTicketVisibility>(new Visibility(TicketVisibility.All));
+        TicketSampleDialog.SampleAssignment? chosen = null;
+        int older = 0, newer = 0;
+        var map = ActivityFieldMap.Create(new Dictionary<string, string>(), null, null, [new ActivityExtraField("Tickete", "Observatii", "Observații client", "both")], new Dictionary<string, string> { [ActivityFieldMap.Problem] = "Defect" }, out _)!;
+        var targets = ActivityFieldMap.Info.Where(item => item.FieldKey is not null).Select(item => new TicketSampleDialog.SampleTarget(item.Key, map.LabelOf(item.Key), item.FieldKey!.Split('.')[0])).ToList();
+        var cut = context.Render<TicketSampleDialog>(parameters => parameters.Add(p => p.Sample, Sample()).Add(p => p.Map, map).Add(p => p.Targets, targets).Add(p => p.HasNewer, false)
+            .Add(p => p.Older, EventCallback.Factory.Create(new object(), () => older++)).Add(p => p.Newer, EventCallback.Factory.Create(new object(), () => newer++))
+            .Add(p => p.Assign, EventCallback.Factory.Create<TicketSampleDialog.SampleAssignment>(new object(), value => chosen = value)));
+        check(cut.Find("#ticket-sample-info").TextContent.Contains("Tichet 9", StringComparison.Ordinal) && cut.FindAll("#ticket-sample-Tickete tbody tr").Count == 7 && cut.FindAll("#ticket-sample-EvenimenteAgent tbody tr").Count == 1
+              && cut.Find("#ticket-sample-Tickete").TextContent.Contains("Poarta inchisa", StringComparison.Ordinal),
+            "Example ticket window: every column of the ticket and of its event is listed with its value");
+        var table = cut.Find("#ticket-sample-preview").TextContent;
+        check(table.Contains("Defect", StringComparison.Ordinal) && table.Contains("Nu merge aerul", StringComparison.Ordinal) && table.Contains("Observații client", StringComparison.Ordinal) && cut.Find("#ticket-sample-notes").TextContent.Contains("Defect: Nu merge aerul", StringComparison.Ordinal),
+            "Example ticket window: it shows what each piece gets (under the names chosen) and the notes that would be written");
+        check(cut.Find("#ticket-sample-Tickete").TextContent.Contains("Defect", StringComparison.Ordinal) && cut.Find("#ticket-sample-Tickete").TextContent.Contains("Observații client", StringComparison.Ordinal),
+            "Example ticket window: the column in use shows which piece (or extra field) reads it");
+        check(!cut.Find("#ticket-sample-older").HasAttribute("disabled") && cut.Find("#ticket-sample-newer").HasAttribute("disabled"), "Example ticket window: the previous ticket can be asked for, the newer one only after going back");
+        cut.Find("#ticket-sample-older").Click();
+        cut.Find("select[aria-label='Folosește coloana Detalii pentru']").Change("problem");
+        check(older == 1 && chosen is { Table: "Tickete", Column: "Detalii", For: "problem" }, "Example ticket window: the previous ticket button and the choice of a column for a piece are passed on");
+        cut.Find("select[aria-label='Folosește coloana DescriptionInternal pentru']").Change("extra");
+        check(chosen is { For: "extra" } && cut.FindAll("select[aria-label='Folosește coloana ID pentru']").Count == 0, "Example ticket window: a column can become an extra field, and a column without text cannot be chosen");
     }
 
     private static void Map(Action<bool, string> check)

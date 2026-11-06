@@ -29,9 +29,21 @@ public static class ActivityImportPanelChecks
         public Task<ActivityFieldMapView> GetFieldChoicesAsync(bool readSource, CancellationToken cancellationToken = default) =>
             Task.FromResult(new ActivityFieldMapView([.. ActivityFieldMap.Fields.Select(field => new ActivityFieldChoice(field, Map.ColumnOf(field),
                 field.Table == "Tickete" ? ["Description", "DescriptionInternal", "Detalii", "NumeTicket", "ProcesatDe", "Subject"] : ["DescriptionInternal", "Rezumat"], false))], null, Map,
-                readSource ? new Dictionary<string, IReadOnlyList<string>> { ["Tickete"] = ["Description", "DescriptionInternal", "Detalii", "NumeTicket", "ProcesatDe", "Subject", "Observatii"], ["EvenimenteAgent"] = ["DescriptionInternal", "Rezumat"] } : null));
+                readSource ? new Dictionary<string, IReadOnlyList<string>> { ["Tickete"] = ["Description", "DescriptionInternal", "Detalii", "NumeTicket", "ProcesatDe", "Subject", "Observatii"], ["EvenimenteAgent"] = ["DescriptionInternal", "Rezumat"] } : null, Change));
         public Task SaveFieldMapAsync(IReadOnlyDictionary<string, string> chosen, CancellationToken cancellationToken = default) { SavedMap = new(chosen); return Task.CompletedTask; }
         public Task SaveFieldSettingsAsync(ActivityFieldMap settings, CancellationToken cancellationToken = default) { SavedSettings = settings; SavedMap = new(settings.Columns); Map = settings; return Task.CompletedTask; }
+        // The tickets the window of the example ticket can show, newest first; each call with an id gives the next older one.
+        public List<TicketSample> Samples = [];
+        public readonly List<long?> SampleCalls = [];
+        public int Confirmations;
+        public Task<ActivityTicketSampleView> GetTicketSampleAsync(long? beforeTicketId, CancellationToken cancellationToken = default)
+        {
+            SampleCalls.Add(beforeTicketId);
+            var next = Samples.Where(sample => beforeTicketId is null || sample.TicketId < beforeTicketId).OrderByDescending(sample => sample.TicketId).FirstOrDefault();
+            return Task.FromResult(new ActivityTicketSampleView(next, next is null ? "Nu există un tichet finalizat mai vechi." : null));
+        }
+        public Task ConfirmTicketStructureAsync(CancellationToken cancellationToken = default) { Confirmations++; Change = null; return Task.CompletedTask; }
+        public TicketStructureDiff? Change;
     }
 
     private sealed class FakePartners : IActivityPartnerImportService
@@ -282,6 +294,45 @@ public static class ActivityImportPanelChecks
         cut.FindAll("button").Single(button => button.TextContent.Trim() == "Revino la valorile implicite").Click();
         check(cut.FindAll("#ai-fields select").All(select => select.GetAttribute("aria-label") is not null) && cut.FindAll("#ai-fields select")[2].GetAttribute("aria-label")!.Contains("Problema", StringComparison.Ordinal),
             "Activity import panel: the selects of the fields are named for the field");
+        // The example ticket: the newest finished ticket opens, "Tichet anterior" loads the one before it, "Tichet mai nou" comes back to the one shown before; a column chosen in the window fills the table.
+        TicketSample Example(long id, string problem) => new(id, "T-" + id, "Titlu " + id, new DateTime(2026, 10, 1), [
+            new("Tickete", [new("NumeTicket", "nvarchar", "T-" + id, true), new("Subject", "nvarchar", "Titlu " + id, true), new("DescriptionInternal", "nvarchar", problem, true), new("Detalii", "nvarchar", "Detalii " + id, true), new("Observatii", "nvarchar", "Obs " + id, true)]),
+            new("EvenimenteAgent", [new("DescriptionInternal", "nvarchar", problem + " apoi rezolvat", true)])], "Ion", id > 10);
+        settingsService.Samples = [Example(30, "Prea putin"), Example(20, "Nu merge aerul"), Example(10, "Alt tichet")];
+        cut.Find("#ai-open-sample").Click();
+        cut.WaitForAssertion(() => { if (cut.FindAll("#ticket-sample-preview").Count == 0) throw new Exception("pending"); }, TimeSpan.FromSeconds(5));
+        check(cut.Find("#ticket-sample-info").TextContent.Contains("Tichet 30", StringComparison.Ordinal) && !cut.Find("#ticket-sample-older").HasAttribute("disabled") && cut.Find("#ticket-sample-newer").HasAttribute("disabled")
+              && settingsService.SampleCalls.SequenceEqual(new long?[] { null }), "Activity import panel: the button opens the newest finished ticket, with the previous one available");
+        cut.Find("#ticket-sample-older").Click();
+        cut.WaitForAssertion(() => { if (!cut.Find("#ticket-sample-info").TextContent.Contains("Tichet 20", StringComparison.Ordinal)) throw new Exception("pending"); }, TimeSpan.FromSeconds(5));
+        check(settingsService.SampleCalls.SequenceEqual(new long?[] { null, 30 }) && !cut.Find("#ticket-sample-newer").HasAttribute("disabled") && cut.Find("#ticket-sample-preview").TextContent.Contains("Nu merge aerul", StringComparison.Ordinal),
+            "Activity import panel: \"Tichet anterior\" loads the ticket before the one shown");
+        cut.Find("#ticket-sample-newer").Click();
+        check(cut.Find("#ticket-sample-info").TextContent.Contains("Tichet 30", StringComparison.Ordinal) && settingsService.SampleCalls.Count == 2, "Activity import panel: \"Tichet mai nou\" comes back to the ticket shown before without reading it again");
+        cut.Find("select[aria-label='Folosește coloana Detalii pentru']").Change("problem");
+        cut.Find("select[aria-label='Folosește coloana Observatii pentru']").Change("extra");
+        check(cut.Find("#ticket-sample-preview").TextContent.Contains("Detalii 30", StringComparison.Ordinal) && cut.Find("#ticket-sample-preview").TextContent.Contains("Obs 30", StringComparison.Ordinal) && cut.FindAll("#ai-extras tbody tr").Count == 1,
+            "Activity import panel: a column chosen in the window becomes the column of the piece (or an extra field) and the preview follows at once");
+        cut.Find("#ticket-sample-older").Click();
+        cut.Find("#ticket-sample-older").Click();
+        cut.WaitForAssertion(() => { if (!cut.Find("#ticket-sample-info").TextContent.Contains("Tichet 10", StringComparison.Ordinal)) throw new Exception("pending"); }, TimeSpan.FromSeconds(5));
+        check(cut.Find("#ticket-sample-older").HasAttribute("disabled"), "Activity import panel: when there is no older finished ticket the button is disabled");
+        cut.Find(".ticket-sample .heading-actions button.danger").Click();
+        check(cut.FindAll("#ticket-sample-preview").Count == 0, "Activity import panel: closing the window shows nothing of the ticket any more");
+        // The names of the pieces are edited in the table and saved with the correspondence.
+        cut.Find("#ai-fields input[aria-label='Numele informației Problema']").Change("Defect");
+        cut.FindAll("button").Single(button => button.TextContent.Trim() == "Salvează corespondența").Click();
+        cut.WaitForAssertion(() => { if (settingsService.SavedSettings?.Labels.Count != 1) throw new Exception("pending"); }, TimeSpan.FromSeconds(5));
+        check(settingsService.SavedSettings!.LabelOf(ActivityFieldMap.Problem) == "Defect" && cut.FindAll("#ai-fields input[aria-label='Numele informației Titlul tichetului']").Count == 0,
+            "Activity import panel: the name of an optional piece is edited in the table and saved (the title and the number cannot be renamed)");
+        // A change of the structure of the tickets: the banner names it and one button confirms the correspondence for the structure now.
+        settingsService.Change = new TicketStructureDiff(["Tickete.NumarMasina"], [], []);
+        cut.FindAll("button").Single(button => button.TextContent.Trim() == "Citește coloanele din ActivityApp").Click();
+        cut.WaitForAssertion(() => { if (cut.FindAll("#ai-structure-change").Count == 0) throw new Exception("pending"); }, TimeSpan.FromSeconds(5));
+        check(cut.Find("#ai-structure-change").TextContent.Contains("Tickete.NumarMasina", StringComparison.Ordinal), "Activity import panel: a change of the structure of the tickets is shown with the correspondence");
+        cut.Find("#ai-structure-confirm").Click();
+        cut.WaitForAssertion(() => { if (cut.FindAll("#ai-structure-change").Count != 0) throw new Exception("pending"); }, TimeSpan.FromSeconds(5));
+        check(settingsService.Confirmations == 1 && cut.Markup.Contains("confirmată pentru structura actuală", StringComparison.Ordinal), "Activity import panel: \"Corespondența verificată\" confirms the correspondence for the structure now and the banner goes away");
         cut.Find("#ai-issues button").Click();
         cut.WaitForAssertion(() => { if (cut.FindAll("#ai-issues").Count != 0) throw new Exception("pending"); }, TimeSpan.FromSeconds(5));
         check(partners.Resolved == 1, "Activity import panel: marking a problem resolved removes it from the list");

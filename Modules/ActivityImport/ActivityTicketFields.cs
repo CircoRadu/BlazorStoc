@@ -58,10 +58,10 @@ internal static class ActivityTicketSourceStore
         var fieldsRead = ActivityFieldMap.Join(map.Required.Where(held.Contains).Concat(held.Contains("gone") ? ["gone"] : []));
         await using var connection = await MariaDb.OpenAsync(configuration, cancellationToken).ConfigureAwait(false);
         await using var command = new MySqlCommand("""
-            INSERT INTO service_intervention_source (intervention_id, source_ticket_id, source_type_id, source_event_id, ticket_number, title, problem, resolution, report, executor, extras, fields_read, notes_items, imported_utc)
-            VALUES (@intervention, @ticket, @type, @event, @number, @title, @problem, @resolution, @report, @executor, @extras, @fieldsRead, @notesItems, @now)
+            INSERT INTO service_intervention_source (intervention_id, source_ticket_id, source_type_id, source_event_id, ticket_number, title, problem, resolution, report, executor, extras, fields_read, notes_items, notes_labels, imported_utc)
+            VALUES (@intervention, @ticket, @type, @event, @number, @title, @problem, @resolution, @report, @executor, @extras, @fieldsRead, @notesItems, @notesLabels, @now)
             ON DUPLICATE KEY UPDATE intervention_id=@intervention, source_type_id=@type, source_event_id=@event, ticket_number=@number, title=@title, problem=@problem, resolution=@resolution,
-                report=@report, executor=@executor, extras=@extras, fields_read=@fieldsRead, notes_items=IF(@updateItems = 1, @notesItems, notes_items), imported_utc=@now
+                report=@report, executor=@executor, extras=@extras, fields_read=@fieldsRead, notes_items=IF(@updateItems = 1, @notesItems, notes_items), notes_labels=IF(@updateItems = 1, @notesLabels, notes_labels), imported_utc=@now
             """, connection);
         command.Parameters.AddWithValue("@intervention", interventionId);
         command.Parameters.AddWithValue("@ticket", source.TicketId);
@@ -77,6 +77,7 @@ internal static class ActivityTicketSourceStore
         command.Parameters.AddWithValue("@fieldsRead", Cut(fieldsRead, 1000));
         command.Parameters.AddWithValue("@notesItems", Cut(ActivityTicketPlanner.NotesItems(source, map), 1000));
         command.Parameters.AddWithValue("@updateItems", updateNotesItems ? 1 : 0);
+        command.Parameters.AddWithValue("@notesLabels", System.Text.Json.JsonSerializer.Serialize(ActivityTicketPlanner.NoteLines(source, map).ToDictionary(line => line.Key, line => line.Label)));
         command.Parameters.AddWithValue("@now", DateTime.UtcNow);
         await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
     }
@@ -89,6 +90,6 @@ internal sealed class MariaActivityTicketVisibility(IConfiguration configuration
     {
         var map = await ActivityFieldSettingsStore.ReadAsync(configuration, cancellationToken).ConfigureAwait(false);
         return new TicketVisibility(map.IsEnabled(ActivityFieldMap.Problem), map.IsEnabled(ActivityFieldMap.Resolution), map.IsEnabled(ActivityFieldMap.Report), map.IsEnabled(ActivityFieldMap.Executor),
-            [.. map.Extras.Select(extra => new TicketExtraLabel(extra.Key, extra.Label))]);
+            [.. map.Extras.Select(extra => new TicketExtraLabel(extra.Key, extra.Label))], map.Labels);
     }
 }

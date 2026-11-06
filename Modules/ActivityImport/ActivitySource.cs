@@ -52,6 +52,11 @@ public interface IActivitySource
     /// <summary>The same tickets (with the extra fields of the structure) for the given ids, whatever their type or date; a ticket that no longer exists (or was deleted) is not returned.</summary>
     Task<IReadOnlyList<ActivityTicket>> ReadTicketsByIdAsync(ActivityConnection connection, StructureReport structure, IReadOnlyList<long> ids, int pageSize, CancellationToken cancellationToken);
     /// <summary>
+    /// One finished ticket (the newest, or the newest older than <paramref name="beforeTicketId"/>) of the given types (any type when none is given) with every column of the ticket and of the event that closed
+    /// it, for the administrator to see what each column holds. Null when there is none. <paramref name="actual"/>: the columns ActivityApp has now (the structure read).
+    /// </summary>
+    Task<TicketSample?> ReadTicketSampleAsync(ActivityConnection connection, IReadOnlyList<ActivityColumn> actual, StructureReport structure, IReadOnlyList<long> typeIds, long? beforeTicketId, CancellationToken cancellationToken);
+    /// <summary>
     /// Of the given IDs of one kind of row (<see cref="LivePartners"/>, <see cref="LiveWorkPoints"/>, <see cref="LiveTickets"/>), those that still exist in ActivityApp (a ticket also
     /// not deleted): used to signal what was deleted there after it was imported. The IDs are bound as parameters, in groups.
     /// </summary>
@@ -282,6 +287,64 @@ public sealed class SqlActivitySource : IActivitySource
                 reader.IsDBNull(11) ? null : Convert.ToInt64(reader.GetValue(11)), reader.IsDBNull(12) ? "" : reader.GetString(12).Trim(), reader.IsDBNull(13) ? null : reader.GetDateTime(13), Str(reader, 14), reader.IsDBNull(15) ? null : Convert.ToInt64(reader.GetValue(15)),
                 keys.Length == 0 ? null : keys.Select((key, index) => (key, value: Str(reader, fixedColumns + index))).ToDictionary(pair => pair.key, pair => pair.value)),
             ticket => ticket.Id, cancellationToken, where, bind).ConfigureAwait(false);
+    }
+
+    public async Task<TicketSample?> ReadTicketSampleAsync(ActivityConnection connection, IReadOnlyList<ActivityColumn> actual, StructureReport structure, IReadOnlyList<long> typeIds, long? beforeTicketId, CancellationToken cancellationToken)
+    {
+        const string tickets = "Tickete", events = "EvenimenteAgent";
+        foreach (var entity in new[] { ActivityContract.Tickets, ActivityContract.Events })
+            if (structure.IsBlocked(entity)) throw new ActivitySourceException($"„{entity}” nu poate fi citit: structura ActivityApp nu mai corespunde (vezi raportul de structură).");
+        string T(string column) => structure.Physical(tickets, column) is { } physical ? "t." + Q(physical) : throw new ActivitySourceException("Tichetele nu pot fi citite: structura ActivityApp nu mai corespunde.");
+        string E(string column) => structure.Physical(events, column) is { } physical ? "e." + Q(physical) : throw new ActivitySourceException("Evenimentele nu pot fi citite: structura ActivityApp nu mai corespunde.");
+        var ticketColumns = actual.Where(column => column.Table.Equals(tickets, StringComparison.OrdinalIgnoreCase)).Take(150).ToList();
+        var eventColumns = actual.Where(column => column.Table.Equals(events, StringComparison.OrdinalIgnoreCase)).Take(150).ToList();
+        var select = string.Join(", ", ticketColumns.Select(column => "t." + Q(column.Column)).Concat(eventColumns.Select(column => "e." + Q(column.Column))));
+        var id = T("ID");
+        var from = $"{Q(tickets)} t INNER JOIN {Q(events)} e ON {E("ID")} = {T("IDEveniment")} AND {E("IDTicket")} = {id}";
+        var deleted = structure.Physical(tickets, "Sters") is { } flag ? $" AND ISNULL(t.{Q(flag)}, 0) = 0" : "";
+        var types = typeIds.Count == 0 ? "" : $" AND {T("IDActivitate")} IN ({string.Join(", ", typeIds.Select((_, index) => $"@type{index}"))})";
+        // Only a finished event is a ticket the import would take (the state of the event is its colour, see ActivityTicketPlanner.FinalizedLabel); without the column every ticket counts.
+        var finished = structure.Physical(events, "Label") is { } label ? $" AND e.{Q(label)} = {ActivityTicketPlanner.FinalizedLabel}" : "";
+        var where = deleted + types + finished;
+        await using var sql = await OpenAsync(connection, cancellationToken).ConfigureAwait(false);
+        try
+        {
+            string[]? values = null;
+            long ticketId = 0;
+            await using (var command = new SqlCommand($"SELECT TOP 1 {id}, {select} FROM {from} WHERE 1 = 1{where}{(beforeTicketId is null ? "" : $" AND {id} < @before")} ORDER BY {id} DESC", sql) { CommandTimeout = 30 })
+            {
+                for (var index = 0; index < typeIds.Count; index++) command.Parameters.AddWithValue($"@type{index}", typeIds[index]);
+                if (beforeTicketId is not null) command.Parameters.AddWithValue("@before", beforeTicketId.Value);
+                await using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
+                if (!await reader.ReadAsync(cancellationToken).ConfigureAwait(false)) return null;
+                ticketId = Convert.ToInt64(reader.GetValue(0));
+                values = new string[reader.FieldCount - 1];
+                for (var index = 1; index < reader.FieldCount; index++) values[index - 1] = ActivityTicketSampleRules.Format(reader.GetValue(index))!;
+            }
+            bool older;
+            await using (var command = new SqlCommand($"SELECT TOP 1 {id} FROM {from} WHERE {id} < @current{where}", sql) { CommandTimeout = 30 })
+            {
+                for (var index = 0; index < typeIds.Count; index++) command.Parameters.AddWithValue($"@type{index}", typeIds[index]);
+                command.Parameters.AddWithValue("@current", ticketId);
+                older = await command.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false) is not null;
+            }
+            SampleColumn Make(ActivityColumn column, int index) => new(column.Column, column.DataType, values![index], ActivityContract.KindOf(column.DataType) == ColumnKind.Text);
+            var tables = new List<SampleTable>
+            {
+                new(tickets, [.. ticketColumns.Select((column, index) => Make(column, index))]),
+                new(events, [.. eventColumns.Select((column, index) => Make(column, ticketColumns.Count + index))])
+            };
+            string Cell(string table, string contractColumn)
+            {
+                var physical = structure.Physical(table, contractColumn);
+                return physical is null ? "" : tables.First(item => item.Table == table).Columns.FirstOrDefault(column => column.Column.Equals(physical, StringComparison.OrdinalIgnoreCase))?.Value ?? "";
+            }
+            var date = DateTime.TryParseExact(Cell(tickets, "DataTicket"), "dd.MM.yyyy HH:mm:ss", System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.None, out var parsed) ? parsed : (DateTime?)null;
+            long.TryParse(Cell(events, "ID"), System.Globalization.NumberStyles.Integer, System.Globalization.CultureInfo.InvariantCulture, out var eventId);
+            var executor = (await WithEventAgentsAsync(connection, structure, [new ActivityTicket(ticketId, 0, 0, 0, date, "", "", "", "", eventId, null, null, "")], cancellationToken).ConfigureAwait(false)).First().Executor;
+            return new TicketSample(ticketId, Cell(tickets, "NumeTicket"), Cell(tickets, "Subject"), date, tables, executor, older);
+        }
+        catch (SqlException exception) { throw new ActivitySourceException(Describe(exception)); }
     }
 
     // The executor of a ticket is the agents attached to its event (the ones who went and did the work), not the person who processed the ticket in the office: when the event has none, or the

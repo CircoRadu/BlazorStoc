@@ -278,6 +278,8 @@ public static class AuditActions
     public const string SetAppPort = "Modificare port aplicație";
     public const string SetReverseProxy = "Modificare HTTPS prin proxy";
     public const string RefreshActivityTickets = "Actualizare tichete ActivityApp preluate";
+    public const string ViewActivityTicketSample = "Vizualizare tichet exemplu ActivityApp";
+    public const string ConfirmActivityTicketStructure = "Confirmare structură tichete ActivityApp";
     // Setari -> Baza de date -> Conexiune: the server of the database (Windows service) and the application itself.
     public const string StopDatabaseServer = "Oprire server bază de date";
     public const string StartDatabaseServer = "Pornire server bază de date";

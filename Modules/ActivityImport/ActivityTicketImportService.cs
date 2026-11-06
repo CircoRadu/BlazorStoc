@@ -95,7 +95,11 @@ public sealed class MariaActivityTicketImportService(IConfiguration configuratio
         var connection = await import.GetConnectionAsync(cancellationToken).ConfigureAwait(false)
             ?? throw new ActivityImportException("Conexiunea la ActivityApp nu este completată (server, cont, parolă). Salveaz-o în setări.");
         var fields = await import.GetFieldMapAsync(cancellationToken).ConfigureAwait(false);
-        var structure = ActivityStructureChecker.Check(await source.ReadStructureAsync(connection, cancellationToken).ConfigureAwait(false), null, fields);
+        var actualStructure = await source.ReadStructureAsync(connection, cancellationToken).ConfigureAwait(false);
+        var structure = ActivityStructureChecker.Check(actualStructure, null, fields);
+        // The structure of the tickets is compared with the one the correspondence was checked against: a column new, gone or of another kind starts a notification (Setari -> Notificari) that
+        // asks to check the correspondence of the fields. The import goes on with the correspondence in force (a column chosen that is gone stops it, as before).
+        if (apply) await ActivityTicketStructureStore.CheckAsync(configuration, actualStructure, cancellationToken).ConfigureAwait(false);
         foreach (var entity in new[] { ActivityContract.Tickets, ActivityContract.Events })
             if (structure.IsBlocked(entity)) throw new ActivityImportException($"Structura ActivityApp s-a schimbat: „{entity}” nu poate fi preluat (vezi raportul de structură din setări).");
         // A column the administrator chose that is gone (or no longer text) stops the run: reading the default instead would put another text in the interventions.

@@ -30,6 +30,23 @@ public static partial class MariaExtendedChecks
             return Task.FromResult<IReadOnlySet<long>>(Live.TryGetValue(kind, out var live) ? ids.Where(live.Contains).ToHashSet() : ids.ToHashSet());
         }
 
+        // A ticket of TicketRows as the window of the example ticket shows it: every column of the ticket and of its event, newest first, the next older one with beforeTicketId.
+        public Task<TicketSample?> ReadTicketSampleAsync(ActivityConnection connection, IReadOnlyList<ActivityColumn> actual, StructureReport structure, IReadOnlyList<long> typeIds, long? beforeTicketId, CancellationToken cancellationToken)
+        {
+            Calls++;
+            if (Failure is not null) return Task.FromException<TicketSample?>(Failure);
+            var rows = TicketRows.Where(ticket => (typeIds.Count == 0 || typeIds.Contains(ticket.TypeId)) && (beforeTicketId is null || ticket.Id < beforeTicketId)).OrderByDescending(ticket => ticket.Id).ToList();
+            if (rows.Count == 0) return Task.FromResult<TicketSample?>(null);
+            var ticket = rows[0];
+            var tables = new List<SampleTable>
+            {
+                new("Tickete", [new("ID", "bigint", ticket.Id.ToString(), false), new("NumeTicket", "nvarchar", ticket.Number, true), new("Subject", "nvarchar", ticket.Title, true), new("DescriptionInternal", "nvarchar", ticket.Problem, true),
+                    new("ProcesatDe", "nvarchar", ticket.Executor, true), new("Observatii", "nvarchar", ExtraValues.GetValueOrDefault((ticket.Id, "x:Tickete.Observatii")), true)]),
+                new("EvenimenteAgent", [new("ID", "bigint", ticket.EventId.ToString(), false), new("DescriptionInternal", "nvarchar", ticket.Report, true)])
+            };
+            return Task.FromResult<TicketSample?>(new TicketSample(ticket.Id, ticket.Number, ticket.Title, ticket.TicketDate, tables, ticket.Executor, rows.Count > 1));
+        }
+
         public readonly List<long> ById = [];
         public readonly Dictionary<(long Ticket, string Key), string> ExtraValues = [];
 

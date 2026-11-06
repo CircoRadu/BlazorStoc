@@ -31,12 +31,14 @@ public sealed class ActivityFieldMap
     public const int MaximumExtras = 10, MaximumLabel = 60;
     public static readonly string[] ExtraTables = ["Tickete", "EvenimenteAgent"];
 
-    public ActivityFieldMap(IReadOnlyDictionary<string, string>? columns = null, IEnumerable<string>? off = null, IReadOnlyDictionary<string, string>? targets = null, IEnumerable<ActivityExtraField>? extras = null)
+    public ActivityFieldMap(IReadOnlyDictionary<string, string>? columns = null, IEnumerable<string>? off = null, IReadOnlyDictionary<string, string>? targets = null, IEnumerable<ActivityExtraField>? extras = null,
+        IReadOnlyDictionary<string, string>? labels = null)
     {
         Columns = columns ?? new Dictionary<string, string>();
         Off = new HashSet<string>(off ?? [], StringComparer.Ordinal);
         Targets = targets ?? new Dictionary<string, string>();
         Extras = [.. extras ?? []];
+        Labels = labels ?? new Dictionary<string, string>();
     }
 
     public static ActivityFieldMap Empty { get; } = new();
@@ -67,6 +69,17 @@ public sealed class ActivityFieldMap
     /// <summary>The destination chosen for a piece of information that differs from its default.</summary>
     public IReadOnlyDictionary<string, string> Targets { get; }
     public IReadOnlyList<ActivityExtraField> Extras { get; }
+    /// <summary>The names the administrator gave to the optional pieces of information (key -> name); a piece not named here keeps its usual name.</summary>
+    public IReadOnlyDictionary<string, string> Labels { get; }
+
+    /// <summary>The name of a piece of information (or of an extra field) as the windows show it.</summary>
+    public string LabelOf(string key) => ExtraOf(key)?.Label ?? (Labels.TryGetValue(key, out var chosen) ? chosen : ItemOf(key)?.Label ?? key);
+
+    /// <summary>The name of a piece of information in front of its text in the notes: the one chosen, else the one the notes always had.</summary>
+    public string NoteLabelOf(string key) => ExtraOf(key)?.Label ?? (Labels.TryGetValue(key, out var chosen) ? chosen : DefaultNoteLabel(key));
+
+    /// <summary>The name in front of a piece of information in the notes of an intervention before names could be chosen.</summary>
+    public static string DefaultNoteLabel(string key) => key switch { Problem => "Problemă", Resolution => "Rezolvare", Report => "Raport original", Executor => "Executant", _ => ItemOf(key)?.Label ?? key };
 
     public static string Key(string table, string column) => $"{table}.{column}";
     public static string ExtraKey(string table, string column) => $"x:{table}.{column}";
@@ -122,7 +135,11 @@ public sealed class ActivityFieldMap
     /// <summary>The map as typed (a field with its default column is dropped, the defaults are not kept): null when it is not valid, with the reason in <paramref name="error"/>.</summary>
     public static ActivityFieldMap? Create(IReadOnlyDictionary<string, string> chosen, out string? error) => Create(chosen, null, null, null, out error);
 
-    public static ActivityFieldMap? Create(IReadOnlyDictionary<string, string> chosen, IEnumerable<string>? off, IReadOnlyDictionary<string, string>? targets, IEnumerable<ActivityExtraField>? extras, out string? error)
+    public static ActivityFieldMap? Create(IReadOnlyDictionary<string, string> chosen, IEnumerable<string>? off, IReadOnlyDictionary<string, string>? targets, IEnumerable<ActivityExtraField>? extras, out string? error) =>
+        Create(chosen, off, targets, extras, null, out error);
+
+    public static ActivityFieldMap? Create(IReadOnlyDictionary<string, string> chosen, IEnumerable<string>? off, IReadOnlyDictionary<string, string>? targets, IEnumerable<ActivityExtraField>? extras,
+        IReadOnlyDictionary<string, string>? labels, out string? error)
     {
         error = null;
         var result = new Dictionary<string, string>(StringComparer.Ordinal);
@@ -167,7 +184,20 @@ public sealed class ActivityFieldMap
             list.Add(new ActivityExtraField(table, column, label, extra.Target));
         }
         if (list.Count > MaximumExtras) { error = $"Cel mult {MaximumExtras} câmpuri suplimentare."; return null; }
-        return new ActivityFieldMap(result, disabled, chosenTargets, list);
+        // The names chosen for the optional pieces: 1 to 60 characters, none used twice (also not by the pieces that keep their usual name, nor by an extra field).
+        var chosenLabels = new Dictionary<string, string>(StringComparer.Ordinal);
+        foreach (var (key, value) in labels ?? new Dictionary<string, string>())
+        {
+            var item = ItemOf(key);
+            if (item is null || item.Mandatory) continue;
+            var label = (value ?? "").Trim();
+            if (label.Length == 0 || label.Equals(item.Label, StringComparison.Ordinal)) continue;
+            if (label.Length > MaximumLabel || label.Any(char.IsControl)) { error = $"Numele unei informații are între 1 și {MaximumLabel} de caractere."; return null; }
+            chosenLabels[key] = label;
+        }
+        var names = Info.Select(item => chosenLabels.TryGetValue(item.Key, out var custom) ? custom : item.Label).Concat(list.Select(extra => extra.Label)).ToList();
+        if (names.GroupBy(name => name, StringComparer.OrdinalIgnoreCase).FirstOrDefault(group => group.Count() > 1) is { } twice) { error = "Numele „" + twice.Key + "” este folosit de două ori."; return null; }
+        return new ActivityFieldMap(result, disabled, chosenTargets, list, chosenLabels);
     }
 
     private static bool ValidColumn(string column) => column.Length is > 0 and <= 128 && column.All(c => char.IsLetterOrDigit(c) || c is '_');
@@ -175,14 +205,14 @@ public sealed class ActivityFieldMap
     // The old format is the dictionary of the columns alone; the new one (version 2) is an object, written only when something besides the columns differs from the default.
     public string ToJson()
     {
-        if (Columns.Count == 0 && Off.Count == 0 && Targets.Count == 0 && Extras.Count == 0) return "";
+        if (Columns.Count == 0 && Off.Count == 0 && Targets.Count == 0 && Extras.Count == 0 && Labels.Count == 0) return "";
         var columns = Columns.OrderBy(pair => pair.Key, StringComparer.Ordinal).ToDictionary(pair => pair.Key, pair => pair.Value);
-        if (Off.Count == 0 && Targets.Count == 0 && Extras.Count == 0) return JsonSerializer.Serialize(columns);
+        if (Off.Count == 0 && Targets.Count == 0 && Extras.Count == 0 && Labels.Count == 0) return JsonSerializer.Serialize(columns);
         return JsonSerializer.Serialize(new Stored(2, columns, [.. Off.Order(StringComparer.Ordinal)], Targets.OrderBy(pair => pair.Key, StringComparer.Ordinal).ToDictionary(pair => pair.Key, pair => pair.Value),
-            [.. Extras.Select(extra => new StoredExtra(extra.Table, extra.Column, extra.Label, extra.Target))]));
+            [.. Extras.Select(extra => new StoredExtra(extra.Table, extra.Column, extra.Label, extra.Target))], Labels.OrderBy(pair => pair.Key, StringComparer.Ordinal).ToDictionary(pair => pair.Key, pair => pair.Value)));
     }
 
-    private sealed record Stored(int V, Dictionary<string, string> Columns, List<string> Off, Dictionary<string, string> Targets, List<StoredExtra> Extras);
+    private sealed record Stored(int V, Dictionary<string, string> Columns, List<string> Off, Dictionary<string, string> Targets, List<StoredExtra> Extras, Dictionary<string, string>? Labels = null);
     private sealed record StoredExtra(string Table, string Column, string Label, string Target);
 
     public static ActivityFieldMap FromJson(string? json)
@@ -196,7 +226,7 @@ public sealed class ActivityFieldMap
             {
                 var stored = JsonSerializer.Deserialize<Stored>(json, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
                 if (stored is null) return Empty;
-                return Create(stored.Columns ?? [], stored.Off ?? [], stored.Targets ?? [], (stored.Extras ?? []).Select(extra => new ActivityExtraField(extra.Table, extra.Column, extra.Label, extra.Target)), out _) ?? Empty;
+                return Create(stored.Columns ?? [], stored.Off ?? [], stored.Targets ?? [], (stored.Extras ?? []).Select(extra => new ActivityExtraField(extra.Table, extra.Column, extra.Label, extra.Target)), stored.Labels ?? [], out _) ?? Empty;
             }
             var values = JsonSerializer.Deserialize<Dictionary<string, string>>(json);
             return values is null ? Empty : Create(values, out _) ?? Empty;
@@ -214,7 +244,8 @@ public sealed class ActivityFieldMap
         var parts = new List<string>();
         parts.AddRange(Fields.Where(field => !IsDefault(field)).Select(field => $"{field.Label}: {ColumnOf(field)}"));
         parts.AddRange(Info.Where(item => !item.Mandatory && Off.Contains(item.Key)).Select(item => $"{item.Label}: oprit"));
-        parts.AddRange(Info.Where(item => !item.Mandatory && !Off.Contains(item.Key) && Targets.ContainsKey(item.Key)).Select(item => $"{item.Label}: {TargetText(TargetOf(item.Key))}"));
+        parts.AddRange(Info.Where(item => !item.Mandatory && Labels.ContainsKey(item.Key)).Select(item => $"{item.Label}: numit „{Labels[item.Key]}”"));
+        parts.AddRange(Info.Where(item => !item.Mandatory && !Off.Contains(item.Key) && Targets.ContainsKey(item.Key)).Select(item => $"{LabelOf(item.Key)}: {TargetText(TargetOf(item.Key))}"));
         parts.AddRange(Extras.Select(extra => $"{extra.Label} ({extra.Table}.{extra.Column}): {TargetText(extra.Target)}"));
         return parts.Count == 0 ? "—" : string.Join(", ", parts);
     }
@@ -226,4 +257,4 @@ public sealed class ActivityFieldMap
 public sealed record ActivityFieldChoice(ActivityMappableField Field, string Current, IReadOnlyList<string> Available, bool CurrentMissing);
 
 /// <summary>What the screen shows: a line per column that can be pointed elsewhere, the settings in force and, when the source was read, the text columns of the tables extra fields can come from.</summary>
-public sealed record ActivityFieldMapView(IReadOnlyList<ActivityFieldChoice> Fields, string? SourceError, ActivityFieldMap? Map = null, IReadOnlyDictionary<string, IReadOnlyList<string>>? TextColumns = null);
+public sealed record ActivityFieldMapView(IReadOnlyList<ActivityFieldChoice> Fields, string? SourceError, ActivityFieldMap? Map = null, IReadOnlyDictionary<string, IReadOnlyList<string>>? TextColumns = null, TicketStructureDiff? StructureChange = null);

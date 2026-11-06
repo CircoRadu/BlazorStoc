@@ -245,3 +245,19 @@ Pasi: Notificari -> Tichete de validat -> Arata tichetele discardate -> iconita 
 | 6 | Modifica manual observatiile unei interventii preluate, apoi adauga alt camp suplimentar | Observatiile modificate manual raman neatinse; mesajul le numara ("modificate de operator") | |
 | 7 | Scoate campul suplimentar cu iconita de stergere, salveaza | Campul dispare din ferestre; datele ramase pe tichete nu se sterg | |
 | 8 | Journal activitate | Intrari "Modificare corespondenta campuri" si "Actualizare tichete ActivityApp preluate" cu valorile vechi/noi si numerele | |
+
+## Modificari de testat - tichet exemplu, nume editabile, structura tichetelor (06.11.2026, versiunea 0.5.45)
+
+**Ce s-a adaugat:** in Setari -> Preluare date ActivityApp, sectiunea 6: butonul "Deschide un tichet exemplu", numele editabile ale informatiilor, bannerul si notificarea cand structura tichetelor din ActivityApp se schimba.
+**Ce face acum:** fereastra arata cel mai recent tichet finalizat cu toate coloanele si valorile lui, ce primeste fiecare informatie si observatiile rezultate; "Tichet anterior" incarca tichetul dinaintea celui afisat. Numele din coloana "Informatie" se pot schimba. La preluare se compara structura tichetelor cu cea verificata; o schimbare da notificarea "Structura tichetelor" pana apesi "Corespondenta verificata".
+
+| Pas | Ce faci | Rezultat asteptat | Rezultat |
+|---|---|---|---|
+| 1 | Sectiunea 6 -> "Deschide un tichet exemplu" | Se deschide cel mai recent tichet finalizat: tabelul "Ce primeste fiecare informatie", observatiile si doua tabele (Tickete, EvenimenteAgent) cu toate coloanele si valorile | |
+| 2 | Apasa "Tichet anterior" de cateva ori, apoi "Tichet mai nou" | Se incarca tichetul dinaintea celui afisat; "Tichet mai nou" revine fara sa citeasca din nou; "Tichet anterior" se dezactiveaza la cel mai vechi | |
+| 3 | La o coloana cu text alege "Folosește pentru" -> o informatie | Coloana devine sursa informatiei; previzualizarea se schimba pe loc; salveaza corespondenta ca sa ramana | |
+| 4 | La alta coloana alege "Camp suplimentar nou" | In tabelul de campuri suplimentare apare un rand cu numele coloanei (il poti redenumi) | |
+| 5 | Schimba numele "Problema" in "Defect", salveaza | In ferestrele tichetului si in observatiile noi apare "Defect"; observatiile vechi raman neatinse | |
+| 6 | Journal activitate | "Vizualizare tichet exemplu ActivityApp" pentru fiecare tichet deschis, cu numarul tichetului (fara continut) | |
+| 7 | In ActivityApp se adauga/scoate o coloana din Tickete sau EvenimenteAgent, apoi ruleaza o sincronizare | Notificarea "Structura tichetelor" cu lista modificarilor; in sectiunea 6 apare bannerul cu aceeasi lista | |
+| 8 | Verifica corespondenta (cu tichetul exemplu), apasa "Corespondenta verificata" | Bannerul si notificarea dispar; Jurnal: "Confirmare structura tichete ActivityApp" | |

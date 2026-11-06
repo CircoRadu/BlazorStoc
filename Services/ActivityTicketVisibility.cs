@@ -7,9 +7,12 @@ namespace BlazorStoc.Services;
 public sealed record TicketExtraLabel(string Key, string Label);
 
 /// <summary>The pieces of information of a ticket that are on (title and number are always shown) and the extra fields in the order of the settings.</summary>
-public sealed record TicketVisibility(bool Problem, bool Resolution, bool Report, bool Executor, IReadOnlyList<TicketExtraLabel> Extras)
+public sealed record TicketVisibility(bool Problem, bool Resolution, bool Report, bool Executor, IReadOnlyList<TicketExtraLabel> Extras, IReadOnlyDictionary<string, string>? Labels = null)
 {
     public static TicketVisibility All { get; } = new(true, true, true, true, []);
+
+    /// <summary>The name the administrator gave to a piece of information (problem, resolution, report, executor), or the usual one.</summary>
+    public string Name(string key, string usual) => Labels is not null && Labels.TryGetValue(key, out var chosen) ? chosen : usual;
 }
 
 public interface IActivityTicketVisibility

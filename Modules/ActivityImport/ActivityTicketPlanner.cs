@@ -97,10 +97,10 @@ public static class ActivityTicketPlanner
     {
         var lines = new List<(string, string, string)>();
         void Add(string key, string label, string value) { if (map.IsEnabled(key) && map.InNotes(key) && value.Length > 0) lines.Add((key, label, value)); }
-        Add(ActivityFieldMap.Problem, "Problemă", source.Problem);
-        Add(ActivityFieldMap.Resolution, "Rezolvare", source.Resolution);
-        Add(ActivityFieldMap.Report, "Raport original", source.Report);
-        Add(ActivityFieldMap.Executor, "Executant", source.Executor);
+        Add(ActivityFieldMap.Problem, map.NoteLabelOf(ActivityFieldMap.Problem), source.Problem);
+        Add(ActivityFieldMap.Resolution, map.NoteLabelOf(ActivityFieldMap.Resolution), source.Resolution);
+        Add(ActivityFieldMap.Report, map.NoteLabelOf(ActivityFieldMap.Report), source.Report);
+        Add(ActivityFieldMap.Executor, map.NoteLabelOf(ActivityFieldMap.Executor), source.Executor);
         foreach (var extra in map.Extras)
             if (extra.Target is ActivityFieldMap.Notes or ActivityFieldMap.Both && source.Extras is not null && source.Extras.TryGetValue(extra.Key, out var value) && value.Length > 0) lines.Add((extra.Key, extra.Label, value));
         return lines;
