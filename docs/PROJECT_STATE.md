@@ -9,6 +9,11 @@ Actualizat: 27.10.2026, Europe/Bucharest (Claude, agent unic, mod `claude_only`)
 - Motorul de facturi este geometric (`Services/Invoices`); utilizatorii obisnuiti creeaza/modifica sabloane, stergerea ramane administratorului.
 - Harta codului: `docs/HARTA_COD.md`. Reguli permanente: `CLAUDE.md`.
 
+## Ultimul lucru facut (07.11.2026): versiunea 0.5.51 (banner modul oprit cu utilizatorul si rolul; branch claude/meniu-cont-utilizator)
+- `ModuleOrigins.StoppedByText(user, role)`, `StoppedModule.StoppedRole`, `ModuleInfo.StoppedRole`, `IAccessControl.GetRoleAsync` (implicit), coloana `module_state.stopped_role` (migrarea 74); textul apare in `ModuleUnavailable`, `ModuleAlertBanner` si `ModulesPanel`.
+- Migrarea 74: testul `Update: the migrations are numbered 1..N` cere numerotare fara goluri; migrarile de mentenanta (74/75 pe branch-ul `claude/acte-aditionale-componente-mentenanta`) se renumeroteaza 75/76 la reunirea branch-urilor (si ledger-ul bazei de dezvoltare, vezi memoria).
+- Verificat: suita completa la release. Neverificat vizual in browser; help in `docs/HELP_DE_REGENERAT.md`.
+
 ## Ultimul lucru facut (07.11.2026): versiunea 0.5.50 (raportare erori, coduri de recuperare .txt; branch claude/meniu-cont-utilizator)
 - Modul `Modules/BugReports` (1.0.0): `IBugReportService` (Maria, migrarea 73 `bug_reports`/`bug_report_files`, imaginile ca BLOB), fereastra `Components/Shared/BugReportDialog.razor` (intrarea din `MainLayout` deasupra de Ajutor, `wwwroot/bug-report.js`: captura paginii din DOM cu stiluri calculate, Ctrl+V), `BugReportsPanel.razor` (Setari -> Rapoarte erori, export ZIP). Permisiuni `setari-bug-raport.*` (doar administrator).
 - `AuthenticatorActions.razor`: fereastra Coduri de recuperare lata + Salveaza codurile (.txt).

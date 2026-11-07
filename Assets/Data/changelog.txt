@@ -1,3 +1,6 @@
+## 0.5.51 | 07.11.2026
+- Notificarea „Modul oprit temporar” (pagina unui modul oprit de administrator) spune acum cine l-a oprit: numele utilizatorului și rolul lui. Motivul opririi rămâne ascuns utilizatorilor obișnuiți. Bannerul roșu de sus (administrator) și lista din Setări, Module arată același text; un modul oprit înainte de această versiune arată doar numele contului.
+
 ## 0.5.50 | 07.11.2026
 - Meniul principal: intrarea nouă „Raportează o eroare”, deasupra lui „Ajutor”. Deschide o fereastră în care descrii problema (titlu, gravitate, descriere); captura paginii de dedesubt se atașează automat, iar imagini se pot adăuga cu Ctrl+V sau din fișier. Fereastra are explicații pas cu pas, în secțiuni închise implicit, și fila „Rapoartele mele”.
 - Setări, „Rapoarte erori” (administrator): lista rapoartelor cu filtre, deschiderea unui raport cu imaginile lui, schimbarea stării cu notă pentru autor, ștergerea și exportul ZIP (un raport sau lista filtrată). Rapoartele rămân în aplicație, nu se trimit în afară. Fiecare operație apare în Jurnalul de activitate cu acțiunea ei.

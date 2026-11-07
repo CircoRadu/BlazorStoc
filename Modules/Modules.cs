@@ -70,7 +70,7 @@ public sealed class ModuleUnavailableException(string moduleId)
 /// Origin is one of <see cref="ModuleOrigins"/>; Failures is the number of consecutive failures counted by the circuit breaker.
 /// </summary>
 public sealed record ModuleInfo(string Id, string Name, string Version, ModuleStatus Status, DateTime SinceUtc = default, string? Reason = null,
-    string? Origin = null, int Failures = 0, string? StoppedBy = null);
+    string? Origin = null, int Failures = 0, string? StoppedBy = null, string? StoppedRole = null);
 
 /// <summary>Why a module is out (shown to the administrator).</summary>
 public static class ModuleOrigins
@@ -80,10 +80,14 @@ public static class ModuleOrigins
     public const string RepeatedFailures = "erori repetate";
     /// <summary>Stopped by the administrator (Setari -> Module); for a manual stop <see cref="ModuleInfo.Reason"/> is the reason the administrator gave.</summary>
     public const string Manual = "oprit de administrator";
+
+    /// <summary>"ion.popescu (Administrator)": who stopped the module and in which role; just the name for a stop saved before the role was kept.</summary>
+    public static string StoppedByText(string? user, string? role) =>
+        string.IsNullOrWhiteSpace(user) ? "necunoscut" : string.IsNullOrWhiteSpace(role) ? user : $"{user} ({role})";
 }
 
 /// <summary>A module stopped by the administrator, as it is saved (module_state) and read back at the next start.</summary>
-public sealed record StoppedModule(string ModuleId, string Reason, string StoppedBy, DateTime StoppedUtc);
+public sealed record StoppedModule(string ModuleId, string Reason, string StoppedBy, DateTime StoppedUtc, string StoppedRole = "");
 
 /// <summary>The answer of <see cref="ModuleRegistry.Stop"/> / <see cref="ModuleRegistry.Start"/>.</summary>
 public enum ModuleToggleResult

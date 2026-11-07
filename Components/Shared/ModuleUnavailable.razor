@@ -5,7 +5,7 @@
 @if (ModuleId is not null && Registry.IsManuallyStopped(ModuleId))
 {
     <div class="error-banner" role="alert">
-        <strong>Modul oprit temporar.</strong> Această parte a aplicației a fost oprită de administrator; restul aplicației funcționează normal.
+        <strong>Modul oprit temporar.</strong> Această parte a aplicației a fost oprită de <strong>@StoppedBy</strong>; restul aplicației funcționează normal.
         <a class="refresh act-nav" href="/">Înapoi la pagina principală</a>
     </div>
 }
@@ -20,4 +20,14 @@ else
 
 @code {
     [Parameter] public string? ModuleId { get; set; }
+
+    // Who stopped it, with the role (the user name and the role are shown; the reason of the stop is not).
+    private string StoppedBy
+    {
+        get
+        {
+            var module = Registry.Snapshot().FirstOrDefault(item => item.Id == ModuleId);
+            return module?.StoppedBy is { Length: > 0 } user ? ModuleOrigins.StoppedByText(user, module.StoppedRole) : "administrator";
+        }
+    }
 }

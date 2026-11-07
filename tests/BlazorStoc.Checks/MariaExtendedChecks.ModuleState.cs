@@ -16,10 +16,10 @@ public static partial class MariaExtendedChecks
         var at = new DateTime(2026, 10, 19, 9, 30, 0, DateTimeKind.Utc);
         try
         {
-            await store.SaveStoppedAsync(new StoppedModule(id, "verificare retea", "admin.ext", at));
+            await store.SaveStoppedAsync(new StoppedModule(id, "verificare retea", "admin.ext", at, "Administrator"));
             var rows = await store.ReadStoppedAsync();
-            Check(rows.Any(row => row.ModuleId == id && row.Reason == "verificare retea" && row.StoppedBy == "admin.ext" && row.StoppedUtc == at && row.StoppedUtc.Kind == DateTimeKind.Utc),
-                "A stopped module is saved with its reason, who and when (UTC)");
+            Check(rows.Any(row => row.ModuleId == id && row.Reason == "verificare retea" && row.StoppedBy == "admin.ext" && row.StoppedRole == "Administrator" && row.StoppedUtc == at && row.StoppedUtc.Kind == DateTimeKind.Utc),
+                "A stopped module is saved with its reason, who (user and role) and when (UTC)");
             await store.SaveStoppedAsync(new StoppedModule(id, "alt motiv", "alt.admin", at.AddHours(1)));
             var again = (await store.ReadStoppedAsync()).Where(row => row.ModuleId == id).ToList();
             Check(again.Count == 1 && again[0].Reason == "alt motiv" && again[0].StoppedBy == "alt.admin", "Saving the same module again replaces its row (one row per module)");

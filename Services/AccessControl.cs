@@ -19,6 +19,9 @@ public interface IAccessControl
     Task<bool> CanManageProductsAsync(CancellationToken cancellationToken = default);
     Task<bool> CanManageBeneficiariesAsync(CancellationToken cancellationToken = default);
     Task<string?> GetUsernameAsync(CancellationToken cancellationToken = default);
+    // The role of the signed-in user as shown to people (Administrator / Utilizator); the default keeps every other implementation working.
+    async Task<string?> GetRoleAsync(CancellationToken cancellationToken = default) =>
+        await IsAdministratorAsync(cancellationToken).ConfigureAwait(false) ? AccessRoles.Administrator : AccessRoles.LimitedUser;
     Task EnsureAdministratorAsync(CancellationToken cancellationToken = default);
     Task EnsureProductOperatorAsync(CancellationToken cancellationToken = default);
     Task EnsureBeneficiaryOperatorAsync(CancellationToken cancellationToken = default);

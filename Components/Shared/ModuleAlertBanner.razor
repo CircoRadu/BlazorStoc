@@ -8,7 +8,9 @@
 {
     <div class="error-banner module-alert" role="alert">
         <strong>@(outModules.Count == 1 ? "Un modul este oprit:" : "Module oprite:")</strong>
-        @string.Join(", ", outModules.Select(module => $"{module.Name} ({module.Origin})"))
+        @string.Join(", ", outModules.Select(module => module.Origin == ModuleOrigins.Manual
+            ? $"{module.Name} ({module.Origin}: {ModuleOrigins.StoppedByText(module.StoppedBy, module.StoppedRole)})"
+            : $"{module.Name} ({module.Origin})"))
         <a class="refresh act-nav" href="@SettingsNavigation.ModulesUrl()" @onclick="OpenDetails" @onclick:preventDefault>Detalii</a>
     </div>
 }

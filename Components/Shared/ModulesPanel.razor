@@ -133,7 +133,7 @@
     private static string CauseText(ModuleInfo module)
     {
         if (module.Status == ModuleStatus.Healthy) return "-";
-        if (module.Origin == ModuleOrigins.Manual) return $"{module.Origin} ({module.StoppedBy}): {module.Reason}";
+        if (module.Origin == ModuleOrigins.Manual) return $"{module.Origin} ({ModuleOrigins.StoppedByText(module.StoppedBy, module.StoppedRole)}): {module.Reason}";
         return $"{module.Origin}{(string.IsNullOrEmpty(module.Reason) || module.Reason == "disabled-by-configuration" ? "" : $" ({module.Reason})")}";
     }
 
