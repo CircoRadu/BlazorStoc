@@ -1,0 +1,31 @@
+# Raportează o eroare
+Cautare: raportare eroare bug problema raport captura imagine ctrl v gravitate stare
+
+Fereastra se deschide din meniul din stânga, intrarea „Raportează o eroare” de deasupra lui „Ajutor”. Înainte să apară, aplicația fotografiază pagina pe care lucrai și o atașează raportului.
+
+## Elemente
+### Raport nou
+- Secțiunile explicative | text | Cum funcționează raportarea, ce se atașează automat, imaginile, gravitatea și stările, cine vede raportul. Sunt închise implicit; le deschizi cu un clic pe titlu. | sel: .bug-help
+- Titlu scurt | câmp | Numele problemei, în câteva cuvinte. Obligatoriu.
+- Gravitate | listă | Blocant, Important, Minor sau Sugestie.
+- Descriere | câmp | Ce ai făcut, ce te așteptai să se întâmple și ce s-a întâmplat de fapt. Obligatoriu.
+- Imagini | listă | Captura automată a paginii, imaginile lipite cu Ctrl+V și fișierele alese. Coșul de lângă o imagine o scoate din raport.
+- Alege fișiere | buton | Adaugă imagini PNG, JPEG, GIF sau WebP.
+- Atașez detaliile tehnice | comutator | Pagina, versiunea, browserul și ultimele erori ale browserului. Secțiunea de dedesubt arată exact ce se atașează.
+- Trimite raportul | buton | Salvează raportul și arată numărul lui.
+- Închide (păstrează ciorna) | buton | Închide fereastra; ce ai scris rămâne până la trimitere.
+- Renunță la raport | buton | Șterge ciorna, după confirmare.
+### Rapoartele mele
+- Tabelul | tabel | Rapoartele tale, cu gravitatea, starea, data și nota administratorului.
+
+## Flux: Cum raportez o problemă
+1. Apasă „Raportează o eroare” din meniu, pe pagina unde a apărut problema.
+2. Scrie titlul, alege gravitatea și descrie problema.
+3. Verifică imaginile: scoate captura dacă arată date pe care nu vrei să le trimiți sau adaugă alta cu Ctrl+V.
+4. Apasă „Trimite raportul” și notează numărul primit.
+5. Vezi starea în fila „Rapoartele mele”.
+
+## Flux: Cum adaug o captură de ecran
+1. Fă captura cu instrumentul sistemului (Win+Shift+S).
+2. Cu fereastra de raport deschisă, apasă Ctrl+V.
+3. Imaginea apare în listă; dacă nu mai e nevoie de ea, apasă coșul de lângă ea.

@@ -1565,3 +1565,45 @@ tr[data-depth="0"] > td { border-top: 4px solid var(--c-d6e4df); }
 .login-card label.password-show input:checked + .toggle-track { background: var(--green); border-color: var(--green); }
 .login-card label.password-show input:checked + .toggle-track::after { transform: translateX(16px); background: var(--c-ffffff); }
 .login-card label.password-show input:focus-visible + .toggle-track { outline: 2px solid var(--green); outline-offset: 2px; }
+
+/* Raportare eroare (popup din meniu) si Setari -> Rapoarte erori */
+.delete-dialog.bug-dialog { width:min(920px, 95vw); max-height:94vh; overflow:auto; }
+.bug-tabs { display:flex; gap:8px; margin:6px 0 14px; }
+.bug-intro { margin:0 0 12px; }
+.bug-help { margin:0 0 8px; border:1px solid var(--line); border-radius:7px; }
+.bug-help .collapsible-header { cursor:pointer; list-style:none; }
+.bug-help-toggle { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:9px 12px; font-weight:700; font-size:14px; }
+.bug-help-body { padding:4px 14px 12px 14px; font-size:14px; line-height:1.5; }
+.bug-help-body ol, .bug-help-body ul { margin:6px 0 0; padding-left:22px; }
+.bug-help-body li { margin-top:6px; }
+.bug-help-body kbd, .bug-intro kbd, .bug-add-images kbd, #bug-no-capture kbd { padding:1px 6px; border:1px solid var(--line); border-radius:4px; background:var(--c-f5f8f6); font-size:12px; }
+.bug-form { margin-top:14px; }
+.bug-form .wide { grid-column:1 / -1; }
+.bug-form textarea { width:100%; resize:vertical; }
+.bug-subtitle { margin:18px 0 8px; font-size:15px; }
+.bug-images { display:flex; flex-wrap:wrap; gap:12px; margin-top:8px; }
+.bug-image { position:relative; margin:0; width:200px; padding:6px; border:1px solid var(--line); border-radius:7px; background:var(--c-ffffff); }
+.bug-image img { display:block; width:100%; height:130px; object-fit:contain; background:var(--c-f5f8f6); border-radius:4px; }
+.bug-image figcaption { margin-top:6px; font-size:12px; color:var(--muted); overflow-wrap:anywhere; }
+.bug-image .row-icon { position:absolute; top:10px; right:10px; background:var(--c-ffffff); }
+.bug-image-large { display:flex; align-items:center; justify-content:center; height:130px; padding:6px; font-size:12px; text-align:center; overflow-wrap:anywhere; background:var(--c-f5f8f6); border-radius:4px; }
+.bug-detail .bug-image { width:min(100%, 560px); }
+.bug-detail .bug-image img { height:auto; max-height:420px; }
+.bug-add-images { display:flex; align-items:center; gap:14px; margin-top:14px; flex-wrap:wrap; }
+.bug-file-button { position:relative; display:inline-flex; align-items:center; cursor:pointer; overflow:hidden; }
+.bug-file-button input[type=file] { position:absolute; inset:0; opacity:0; cursor:pointer; }
+.bug-tech { margin-top:16px; display:grid; gap:10px; }
+.bug-tech-text { max-height:240px; overflow:auto; margin:8px 0 0; padding:10px 12px; background:var(--c-f5f8f6); border:1px solid var(--line); border-radius:6px; font-size:12px; white-space:pre-wrap; overflow-wrap:anywhere; }
+.bug-dialog .editor-actions { margin-top:18px; }
+.bug-dialog .error-banner, .bug-dialog .success-banner { margin:10px 0 12px; }
+.bug-facts { display:grid; grid-template-columns:max-content 1fr; gap:6px 16px; margin:0 0 14px; }
+.bug-facts dt { font-weight:700; color:var(--muted); }
+.bug-facts dd { margin:0; overflow-wrap:anywhere; }
+.bug-description { white-space:pre-wrap; overflow-wrap:anywhere; margin:6px 0 14px; }
+.bug-detail { margin-top:20px; }
+.bug-filters { margin-bottom:12px; }
+
+/* Codurile de recuperare ale unui autentificator: fereastra suficient de larga, codurile se rup la margine in loc sa iasa din pagina */
+.delete-dialog.recovery-dialog { width:min(640px, 94vw); max-width:94vw; box-sizing:border-box; }
+.recovery-codes { margin:14px 0 0; padding:14px 16px; background:var(--c-f5f8f6); border:1px solid var(--line); border-radius:8px; font-family:Consolas,monospace; font-size:15px; line-height:1.7; white-space:pre-wrap; overflow-wrap:anywhere; word-break:break-word; max-width:100%; box-sizing:border-box; }
+.recovery-dialog .muted { overflow-wrap:anywhere; }

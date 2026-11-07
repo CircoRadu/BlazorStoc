@@ -4,6 +4,18 @@ Fluxul: administratorul creeaza conturi (Administrator / Utilizator) -> autentif
 
 ## Modificari de testat
 
+### 07.11.2026 - Fereastra codurilor de recuperare
+
+**Ce s-a adaugat:** fereastra "Coduri de recuperare" (dupa asocierea unui autentificator sau generarea de coduri noi) este mai larga, iar codurile se rup la margine in loc sa iasa din fereastra; buton nou "Salveaza codurile (.txt)".
+
+**Ce face acum:** codurile se vad intregi; butonul descarca un fisier text cu utilizatorul, data si codurile.
+
+| Nr | Pas | Rezultat asteptat | Rezultat obtinut |
+|---|---|---|---|
+| 1 | Setari -> Autentificare: asociaza un autentificator unui cont de test si confirma codul | Se deschide fereastra cu codurile; textul nu depaseste marginea ferestrei | |
+| 2 | Apasa "Salveaza codurile (.txt)" | Se descarca coduri-recuperare-<utilizator>-<data>.txt cu titlu, data si toate codurile, cate unul pe rand | |
+| 3 | Apasa "Am notat codurile" | Fereastra se inchide | |
+
 ### 06.11.2026 - Schimbarea parolei la prima autentificare si politica de parola
 
 **Ce s-a adaugat:** pagina "Alege o parola noua" (`/Account/ChangePassword`), indicatorul "Parola de schimbat" in lista de utilizatori, politica de parola (minimum 8 caractere, cu litera mica, litera mare, cifra si caracter special), jurnal "Stabilire parola de catre administrator" si "Schimbare parola la prima autentificare".

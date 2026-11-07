@@ -2,6 +2,7 @@
 @using QRCoder
 @inject IAccessSecuritySettingsService Settings
 @inject ILogger<AuthenticatorActions> Logger
+@inject IJSRuntime JS
 @implements IDisposable
 @* The operations of the administrator on the authenticator of one account (Setari -> Autentificare and the page of the user): associate (QR code + first code + recovery codes), revoke,
    resume after the account was reactivated, new recovery codes, unlock. Every change asks the password of the administrator again; the authenticator of an administrator's account only
@@ -68,11 +69,15 @@
 @if (recovery is not null)
 {
     <div class="delete-overlay">
-        <section class="delete-dialog" role="dialog" aria-modal="true" aria-labelledby="recovery-title">
+        <section class="delete-dialog recovery-dialog" role="dialog" aria-modal="true" aria-labelledby="recovery-title">
             <div class="dialog-head"><h2 id="recovery-title">Coduri de recuperare · @Row.Username</h2></div>
             <p class="muted"><small>Fiecare cod se poate folosi o singură dată, dacă utilizatorul pierde telefonul. Se afișează doar acum: dă-i-le utilizatorului și nu le păstra în alt loc.</small></p>
             <pre class="recovery-codes">@string.Join(Environment.NewLine, recovery)</pre>
-            <div class="editor-actions"><button type="button" class="primary" @onclick="CloseRecovery">Am notat codurile</button></div>
+            <div class="editor-actions">
+                <button type="button" class="primary" id="recovery-done" @onclick="CloseRecovery">Am notat codurile</button>
+                <button type="button" class="refresh act-export" id="recovery-save-txt" @onclick="SaveRecoveryAsync">Salvează codurile (.txt)</button>
+            </div>
+            @if (saveError is not null) { <div class="error-banner" role="alert">@saveError</div> }
         </section>
     </div>
 }
@@ -93,6 +98,8 @@
     private string adminPassword = "", code = "";
     private string? dialogError, secret;
     private IReadOnlyList<string>? recovery;
+    private string? saveError;
+    private IJSObjectReference? downloads;
 
     private string QrSvg
     {
@@ -135,7 +142,35 @@
         if (replacing) _ = Settings.CancelReplacementAsync(Row.Id, CancellationToken.None);
         secret = null; code = ""; dialogError = null; replacing = false; _ = Changed.InvokeAsync();
     }
-    private void CloseRecovery() { recovery = null; _ = Changed.InvokeAsync(); }
+    private void CloseRecovery() { recovery = null; saveError = null; _ = Changed.InvokeAsync(); }
+
+    // The codes as a text file the browser downloads (made here, nothing is kept on the server).
+    private async Task SaveRecoveryAsync()
+    {
+        if (recovery is null) return;
+        saveError = null;
+        try
+        {
+            var text = string.Join(Environment.NewLine, new[]
+            {
+                $"Coduri de recuperare - {Row.Username}",
+                $"Generate: {DateTime.Now:dd.MM.yyyy HH:mm}",
+                "Fiecare cod se poate folosi o singura data, daca utilizatorul pierde telefonul.",
+                "Pastreaza fisierul intr-un loc sigur si sterge-l dupa ce codurile au fost predate.",
+                ""
+            }.Concat(recovery));
+            var name = $"coduri-recuperare-{new string(Row.Username.Where(char.IsLetterOrDigit).ToArray())}-{DateTime.Now:yyyyMMdd-HHmm}.txt";
+            downloads ??= await JS.InvokeAsync<IJSObjectReference>("import", "./file-download.js");
+            using var stream = new MemoryStream(new System.Text.UTF8Encoding(false).GetBytes(text + Environment.NewLine));
+            using var reference = new DotNetStreamReference(stream);
+            await downloads.InvokeVoidAsync("downloadBinary", name, reference, "text/plain");
+        }
+        catch (Exception exception) when (exception is JSException or InvalidOperationException)
+        {
+            Logger.LogWarning("The recovery codes could not be saved as a file ({ErrorType}).", exception.GetType().Name);
+            saveError = "Fișierul nu a putut fi creat. Notează codurile din fereastră.";
+        }
+    }
 
     private async Task RunAsync()
     {
@@ -194,5 +229,9 @@
         finally { busy = false; }
     }
 
-    public void Dispose() { lifetime.Cancel(); lifetime.Dispose(); }
+    public void Dispose()
+    {
+        lifetime.Cancel(); lifetime.Dispose();
+        if (downloads is not null) _ = downloads.DisposeAsync().AsTask().ContinueWith(_ => { }, TaskScheduler.Default);
+    }
 }

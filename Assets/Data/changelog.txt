@@ -1,3 +1,9 @@
+## 0.5.50 | 07.11.2026
+- Meniul principal: intrarea nouă „Raportează o eroare”, deasupra lui „Ajutor”. Deschide o fereastră în care descrii problema (titlu, gravitate, descriere); captura paginii de dedesubt se atașează automat, iar imagini se pot adăuga cu Ctrl+V sau din fișier. Fereastra are explicații pas cu pas, în secțiuni închise implicit, și fila „Rapoartele mele”.
+- Setări, „Rapoarte erori” (administrator): lista rapoartelor cu filtre, deschiderea unui raport cu imaginile lui, schimbarea stării cu notă pentru autor, ștergerea și exportul ZIP (un raport sau lista filtrată). Rapoartele rămân în aplicație, nu se trimit în afară. Fiecare operație apare în Jurnalul de activitate cu acțiunea ei.
+- Setări, Autentificare: fereastra „Coduri de recuperare” este mai largă, iar codurile nu mai ies din fereastră; butonul nou „Salvează codurile (.txt)” descarcă codurile într-un fișier text.
+- Versiuni de modul: noul modul „Raportare erori” (1.0.0), Jurnal 1.4.15, Elcomtur 1.3.1.
+
 ## 0.5.49 | 06.11.2026
 - Setări, Utilizatori, formularul de creare și de editare a unui utilizator: cele cinci condiții ale parolei sunt afișate pe rânduri separate și verificate pe măsură ce scrii (verde când sunt îndeplinite, roșu în caz contrar), iar „Arată parola” este acum un comutator On/Off, ca în restul aplicației.
 - Setări, Baza de date, Conexiune: la schimbarea parolei unui cont al bazei de date și la fraza-parolă a exportului, condițiile parolei (lungime, fără caractere de control) sunt afișate pe rânduri și verificate pe măsură ce scrii. Parolele altor sisteme (conexiunea la baza de date, copia pe NAS, ActivityApp, Elcomtur) au comutatorul „Arată parola”.

@@ -1,0 +1,253 @@
+@namespace BlazorStoc.Components.Shared
+@using BlazorStoc.Modules
+@using BlazorStoc.Modules.BugReports
+@inject IBugReportService Reports
+@inject IAccessControl Access
+@inject IJSRuntime JS
+@inject ILogger<BugReportsPanel> Logger
+@implements IAsyncDisposable
+@* Setari -> Rapoarte erori (administrator): the reports sent from the menu entry "Raportează o eroare". Filters, a paged table (server side), the report with its pictures,
+   the change of state with a note, the deletion and the ZIP export (one report or everything the filters show). *@
+<section class="catalog" aria-labelledby="bug-admin-title">
+    <div class="catalog-heading"><h2 id="bug-admin-title">Rapoarte erori <span class="count-badge">@total</span></h2></div>
+    <div class="catalog-body">
+        @if (error is not null) { <div class="error-banner" role="alert" id="bug-admin-error">@error</div> }
+        @if (notice is not null) { <div class="success-banner" role="status" id="bug-admin-notice">@notice</div> }
+        <CollapsibleSection Id="bug-admin-flow" RootClass="bug-help" HeaderRowClass="collapsible-header" ToggleClass="bug-help-toggle" ContentClass="bug-help-body" Expanded="false">
+            <Header>Cum se lucrează cu rapoartele</Header>
+            <ChildContent>
+                <ol>
+                    <li>Utilizatorii trimit rapoarte din meniul „Raportează o eroare”; fiecare primește un număr (BUG-0042) și starea <strong>Nou</strong>. Rapoartele nu ies din aplicație.</li>
+                    <li>Filtrezi lista după stare, gravitate, autor sau perioadă și deschizi un raport cu pictograma ochi: vezi descrierea, pagina, detaliile tehnice și imaginile (prima este captura paginii).</li>
+                    <li>Alegi starea (<strong>În analiză</strong>, <strong>Rezolvat</strong>, <strong>Respins</strong>) și scrii o notă pentru autor; autorul le vede în „Rapoartele mele”. Fiecare schimbare intră în jurnalul de activitate.</li>
+                    <li><strong>Exportă raportul</strong> descarcă un ZIP cu <code>raport.json</code>, <code>raport.txt</code> și imaginile; <strong>Exportă lista filtrată</strong> pune toate rapoartele din filtre într-un ZIP, cu un <code>index.csv</code>.</li>
+                    <li>Pictograma coșului șterge definitiv raportul și imaginile lui (după confirmare); ștergerea intră în jurnal.</li>
+                </ol>
+            </ChildContent>
+        </CollapsibleSection>
+
+        <div class="audit-filters bug-filters">
+            <label>Stare
+                <select id="bug-filter-state" @bind="state" @bind:after="FilterChangedAsync">
+                    <option value="">Toate</option>
+                    @foreach (var item in BugReportRules.States) { <option value="@item">@item</option> }
+                </select></label>
+            <label>Gravitate
+                <select id="bug-filter-severity" @bind="severity" @bind:after="FilterChangedAsync">
+                    <option value="">Toate</option>
+                    @foreach (var item in BugReportRules.Severities) { <option value="@item">@item</option> }
+                </select></label>
+            <label>Autor <input id="bug-filter-user" @bind="user" @bind:event="onchange" @bind:after="FilterChangedAsync" /></label>
+            <label>De la <input id="bug-filter-from" type="date" @bind="from" @bind:after="FilterChangedAsync" /></label>
+            <label>Până la <input id="bug-filter-to" type="date" @bind="to" @bind:after="FilterChangedAsync" /></label>
+        </div>
+        <div class="editor-actions">
+            <button type="button" class="refresh act-reload" id="bug-refresh" disabled="@busy" @onclick="LoadAsync">Actualizează</button>
+            @if (canExport) { <button type="button" class="refresh act-export" id="bug-export-filter" disabled="@(busy || total == 0)" @onclick="ExportFilteredAsync">Exportă lista filtrată (ZIP)</button> }
+        </div>
+
+        @if (loading) { <div class="empty-state" role="status"><div class="spinner"></div><h3>Se încarcă</h3></div> }
+        else if (items.Count == 0) { <p class="muted" id="bug-admin-empty">Niciun raport pentru filtrele alese.</p> }
+        else
+        {
+            <div class="table-scroll">
+                <table id="bug-admin-table">
+                    <thead><tr><th>Număr</th><th>Titlu</th><th>Gravitate</th><th>Stare</th><th>Autor</th><th>Trimis</th><th>Imagini</th><th>Operații</th></tr></thead>
+                    <tbody>
+                        @foreach (var report in items)
+                        {
+                            var item = report;
+                            <tr class="@(opened?.Id == item.Id ? "selected" : "")">
+                                <td>@item.Number</td><td>@item.Title</td><td>@item.Severity</td><td>@item.State</td><td>@item.UserName</td>
+                                <td>@BugReportRules.Display(item.CreatedUtc)</td><td>@item.FileCount</td>
+                                <td class="row-actions">
+                                    <button type="button" class="row-icon view" aria-label="Deschide raportul @item.Number" title="Deschide raportul @item.Number" @onclick="() => OpenAsync(item)"></button>
+                                    @if (canEdit) { <button type="button" class="row-icon delete" aria-label="Șterge raportul @item.Number" title="Șterge raportul @item.Number" @onclick="() => AskDelete(item)"></button> }
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+            <AuditPager Id="bug-admin-size" Label="Rapoarte pe pagină" PageSizes="sizes" PageSize="pageSize" Page="page" Total="total" PageChanged="PageChangedAsync" PageSizeChanged="SizeChangedAsync" />
+        }
+
+        @if (deleting is not null)
+        {
+            <div class="error-banner" role="alert" id="bug-delete-confirm">Ștergi definitiv raportul <strong>@deleting.Number</strong> („@deleting.Title”) și imaginile lui? Nu se poate anula.
+                <span class="editor-actions"><button type="button" class="danger" id="bug-delete-yes" disabled="@busy" @onclick="DeleteAsync">Da, șterge</button>
+                    <button type="button" class="refresh act-nav" id="bug-delete-no" @onclick="() => deleting = null">Nu, păstrează</button></span></div>
+        }
+
+        @if (opened is not null)
+        {
+            <section class="catalog bug-detail" id="bug-detail" aria-labelledby="bug-detail-title">
+                <div class="catalog-heading"><h3 id="bug-detail-title">@opened.Number · @opened.Title</h3></div>
+                <div class="catalog-body">
+                    <dl class="bug-facts">
+                        <dt>Gravitate</dt><dd>@opened.Severity</dd>
+                        <dt>Autor</dt><dd>@opened.UserName (@opened.UserRole)</dd>
+                        <dt>Trimis</dt><dd>@BugReportRules.Display(opened.CreatedUtc) · versiunea @opened.AppVersion</dd>
+                        <dt>Pagina</dt><dd>@opened.PageTitle <code>@opened.Route</code></dd>
+                    </dl>
+                    <h4>Descriere</h4>
+                    <p class="bug-description">@opened.Description</p>
+                    <div class="bug-images" id="bug-detail-images">
+                        @foreach (var picture in pictures)
+                        {
+                            <figure class="bug-image"><img src="@picture.Url" alt="@picture.Name" /><figcaption>@picture.Name</figcaption></figure>
+                        }
+                    </div>
+                    <CollapsibleSection Id="bug-detail-tech" RootClass="bug-help" HeaderRowClass="collapsible-header" ToggleClass="bug-help-toggle" ContentClass="bug-help-body" Expanded="false">
+                        <Header>Detalii tehnice</Header>
+                        <ChildContent><pre class="bug-tech-text">@(string.IsNullOrWhiteSpace(opened.TechJson) ? "(neatașate)" : opened.TechJson)</pre></ChildContent>
+                    </CollapsibleSection>
+                    <div class="editor-grid bug-form">
+                        <label>Stare
+                            <select id="bug-detail-state" @bind="newState" disabled="@(!canEdit || busy)">
+                                @foreach (var item in BugReportRules.States) { <option value="@item">@item</option> }
+                            </select></label>
+                        <label class="wide">Notă pentru autor
+                            <textarea id="bug-detail-note" rows="3" maxlength="@BugReportRules.MaxNote" @bind="note" @bind:event="oninput" disabled="@(!canEdit || busy)"></textarea></label>
+                    </div>
+                    <div class="editor-actions">
+                        @if (canEdit) { <button type="button" class="primary" id="bug-detail-save" disabled="@busy" @onclick="SaveStateAsync">@(busy ? "Se salvează…" : "Salvează starea")</button> }
+                        @if (canExport) { <button type="button" class="refresh act-export" id="bug-detail-export" disabled="@busy" @onclick="ExportOpenedAsync">Exportă raportul (ZIP)</button> }
+                        <button type="button" class="refresh act-close" id="bug-detail-close" @onclick="CloseDetail">Închide raportul</button>
+                    </div>
+                </div>
+            </section>
+        }
+    </div>
+</section>
+
+@code {
+    private sealed record Picture(string Name, string Url);
+
+    private readonly CancellationTokenSource lifetime = new();
+    private static readonly IReadOnlyList<int> sizes = [10, 25, 50, 100];
+    private IReadOnlyList<BugReport> items = [];
+    private List<Picture> pictures = [];
+    private BugReport? opened, deleting;
+    private string state = "", severity = "", user = "", newState = BugReportRules.StateNew, note = "";
+    private DateTime? from, to;
+    private int page = 1, pageSize = 25, total;
+    private bool loading = true, busy, canEdit, canExport;
+    private string? error, notice;
+    private IJSObjectReference? downloads;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            canEdit = await Access.HasAsync("setari-bug-raport.edit", lifetime.Token);
+            canExport = await Access.HasAsync("setari-bug-raport.export", lifetime.Token);
+        }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        await LoadAsync();
+    }
+
+    private BugReportQuery Query => new(state.Length == 0 ? null : state, severity.Length == 0 ? null : severity, user, from is { } f ? DateOnly.FromDateTime(f) : null, to is { } t ? DateOnly.FromDateTime(t) : null);
+
+    private async Task LoadAsync()
+    {
+        loading = true; error = null;
+        try
+        {
+            var result = await Reports.QueryAsync(Query, page, pageSize, lifetime.Token);
+            if (result.Items.Count == 0 && result.Total > 0 && page > 1) { page = Math.Max(1, (result.Total + pageSize - 1) / pageSize); result = await Reports.QueryAsync(Query, page, pageSize, lifetime.Token); }
+            items = result.Items; total = result.Total;
+        }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (Exception exception) when (exception is AccessDeniedException or ModuleUnavailableException or BugReportException) { error = exception.Message; }
+        catch (Exception exception)
+        {
+            Logger.LogError("The bug reports could not be read ({ErrorType}).", exception.GetType().Name);
+            error = "Rapoartele nu au putut fi citite. Încearcă din nou.";
+        }
+        finally { loading = false; }
+    }
+
+    private async Task FilterChangedAsync() { page = 1; await LoadAsync(); }
+    private async Task PageChangedAsync(int value) { page = value; await LoadAsync(); }
+    private async Task SizeChangedAsync(int value) { pageSize = value; page = 1; await LoadAsync(); }
+
+    private async Task OpenAsync(BugReport report)
+    {
+        error = notice = null; deleting = null;
+        opened = report; newState = report.State; note = report.AdminNote; pictures = [];
+        try
+        {
+            foreach (var file in await Reports.GetFilesAsync(report.Id, lifetime.Token))
+                if (await Reports.GetFileContentAsync(file.Id, lifetime.Token) is { } content)
+                    pictures.Add(new Picture(file.Kind == BugReportRules.KindScreenshot ? "Captura paginii" : file.FileName, $"data:{content.ContentType};base64,{Convert.ToBase64String(content.Content)}"));
+        }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (Exception exception) when (exception is AccessDeniedException or ModuleUnavailableException) { error = exception.Message; }
+    }
+
+    private void CloseDetail() { opened = null; pictures = []; }
+    private void AskDelete(BugReport report) { deleting = report; error = notice = null; }
+
+    private async Task RunAsync(Func<Task> work, string failure)
+    {
+        if (busy) return;
+        busy = true; error = null;
+        try { await work(); }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (Exception exception) when (exception is BugReportException or AccessDeniedException or ModuleUnavailableException) { error = exception.Message; }
+        catch (Exception exception)
+        {
+            Logger.LogError("{Failure} ({ErrorType}).", failure, exception.GetType().Name);
+            error = failure + " Încearcă din nou.";
+        }
+        finally { busy = false; }
+    }
+
+    private Task SaveStateAsync() => RunAsync(async () =>
+    {
+        var saved = await Reports.ChangeStateAsync(opened!.Id, newState, note, lifetime.Token);
+        opened = saved;
+        notice = $"Raportul {saved.Number} este acum „{saved.State}”.";
+        await LoadAsync();
+    }, "Starea nu a putut fi salvată.");
+
+    private Task DeleteAsync() => RunAsync(async () =>
+    {
+        var gone = deleting!;
+        await Reports.DeleteAsync(gone.Id, lifetime.Token);
+        if (opened?.Id == gone.Id) CloseDetail();
+        deleting = null;
+        notice = $"Raportul {gone.Number} a fost șters.";
+        await LoadAsync();
+    }, "Raportul nu a putut fi șters.");
+
+    private Task ExportOpenedAsync() => RunAsync(() => ExportAsync([opened!.Id]), "Exportul nu a putut fi făcut.");
+
+    private Task ExportFilteredAsync() => RunAsync(async () =>
+    {
+        var all = await Reports.QueryAsync(Query, 1, 0, lifetime.Token);
+        await ExportAsync([.. all.Items.Select(item => item.Id)]);
+    }, "Exportul nu a putut fi făcut.");
+
+    private async Task ExportAsync(IReadOnlyList<int> ids)
+    {
+        var export = await Reports.ExportAsync(ids, lifetime.Token);
+        downloads ??= await JS.InvokeAsync<IJSObjectReference>("import", "./file-download.js");
+        using var stream = new MemoryStream(export.Content);
+        using var reference = new DotNetStreamReference(stream);
+        await downloads.InvokeVoidAsync("downloadBinary", export.FileName, reference, "application/zip");
+        notice = $"Fișierul {export.FileName} a fost descărcat ({export.Reports} {(export.Reports == 1 ? "raport" : "rapoarte")}).";
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        lifetime.Cancel();
+        if (downloads is not null)
+        {
+            try { await downloads.DisposeAsync(); }
+            catch (Exception exception) when (exception is JSDisconnectedException or JSException or InvalidOperationException) { }
+        }
+        lifetime.Dispose();
+    }
+}

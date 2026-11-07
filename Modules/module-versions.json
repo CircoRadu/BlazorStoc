@@ -156,8 +156,8 @@
                                                  ]
                                  },
                     "Journal":  {
-                                    "version":  "1.4.14",
-                                    "hash":  "1e2f86ec2435f61eef2e892c7760265dfa9572cbc4761fb794616ef9bc5bf636",
+                                    "version":  "1.4.15",
+                                    "hash":  "0f5117dc41f9de92380faba8c0ee75ed957d36c43c12d8868cf5e0ec0ce3d41b",
                                     "history":  [
                                                     {
                                                         "version":  "1.0.0",
@@ -268,6 +268,11 @@
                                                         "version":  "1.4.14",
                                                         "date":  "06.11.2026",
                                                         "note":  "Filtrul de actiuni: Stabilire parola de catre administrator si Schimbare parola la prima autentificare"
+                                                    },
+                                                    {
+                                                        "version":  "1.4.15",
+                                                        "date":  "07.11.2026",
+                                                        "note":  "Filtrul de evenimente cunoaste rapoartele de erori (entitate si actiuni: creare, schimbare stare, stergere, export)"
                                                     }
                                                 ]
                                 },
@@ -546,8 +551,8 @@
                                                  ]
                                  },
                     "Elcomtur":  {
-                                     "version":  "1.3.0",
-                                     "hash":  "f724a049629bd6332649734c959042875eb75a96af33655ab831577bf3ac8453",
+                                     "version":  "1.3.1",
+                                     "hash":  "bc0d44e640faa3a6e5578aa3c1782555e2ee94d9a5041d2f5aa46127b9257958",
                                      "history":  [
                                                      {
                                                          "version":  "1.0.0",
@@ -573,8 +578,24 @@
                                                          "version":  "1.3.0",
                                                          "date":  "06.11.2026",
                                                          "note":  "Ora verificarii zilnice a preluarii automate se alege din setari"
+                                                     },
+                                                     {
+                                                         "version":  "1.3.1",
+                                                         "date":  "07.11.2026",
+                                                         "note":  "Corectie minora in panoul de preluare automata (0.5.49), versiune inregistrata ulterior"
                                                      }
                                                  ]
-                                 }
+                                 },
+                    "BugReports":  {
+                                       "version":  "1.0.0",
+                                       "hash":  "5dae579515986e50f07fef0aa2cdda504903f5488493759c9c97c6d9cd15eb12",
+                                       "history":  [
+                                                       {
+                                                           "version":  "1.0.0",
+                                                           "date":  "07.11.2026",
+                                                           "note":  "Versiune de pornire (inceputul versionarii modulelor)"
+                                                       }
+                                                   ]
+                                   }
                 }
 }

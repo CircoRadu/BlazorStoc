@@ -229,6 +229,16 @@ REPLACE INTO `beneficiary_work_points` (`id`, `beneficiary_id`, `name`, `address
 /*!40000 ALTER TABLE `beneficiary_work_points` ENABLE KEYS */;
 UNLOCK TABLES;
 
+LOCK TABLES `bug_report_files` WRITE;
+/*!40000 ALTER TABLE `bug_report_files` DISABLE KEYS */;
+/*!40000 ALTER TABLE `bug_report_files` ENABLE KEYS */;
+UNLOCK TABLES;
+
+LOCK TABLES `bug_reports` WRITE;
+/*!40000 ALTER TABLE `bug_reports` DISABLE KEYS */;
+/*!40000 ALTER TABLE `bug_reports` ENABLE KEYS */;
+UNLOCK TABLES;
+
 LOCK TABLES `catalog_settings` WRITE;
 /*!40000 ALTER TABLE `catalog_settings` DISABLE KEYS */;
 /*!40000 ALTER TABLE `catalog_settings` ENABLE KEYS */;
@@ -943,7 +953,8 @@ REPLACE INTO `schema_migrations` (`version`, `description`, `checksum`, `origin`
 (69,'Autentificare in doi pasi (TOTP) pentru accesul din afara retelei interne: secretul fiecarui utilizator (web_user_totp) si codurile de recuperare (web_user_recovery_codes)','117dd81dd5ee42c29332267e224d847f01cb515103974e18f4c71688b7654a35','applied','2026-11-06 11:56:08','0.5.45'),
 (70,'Autentificatorul asociat de administrator: stare suspendata (cont inactiv), ultima folosire (data si IP), cine l-a asociat si cine l-a confirmat: web_user_totp.suspended_utc, last_used_utc, last_used_ip, enrolled_by, confirmed_by','4247bf59c28f925c0790375176c83c5b043bc836a09e8584cf5d6ea46a0210c3','applied','2026-11-06 13:17:37','0.5.45'),
 (71,'Inlocuirea atomica a secretului autentificatorului (schimbarea telefonului): web_user_totp.pending_secret_protected','ff7236438b8db8f23501231ddd19cbbd13bc9832edd54d76d8372dd5fc5cc293','applied','2026-11-06 13:32:46','0.5.45'),
-(72,'Schimbarea parolei la prima autentificare: web_users.must_change_password','4854d1cb46e1ccbac890c1543a0e1c2fb7a553beea5c41f74a99bc62062f5922','applied','2026-11-06 15:11:42','0.5.46');
+(72,'Schimbarea parolei la prima autentificare: web_users.must_change_password','4854d1cb46e1ccbac890c1543a0e1c2fb7a553beea5c41f74a99bc62062f5922','applied','2026-11-06 15:11:42','0.5.46'),
+(73,'Raportare erori: rapoartele utilizatorilor (bug_reports) si imaginile lor (bug_report_files)','369a8048a88c0d4d3682377ea931882d346438d2eec3aa670416642deccc62fe','applied','2026-11-07 12:58:11','0.5.49');
 /*!40000 ALTER TABLE `schema_migrations` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -1581,6 +1592,9 @@ REPLACE INTO `user_type_permissions` (`user_type_id`, `permission_key`) VALUES (
 (1,'setari-backup.edit'),
 (1,'setari-backup.restore'),
 (1,'setari-backup.view'),
+(1,'setari-bug-raport.edit'),
+(1,'setari-bug-raport.export'),
+(1,'setari-bug-raport.view'),
 (1,'setari-facturi.add'),
 (1,'setari-facturi.delete'),
 (1,'setari-facturi.edit'),

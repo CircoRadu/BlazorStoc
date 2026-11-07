@@ -20,6 +20,7 @@ public static class HelpContents
         ("Analize de risc", ["analize-risc", "analizor-risc"]),
         ("Vehicule", ["vehicule"]),
         ("Notificări și jurnal", ["notificari", "jurnal"]),
+        ("Raportare erori", ["raportare-eroare"]),
         ("Categorii și nomenclator", ["categorii", "nomenclator"]),
         ("Setări și utilizatori", ["setari", "utilizatori"])
     ];

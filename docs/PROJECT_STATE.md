@@ -9,6 +9,12 @@ Actualizat: 27.10.2026, Europe/Bucharest (Claude, agent unic, mod `claude_only`)
 - Motorul de facturi este geometric (`Services/Invoices`); utilizatorii obisnuiti creeaza/modifica sabloane, stergerea ramane administratorului.
 - Harta codului: `docs/HARTA_COD.md`. Reguli permanente: `CLAUDE.md`.
 
+## Ultimul lucru facut (07.11.2026): versiunea 0.5.50 (raportare erori, coduri de recuperare .txt; branch claude/meniu-cont-utilizator)
+- Modul `Modules/BugReports` (1.0.0): `IBugReportService` (Maria, migrarea 73 `bug_reports`/`bug_report_files`, imaginile ca BLOB), fereastra `Components/Shared/BugReportDialog.razor` (intrarea din `MainLayout` deasupra de Ajutor, `wwwroot/bug-report.js`: captura paginii din DOM cu stiluri calculate, Ctrl+V), `BugReportsPanel.razor` (Setari -> Rapoarte erori, export ZIP). Permisiuni `setari-bug-raport.*` (doar administrator).
+- `AuthenticatorActions.razor`: fereastra Coduri de recuperare lata + Salveaza codurile (.txt).
+- Mentenanta (acte aditionale la contracte, nomenclator Componente mentenanta, contracte cu unitati) se lucreaza pe branch-ul `claude/acte-aditionale-componente-mentenanta`; propunerea: `docs/PROPUNERE_ACT_ADITIONAL_CONTRACT.md`.
+- Verificat: suita in memorie 2210, MariaDB 3550. Neverificat: descarcarea .txt a codurilor; help minim (`docs/HELP_DE_REGENERAT.md`).
+
 ## Ultimul lucru facut (06.11.2026): versiunea 0.5.45 (tichet exemplu, nume editabile, structura tichetelor, branch claude/tichet-exemplu-activityapp)
 - Tichet exemplu: `ActivityTicketSample.cs` (modele, `Preview`, `ToTicket`), `IActivitySource.ReadTicketSampleAsync` (cel mai recent tichet finalizat al tipurilor alese, apoi cel mai vechi urmator; toate coloanele din Tickete/EvenimenteAgent), `IActivityImportService.GetTicketSampleAsync` (drept de rulare, jurnal pe numarul tichetului), `Components/Shared/TicketSampleDialog.razor` (tabele, previzualizare, "Tichet anterior"/"Tichet mai nou", alegerea coloanei pentru o informatie sau camp suplimentar).
 - Nume editabile (`ActivityFieldMap.Labels`, `LabelOf`/`NoteLabelOf`); numele cu care au intrat in observatii se pastreaza pe inregistrarea sursa (`notes_labels`, migrarea 67) ca recitirea sa recunoasca textul generat.

@@ -847,3 +847,10 @@ Cerut de utilizator la 06.10.2026 (verificarea fluxului, apoi deciziile: facturi
 
 - Editorul de utilizatori (Setari -> Utilizatori): lista conditiilor parolei pe randuri separate, verificate la tastare, si Arata parola ca intrerupator (UserEditor.razor, PasswordRulesList.razor). Modificarile facute si in alte panouri din Setari (conturile bazei de date, parolele conexiunii, NAS, ActivityApp, Elcomtur) au fost retrase: cererea privea doar utilizatorii.
 - Verificat: suita completa la release (rulata de release.ps1).
+
+## Finalizat la 07.11.2026 16:16 - Versiunea 0.5.50: raportare erori si salvarea codurilor de recuperare
+
+- Modul nou Raportare erori (Modules/BugReports, migrarea 73): intrarea Raporteaza o eroare in meniu deasupra de Ajutor, fereastra cu sectiuni explicative inchise implicit, captura automata a paginii (din DOM), Ctrl+V, Rapoartele mele; Setari -> Rapoarte erori (filtre, stare + nota, stergere, export ZIP). Permisiuni setari-bug-raport.*; jurnal cu actiuni proprii.
+- Fereastra Coduri de recuperare (AuthenticatorActions): mai lata, codurile se rup la margine, buton Salveaza codurile (.txt).
+- Module: BugReports 1.0.0, Journal 1.4.15, Elcomtur 1.3.1 (versiune restanta din 0.5.49).
+- Verificat: suita completa in memorie 2210, MariaDB 3550, browser pe instanta separata (trimitere, captura, Ctrl+V, administrare, export ZIP, stergere). Neverificat cap-la-cap: descarcarea .txt a codurilor (cere asocierea unui autentificator real); help doar minim (docs/HELP_DE_REGENERAT.md).

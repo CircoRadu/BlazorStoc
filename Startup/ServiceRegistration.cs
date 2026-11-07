@@ -143,6 +143,7 @@ internal static class ServiceRegistration
         registry.Add(new ElcomturModule(), services, configuration);
         registry.Add(new JournalModule(), services, configuration);
         registry.Add(new ProjectObservationsModule(), services, configuration);
+        registry.Add(new BlazorStoc.Modules.BugReports.BugReportsModule(), services, configuration);
         return services;
     }
 

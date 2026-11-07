@@ -48,6 +48,7 @@ Directorul contine, pentru fiecare componenta a aplicatiei, un fisier cu pasii p
 | 15_Analize_de_risc.md | Analize de risc, reinnoiri, notificare de expirare | /analize-risc, fisa beneficiarului |
 | 16_Tipuri_de_utilizatori.md | Tipuri de utilizatori, permisiuni pe module/actiuni, Acces refuzat | /setari (Tipuri de utilizatori), /utilizatori |
 | 17_Help.md | Help contextual: iconita "?", popup cu fluxuri si elemente, cautare din pagina principala | toate ferestrele |
+| 20_Raportare_erori.md | Raportare erori: intrarea din meniu, captura automata, Ctrl+V, rapoartele mele, administrare si export ZIP | meniu (deasupra de Ajutor), /setari (Rapoarte erori) |
 
 ## Rularea testelor dintr-o pagina de lucru (unealta `tools/teste-utilizator.mjs`)
 

@@ -10,7 +10,7 @@ public sealed class ElcomturModule : IModule
 
     public string Id => ModuleId;
     public string Name => "Elcomtur";
-    public Version Version { get; } = new(1, 3, 0);
+    public Version Version { get; } = new(1, 3, 1);
     public IReadOnlyList<ModuleNavItem> Nav { get; } = [];
 
     public void Register(IServiceCollection services, IConfiguration configuration)

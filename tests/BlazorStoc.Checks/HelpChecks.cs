@@ -220,7 +220,9 @@ public static class HelpChecks
         // New 30.10.2026: the pictures are made on request (docs/HELP_DE_REGENERAT.md).
         "nomenclator-analizor-risc", "analizor-risc-editor", "beneficiari-fisiere",
         // New 06.11.2026: needs an ActivityApp connection to be photographed; the picture is made on request (docs/HELP_DE_REGENERAT.md).
-        "setari-tichet-exemplu"
+        "setari-tichet-exemplu",
+        // New 07.11.2026: the popup of the menu entry "Raporteaza o eroare"; the picture is made on request (docs/HELP_DE_REGENERAT.md).
+        "raportare-eroare"
     };
 
     // Elements that the demo environment cannot show in the state they describe (topic key|element name); the list only shrinks.

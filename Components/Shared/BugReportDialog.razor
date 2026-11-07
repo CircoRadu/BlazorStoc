@@ -1,0 +1,345 @@
+@namespace BlazorStoc.Components.Shared
+@using BlazorStoc.Modules
+@using BlazorStoc.Modules.BugReports
+@using Microsoft.AspNetCore.Components.Forms
+@inject IBugReportService Reports
+@inject IJSRuntime JS
+@inject ILogger<BugReportDialog> Logger
+@implements IAsyncDisposable
+@* Raportare eroare: the popup opened by the menu entry above "Ajutor" (wwwroot/bug-report.js). The script photographs the page BEFORE the popup shows and hands the picture to Opened;
+   Ctrl+V pictures arrive through AddPasted; a file can also be chosen. The flow is described at the top in sections that stay closed until opened. *@
+<dialog id="bug-dialog" class="delete-dialog bug-dialog" aria-labelledby="bug-title">
+    <div class="dialog-head"><h2 id="bug-title">Raportează o eroare</h2><HelpButton Topic="raportare-eroare" About="Raportare eroare" /></div>
+    <div class="bug-tabs" role="tablist" aria-label="Raportare erori">
+        <button type="button" role="tab" id="bug-tab-new" class="settings-tab @(tab == "new" ? "active" : "")" aria-selected="@(tab == "new")" @onclick="@(() => SelectTab("new"))">Raport nou</button>
+        <button type="button" role="tab" id="bug-tab-mine" class="settings-tab @(tab == "mine" ? "active" : "")" aria-selected="@(tab == "mine")" @onclick="@(() => SelectTab("mine"))">Rapoartele mele @if (mine is not null) { <span class="count-badge">@mine.Count</span> }</button>
+    </div>
+    @if (error is not null) { <div class="error-banner" role="alert" id="bug-error">@error</div> }
+
+    @if (tab == "new")
+    {
+        @if (sent is not null)
+        {
+            <div class="success-banner" role="status" id="bug-sent">Raportul <strong>@sent.Number</strong> a fost trimis. Mulțumim! Administratorul îl va analiza, iar starea lui o vezi în „Rapoartele mele”.</div>
+            <div class="editor-actions">
+                <button type="button" class="refresh act-confirm" id="bug-another" @onclick="NewReport">Raportează altă problemă</button>
+                <button type="button" class="refresh act-close" id="bug-close-sent" @onclick="CloseAsync">Închide</button>
+            </div>
+        }
+        else
+        {
+            <p class="muted bug-intro">Spune-ne ce nu a mers. Fereastra păstrează ce ai scris dacă o închizi; raportul pleacă doar când apeși <strong>Trimite raportul</strong>, și rămâne în aplicație, la dispoziția administratorului.</p>
+            <CollapsibleSection Id="bug-flow" RootClass="bug-help" HeaderRowClass="collapsible-header" ToggleClass="bug-help-toggle" ContentClass="bug-help-body" Expanded="false">
+                <Header>Cum funcționează raportarea, pas cu pas</Header>
+                <ChildContent>
+                    <ol>
+                        <li><strong>Pornești raportul.</strong> Apeși „Raportează o eroare” din meniul din stânga, deasupra lui „Ajutor”. Înainte să se deschidă această fereastră, aplicația fotografiază pagina pe care lucrai, ca administratorul să vadă exact ce vedeai tu.</li>
+                        <li><strong>Descrii problema.</strong> Scrii un titlu scurt, alegi gravitatea și povestești în descriere ce ai făcut, ce te așteptai să se întâmple și ce s-a întâmplat de fapt.</li>
+                        <li><strong>Verifici imaginile.</strong> Captura paginii apare ca prima imagine; o poți scoate dacă arată date pe care nu vrei să le trimiți. Poți adăuga imagini cu <kbd>Ctrl</kbd>+<kbd>V</kbd> sau alegând un fișier.</li>
+                        <li><strong>Alegi detaliile tehnice.</strong> Comutatorul „Atașez detaliile tehnice” este pornit; poți vedea exact ce se atașează și îl poți opri.</li>
+                        <li><strong>Trimiți.</strong> Apeși „Trimite raportul”. Primești un număr (de exemplu BUG-0042) care identifică raportul.</li>
+                        <li><strong>Urmărești.</strong> Administratorul analizează raportul și îi schimbă starea (Nou, În analiză, Rezolvat, Respins), eventual cu o notă. Le vezi în fila „Rapoartele mele”.</li>
+                    </ol>
+                </ChildContent>
+            </CollapsibleSection>
+            <CollapsibleSection Id="bug-auto" RootClass="bug-help" HeaderRowClass="collapsible-header" ToggleClass="bug-help-toggle" ContentClass="bug-help-body" Expanded="false">
+                <Header>Ce se atașează automat și ce nu</Header>
+                <ChildContent>
+                    <p>Odată cu raportul se salvează: pagina deschisă (adresa și titlul), numele tău de utilizator și tipul contului, versiunea aplicației, data și ora, tema, mărimea ferestrei, browserul și ultimele erori văzute de browser în această sesiune.</p>
+                    <p>Nu se colectează parole, chei, cookie-uri sau conținutul câmpurilor din formulare. Captura reprezintă pagina așa cum arăta; dacă pe ea sunt date sensibile, scoate imaginea înainte de trimitere.</p>
+                </ChildContent>
+            </CollapsibleSection>
+            <CollapsibleSection Id="bug-pictures" RootClass="bug-help" HeaderRowClass="collapsible-header" ToggleClass="bug-help-toggle" ContentClass="bug-help-body" Expanded="false">
+                <Header>Imagini: captura automată, Ctrl+V și fișiere</Header>
+                <ChildContent>
+                    <ul>
+                        <li><strong>Captura automată</strong> se face din conținutul paginii, fără permisiune de la browser. Părțile desenate special (harta, cadrele încorporate) pot lipsi sau ieși incomplete; în acest caz fă o captură cu instrumentul sistemului (Win+Shift+S) și lipește-o cu <kbd>Ctrl</kbd>+<kbd>V</kbd>.</li>
+                        <li><strong>Ctrl+V</strong> funcționează oriunde în această fereastră, când ai o imagine copiată. Textul copiat se lipește normal în câmpuri.</li>
+                        <li><strong>Alege fișiere</strong> adaugă imagini PNG, JPEG, GIF sau WebP, fiecare de cel mult @(BugReportRules.MaxImageBytes / 1024 / 1024) MB; în total cel mult @BugReportRules.MaxImages imagini.</li>
+                        <li>Pictograma coșului de lângă fiecare imagine o scoate din raport.</li>
+                    </ul>
+                </ChildContent>
+            </CollapsibleSection>
+            <CollapsibleSection Id="bug-states" RootClass="bug-help" HeaderRowClass="collapsible-header" ToggleClass="bug-help-toggle" ContentClass="bug-help-body" Expanded="false">
+                <Header>Gravitate și stări</Header>
+                <ChildContent>
+                    <ul>
+                        <li><strong>Blocant</strong> – nu pot continua lucrul. <strong>Important</strong> – merge, dar greșit sau incomplet. <strong>Minor</strong> – deranjează, dar nu schimbă rezultatul. <strong>Sugestie</strong> – o idee de îmbunătățire.</li>
+                        <li>Stările unui raport: <strong>Nou</strong> (abia trimis), <strong>În analiză</strong> (administratorul s-a apucat de el), <strong>Rezolvat</strong>, <strong>Respins</strong> (nu este o problemă sau nu se poate reproduce; nota spune de ce).</li>
+                    </ul>
+                </ChildContent>
+            </CollapsibleSection>
+            <CollapsibleSection Id="bug-privacy" RootClass="bug-help" HeaderRowClass="collapsible-header" ToggleClass="bug-help-toggle" ContentClass="bug-help-body" Expanded="false">
+                <Header>Cine vede raportul</Header>
+                <ChildContent>
+                    <p>Raportul, cu imaginile lui, îl văd doar tu și administratorii. Nu se trimite pe email și nu iese din aplicație; administratorul îl poate exporta ca fișier ZIP.</p>
+                </ChildContent>
+            </CollapsibleSection>
+
+            <div class="editor-grid bug-form">
+                <label class="wide">Titlu scurt
+                    <input id="bug-title-input" maxlength="@BugReportRules.MaxTitle" @bind="title" @bind:event="oninput" disabled="@busy" placeholder="Ex.: Nu se salvează ieșirea din stoc" />
+                </label>
+                <label>Gravitate
+                    <select id="bug-severity" @bind="severity" disabled="@busy">
+                        @foreach (var item in BugReportRules.Severities) { <option value="@item">@item</option> }
+                    </select>
+                </label>
+                <label class="wide">Descriere
+                    <textarea id="bug-description" rows="7" maxlength="@BugReportRules.MaxDescription" @bind="description" @bind:event="oninput" disabled="@busy"
+                              placeholder="@DescriptionHint"></textarea>
+                    <small>@description.Length.ToString("N0") / @BugReportRules.MaxDescription.ToString("N0") caractere</small>
+                </label>
+            </div>
+
+            <h3 class="bug-subtitle">Imagini <span class="count-badge">@images.Count</span></h3>
+            @if (!capturedAuto)
+            {
+                <p class="muted" id="bug-no-capture">Captura automată a paginii nu a putut fi făcută. Poți lipi o imagine cu <kbd>Ctrl</kbd>+<kbd>V</kbd> sau alege un fișier.</p>
+            }
+            <div class="bug-images" id="bug-images">
+                @foreach (var image in images)
+                {
+                    var item = image;
+                    <figure class="bug-image">
+                        @if (item.DataUrl is not null) { <img src="@item.DataUrl" alt="@item.Label" /> }
+                        else { <div class="bug-image-large">@item.Name · @(item.Bytes.Length / 1024) KB</div> }
+                        <figcaption>@item.Label</figcaption>
+                        <button type="button" class="row-icon delete" aria-label="Scoate imaginea @item.Label din raport" title="Scoate imaginea @item.Label din raport" disabled="@busy" @onclick="() => images.Remove(item)"></button>
+                    </figure>
+                }
+            </div>
+            <div class="bug-add-images">
+                <label class="refresh act-confirm bug-file-button">Alege fișiere…<InputFile OnChange="OnFilesAsync" multiple accept="image/png,image/jpeg,image/gif,image/webp" disabled="@busy" /></label>
+                <span class="muted">sau apasă <kbd>Ctrl</kbd>+<kbd>V</kbd> cu o imagine copiată</span>
+            </div>
+
+            <div class="bug-tech">
+                <ToggleSwitch Id="bug-attach-tech" Value="attachTech" ValueChanged="value => attachTech = value" Disabled="busy" OnText="Atașez detaliile tehnice" OffText="Nu atașez detaliile tehnice" />
+                <CollapsibleSection Id="bug-tech-details" RootClass="bug-help" HeaderRowClass="collapsible-header" ToggleClass="bug-help-toggle" ContentClass="bug-help-body" Expanded="false">
+                    <Header>Detaliile tehnice care se atașează</Header>
+                    <ChildContent>
+                        <p class="muted">Se salvează numai pagina și titlul ei, plus textul de mai jos (dacă comutatorul este pornit).</p>
+                        <pre class="bug-tech-text" id="bug-tech-text">@(string.IsNullOrWhiteSpace(techJson) ? "(nimic)" : techJson)</pre>
+                    </ChildContent>
+                </CollapsibleSection>
+            </div>
+
+            @if (confirmDiscard)
+            {
+                <div class="error-banner" role="alert" id="bug-discard-confirm">Renunți la raport? Textul și imaginile se pierd.
+                    <span class="editor-actions"><button type="button" class="danger" id="bug-discard-yes" @onclick="DiscardAsync">Da, renunț</button><button type="button" class="refresh act-nav" id="bug-discard-no" @onclick="() => confirmDiscard = false">Nu, păstrează</button></span></div>
+            }
+            <div class="editor-actions">
+                <button type="button" class="primary" id="bug-send" disabled="@(busy)" @onclick="SendAsync">@(busy ? "Se trimite…" : "Trimite raportul")</button>
+                <button type="button" class="refresh act-nav" id="bug-hide" disabled="@busy" @onclick="CloseAsync">Închide (păstrează ciorna)</button>
+                <button type="button" class="refresh act-close" id="bug-discard" disabled="@busy" @onclick="AskDiscard">Renunță la raport</button>
+            </div>
+        }
+    }
+    else
+    {
+        <p class="muted bug-intro">Rapoartele trimise de tine, cele mai noi primele. Starea o schimbă administratorul.</p>
+        @if (mine is null) { <div class="empty-state" role="status"><div class="spinner"></div><h3>Se încarcă</h3></div> }
+        else if (mine.Count == 0) { <p class="muted" id="bug-mine-empty">Nu ai trimis niciun raport.</p> }
+        else
+        {
+            <Paged Items="mine" Id="bug-mine-size" Context="pageRows" DefaultSize="10">
+                <div class="table-scroll">
+                    <table class="bug-mine" id="bug-mine-table">
+                        <thead><tr><th>Număr</th><th>Titlu</th><th>Gravitate</th><th>Stare</th><th>Trimis</th><th>Nota administratorului</th></tr></thead>
+                        <tbody>
+                            @foreach (var report in pageRows)
+                            {
+                                <tr>
+                                    <td>@report.Number</td><td>@report.Title</td><td>@report.Severity</td><td>@report.State</td>
+                                    <td>@BugReportRules.Display(report.CreatedUtc)</td><td>@(report.AdminNote.Length == 0 ? "–" : report.AdminNote)</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </Paged>
+        }
+        <div class="editor-actions"><button type="button" class="refresh act-close" id="bug-close-mine" @onclick="CloseAsync">Închide</button></div>
+    }
+</dialog>
+
+@code {
+    private sealed class PendingImage(string kind, string name, byte[] bytes, string contentType)
+    {
+        public string Kind { get; } = kind;
+        public string Name { get; } = name;
+        public byte[] Bytes { get; } = bytes;
+        public string? DataUrl { get; } = bytes.Length <= 1_500_000 ? $"data:{contentType};base64,{Convert.ToBase64String(bytes)}" : null;
+        public string Label => Kind switch { BugReportRules.KindScreenshot => "Captura paginii", BugReportRules.KindFile => Name, _ => "Imagine lipită" };
+    }
+
+    private static readonly string DescriptionHint = string.Join(Environment.NewLine, "Ce ai făcut (pașii)?", "Ce te așteptai să se întâmple?", "Ce s-a întâmplat de fapt (mesajul afișat, ce lipsește)?");
+    private readonly List<PendingImage> images = [];
+    private DotNetObjectReference<BugReportDialog>? self;
+    private string tab = "new", title = "", description = "", severity = BugReportRules.SeverityImportant, route = "", pageTitle = "", techJson = "";
+    private bool attachTech = true, busy, capturedAuto = true, confirmDiscard;
+    private string? error;
+    private BugReport? sent;
+    private IReadOnlyList<BugReport>? mine;
+    private readonly CancellationTokenSource lifetime = new();
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+        self = DotNetObjectReference.Create(this);
+        try { await JS.InvokeVoidAsync("bugReport.register", self); }
+        catch (Exception exception) when (exception is JSException or InvalidOperationException or TaskCanceledException) { }
+    }
+
+    private static async Task<byte[]> ReadAsync(IJSStreamReference reference)
+    {
+        await using var stream = await reference.OpenReadStreamAsync(BugReportRules.MaxImageBytes + 1);
+        using var buffer = new MemoryStream();
+        await stream.CopyToAsync(buffer);
+        return buffer.ToArray();
+    }
+
+    // Called by the script when the user opens the popup: the picture of the page under it (null when it could not be made), the address, the title and the technical details.
+    [JSInvokable]
+    public async Task Opened(IJSStreamReference? screenshot, string pageRoute, string pageName, string tech)
+    {
+        route = pageRoute; pageTitle = pageName; techJson = tech;
+        images.RemoveAll(item => item.Kind == BugReportRules.KindScreenshot);
+        capturedAuto = false;
+        if (screenshot is not null)
+        {
+            try
+            {
+                var bytes = await ReadAsync(screenshot);
+                if (BugReportRules.DetectImageType(bytes) is { } type && bytes.Length <= BugReportRules.MaxImageBytes)
+                {
+                    images.Insert(0, new PendingImage(BugReportRules.KindScreenshot, "pagina" + BugReportRules.Extension(type), bytes, type));
+                    capturedAuto = true;
+                }
+            }
+            catch (Exception exception) when (exception is not OperationCanceledException) { Logger.LogWarning("The capture of the page could not be read ({ErrorType}).", exception.GetType().Name); }
+        }
+        if (sent is not null) ResetForm();
+        tab = "new"; error = null; confirmDiscard = false;
+        await InvokeAsync(StateHasChanged);
+    }
+
+    [JSInvokable]
+    public async Task AddPasted(IJSStreamReference picture, string name)
+    {
+        try
+        {
+            var bytes = await ReadAsync(picture);
+            AddImage(BugReportRules.KindPasted, name, bytes);
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            Logger.LogWarning("A pasted picture could not be read ({ErrorType}).", exception.GetType().Name);
+            error = "Imaginea lipită nu a putut fi citită.";
+        }
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private void AddImage(string kind, string name, byte[] bytes)
+    {
+        if (sent is not null) return;
+        if (images.Count >= BugReportRules.MaxImages) { error = $"Poți atașa cel mult {BugReportRules.MaxImages} imagini."; return; }
+        if (bytes.Length > BugReportRules.MaxImageBytes) { error = $"Imaginea „{name}” depășește {BugReportRules.MaxImageBytes / 1024 / 1024} MB."; return; }
+        if (BugReportRules.DetectImageType(bytes) is not { } type) { error = $"Fișierul „{name}” nu este o imagine (PNG, JPEG, GIF sau WebP)."; return; }
+        error = null;
+        images.Add(new PendingImage(kind, BugReportRules.SafeName(name, "imagine" + BugReportRules.Extension(type)), bytes, type));
+    }
+
+    private async Task OnFilesAsync(InputFileChangeEventArgs args)
+    {
+        error = null;
+        foreach (var file in args.GetMultipleFiles(BugReportRules.MaxImages))
+        {
+            try
+            {
+                await using var stream = file.OpenReadStream(BugReportRules.MaxImageBytes);
+                using var buffer = new MemoryStream();
+                await stream.CopyToAsync(buffer, lifetime.Token);
+                AddImage(BugReportRules.KindFile, file.Name, buffer.ToArray());
+            }
+            catch (IOException) { error = $"Fișierul „{file.Name}” depășește {BugReportRules.MaxImageBytes / 1024 / 1024} MB."; }
+        }
+    }
+
+    private async Task SelectTab(string value)
+    {
+        tab = value; error = null;
+        if (value != "mine") return;
+        mine = null;
+        await LoadMineAsync();
+    }
+
+    private async Task LoadMineAsync()
+    {
+        try { mine = await Reports.GetMineAsync(lifetime.Token); }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (Exception exception) when (exception is AccessDeniedException or ModuleUnavailableException) { error = exception.Message; mine = []; }
+        catch (Exception exception)
+        {
+            Logger.LogError("The reports of the user could not be read ({ErrorType}).", exception.GetType().Name);
+            error = "Rapoartele nu au putut fi citite. Încearcă din nou.";
+            mine = [];
+        }
+    }
+
+    private async Task SendAsync()
+    {
+        if (busy) return;
+        busy = true; error = null;
+        try
+        {
+            var input = new BugReportInput(title, description, severity, route, pageTitle, attachTech ? techJson : "",
+                [.. images.Select(item => new BugReportImage(item.Kind, item.Name, item.Bytes))]);
+            sent = await Reports.CreateAsync(input, lifetime.Token);
+            ResetForm(keepSent: true);
+            mine = null;
+        }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (Exception exception) when (exception is BugReportException or AccessDeniedException or ModuleUnavailableException) { error = exception.Message; }
+        catch (Exception exception)
+        {
+            Logger.LogError("A bug report could not be saved ({ErrorType}).", exception.GetType().Name);
+            error = "Raportul nu a putut fi salvat. Ce ai scris a rămas în fereastră; încearcă din nou.";
+        }
+        finally { busy = false; }
+    }
+
+    private void ResetForm(bool keepSent = false)
+    {
+        title = description = ""; severity = BugReportRules.SeverityImportant; attachTech = true; confirmDiscard = false;
+        images.RemoveAll(item => item.Kind != BugReportRules.KindScreenshot || keepSent);
+        if (!keepSent) sent = null;
+    }
+
+    private void NewReport() { sent = null; ResetForm(); error = null; }
+
+    private void AskDiscard()
+    {
+        if (title.Length == 0 && description.Length == 0 && images.All(item => item.Kind == BugReportRules.KindScreenshot)) { _ = CloseAsync(); return; }
+        confirmDiscard = true;
+    }
+
+    private async Task DiscardAsync() { ResetForm(); await CloseAsync(); }
+
+    private async Task CloseAsync()
+    {
+        try { await JS.InvokeVoidAsync("bugReport.close"); }
+        catch (Exception exception) when (exception is JSException or InvalidOperationException or TaskCanceledException) { }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        lifetime.Cancel();
+        try { await JS.InvokeVoidAsync("bugReport.unregister"); }
+        catch (Exception exception) when (exception is JSException or InvalidOperationException or TaskCanceledException or JSDisconnectedException) { }
+        self?.Dispose();
+        lifetime.Dispose();
+    }
+}
