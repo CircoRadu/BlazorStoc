@@ -22,10 +22,10 @@ public sealed record ReviewWorkPoint(int Id, string Name, string Address);
 
 /// <summary>Everything the popup of a ticket shows and the editor starts from: the ticket as read from ActivityApp, the points of the beneficiary, the notes each category would get.</summary>
 public sealed record ActivityReviewDetail(ActivityReviewItem Item, int BeneficiaryId, int WorkPointId, TicketSource Source, IReadOnlyList<ReviewWorkPoint> WorkPoints, bool Covered,
-    string NotesService, string NotesMaintenance, ReviewCategory Proposed, bool Legacy);
+    string NotesService, string NotesMaintenance, ReviewCategory Proposed, bool Legacy, InterventionComponentChoice? Components = null);
 
 /// <summary>An edit + take: what the operator chose for the intervention that is recorded.</summary>
-public sealed record ReviewTakeInput(ReviewCategory Category, int WorkPointId, DateOnly PerformedOn, string? Notes);
+public sealed record ReviewTakeInput(ReviewCategory Category, int WorkPointId, DateOnly PerformedOn, string? Notes, IReadOnlyList<int>? ComponentIds = null);
 
 /// <summary>A ticket discarded by the operator (never read again unless it is reactivated).</summary>
 public sealed record ActivityDiscardedTicket(long TicketId, string TicketNumber, string Title, string DiscardedBy, DateTime DiscardedUtc, bool CanReactivate);
@@ -40,6 +40,8 @@ public interface IActivityReviewService
     Task DecideAsync(long id, ReviewDecision decision, CancellationToken cancellationToken = default);
     /// <summary>Edit + take: records the intervention with what the operator chose.</summary>
     Task TakeAsync(long id, ReviewTakeInput input, CancellationToken cancellationToken = default);
+    /// <summary>The components the operator can choose for the ticket when the intervention is recorded at the work point.</summary>
+    Task<InterventionComponentChoice> GetComponentChoiceAsync(long id, int workPointId, CancellationToken cancellationToken = default) => Task.FromResult(InterventionComponentChoice.None);
     /// <summary>The tickets discarded, newest first.</summary>
     Task<IReadOnlyList<ActivityDiscardedTicket>> GetDiscardedAsync(CancellationToken cancellationToken = default);
     /// <summary>The ticket as read from ActivityApp, to view a discarded one (read only).</summary>
@@ -169,10 +171,20 @@ public sealed class MariaActivityReviewService(IConfiguration configuration, IAc
         try { covered = interventions is not null && await interventions.IsCoveredAsync(row.BeneficiaryId, row.WorkPointId, cancellationToken).ConfigureAwait(false); }
         catch (ModuleUnavailableException) { }
         var keyword = item.Keyword;
+        var components = InterventionComponentChoice.None;
+        try { if (interventions is not null) components = await interventions.GetComponentChoiceAsync(row.BeneficiaryId, row.WorkPointId, cancellationToken).ConfigureAwait(false); }
+        catch (ModuleUnavailableException) { }
         return new ActivityReviewDetail(item, row.BeneficiaryId, row.WorkPointId, source, points, covered,
             ActivityTicketPlanner.Notes(forNotes, map, keyword, false),
             ActivityTicketPlanner.Notes(forNotes, map, keyword, true, !covered),
-            item.Kind == ActivityTicketPlanner.ServiceKind ? ReviewCategory.Service : ReviewCategory.Maintenance, row.InterventionId is not null);
+            item.Kind == ActivityTicketPlanner.ServiceKind ? ReviewCategory.Service : ReviewCategory.Maintenance, row.InterventionId is not null, components);
+    }
+
+    public async Task<InterventionComponentChoice> GetComponentChoiceAsync(long id, int workPointId, CancellationToken cancellationToken = default)
+    {
+        if (interventions is null) return InterventionComponentChoice.None;
+        var row = await FindAsync(id, cancellationToken).ConfigureAwait(false);
+        return row is null ? InterventionComponentChoice.None : await interventions.GetComponentChoiceAsync(row.BeneficiaryId, workPointId, cancellationToken).ConfigureAwait(false);
     }
 
     // "Preluare" as it is: the category chosen, everything else as the ticket proposes it. A discard asks nothing more.
@@ -204,12 +216,12 @@ public sealed class MariaActivityReviewService(IConfiguration configuration, IAc
             if (row.InterventionId is { } existing)
             {
                 // A ticket proposed before the approval queue existed already has its on-demand intervention: the maintenance replaces it, the service keeps it.
-                interventionId = maintenance ? await ConvertToMaintenanceAsync(row, item, existing, cancellationToken).ConfigureAwait(false) : existing;
+                interventionId = maintenance ? await ConvertToMaintenanceAsync(row, item, existing, input.ComponentIds, cancellationToken).ConfigureAwait(false) : existing;
             }
             else
             {
                 interventionId = maintenance
-                    ? await interventions.RecordMaintenanceUncoveredAsync(row.BeneficiaryId, input.WorkPointId, input.PerformedOn, notes, cancellationToken).ConfigureAwait(false)
+                    ? await interventions.RecordMaintenanceUncoveredAsync(row.BeneficiaryId, input.WorkPointId, input.PerformedOn, notes, input.ComponentIds ?? [], cancellationToken).ConfigureAwait(false)
                     : await interventions.RecordAsync(row.BeneficiaryId, input.WorkPointId, input.PerformedOn, notes, cancellationToken).ConfigureAwait(false);
                 var stored = await ActivityTicketStore.FindAsync(configuration, row.TicketId, cancellationToken).ConfigureAwait(false);
                 if (stored is not null)
@@ -282,7 +294,7 @@ public sealed class MariaActivityReviewService(IConfiguration configuration, IAc
 
     // A ticket proposed before the queue (its on-demand intervention is already in the register) is confirmed as maintenance: the maintenance is recorded (the next due date moves by the cycle of
     // the contract when there is one), the ticket is tied to it, and the on-demand one is deleted.
-    private async Task<int> ConvertToMaintenanceAsync(Row row, ActivityReviewItem item, int onDemandId, CancellationToken cancellationToken)
+    private async Task<int> ConvertToMaintenanceAsync(Row row, ActivityReviewItem item, int onDemandId, IReadOnlyList<int>? componentIds, CancellationToken cancellationToken)
     {
         var stored = await ActivityTicketStore.FindAsync(configuration, row.TicketId, cancellationToken).ConfigureAwait(false);
         var (problem, resolution) = stored is null ? ("", item.Resolution) : ActivityTicketPlanner.SplitReport(stored.Ticket.Problem, stored.Ticket.Report);
@@ -290,7 +302,7 @@ public sealed class MariaActivityReviewService(IConfiguration configuration, IAc
         var map = await ActivityFieldSettingsStore.ReadAsync(configuration, cancellationToken).ConfigureAwait(false);
         var notes = stored is null ? ActivityTicketPlanner.Notes(item.TicketNumber, item.Title, problem, resolution, "", row.Keyword, true, !covered)
             : ActivityTicketPlanner.Notes(ActivityTicketPlanner.SourceOf(stored.Ticket, map), map, row.Keyword, true, !covered);
-        var maintenanceId = await interventions.RecordMaintenanceUncoveredAsync(row.BeneficiaryId, row.WorkPointId, row.PerformedOn, notes, cancellationToken).ConfigureAwait(false);
+        var maintenanceId = await interventions.RecordMaintenanceUncoveredAsync(row.BeneficiaryId, row.WorkPointId, row.PerformedOn, notes, componentIds ?? [], cancellationToken).ConfigureAwait(false);
         await ExecuteAsync("UPDATE service_intervention_source SET intervention_id=@new WHERE intervention_id=@old", p => { p.AddWithValue("@new", maintenanceId); p.AddWithValue("@old", onDemandId); }, cancellationToken).ConfigureAwait(false);
         await ExecuteAsync("UPDATE activity_import_map SET local_id=@new WHERE entity='ticket' AND source_id=@ticket", p => { p.AddWithValue("@new", maintenanceId); p.AddWithValue("@ticket", row.TicketId); }, cancellationToken).ConfigureAwait(false);
         await ExecuteAsync("UPDATE activity_import_tickets SET intervention_id=@new, updated_utc=@now WHERE ticket_id=@ticket", p => { p.AddWithValue("@new", maintenanceId); p.AddWithValue("@now", DateTime.UtcNow); p.AddWithValue("@ticket", row.TicketId); }, cancellationToken).ConfigureAwait(false);
@@ -431,6 +443,7 @@ internal sealed class GuardedActivityReviewService(IActivityReviewService inner,
     public Task<ActivityReviewDetail> GetDetailAsync(long id, CancellationToken cancellationToken = default) => modules.RunAsync(Id, () => inner.GetDetailAsync(id, cancellationToken));
     public Task DecideAsync(long id, ReviewDecision decision, CancellationToken cancellationToken = default) => modules.RunAsync(Id, () => inner.DecideAsync(id, decision, cancellationToken));
     public Task TakeAsync(long id, ReviewTakeInput input, CancellationToken cancellationToken = default) => modules.RunAsync(Id, () => inner.TakeAsync(id, input, cancellationToken));
+    public Task<InterventionComponentChoice> GetComponentChoiceAsync(long id, int workPointId, CancellationToken cancellationToken = default) => modules.RunAsync(Id, () => inner.GetComponentChoiceAsync(id, workPointId, cancellationToken));
     public Task<IReadOnlyList<ActivityDiscardedTicket>> GetDiscardedAsync(CancellationToken cancellationToken = default) => modules.RunAsync(Id, () => inner.GetDiscardedAsync(cancellationToken));
     public Task<TicketSource> GetDiscardedDetailAsync(long ticketId, CancellationToken cancellationToken = default) => modules.RunAsync(Id, () => inner.GetDiscardedDetailAsync(ticketId, cancellationToken));
     public Task ReactivateAsync(long ticketId, CancellationToken cancellationToken = default) => modules.RunAsync(Id, () => inner.ReactivateAsync(ticketId, cancellationToken));

@@ -43,6 +43,10 @@ public sealed class ServiceInterventionInput : IValidatableObject
     // Maintenance only, set by the ActivityApp ticket approval: a maintenance of a point that no active contract covers (a contract not recorded yet) is accepted; it moves no due date and has no contract.
     public bool AllowUncovered { get; set; }
 
+    // Maintenance only: the components (nomenclator Componente mentenanta) the intervention covered. Under a complete contract only the units that cover them have their due dates moved;
+    // empty = every unit of the point (older interventions, an automatic take).
+    public List<int> ComponentIds { get; set; } = [];
+
     public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
     {
         if (WorkPointId <= 0) yield return new("Alege punctul de lucru.", [nameof(WorkPointId)]);
@@ -56,6 +60,7 @@ public sealed class ServiceInterventionInput : IValidatableObject
         var normalized = new ServiceInterventionInput
         {
             Kind = Kind, WorkPointId = WorkPointId, PerformedOn = PerformedOn, Basis = Basis, ChosenDue = ChosenDue, AllowUncovered = AllowUncovered,
+            ComponentIds = [.. ComponentIds.Distinct()],
             Notes = TextNormalization.ForStorage((Notes ?? "").Replace("\r\n", "\n"))
         };
         var results = new List<ValidationResult>();
@@ -69,6 +74,15 @@ public sealed class ServiceInterventionInput : IValidatableObject
         Kind = value.Kind, WorkPointId = value.WorkPointId, PerformedOn = value.PerformedOn, Notes = value.Notes,
         Basis = value.Basis ?? ServiceNextDueBasis.FromPerformed, ChosenDue = value.Basis == ServiceNextDueBasis.Chosen ? value.NextDueSet : null
     };
+}
+
+/// <summary>One component an intervention can cover (Group = its family, or "Componentă discretă").</summary>
+public sealed record InterventionComponentOption(int ComponentId, string Name, string Group);
+
+/// <summary>The components offered for a work point: under a complete contract only the ones the contract covers (Required: at least one must be chosen); otherwise every active component of the nomenclator.</summary>
+public sealed record InterventionComponentChoice(IReadOnlyList<InterventionComponentOption> Options, bool Required)
+{
+    public static InterventionComponentChoice None { get; } = new([], false);
 }
 
 /// <summary>The ActivityApp ticket an intervention was taken from (kept apart from the notes): number, title, problem, resolution, the report as written and the executor.</summary>
@@ -102,6 +116,11 @@ public interface IServiceInterventionRepository
     Task DeleteAsync(ServiceIntervention original, string reason, CancellationToken cancellationToken = default);
     /// <summary>The ticket an intervention was taken from, or null for one recorded by hand.</summary>
     Task<InterventionTicket?> GetTicketAsync(int interventionId, CancellationToken cancellationToken = default) => Task.FromResult<InterventionTicket?>(null);
+    /// <summary>The components covered by each of the interventions (an intervention without components is not in the answer).</summary>
+    Task<IReadOnlyDictionary<int, IReadOnlyList<int>>> GetComponentsAsync(IReadOnlyCollection<int> interventionIds, CancellationToken cancellationToken = default) =>
+        Task.FromResult<IReadOnlyDictionary<int, IReadOnlyList<int>>>(new Dictionary<int, IReadOnlyList<int>>());
+    /// <summary>The components a maintenance intervention of the work point can cover.</summary>
+    Task<InterventionComponentChoice> GetComponentChoiceAsync(int beneficiaryId, int workPointId, CancellationToken cancellationToken = default) => Task.FromResult(InterventionComponentChoice.None);
 }
 
 public static class ServiceInterventionRules

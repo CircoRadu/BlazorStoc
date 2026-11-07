@@ -208,12 +208,13 @@ internal static class MariaArchivePersistence
                 var serviceContract = ArchiveJson.Entity<ServiceContract>(snapshot);
                 await ExecuteAsync(connection, transaction, """
                     INSERT INTO archive_service_contracts
-                        (archive_id,original_id,beneficiary_id,contract_number,contract_date,cycle_months,valid_until,is_active,notes,version)
-                    VALUES(@archiveId,@id,@beneficiary,@number,@date,@cycle,@validUntil,@active,@notes,@version)
+                        (archive_id,original_id,beneficiary_id,contract_number,contract_date,cycle_months,valid_until,is_active,notes,version,reference_date,is_frozen)
+                    VALUES(@archiveId,@id,@beneficiary,@number,@date,@cycle,@validUntil,@active,@notes,@version,@reference,@frozen)
                     """, token, ("@archiveId", operation.Id.ToString("D")), ("@id", serviceContract.Id), ("@beneficiary", serviceContract.BeneficiaryId),
                     ("@number", serviceContract.Number), ("@date", serviceContract.Date.ToDateTime(TimeOnly.MinValue)), ("@cycle", serviceContract.CycleMonths),
                     ("@validUntil", serviceContract.ValidUntil?.ToDateTime(TimeOnly.MinValue)), ("@active", serviceContract.IsActive ? 1 : 0),
-                    ("@notes", serviceContract.Notes), ("@version", serviceContract.Version)).ConfigureAwait(false);
+                    ("@notes", serviceContract.Notes), ("@version", serviceContract.Version),
+                    ("@reference", serviceContract.ReferenceDate?.ToDateTime(TimeOnly.MinValue)), ("@frozen", serviceContract.IsFrozen ? 1 : 0)).ConfigureAwait(false);
                 break;
             case AuditEntities.RiskAnalysis:
                 var riskAnalysis = ArchiveJson.Entity<RiskAnalysis>(snapshot);

@@ -11,12 +11,14 @@ public sealed class MaintenanceModule : IModule
 
     public string Id => ModuleId;
     public string Name => "Mentenanță";
-    public Version Version { get; } = new(1, 7, 2);
+    public Version Version { get; } = new(1, 10, 0);
     public IReadOnlyList<ModuleNavItem> Nav { get; } = [new("/mentenanta", "Mentenanță", "⚒", ModuleId)];
 
     public void Register(IServiceCollection services, IConfiguration configuration)
     {
         services.AddScoped<IServiceContractRepository>(provider => new GuardedServiceContractRepository(
+            ActivatorUtilities.CreateInstance<MariaServiceContractRepository>(provider), provider.GetRequiredService<ModuleRegistry>()));
+        services.AddScoped<IServiceContractAddendumRepository>(provider => new GuardedServiceContractAddendumRepository(
             ActivatorUtilities.CreateInstance<MariaServiceContractRepository>(provider), provider.GetRequiredService<ModuleRegistry>()));
         services.AddScoped<IServiceInterventionRepository>(provider => new GuardedServiceInterventionRepository(
             ActivatorUtilities.CreateInstance<MariaServiceInterventionRepository>(provider), provider.GetRequiredService<ModuleRegistry>()));
@@ -34,6 +36,7 @@ public sealed class MaintenanceModule : IModule
     public void RegisterUnavailable(IServiceCollection services)
     {
         services.AddScoped<IServiceContractRepository, UnavailableServiceContractRepository>();
+        services.AddScoped<IServiceContractAddendumRepository, UnavailableServiceContractAddendumRepository>();
         services.AddScoped<IServiceInterventionRepository, UnavailableServiceInterventionRepository>();
         services.AddScoped<IOnDemandInterventionRecorder, UnavailableOnDemandInterventionRecorder>();
         services.AddScoped<IOnDemandInterventionRecorderFactory, UnavailableOnDemandInterventionRecorderFactory>();

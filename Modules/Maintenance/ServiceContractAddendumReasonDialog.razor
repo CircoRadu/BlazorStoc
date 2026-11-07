@@ -1,0 +1,37 @@
+@namespace BlazorStoc.Components.Pages
+@using BlazorStoc.Services
+@* The confirmation of the cancellation or of the deletion of an addendum: what happens and the reason (kept in the journal). *@
+<div class="delete-overlay">
+    <section class="delete-dialog" role="dialog" aria-modal="true" aria-labelledby="addendum-reason-title">
+        <h2 id="addendum-reason-title">@Title</h2>
+        <p class="delete-object">@ObjectLabel</p>
+        <p class="muted">@Description</p>
+        <ChangeReasonField Id="addendum-reason" Value="reason" ValueChanged="value => { reason = value; reasonError = null; }" Error="@reasonError" Disabled="Busy" Hint="Motivul se păstrează în jurnalul de activitate." />
+        @if (Error is not null) { <div class="error-banner" role="alert">@Error</div> }
+        <div class="editor-actions">
+            <button type="button" class="@(Danger ? "danger" : "primary")" id="addendum-reason-confirm" disabled="@Busy" @onclick="ConfirmAsync">@(Busy ? "Se execută…" : ConfirmText)</button>
+            <button type="button" class="refresh act-close" id="addendum-reason-cancel" disabled="@Busy" @onclick="() => Cancelled.InvokeAsync()">Renunță</button>
+        </div>
+    </section>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public string Title { get; set; } = "";
+    [Parameter, EditorRequired] public string ObjectLabel { get; set; } = "";
+    [Parameter] public string Description { get; set; } = "";
+    [Parameter] public string ConfirmText { get; set; } = "Confirmă";
+    [Parameter] public bool Danger { get; set; }
+    [Parameter] public bool Busy { get; set; }
+    [Parameter] public string? Error { get; set; }
+    [Parameter, EditorRequired] public EventCallback<string> Confirmed { get; set; }
+    [Parameter, EditorRequired] public EventCallback Cancelled { get; set; }
+
+    private string reason = "";
+    private string? reasonError;
+
+    private async Task ConfirmAsync()
+    {
+        if (ChangeReasonRules.ValidationError(reason) is { } message) { reasonError = message; return; }
+        await Confirmed.InvokeAsync(reason);
+    }
+}

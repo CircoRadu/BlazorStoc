@@ -290,7 +290,7 @@ public static class ElcomturChecks
         context.Services.AddSingleton<IElcomturAutoAlertReader>(new FakeAutoAlerts(auto));
         var cut = context.Render<BlazorStoc.Components.Pages.ElcomturAutoPanel>();
         check(cut.FindAll("#elcomtur-auto-path").Count == 1 && cut.FindAll("#elcomtur-auto-user").Count == 1 && cut.FindAll("#elcomtur-auto-password").Count == 1 && cut.FindAll("#elcomtur-auto-mask").Count == 1
-            && cut.FindAll("#elcomtur-auto-days").Count == 1 && cut.FindAll("input[role=switch]").Count == 1 && !cut.Find("input[role=switch]").HasAttribute("checked") && cut.Find("#elcomtur-auto-status").TextContent.Contains("Nicio verificare"),
+            && cut.FindAll("#elcomtur-auto-days").Count == 1 && cut.FindAll("input[role=switch]").Count == 2 && !cut.Find("input[role=switch]").HasAttribute("checked") && cut.Find("#elcomtur-auto-status").TextContent.Contains("Nicio verificare"),
             "Elcomtur automatic panel: the directory, account, password, mask, firm and threshold fields and the On/Off switch are shown (off at first), with no check yet");
         cut.Find("#elcomtur-auto-path").Change(@"\\nas\backup\elcomtur");
         cut.Find("#elcomtur-auto-user").Change("elcomtur");

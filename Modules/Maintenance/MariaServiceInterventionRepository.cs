@@ -24,10 +24,10 @@ public sealed class MariaServiceInterventionRepository(
     private sealed record Pending(string Action, string Target, string Details, string Motif);
 
     // The coverage row of a work point in an ACTIVE contract, with the contract fields the due date needs.
-    private sealed record Coverage(int PointId, int ContractId, int? PointCycle, DateOnly NextDue, long PointVersion, string ContractNumber, DateOnly ContractDate, int ContractCycle)
+    private sealed record Coverage(int PointId, int ContractId, int? PointCycle, DateOnly NextDue, long PointVersion, string ContractNumber, DateOnly ContractDate, int? ContractCycle, bool Frozen)
     {
         public string Label => ServiceContractNumber.Format(ContractNumber, ContractDate);
-        public int Cycle => PointCycle ?? ContractCycle;
+        public int Cycle => PointCycle ?? ContractCycle ?? ServiceContractRules.MinimumCycle;
     }
 
     public async Task<IReadOnlyList<ServiceIntervention>> GetForBeneficiaryAsync(int beneficiaryId, CancellationToken cancellationToken = default)
@@ -102,20 +102,47 @@ public sealed class MariaServiceInterventionRepository(
             string? contractLabel = null;
             DateOnly? plannedDue = null, newDue = null;
             ServiceNextDueBasis? basis = null;
+            var frozenContract = false;
+            if (value.Kind == ServiceInterventionKind.Maintenance && value.ComponentIds.Count > 0)
+                await EnsureComponentsExistAsync(connection, transaction, value.ComponentIds, cancellationToken).ConfigureAwait(false);
+            var unitSnapshot = new List<(int UnitId, DateOnly Planned, DateOnly NewDue)>();
             if (value.Kind == ServiceInterventionKind.Maintenance)
             {
                 var coverage = await LockCoverageAsync(connection, transaction, value.WorkPointId, beneficiaryId, cancellationToken).ConfigureAwait(false);
                 if (coverage is null && !value.AllowUncovered) throw ServiceInterventionRules.NotCovered(workPointName);
                 // Without a contract (allowed only for an approved ActivityApp ticket): a maintenance with no contract and no due date to move.
                 if (coverage is not null) (contractId, contractLabel) = (coverage.ContractId, coverage.Label);
+                // A frozen contract (incomplete data) produces no effects: the intervention is recorded under it but the due date stays as it is.
+                frozenContract = coverage is { Frozen: true };
                 var latest = coverage is null ? null : await LatestMovingAsync(connection, transaction, value.WorkPointId, null, cancellationToken).ConfigureAwait(false);
-                if (coverage is not null && ServiceInterventionRules.Moves(performedOn, latest?.PerformedOn))
+                if (coverage is not null && !frozenContract && ServiceInterventionRules.Moves(performedOn, latest?.PerformedOn))
                 {
                     plannedDue = coverage.NextDue;
                     basis = value.Basis;
-                    newDue = ServiceInterventionRules.ResolveDue(value.Basis, performedOn, coverage.NextDue, coverage.Cycle, value.ChosenDue, out var dueError)
-                        ?? throw new ServiceInterventionOperationException(dueError!);
-                    await SetDueAsync(connection, transaction, coverage.PointId, coverage.PointVersion, coverage.ContractId, newDue.Value, cancellationToken).ConfigureAwait(false);
+                    // Every unit that covers the point moves (the components chosen by the intervention come with the next stage); the date of the point is the earliest of them.
+                    DateOnly? pointDue = null;
+                    var allDues = await LockDuesAsync(connection, transaction, coverage.PointId, cancellationToken).ConfigureAwait(false);
+                    var dues = allDues;
+                    if (dues.Count > 0 && value.ComponentIds.Count > 0)
+                        dues = await TouchedDuesAsync(connection, transaction, coverage.ContractId, dues, value.ComponentIds, cancellationToken).ConfigureAwait(false);
+                    if (dues.Count == 0)
+                        newDue = ServiceInterventionRules.ResolveDue(value.Basis, performedOn, coverage.NextDue, coverage.Cycle, value.ChosenDue, out var dueError)
+                            ?? throw new ServiceInterventionOperationException(dueError!);
+                    else
+                    {
+                        foreach (var due in dues)
+                        {
+                            var moved = ServiceInterventionRules.ResolveDue(value.Basis, performedOn, due.NextDue, due.Cycle ?? ServiceContractRules.MinimumCycle, value.ChosenDue, out var unitError)
+                                ?? throw new ServiceInterventionOperationException(unitError!);
+                            await SetUnitDueAsync(connection, transaction, due.Id, moved, cancellationToken).ConfigureAwait(false);
+                            unitSnapshot.Add((due.UnitId, due.NextDue, moved));
+                        }
+                        // The intervention keeps the dates of the units it moved (the next date is after the visit); the date of the POINT is the earliest of ALL its units.
+                        plannedDue = dues.Min(due => due.NextDue);
+                        newDue = unitSnapshot.Min(item => item.NewDue);
+                        pointDue = allDues.Min(due => unitSnapshot.FirstOrDefault(item => item.UnitId == due.UnitId) is { UnitId: > 0 } moved ? moved.NewDue : due.NextDue);
+                    }
+                    await SetDueAsync(connection, transaction, coverage.PointId, coverage.PointVersion, coverage.ContractId, pointDue ?? newDue!.Value, cancellationToken).ConfigureAwait(false);
                 }
             }
             await using var insert = Command(connection, transaction, """
@@ -128,12 +155,22 @@ public sealed class MariaServiceInterventionRepository(
                 ("@basis", basis is { } chosen ? ServiceInterventionRules.BasisCode(chosen).ToString() : null),
                 ("@dueSet", newDue is { } set ? SqlDate(set) : null), ("@notes", value.Notes), ("@recordedBy", actor), ("@recorded", MariaTimeText.Format(recorded)));
             await insert.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
+            if (value.Kind == ServiceInterventionKind.Maintenance)
+                foreach (var componentId in value.ComponentIds)
+                    await using (var save = Command(connection, transaction, "INSERT INTO service_intervention_components (intervention_id, component_id) VALUES (@intervention, @component)",
+                        ("@intervention", insert.LastInsertedId), ("@component", componentId)))
+                        await save.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
+            foreach (var item in unitSnapshot)
+                await using (var snapshot = Command(connection, transaction, "INSERT INTO service_intervention_unit_dues (intervention_id, unit_id, planned_due, next_due_set) VALUES (@intervention, @unit, @planned, @set)",
+                    ("@intervention", insert.LastInsertedId), ("@unit", item.UnitId), ("@planned", SqlDate(item.Planned)), ("@set", SqlDate(item.NewDue))))
+                    await snapshot.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
             var intervention = new ServiceIntervention(checked((int)insert.LastInsertedId), value.Kind, beneficiaryId, value.WorkPointId, contractId, workPointName,
                 workPointAddress, contractLabel, performedOn, plannedDue, basis, newDue, value.Notes, actor, recorded, 0);
             var details = ServiceInterventionRules.Identification(intervention);
             if (value.Kind == ServiceInterventionKind.Maintenance)
                 details += basis is { } used
                     ? $"; Varianta scadenței: {ServiceInterventionRules.BasisLabel(used)}; Scadența: {StockMovementRules.DisplayDate(plannedDue!.Value)} → {StockMovementRules.DisplayDate(newDue!.Value)}"
+                    : frozenContract ? "; Nu modifică scadența (contractul este înghețat: date incomplete)"
                     : "; Nu modifică scadența (există o intervenție de mentenanță mai recentă pentru punct)";
             pending.Add(new(value.Kind == ServiceInterventionKind.Maintenance ? AuditActions.RecordMaintenance : AuditActions.RecordOnDemand,
                 ServiceInterventionRules.Target(intervention, ownerName), details, string.Empty));
@@ -181,10 +218,35 @@ public sealed class MariaServiceInterventionRepository(
                 if (await LatestMovingAsync(connection, transaction, original.WorkPointId, original.Id, cancellationToken).ConfigureAwait(false) is { } previous && performedOn < previous.PerformedOn)
                     throw ServiceInterventionRules.BeforePrevious(previous.PerformedOn);
                 var row = await LockCoverageRowAsync(connection, transaction, original.ContractId!.Value, original.WorkPointId, cancellationToken).ConfigureAwait(false);
-                if (row is null || row.NextDue != original.NextDueSet) throw ServiceInterventionRules.DueMovedMeanwhile();
-                newDue = ServiceInterventionRules.ResolveDue(value.Basis, performedOn, original.PlannedDue!.Value, row.Cycle, value.ChosenDue, out var dueError)
-                    ?? throw new ServiceInterventionOperationException(dueError!);
-                await SetDueAsync(connection, transaction, row.PointId, row.PointVersion, row.ContractId, newDue.Value, cancellationToken).ConfigureAwait(false);
+                var snapshots = await ReadSnapshotAsync(connection, transaction, original.Id, cancellationToken).ConfigureAwait(false);
+                // With dates per unit the check is made per unit below; the date of the point is the earliest of all its units, not the date the intervention stored.
+                if (row is null || (snapshots.Count == 0 && row.NextDue != original.NextDueSet)) throw ServiceInterventionRules.DueMovedMeanwhile();
+                DateOnly? pointDueAfter = null;
+                if (snapshots.Count == 0)
+                    newDue = ServiceInterventionRules.ResolveDue(value.Basis, performedOn, original.PlannedDue!.Value, row.Cycle, value.ChosenDue, out var dueError)
+                        ?? throw new ServiceInterventionOperationException(dueError!);
+                else
+                {
+                    var dues = (await LockDuesAsync(connection, transaction, row.PointId, cancellationToken).ConfigureAwait(false)).ToDictionary(due => due.UnitId);
+                    var resolved = new List<(int UnitId, DateOnly Planned, DateOnly NewDue)>();
+                    foreach (var snapshot in snapshots)
+                    {
+                        if (!dues.TryGetValue(snapshot.UnitId, out var due) || due.NextDue != snapshot.NewDue) throw ServiceInterventionRules.DueMovedMeanwhile();
+                        var moved = ServiceInterventionRules.ResolveDue(value.Basis, performedOn, snapshot.Planned, due.Cycle ?? ServiceContractRules.MinimumCycle, value.ChosenDue, out var unitError)
+                            ?? throw new ServiceInterventionOperationException(unitError!);
+                        resolved.Add((snapshot.UnitId, snapshot.Planned, moved));
+                    }
+                    foreach (var item in resolved)
+                    {
+                        await SetUnitDueAsync(connection, transaction, dues[item.UnitId].Id, item.NewDue, cancellationToken).ConfigureAwait(false);
+                        await using var save = Command(connection, transaction, "UPDATE service_intervention_unit_dues SET next_due_set=@set WHERE intervention_id=@intervention AND unit_id=@unit",
+                            ("@set", SqlDate(item.NewDue)), ("@intervention", original.Id), ("@unit", item.UnitId));
+                        await save.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
+                    }
+                    newDue = resolved.Min(item => item.NewDue);
+                    pointDueAfter = dues.Values.Select(due => resolved.FirstOrDefault(item => item.UnitId == due.UnitId) is { UnitId: > 0 } item ? item.NewDue : due.NextDue).Min();
+                }
+                await SetDueAsync(connection, transaction, row.PointId, row.PointVersion, row.ContractId, pointDueAfter ?? newDue!.Value, cancellationToken).ConfigureAwait(false);
                 after = after with { Basis = value.Basis, NextDueSet = newDue };
             }
             if (after == original) return new ServiceInterventionSaved(original, original.NextDueSet, original.NextDueSet);
@@ -251,8 +313,20 @@ public sealed class MariaServiceInterventionRepository(
                     var current = await ServicePhotoArchive.ReadAsync(connection, transaction, "intervention_id=@id", token, ("@id", original.Id)).ConfigureAwait(false);
                     if (!current.Select(photo => photo.Id).Order().SequenceEqual(photos.Select(photo => photo.Id).Order())) throw ServiceInterventionRules.Changed();
                     if (original.MovesDue && await LatestMovingAsync(connection, transaction, original.WorkPointId, null, token).ConfigureAwait(false) is { } latest && latest.Id == original.Id &&
-                        await LockCoverageRowAsync(connection, transaction, original.ContractId!.Value, original.WorkPointId, token).ConfigureAwait(false) is { } row && row.NextDue == original.NextDueSet)
-                        await SetDueAsync(connection, transaction, row.PointId, row.PointVersion, row.ContractId, original.PlannedDue!.Value, token).ConfigureAwait(false);
+                        await LockCoverageRowAsync(connection, transaction, original.ContractId!.Value, original.WorkPointId, token).ConfigureAwait(false) is { } row && (row.NextDue == original.NextDueSet || (await ReadSnapshotAsync(connection, transaction, original.Id, token).ConfigureAwait(false)).Count > 0))
+                    {
+                        var snapshots = await ReadSnapshotAsync(connection, transaction, original.Id, token).ConfigureAwait(false);
+                        var restoredDue = original.PlannedDue!.Value;
+                        if (snapshots.Count > 0)
+                        {
+                            var dues = await LockDuesAsync(connection, transaction, row.PointId, token).ConfigureAwait(false);
+                            foreach (var snapshot in snapshots)
+                                if (dues.FirstOrDefault(due => due.UnitId == snapshot.UnitId) is { } due && due.NextDue == snapshot.NewDue)
+                                    await SetUnitDueAsync(connection, transaction, due.Id, snapshot.Planned, token).ConfigureAwait(false);
+                            restoredDue = dues.Select(due => snapshots.FirstOrDefault(snapshot => snapshot.UnitId == due.UnitId) is { } snapshot && due.NextDue == snapshot.NewDue ? snapshot.Planned : due.NextDue).Min();
+                        }
+                        await SetDueAsync(connection, transaction, row.PointId, row.PointVersion, row.ContractId, restoredDue, token).ConfigureAwait(false);
+                    }
                     await MariaArchivePersistence.InsertAsync(connection, transaction, operation, prepared, token).ConfigureAwait(false);
                     await using (var deletePhotos = Command(connection, transaction, "DELETE FROM service_photos WHERE intervention_id=@id", ("@id", original.Id)))
                         await deletePhotos.ExecuteNonQueryAsync(token).ConfigureAwait(false);
@@ -291,13 +365,14 @@ public sealed class MariaServiceInterventionRepository(
     }
 
     private const string CoverageSelect = """
-        SELECT p.id, p.contract_id, p.cycle_months, p.next_due, p.version, c.contract_number, c.contract_date, c.cycle_months
+        SELECT p.id, p.contract_id, p.cycle_months, p.next_due, p.version, c.contract_number, c.contract_date,
+               COALESCE((SELECT MIN(COALESCE(p.cycle_months, u.cycle_months, c.cycle_months)) FROM service_contract_units u WHERE u.contract_id = c.id AND u.is_active = 1), c.cycle_months), c.is_frozen
         FROM service_contract_points p JOIN service_contracts c ON c.id = p.contract_id
         """;
 
     private static Coverage ReadCoverage(MySqlDataReader reader) =>
         new(checked((int)reader.GetInt64(0)), checked((int)reader.GetInt64(1)), reader.IsDBNull(2) ? null : reader.GetInt32(2), ReadDate(reader, 3), reader.GetInt64(4),
-            reader.GetString(5), ReadDate(reader, 6), reader.GetInt32(7));
+            reader.GetString(5), ReadDate(reader, 6), reader.IsDBNull(7) ? null : reader.GetInt32(7), reader.GetInt32(8) != 0);
 
     // The coverage of the work point in its active contract (locked); null when no active contract covers it.
     private static async Task<Coverage?> LockCoverageAsync(MySqlConnection connection, MySqlTransaction transaction, int workPointId, int beneficiaryId, CancellationToken token)
@@ -366,4 +441,130 @@ public sealed class MariaServiceInterventionRepository(
 
     private static DateTime SqlDate(DateOnly date) => date.ToDateTime(TimeOnly.MinValue);
 
+    // ---- due dates per unit ----
+
+    private sealed record UnitDue(int Id, int UnitId, DateOnly NextDue, int? Cycle);
+    private sealed record UnitSnapshot(int UnitId, DateOnly Planned, DateOnly NewDue);
+
+    // The dates of the units that cover the point (locked), with the effective cycle of each (its own, else the one of the contract).
+    private static async Task<List<UnitDue>> LockDuesAsync(MySqlConnection connection, MySqlTransaction transaction, int pointId, CancellationToken token)
+    {
+        var rows = new List<UnitDue>();
+        await using var command = Command(connection, transaction, """
+            SELECT d.id, d.unit_id, d.next_due, COALESCE(p.cycle_months, u.cycle_months, c.cycle_months)
+            FROM service_contract_unit_dues d
+            JOIN service_contract_units u ON u.id = d.unit_id
+            JOIN service_contract_points p ON p.id = d.point_id
+            JOIN service_contracts c ON c.id = p.contract_id
+            WHERE d.point_id=@point ORDER BY d.unit_id FOR UPDATE
+            """, ("@point", pointId));
+        await using var reader = await command.ExecuteReaderAsync(token).ConfigureAwait(false);
+        while (await reader.ReadAsync(token).ConfigureAwait(false))
+            rows.Add(new(checked((int)reader.GetInt64(0)), checked((int)reader.GetInt64(1)), ReadDate(reader, 2), reader.IsDBNull(3) ? null : reader.GetInt32(3)));
+        return rows;
+    }
+
+    private static async Task SetUnitDueAsync(MySqlConnection connection, MySqlTransaction transaction, int dueId, DateOnly due, CancellationToken token)
+    {
+        await using var update = Command(connection, transaction, "UPDATE service_contract_unit_dues SET next_due=@due, version=version+1 WHERE id=@id", ("@due", SqlDate(due)), ("@id", dueId));
+        await update.ExecuteNonQueryAsync(token).ConfigureAwait(false);
+    }
+
+    private static async Task<List<UnitSnapshot>> ReadSnapshotAsync(MySqlConnection connection, MySqlTransaction transaction, int interventionId, CancellationToken token)
+    {
+        var rows = new List<UnitSnapshot>();
+        await using var command = Command(connection, transaction, "SELECT unit_id, planned_due, next_due_set FROM service_intervention_unit_dues WHERE intervention_id=@id ORDER BY unit_id", ("@id", interventionId));
+        await using var reader = await command.ExecuteReaderAsync(token).ConfigureAwait(false);
+        while (await reader.ReadAsync(token).ConfigureAwait(false)) rows.Add(new(checked((int)reader.GetInt64(0)), ReadDate(reader, 1), ReadDate(reader, 2)));
+        return rows;
+    }
+
+    // ---- components of an intervention ----
+
+    private static async Task EnsureComponentsExistAsync(MySqlConnection connection, MySqlTransaction transaction, IReadOnlyCollection<int> ids, CancellationToken token)
+    {
+        await using var command = Command(connection, transaction, $"SELECT COUNT(*) FROM maintenance_components WHERE id IN ({string.Join(",", ids)})");
+        if (Convert.ToInt32(await command.ExecuteScalarAsync(token).ConfigureAwait(false)) != ids.Count)
+            throw new ServiceInterventionOperationException("O componentă aleasă nu mai există în nomenclator. Actualizează pagina.");
+    }
+
+    // Under a complete contract the chosen components must be covered by it; the units that cover them are the ones whose dates move.
+    private static async Task<List<UnitDue>> TouchedDuesAsync(MySqlConnection connection, MySqlTransaction transaction, int contractId, List<UnitDue> dues, IReadOnlyCollection<int> componentIds, CancellationToken token)
+    {
+        var covered = new Dictionary<int, HashSet<int>>();
+        await using (var command = Command(connection, transaction, """
+            SELECT u.id, COALESCE(u.component_id, m.component_id)
+            FROM service_contract_units u LEFT JOIN service_contract_unit_members m ON m.unit_id = u.id AND m.is_active = 1
+            WHERE u.contract_id=@contract AND u.is_active=1
+            """, ("@contract", contractId)))
+        await using (var reader = await command.ExecuteReaderAsync(token).ConfigureAwait(false))
+            while (await reader.ReadAsync(token).ConfigureAwait(false))
+            {
+                if (reader.IsDBNull(1)) continue;
+                var unitId = checked((int)reader.GetInt64(0));
+                if (!covered.TryGetValue(unitId, out var set)) covered[unitId] = set = [];
+                set.Add(checked((int)reader.GetInt64(1)));
+            }
+        var all = covered.Values.SelectMany(set => set).ToHashSet();
+        if (componentIds.Any(id => !all.Contains(id))) throw new ServiceInterventionOperationException("O componentă aleasă nu face parte din contractul punctului de lucru.");
+        var touched = covered.Where(item => item.Value.Overlaps(componentIds)).Select(item => item.Key).ToHashSet();
+        return [.. dues.Where(due => touched.Contains(due.UnitId))];
+    }
+
+    public async Task<IReadOnlyDictionary<int, IReadOnlyList<int>>> GetComponentsAsync(IReadOnlyCollection<int> interventionIds, CancellationToken cancellationToken = default)
+    {
+        var result = new Dictionary<int, List<int>>();
+        if (interventionIds.Count == 0) return new Dictionary<int, IReadOnlyList<int>>();
+        await using var connection = await MariaDb.OpenAsync(configuration, cancellationToken).ConfigureAwait(false);
+        await using var command = Command(connection, null, $"SELECT intervention_id, component_id FROM service_intervention_components WHERE intervention_id IN ({string.Join(",", interventionIds.Distinct())}) ORDER BY intervention_id, component_id");
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
+        while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
+        {
+            var id = checked((int)reader.GetInt64(0));
+            if (!result.TryGetValue(id, out var list)) result[id] = list = [];
+            list.Add(checked((int)reader.GetInt64(1)));
+        }
+        return result.ToDictionary(item => item.Key, item => (IReadOnlyList<int>)item.Value);
+    }
+
+    public async Task<InterventionComponentChoice> GetComponentChoiceAsync(int beneficiaryId, int workPointId, CancellationToken cancellationToken = default)
+    {
+        if (accessControl is not null) await accessControl.EnsureAnyPermissionAsync(cancellationToken).ConfigureAwait(false);
+        await using var connection = await MariaDb.OpenAsync(configuration, cancellationToken).ConfigureAwait(false);
+        int? contractId = null;
+        await using (var command = Command(connection, null, "SELECT c.id FROM service_contract_points p JOIN service_contracts c ON c.id = p.contract_id WHERE p.active_work_point_id=@point AND c.beneficiary_id=@beneficiary AND c.is_frozen=0 LIMIT 1",
+            ("@point", workPointId), ("@beneficiary", beneficiaryId)))
+            if (await command.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false) is { } found) contractId = Convert.ToInt32(found);
+        var options = new List<InterventionComponentOption>();
+        var required = false;
+        if (contractId is { } contract)
+        {
+            await using var command = Command(connection, null, """
+                SELECT COALESCE(m.id, d.id), COALESCE(m.name, d.name), COALESCE(f.name, 'Componentă discretă')
+                FROM service_contract_units u
+                LEFT JOIN maintenance_families f ON f.id = u.family_id
+                LEFT JOIN service_contract_unit_members um ON um.unit_id = u.id AND um.is_active = 1
+                LEFT JOIN maintenance_components m ON m.id = um.component_id
+                LEFT JOIN maintenance_components d ON d.id = u.component_id
+                WHERE u.contract_id=@contract AND u.is_active=1 AND COALESCE(m.id, d.id) IS NOT NULL
+                ORDER BY u.position, u.id, COALESCE(m.sort_order, d.sort_order), COALESCE(m.id, d.id)
+                """, ("@contract", contract));
+            await using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
+            while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
+                options.Add(new(checked((int)reader.GetInt64(0)), reader.GetString(1), reader.GetString(2)));
+            required = options.Count > 0;
+        }
+        else
+        {
+            await using var command = Command(connection, null, """
+                SELECT c.id, c.name, COALESCE(f.name, 'Componentă discretă')
+                FROM maintenance_components c LEFT JOIN maintenance_families f ON f.id = c.family_id
+                WHERE c.active=1 ORDER BY COALESCE(f.sort_order, 1000000), f.name, c.sort_order, c.id
+                """);
+            await using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
+            while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
+                options.Add(new(checked((int)reader.GetInt64(0)), reader.GetString(1), reader.GetString(2)));
+        }
+        return new(options, required);
+    }
 }

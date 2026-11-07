@@ -1,0 +1,473 @@
+@using System.ComponentModel.DataAnnotations
+@namespace BlazorStoc.Components.Pages
+@using System.Globalization
+@using BlazorStoc.Services
+@inject IServiceContractAddendumRepository Repository
+@inject IMaintenanceComponentRepository ComponentCatalog
+@inject IServiceInterventionRepository InterventionsRepository
+@inject ILogger<ServiceContractAddendumEditor> Logger
+@implements IDisposable
+@* Act adițional la un contract de mentenanță: fereastra unui act nou (ce modifică: valabilitate, ciclicitate, puncte acoperite, alte clauze) sau corectarea câmpurilor descriptive ale unui act
+   existent. Efectul se aplică la salvare, o singură dată; scadențele afectate sunt propuse și pot fi modificate. Nu se atașează fișiere. *@
+<UnsavedChangesTracker @ref="tracker" Adding="true" Snapshot="CurrentSnapshot" Discard="DiscardAsync" />
+<section class="product-editor" aria-labelledby="addendum-editor-title">
+    <div class="catalog-heading"><h2 id="addendum-editor-title">@(Original is null ? $"Adaugă act adițional la contractul {Details.Contract.Label}" : $"Corectează actul adițional {Original.Label}")</h2><span class="heading-actions"><HelpButton Topic="mentenanta-act-aditional" About="Act adițional" /></span></div>
+    @if (error is not null) { <div class="error-banner" role="alert">@error</div> }
+    @if (errors.Count > 0)
+    {
+        <div class="error-banner" role="alert"><ul class="validation-errors">@foreach (var message in errors) { <li>@message</li> }</ul></div>
+    }
+    <CollapsibleSection Id="addendum-flow" RootClass="bug-help" HeaderRowClass="collapsible-header" ToggleClass="bug-help-toggle" ContentClass="bug-help-body" Expanded="false">
+        <Header>Cum funcționează un act adițional, pas cu pas</Header>
+        <ChildContent>
+            <ol>
+                <li><strong>Datele actului.</strong> Scrii numărul și data semnării, iar „Efect de la” (opțional) dacă diferă de data actului.</li>
+                <li><strong>Ce modifică.</strong> Pornești comutatoarele pentru ce prevede actul: valabilitatea contractului, ciclicitatea, punctele acoperite și/sau alte clauze (preț, program etc.), care se rețin doar ca descriere.</li>
+                <li><strong>Componentele și data de referință.</strong> Actul poate păstra componentele, ciclicitatea și data de referință ale contractului (nu pornești nimic) sau le poate declara: pornești „Componente” și vezi familiile și componentele din contract cu On/Off (poți adăuga altele din nomenclator), „Data de referință” și/sau „Ciclicitate” pentru valori noi, globale sau pe familie / componentă. Dacă beneficiarul are intervenții preluate, le verifici: pentru cele fără componente alegi ce au acoperit, iar scadențele propuse țin cont de ultima intervenție care acoperă fiecare componentă.</li>
+                <li><strong>Scadențele.</strong> La o schimbare de ciclicitate, scadența fiecărui punct fără ciclicitate proprie este propusă mutată cu diferența dintre cicluri; la un punct nou, prima scadență este propusă de la data actului. Poți modifica orice scadență propusă.</li>
+                <li><strong>Verifici rezumatul „Înainte → După”</strong> și salvezi. Efectul se aplică atunci, o singură dată, și actul apare în lista de acte a contractului.</li>
+                <li><strong>Dacă greșești.</strong> Ultimul act aplicat poate fi anulat (cu motiv): contractul revine la valorile de dinainte, cât timp nu a fost modificat între timp. Un act anulat sau unul cu alte clauze se poate șterge.</li>
+                <li><strong>Contract oprit (Off).</strong> Un act cu efecte se adaugă doar la un contract activ; la un contract oprit se poate adăuga doar un act cu alte clauze.</li>
+            </ol>
+        </ChildContent>
+    </CollapsibleSection>
+    <EditForm Model="input" OnSubmit="SubmitAsync" FormName="service-contract-addendum-editor">
+        <fieldset disabled="@saving">
+            <div class="editor-grid">
+                <label for="addendum-number">Număr act *<input id="addendum-number" maxlength="@ServiceContractNumber.NumberMaximumLength" autocomplete="off" @bind="number" @bind:event="oninput" placeholder="2" /></label>
+                <label for="addendum-date">Data actului *<PickOnlyDate Id="addendum-date" Value="date" ValueChanged="OnDateChanged" Disabled="saving" /></label>
+                <label for="addendum-effective">Efect de la (opțional)<PickOnlyDate Id="addendum-effective" Value="effective" ValueChanged="value => effective = value" Disabled="saving" /></label>
+            </div>
+
+            @if (Original is null)
+            {
+                <h3 class="addendum-subtitle">Ce modifică actul</h3>
+                @if (!Details.Contract.IsActive) { <p class="form-note" id="addendum-off-note">Contractul este oprit (Off): se poate adăuga doar un act cu alte clauze. Activează contractul ca să modifici valabilitatea, ciclicitatea sau punctele.</p> }
+                <div class="addendum-kinds">
+                    <div class="addendum-kind">
+                        <ToggleSwitch Id="addendum-kind-validity" Value="input.ChangeValidity" ValueChanged="value => input.ChangeValidity = value" Disabled="@(saving || !Details.Contract.IsActive)" OnText="Valabilitate" OffText="Valabilitate" />
+                        @if (input.ChangeValidity)
+                        {
+                            <div class="addendum-kind-body">
+                                <span class="muted">Acum: @ServiceContractRules.ValidUntilText(Details.Contract.ValidUntil)</span>
+                                <label for="addendum-new-valid">Valabil până la (gol = fără termen)<span class="valid-until-field"><PickOnlyDate Id="addendum-new-valid" @bind-Value="input.NewValidUntil" Min="@ValidUntilMin" Disabled="saving" />
+                                    <button type="button" class="refresh act-nav" @onclick="() => input.NewValidUntil = null">Fără termen</button></span></label>
+                            </div>
+                        }
+                    </div>
+                    <div class="addendum-kind">
+                        <ToggleSwitch Id="addendum-kind-cycle" Value="input.ChangeCycle" ValueChanged="SetChangeCycle" Disabled="@(saving || !Details.Contract.IsActive)" OnText="Ciclicitate" OffText="Ciclicitate" />
+                        @if (input.ChangeCycle)
+                        {
+                            <div class="addendum-kind-body">
+                                <span class="muted">Acum: @ServiceContractRules.CycleText(Details.Contract.CycleMonths)</span>
+                                <label for="addendum-new-cycle">Ciclicitate nouă (luni)<select id="addendum-new-cycle" value="@input.NewCycleMonths" @onchange="OnCycleChanged">
+                                    @for (var months = ServiceContractRules.MinimumCycle; months <= ServiceContractRules.MaximumCycle; months++) { <option value="@months" selected="@(input.NewCycleMonths == months)">@ServiceContractRules.CycleText(months)</option> }
+                                </select></label>
+                            </div>
+                        }
+                    </div>
+                    <div class="addendum-kind">
+                        <ToggleSwitch Id="addendum-kind-reference" Value="input.ChangeReference" ValueChanged="SetChangeReference" Disabled="@(saving || !Details.Contract.IsActive)" OnText="Data de referință" OffText="Data de referință" />
+                        @if (input.ChangeReference)
+                        {
+                            <div class="addendum-kind-body">
+                                <span class="muted">Acum: @ServiceContractRules.ReferenceDateText(Details.Contract.ReferenceDate)</span>
+                                <label for="addendum-new-reference">Data de referință nouă<PickOnlyDate Id="addendum-new-reference" Value="input.NewReferenceDate" ValueChanged="OnReferenceChanged" Disabled="saving" /></label>
+                            </div>
+                        }
+                    </div>
+                    <div class="addendum-kind">
+                        <ToggleSwitch Id="addendum-kind-components" Value="input.ChangeComponents" ValueChanged="SetChangeComponents" Disabled="@(saving || !Details.Contract.IsActive)" OnText="Componente" OffText="Componente" />
+                        @if (input.ChangeComponents)
+                        {
+                            <div class="addendum-kind-body">
+                                @if (catalog is null) { <span class="muted">Componentele nu se pot încărca acum.</span> }
+                                else
+                                {
+                                    <span class="muted">Componentele în vigoare după act: cele pornite (On) de mai jos. Cele oprite (Off) se scot din contract.</span>
+                                    <ServiceContractUnitsPanel Catalog="catalog" Units="input.Units" GlobalCycle="@(input.ChangeCycle ? input.NewCycleMonths : Details.Contract.CycleMonths)" GlobalReference="@(input.ChangeReference ? input.NewReferenceDate : Details.Contract.ReferenceDate)"
+                                                               Disabled="saving" IdPrefix="addendum-units" Changed="UnitsChanged" />
+                                }
+                            </div>
+                        }
+                    </div>
+                    <div class="addendum-kind">
+                        <ToggleSwitch Id="addendum-kind-points" Value="input.ChangePoints" ValueChanged="value => input.ChangePoints = value" Disabled="@(saving || !Details.Contract.IsActive)" OnText="Puncte acoperite" OffText="Puncte acoperite" />
+                    </div>
+                    <div class="addendum-kind">
+                        <ToggleSwitch Id="addendum-kind-other" Value="input.Other" ValueChanged="value => input.Other = value" Disabled="saving" OnText="Alte clauze" OffText="Alte clauze" />
+                    </div>
+                </div>
+            }
+
+            @if (Original is not null || input.Other)
+            {
+                <div class="editor-grid">
+                    <label for="addendum-summary" class="full-width">@(Original is null ? "Alte clauze (descriere) *" : "Descriere")<textarea id="addendum-summary" rows="3" maxlength="@ServiceContractAddendumInput.SummaryMaximumLength" @bind="summary" @bind:event="oninput"
+                        placeholder="Ex.: prețul se indexează anual; programul vizitelor se modifică…"></textarea></label>
+                </div>
+            }
+            else if (input.ChangeValidity || input.ChangeCycle || input.ChangePoints || input.ChangeReference || input.ChangeComponents)
+            {
+                <div class="editor-grid"><label for="addendum-summary" class="full-width">Descriere (opțional)<textarea id="addendum-summary" rows="2" maxlength="@ServiceContractAddendumInput.SummaryMaximumLength" @bind="summary" @bind:event="oninput"></textarea></label></div>
+            }
+
+            @if (Original is null && input.CarriesPoints)
+            {
+                <div class="catalog-heading contract-points-heading"><h3>Puncte de lucru din contract după act <span>@rows.Count(row => row.Included)</span></h3></div>
+                <p class="form-note">@(input.ChangePoints ? "Bifează punctele acoperite după act; un punct nou are nevoie de prima scadență." : "Punctele rămân aceleași; poți ajusta scadențele propuse.") Scadența este data următoarei vizite.</p>
+                <div class="table-scroll"><table class="contract-points-table"><thead><tr><th></th><th>PUNCT DE LUCRU</th><th>STARE</th><th>SCADENȚA (PROPUSĂ)</th><th>CICLICITATE INDIVIDUALĂ</th></tr></thead><tbody>
+                @foreach (var row in rows)
+                {
+                    <tr @key="row.Point.Id">
+                        <td>
+                            @if (row.Conflict is not null)
+                            {
+                                <ToggleSwitch Value="@row.Move" ValueChanged="@(value => SetMove(row, value))" Disabled="@(!input.ChangePoints)" AriaLabel="@($"Mută aici punctul {row.Point.Name}")">Mută aici</ToggleSwitch>
+                            }
+                            else
+                            {
+                                <ToggleSwitch Compact Value="@row.Included" ValueChanged="@(value => SetIncluded(row, value))" Disabled="@(!input.ChangePoints)" AriaLabel="@($"Include punctul {row.Point.Name}")" />
+                            }
+                        </td>
+                        <td><strong>@row.Point.Name</strong>@if (row.Point.IsPrimary) { <text> <span class="anaf-source ok">Principal</span></text> }<br /><small class="muted">@row.Point.Address</small></td>
+                        <td>
+                            @if (row.Existing && row.Included) { <span>În contract</span> }
+                            else if (row.Existing) { <span class="muted">Se scoate din contract</span> }
+                            else if (row.Conflict is not null) { <small>În contractul activ <strong>@row.Conflict.ContractLabel</strong>@if (row.ConflictDue is { } conflictDue) { <text>, scadență @StockMovementRules.DisplayDate(conflictDue)</text> }.</small> }
+                            else if (row.Included) { <span>Punct nou</span> }
+                        </td>
+                        <td>
+                            @if (row.Included && !row.Move) { <PickOnlyDate Id="@($"addendum-due-{row.Point.Id}")" Value="row.NextDue" ValueChanged="value => row.NextDue = value" Disabled="saving" /> }
+                            else if (row.Move && row.ConflictDue is { } kept) { <span>@StockMovementRules.DisplayDate(kept) <small class="muted">(păstrată)</small></span> }
+                        </td>
+                        <td>
+                            @if (row.Included && !row.Move)
+                            {
+                                <select aria-label="@($"Ciclicitate individuală pentru {row.Point.Name}")" @onchange="e => row.Cycle = ParseCycle(e.Value)">
+                                    <option value="" selected="@(row.Cycle is null)">Din contract (@ServiceContractRules.CycleText(NewContractCycle))</option>
+                                    @for (var months = ServiceContractRules.MinimumCycle; months <= ServiceContractRules.MaximumCycle; months++) { <option value="@months" selected="@(row.Cycle == months)">@ServiceContractRules.CycleText(months)</option> }
+                                </select>
+                            }
+                        </td>
+                    </tr>
+                }
+                </tbody></table></div>
+            }
+
+            @if (Original is null && (input.ChangeComponents || input.ChangeReference) && unverified.Count > 0 && catalog is not null)
+            {
+                <div class="catalog-heading contract-points-heading"><h3>Intervenții de mentenanță de verificat <span>@unverified.Count</span></h3></div>
+                <p class="form-note">Beneficiarul are intervenții de mentenanță fără componente. Alege ce componente a acoperit fiecare (opțional): scadențele propuse țin cont de ultima intervenție care acoperă fiecare componentă; una fără componente se socotește că a acoperit tot.</p>
+                <div class="table-scroll"><table class="contract-points-table" id="addendum-interventions"><thead><tr><th>EFECTUATĂ LA</th><th>PUNCT DE LUCRU</th><th>COMPONENTE ACOPERITE</th></tr></thead><tbody>
+                @foreach (var item in unverified)
+                {
+                    <tr @key="item.Id">
+                        <td>@StockMovementRules.DisplayDate(item.PerformedOn)</td>
+                        <td><strong>@item.WorkPointName</strong></td>
+                        <td><div class="unit-members">
+                            @foreach (var component in VerifyOptions)
+                            {
+                                <span class="unit-member"><ToggleSwitch Compact Value="@IsAssigned(item.Id, component.Id)" ValueChanged="@(value => Assign(item.Id, component.Id, value))" Disabled="saving" AriaLabel="@($"{component.Name} la intervenția din {StockMovementRules.DisplayDate(item.PerformedOn)}")" /><span class="unit-member-name">@component.Name</span></span>
+                            }
+                        </div></td>
+                    </tr>
+                }
+                </tbody></table></div>
+            }
+
+            @if (Original is null && Summary.Count > 0)
+            {
+                <div class="addendum-summary" id="addendum-summary-box"><h3>Înainte → După</h3><ul>@foreach (var line in Summary) { <li>@line</li> }</ul></div>
+            }
+            <div class="editor-actions"><button class="primary" type="submit" id="addendum-save">@(saving ? "Se salvează…" : Original is null ? "Salvează și aplică" : "Salvează corecturile")</button><button class="danger" type="button" id="addendum-cancel" @onclick="CloseAsync">Anulează</button></div>
+        </fieldset>
+    </EditForm>
+</section>
+
+@code {
+    [Parameter, EditorRequired] public ServiceContractDetails Details { get; set; } = default!;
+    [Parameter, EditorRequired] public IReadOnlyList<WorkPoint> WorkPoints { get; set; } = Array.Empty<WorkPoint>();
+    // Every contract of the beneficiary: the other active ones decide which points must be moved instead of added.
+    [Parameter, EditorRequired] public IReadOnlyList<ServiceContractDetails> Contracts { get; set; } = Array.Empty<ServiceContractDetails>();
+    [Parameter] public ServiceContractAddendum? Original { get; set; }
+    [Parameter] public EventCallback Saved { get; set; }
+    [Parameter] public EventCallback Closed { get; set; }
+
+    private sealed class Row
+    {
+        public required WorkPoint Point { get; init; }
+        public bool Included { get; set; }
+        public bool Move { get; set; }
+        public DateOnly? NextDue { get; set; }
+        public int? Cycle { get; set; }
+        public bool Existing { get; init; }
+        public DateOnly? OriginalDue { get; init; }
+        public ServiceContractConflict? Conflict { get; init; }
+        public DateOnly? ConflictDue { get; init; }
+    }
+
+    private UnsavedChangesTracker? tracker;
+    private MaintenanceCatalog? catalog;
+    private IReadOnlyList<ServiceIntervention> interventions = [];
+    private IReadOnlyDictionary<int, IReadOnlyList<int>> savedComponents = new Dictionary<int, IReadOnlyList<int>>();
+    private readonly Dictionary<int, HashSet<int>> assigned = [];
+    private readonly ServiceContractAddendumInput input = new();
+    private List<Row> rows = [];
+    private string number = "", summary = "";
+    private DateOnly? date, effective;
+    private bool saving;
+    private string? error;
+    private List<string> errors = [];
+    private readonly CancellationTokenSource lifetime = new();
+
+    private int NewContractCycle => input.ChangeCycle ? input.NewCycleMonths : Details.Contract.CycleMonths ?? ServiceContractRules.MinimumCycle;
+    private string ValidUntilMin => Details.Contract.Date.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+
+    private string CurrentSnapshot() => FormSnapshot.Of(new { number, date, effective, summary, input.ChangeValidity, input.NewValidUntil, input.ChangeCycle, input.NewCycleMonths, input.ChangePoints, input.Other, input.ChangeReference, input.NewReferenceDate, input.ChangeComponents },
+        string.Join('|', rows.Where(row => row.Included).Select(row => $"{row.Point.Id}:{row.Move}:{row.NextDue:yyyy-MM-dd}:{row.Cycle}")),
+        string.Join('|', input.Units.Select(unit => $"{unit.Key}:{unit.IsActive}:{unit.CycleMonths}:{unit.ReferenceDate:yyyy-MM-dd}:{string.Join(',', unit.Members.Select(member => member.IsActive ? 1 : 0))}")),
+        string.Join('|', assigned.Where(item => item.Value.Count > 0).Select(item => $"{item.Key}:{string.Join(',', item.Value.Order())}")));
+    private Task DiscardAsync() => Closed.InvokeAsync();
+    private Task CloseAsync() => saving ? Task.CompletedTask : tracker is null ? Closed.InvokeAsync() : tracker.RunAfterConfirmAsync(() => Closed.InvokeAsync());
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (Original is not null) return;
+        try
+        {
+            catalog = await ComponentCatalog.GetCatalogAsync(lifetime.Token);
+            interventions = [.. (await InterventionsRepository.GetForBeneficiaryAsync(Details.Contract.BeneficiaryId, lifetime.Token)).Where(item => item.IsMaintenance && Details.Points.Any(point => point.Point.WorkPointId == item.WorkPointId))];
+            savedComponents = await InterventionsRepository.GetComponentsAsync([.. interventions.Select(item => item.Id)], lifetime.Token);
+        }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (Exception exception) when (exception is AccessDeniedException or BlazorStoc.Modules.ModuleUnavailableException) { catalog = null; }
+        catch (Exception exception) { Logger.LogError("Addendum data loading failed ({ErrorType}).", exception.GetType().Name); catalog = null; }
+        tracker?.Rebase();
+    }
+
+    protected override void OnInitialized()
+    {
+        if (Original is not null)
+        {
+            number = Original.Number; date = Original.Date; effective = Original.EffectiveDate; summary = Original.Summary;
+            return;
+        }
+        input.NewCycleMonths = Details.Contract.CycleMonths ?? ServiceContractRules.MinimumCycle;
+        input.NewValidUntil = Details.Contract.ValidUntil;
+        input.NewReferenceDate = Details.Contract.ReferenceDate;
+        input.Units = ServiceContractInput.From(Details).Units;
+        var coverage = Contracts.Where(item => item.Contract.IsActive && item.Contract.Id != Details.Contract.Id)
+            .SelectMany(item => item.Points.Select(point => (item.Contract, point.Point))).ToList();
+        rows = WorkPoints.Where(point => point.Id > 0).Select(point =>
+        {
+            var own = Details.Points.FirstOrDefault(item => item.Point.WorkPointId == point.Id)?.Point;
+            var other = Details.Contract.IsActive ? coverage.FirstOrDefault(item => item.Point.WorkPointId == point.Id) : default;
+            return new Row
+            {
+                Point = point, Included = own is not null, Existing = own is not null, NextDue = own?.NextDue, OriginalDue = own?.NextDue, Cycle = own?.CycleMonths,
+                Conflict = own is null && other.Contract is not null ? new(point.Id, point.Name, other.Contract.Id, other.Contract.Label) : null,
+                ConflictDue = own is null && other.Contract is not null ? other.Point.NextDue : null
+            };
+        }).ToList();
+    }
+
+    private void OnDateChanged(DateOnly? value) => date = value;
+
+    private void SetChangeCycle(bool value)
+    {
+        input.ChangeCycle = value;
+        if (value) Repropose();
+        else foreach (var row in rows.Where(row => row.Existing)) row.NextDue = row.OriginalDue;
+    }
+
+    private void OnCycleChanged(ChangeEventArgs args)
+    {
+        if (int.TryParse(args.Value?.ToString(), CultureInfo.InvariantCulture, out var months)) input.NewCycleMonths = months;
+        Repropose();
+    }
+
+    private void SetChangeReference(bool value)
+    {
+        input.ChangeReference = value;
+        if (value) input.NewReferenceDate ??= Details.Contract.ReferenceDate;
+        Repropose();
+    }
+
+    private void OnReferenceChanged(DateOnly? value)
+    {
+        input.NewReferenceDate = value;
+        Repropose();
+    }
+
+    private void SetChangeComponents(bool value)
+    {
+        input.ChangeComponents = value;
+        if (value) input.Units = ServiceContractInput.From(Details).Units;
+        Repropose();
+    }
+
+    private void UnitsChanged() => Repropose();
+
+    private bool IsAssigned(int interventionId, int componentId) => assigned.TryGetValue(interventionId, out var set) && set.Contains(componentId);
+
+    private void Assign(int interventionId, int componentId, bool on)
+    {
+        if (!assigned.TryGetValue(interventionId, out var set)) assigned[interventionId] = set = [];
+        if (on) set.Add(componentId); else set.Remove(componentId);
+        Repropose();
+    }
+
+    // The interventions of the contract's points that have no components saved.
+    private IReadOnlyList<ServiceIntervention> unverified => [.. interventions.Where(item => !savedComponents.ContainsKey(item.Id)).OrderByDescending(item => item.PerformedOn)];
+
+    // The components an intervention can be given: the ones the contract covers after the act.
+    private IReadOnlyList<MaintenanceComponent> VerifyOptions
+    {
+        get
+        {
+            if (catalog is null) return [];
+            var ids = UnitCoverage(input.ChangeComponents ? input.Units : ServiceContractInput.From(Details).Units).SelectMany(item => item.Value).ToHashSet();
+            return [.. catalog.Components.Where(component => ids.Contains(component.Id))];
+        }
+    }
+
+    // For each unit that covers: the components it covers (a discrete component, or the elements of a family that are On).
+    private Dictionary<ServiceContractUnitInput, HashSet<int>> UnitCoverage(IEnumerable<ServiceContractUnitInput> units)
+    {
+        var result = new Dictionary<ServiceContractUnitInput, HashSet<int>>();
+        foreach (var unit in units.Where(unit => unit.IsActive))
+        {
+            if (unit.ComponentId is { } componentId) { result[unit] = [componentId]; continue; }
+            var members = unit.Members.Count > 0 ? unit.Members.Where(member => member.IsActive).Select(member => member.ComponentId) : (catalog?.MembersOf(unit.FamilyId ?? 0).Select(member => member.Id) ?? []);
+            var set = members.ToHashSet();
+            if (set.Count > 0) result[unit] = set;
+        }
+        return result;
+    }
+
+    // The due date proposed for a point after the act: for each unit that covers it, the last intervention that covered the unit (else the reference date) plus the cycle of the unit; the earliest of them.
+    private DateOnly? UnitProposal(int workPointId)
+    {
+        var contractCycle = input.ChangeCycle ? input.NewCycleMonths : Details.Contract.CycleMonths;
+        var contractReference = input.ChangeReference ? input.NewReferenceDate : Details.Contract.ReferenceDate;
+        DateOnly? best = null;
+        foreach (var (unit, covered) in UnitCoverage(input.ChangeComponents ? input.Units : ServiceContractInput.From(Details).Units))
+        {
+            var cycle = unit.CycleMonths ?? contractCycle;
+            var reference = unit.ReferenceDate ?? contractReference;
+            if (cycle is null || reference is null) continue;
+            DateOnly? last = null;
+            foreach (var item in interventions.Where(item => item.WorkPointId == workPointId))
+            {
+                var components = new HashSet<int>(savedComponents.TryGetValue(item.Id, out var saved) ? saved : []);
+                if (assigned.TryGetValue(item.Id, out var added)) components.UnionWith(added);
+                if (components.Count == 0 || components.Overlaps(covered)) last = last is null || item.PerformedOn > last ? item.PerformedOn : last;
+            }
+            var due = ServiceContractAddendumRules.ProposedUnitDue(last, reference.Value, cycle.Value);
+            best = best is null || due < best ? due : best;
+        }
+        return best;
+    }
+
+    // A change of the cycle moves the due date of a point that follows the cycle of the contract by the difference of the cycles; a change of the reference date or of the components proposes the date from the
+    // last intervention that covered each component. The user can change every proposed date.
+    private void Repropose()
+    {
+        var unitBased = input.ChangeComponents || input.ChangeReference;
+        foreach (var row in rows)
+        {
+            if (row.Existing && row.Included && row.Cycle is null && row.OriginalDue is { } due)
+                row.NextDue = unitBased && UnitProposal(row.Point.Id) is { } proposed ? proposed : ServiceContractAddendumRules.ProposedDue(due, Details.Contract.CycleMonths ?? ServiceContractRules.MinimumCycle, NewContractCycle);
+            else if (!row.Existing && row.Included && !row.Move) row.NextDue = ProposedFirstDue();
+        }
+    }
+
+    private DateOnly ProposedFirstDue() => (effective ?? date ?? DateOnly.FromDateTime(DateTime.Today)).AddMonths(NewContractCycle);
+
+    private void SetIncluded(Row row, bool included)
+    {
+        row.Included = included;
+        if (included && !row.Existing) row.NextDue ??= ProposedFirstDue();
+    }
+
+    private void SetMove(Row row, bool move) { row.Move = move; row.Included = move; }
+
+    private static int? ParseCycle(object? value) => int.TryParse(value?.ToString(), CultureInfo.InvariantCulture, out var months) ? months : null;
+
+    // The "Înainte → După" lines shown before saving.
+    private IReadOnlyList<string> Summary
+    {
+        get
+        {
+            var lines = new List<string>();
+            if (input.ChangeValidity) lines.Add($"Valabilitate: {ServiceContractRules.ValidUntilText(Details.Contract.ValidUntil)} → {ServiceContractRules.ValidUntilText(input.NewValidUntil)}");
+            if (input.ChangeCycle) lines.Add($"Ciclicitate contract: {ServiceContractRules.CycleText(Details.Contract.CycleMonths)} → {ServiceContractRules.CycleText(input.NewCycleMonths)}");
+            if (input.ChangeReference) lines.Add($"Data de referință: {ServiceContractRules.ReferenceDateText(Details.Contract.ReferenceDate)} → {ServiceContractRules.ReferenceDateText(input.NewReferenceDate)}");
+            if (input.ChangeComponents && catalog is not null)
+            {
+                string UnitName(ServiceContractUnitInput unit) => unit.FamilyId is { } familyId ? catalog.Family(familyId)?.Name ?? "familie" : catalog.Components.FirstOrDefault(component => component.Id == unit.ComponentId)?.Name ?? "componentă";
+                var before = ServiceContractInput.From(Details).Units;
+                foreach (var unit in input.Units.Where(unit => unit.IsActive && before.All(old => old.Key != unit.Key || !old.IsActive))) lines.Add($"Componentă adăugată: {UnitName(unit)}");
+                foreach (var old in before.Where(old => old.IsActive && input.Units.All(unit => unit.Key != old.Key || !unit.IsActive))) lines.Add($"Componentă scoasă: {UnitName(old)}");
+            }
+            if (input.CarriesPoints)
+            {
+                foreach (var row in rows.Where(row => row.Existing && row.Included && row.NextDue != row.OriginalDue && row.NextDue is not null))
+                    lines.Add($"Scadență {row.Point.Name}: {StockMovementRules.DisplayDate(row.OriginalDue!.Value)} → {StockMovementRules.DisplayDate(row.NextDue!.Value)}");
+                foreach (var row in rows.Where(row => !row.Existing && row.Included))
+                    lines.Add(row.Move ? $"Punct mutat în contract: {row.Point.Name}" : $"Punct adăugat: {row.Point.Name}" + (row.NextDue is { } due ? $" (prima scadență {StockMovementRules.DisplayDate(due)})" : ""));
+                foreach (var row in rows.Where(row => row.Existing && !row.Included)) lines.Add($"Punct scos: {row.Point.Name}");
+            }
+            if (input.Other) lines.Add("Alte clauze: se rețin ca descriere, contractul nu se modifică.");
+            return lines;
+        }
+    }
+
+    private async Task SubmitAsync()
+    {
+        if (saving) return;
+        error = null;
+        errors = [];
+        saving = true;
+        try
+        {
+            if (Original is not null)
+            {
+                await Repository.UpdateAsync(Original, new ServiceContractAddendumEdit { Number = number, Date = date, EffectiveDate = effective, Summary = summary }, lifetime.Token);
+            }
+            else
+            {
+                input.Number = number; input.Date = date; input.EffectiveDate = effective; input.Summary = summary;
+                input.InterventionComponents = [.. assigned.Where(item => item.Value.Count > 0).Select(item => new AddendumInterventionComponents { InterventionId = item.Key, ComponentIds = [.. item.Value] })];
+                input.Points = input.CarriesPoints
+                    ? rows.Where(row => row.Included).Select(row => new ServiceContractPointInput { WorkPointId = row.Point.Id, NextDue = row.Move ? null : row.NextDue, CycleMonths = row.Move ? null : row.Cycle, MoveFromOtherContract = row.Move }).ToList()
+                    : [];
+                var results = new List<ValidationResult>();
+                if (!Validator.TryValidateObject(input, new ValidationContext(input), results, true))
+                {
+                    errors = [.. results.Select(result => result.ErrorMessage ?? string.Empty).Where(message => message.Length > 0).Distinct()];
+                    saving = false;
+                    return;
+                }
+                await Repository.AddAsync(Details.Contract, input, lifetime.Token);
+            }
+            tracker?.Rebase();
+            saving = false;
+            await Saved.InvokeAsync();
+            return;
+        }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (ServiceContractOperationException exception) { error = exception.Message; }
+        catch (AccessDeniedException exception) { error = exception.Message; }
+        catch (Exception exception)
+        {
+            Logger.LogError("Service contract addendum saving failed ({ErrorType}).", exception.GetType().Name);
+            error = "Actul adițional nu a putut fi salvat. Datele formularului au fost păstrate; actualizează pagina înainte să reîncerci.";
+        }
+        saving = false;
+    }
+
+    public void Dispose() { lifetime.Cancel(); lifetime.Dispose(); }
+}

@@ -1,0 +1,17 @@
+# Act adițional la contractul de mentenanță
+Cautare: act aditional contract mentenanta valabilitate ciclicitate puncte componente clauze anulare
+
+Fereastra pentru un act adițional la un contract de mentenanță: numărul și data actului, ce modifică (valabilitate, ciclicitate, puncte acoperite, alte clauze) și rezumatul „Înainte → După”. Efectul se aplică la salvare, o singură dată.
+
+## Elemente
+### Fereastra
+- Cum funcționează | text | Secțiune explicativă, închisă implicit. | sel: .bug-help
+- Număr act și Data actului | câmpuri | Identifică actul; „Efect de la” este opțional.
+- Ce modifică actul | comutatoare | Valabilitate, ciclicitate, puncte acoperite, alte clauze.
+- Înainte → După | text | Ce se schimbă în contract la salvare.
+- Salvează și aplică | buton | Salvează actul și aplică efectul.
+
+## Flux: Cum adaug un act adițional
+1. Scrie numărul și data actului.
+2. Pornește comutatoarele pentru ce modifică și completează valorile noi.
+3. Verifică rezumatul „Înainte → După” și apasă „Salvează și aplică”.

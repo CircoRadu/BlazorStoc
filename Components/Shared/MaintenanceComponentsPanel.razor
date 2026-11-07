@@ -1,0 +1,206 @@
+@namespace BlazorStoc.Components.Shared
+@using BlazorStoc.Services
+@inject IMaintenanceComponentRepository Repository
+@inject ILogger<MaintenanceComponentsPanel> Logger
+@implements IDisposable
+@* Nomenclator -> Componente mentenanță: families and components shared by the maintenance contracts and by the tickets taken by an operator (see Services/MaintenanceComponents.cs). *@
+<p class="muted panel-note">Componentele pe care le acoperă contractele de mentenanță și intervențiile (inclusiv tichetele preluate de un operator). Nu se șterge nimic: ce nu mai trebuie se dezactivează și nu mai apare la alegeri noi.</p>
+<CollapsibleSection Id="maint-components-help" RootClass="bug-help" HeaderRowClass="collapsible-header" ToggleClass="bug-help-toggle" ContentClass="bug-help-body" Expanded="false">
+    <Header>Cum funcționează familiile și componentele</Header>
+    <ChildContent>
+        <ul>
+            <li><strong>Familia</strong> grupează componente (de exemplu „Securitate fizică”: efracție, TVCI, control acces). La un contract se poate alege familia întreagă, cu fiecare componentă a ei pornită sau oprită (On/Off).</li>
+            <li><strong>Componenta discretă</strong> nu are familie și se alege singură la un contract. O componentă dintr-o familie nu se alege separat, în afara familiei: dacă are nevoie de ciclicitate proprie, definește-o discretă.</li>
+            <li>Ciclicitatea și data de referință se dau la un contract pentru familie sau pentru componenta discretă, niciodată pentru o componentă din interiorul unei familii.</li>
+            <li><strong>Denumirile alternative</strong> sunt cuvintele din tichete pentru aceeași componentă (de exemplu „CCTV” pentru „TVCI”). Numele familiilor, ale componentelor și denumirile alternative nu se pot repeta.</li>
+            <li>Ordinea de aici este ordinea în care apar la alegeri. Mutarea unei componente în altă familie o pune la finalul ei.</li>
+        </ul>
+    </ChildContent>
+</CollapsibleSection>
+@if (error is not null) { <div class="error-banner" role="alert" id="maint-components-error">@error</div> }
+@if (notice is not null) { <div class="success-banner" role="status" id="maint-components-notice">@notice</div> }
+
+<section class="catalog">
+    <div class="catalog-heading"><h2>Familii <span class="count-badge">@catalog.Families.Count</span></h2></div>
+    <form class="filters" @onsubmit="AddFamilyAsync" @onsubmit:preventDefault>
+        <label class="search-box"><span>＋</span><input id="maint-family-new" aria-label="Denumirea familiei noi" placeholder="Denumirea unei familii noi…" maxlength="@MaintenanceComponentRules.NameMaximumLength" disabled="@busy" @bind="newFamily" @bind:event="oninput" /></label>
+        <button type="submit" class="primary" id="maint-family-add" disabled="@(busy || string.IsNullOrWhiteSpace(newFamily))">Adaugă familia</button>
+    </form>
+</section>
+
+<section class="catalog">
+    <div class="catalog-heading"><h2>Componentă nouă</h2></div>
+    <form class="filters" @onsubmit="AddComponentAsync" @onsubmit:preventDefault>
+        <label class="search-box"><span>＋</span><input id="maint-component-new" aria-label="Denumirea componentei noi" placeholder="Denumirea unei componente noi…" maxlength="@MaintenanceComponentRules.NameMaximumLength" disabled="@busy" @bind="newComponent" @bind:event="oninput" /></label>
+        <label class="inline-select">În familia
+            <select id="maint-component-family" aria-label="Familia componentei noi" disabled="@busy" @bind="newComponentFamily">
+                <option value="">— componentă discretă —</option>
+                @foreach (var family in catalog.Families.Where(family => family.Active)) { <option value="@family.Id">@family.Name</option> }
+            </select></label>
+        <button type="submit" class="primary" id="maint-component-add" disabled="@(busy || string.IsNullOrWhiteSpace(newComponent))">Adaugă componenta</button>
+    </form>
+</section>
+
+@if (loading)
+{
+    <div class="empty-state" role="status"><div class="spinner"></div><h3>Se încarcă</h3></div>
+}
+else
+{
+    @for (var index = 0; index < catalog.Families.Count; index++)
+    {
+        var family = catalog.Families[index];
+        var position = index;
+        <section class="catalog maint-family @(family.Active ? "" : "inactive-row")" id="@($"maint-family-{family.Id}")">
+            <div class="catalog-heading maint-family-head">
+                <h2>
+                    @if (renamingFamilyId == family.Id)
+                    {
+                        <form class="inline-form" @onsubmit="() => RenameFamilyAsync(family)" @onsubmit:preventDefault>
+                            <input aria-label="@($"Denumirea nouă a familiei {family.Name}")" maxlength="@MaintenanceComponentRules.NameMaximumLength" disabled="@busy" @bind="renameText" @bind:event="oninput" />
+                            <button type="submit" class="row-icon check" disabled="@busy" aria-label="@($"Salvează denumirea familiei {family.Name}")" title="Salvează denumirea"></button>
+                            <button type="button" class="row-icon close" disabled="@busy" aria-label="Renunță la redenumire" title="Renunță" @onclick="() => renamingFamilyId = null"></button>
+                        </form>
+                    }
+                    else { <text>@family.Name <span class="count-badge">@catalog.MembersOf(family.Id).Count</span></text> }
+                </h2>
+                <span class="heading-actions">
+                    <button type="button" class="row-icon up" aria-label="@($"Mută familia {family.Name} mai sus")" title="@($"Mută familia {family.Name} mai sus")" disabled="@(busy || position == 0)" @onclick="() => MoveFamilyAsync(family, -1)"></button>
+                    <button type="button" class="row-icon down" aria-label="@($"Mută familia {family.Name} mai jos")" title="@($"Mută familia {family.Name} mai jos")" disabled="@(busy || position == catalog.Families.Count - 1)" @onclick="() => MoveFamilyAsync(family, 1)"></button>
+                    <button type="button" class="row-icon edit" aria-label="@($"Redenumește familia {family.Name}")" title="@($"Redenumește familia {family.Name}")" disabled="@busy" @onclick="() => StartRenameFamily(family)"></button>
+                    <ToggleSwitch Compact Value="family.Active" ValueChanged="value => SetFamilyActiveAsync(family, value)" Disabled="busy" AriaLabel="@($"Activ: familia {family.Name}")" />
+                </span>
+            </div>
+            @ComponentTable(catalog.MembersOf(family.Id))
+        </section>
+    }
+    <section class="catalog maint-family" id="maint-discrete">
+        <div class="catalog-heading"><h2>Componente discrete <span class="count-badge">@catalog.Discrete.Count</span></h2></div>
+        @ComponentTable(catalog.Discrete)
+    </section>
+}
+
+@code {
+    private readonly CancellationTokenSource lifetime = new();
+    private MaintenanceCatalog catalog = new([], []);
+    private bool loading = true, busy;
+    private string? error, notice;
+    private string newFamily = "", newComponent = "", newComponentFamily = "", renameText = "";
+    private int? renamingFamilyId, renamingComponentId;
+    private readonly Dictionary<int, string> aliasTexts = [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        await RunAsync(ReloadAsync, null);
+        loading = false;
+    }
+
+    private async Task ReloadAsync() => catalog = await Repository.GetCatalogAsync(lifetime.Token);
+    private string AliasText(int id) => aliasTexts.GetValueOrDefault(id, string.Empty);
+
+    private RenderFragment ComponentTable(IReadOnlyList<MaintenanceComponent> components) =>
+        components.Count == 0 ? (builder => builder.AddMarkupContent(0, "<p class=\"muted maint-empty\">Nicio componentă aici.</p>")) : ComponentRows(components);
+
+    private RenderFragment ComponentRows(IReadOnlyList<MaintenanceComponent> components) => @<div class="table-scroll"><table class="system-types maint-components"><thead><tr><th>ORDINE</th><th>COMPONENTĂ</th><th>DENUMIRI ALTERNATIVE</th><th>FAMILIE</th><th>STARE</th></tr></thead><tbody>
+        @for (var index = 0; index < components.Count; index++)
+        {
+            var component = components[index];
+            var position = index;
+            <tr @key="component.Id" class="@(component.Active ? "" : "inactive-row")" id="@($"maint-component-{component.Id}")">
+                <td>
+                    <button type="button" class="row-icon up" aria-label="@($"Mută {component.Name} mai sus")" title="@($"Mută {component.Name} mai sus")" disabled="@(busy || position == 0)" @onclick="() => MoveComponentAsync(component, -1)"></button>
+                    <button type="button" class="row-icon down" aria-label="@($"Mută {component.Name} mai jos")" title="@($"Mută {component.Name} mai jos")" disabled="@(busy || position == components.Count - 1)" @onclick="() => MoveComponentAsync(component, 1)"></button>
+                </td>
+                <td>
+                    @if (renamingComponentId == component.Id)
+                    {
+                        <form @onsubmit="() => RenameComponentAsync(component)" @onsubmit:preventDefault>
+                            <input aria-label="@($"Denumirea nouă a componentei {component.Name}")" maxlength="@MaintenanceComponentRules.NameMaximumLength" disabled="@busy" @bind="renameText" @bind:event="oninput" />
+                            <button type="submit" class="row-icon check" disabled="@busy" aria-label="@($"Salvează denumirea componentei {component.Name}")" title="Salvează denumirea"></button>
+                            <button type="button" class="row-icon close" disabled="@busy" aria-label="Renunță la redenumire" title="Renunță" @onclick="() => renamingComponentId = null"></button>
+                        </form>
+                    }
+                    else
+                    {
+                        <strong>@component.Name</strong>
+                        <button type="button" class="row-icon edit" aria-label="@($"Redenumește componenta {component.Name}")" title="@($"Redenumește componenta {component.Name}")" disabled="@busy" @onclick="() => StartRenameComponent(component)"></button>
+                    }
+                </td>
+                <td>
+                    @foreach (var alias in component.Aliases)
+                    {
+                        <span class="alias-chip">@alias <button type="button" class="alias-remove" aria-label="@($"Șterge denumirea alternativă {alias}")" disabled="@busy" @onclick="() => RemoveAliasAsync(component, alias)" title="@($"Șterge denumirea alternativă {alias}")">×</button></span>
+                    }
+                    <form class="alias-add" @onsubmit="() => AddAliasAsync(component)" @onsubmit:preventDefault>
+                        <input aria-label="@($"Denumire alternativă pentru {component.Name}")" placeholder="+ denumire alternativă" maxlength="@MaintenanceComponentRules.NameMaximumLength" disabled="@busy"
+                               value="@AliasText(component.Id)" @oninput="args => aliasTexts[component.Id] = args.Value?.ToString() ?? string.Empty" />
+                        <button type="submit" class="refresh act-confirm" aria-label="@($"Adaugă denumirea alternativă pentru {component.Name}")" disabled="@(busy || string.IsNullOrWhiteSpace(AliasText(component.Id)))">Adaugă</button>
+                    </form>
+                </td>
+                <td>
+                    <select aria-label="@($"Familia componentei {component.Name}")" disabled="@busy" value="@(component.FamilyId?.ToString() ?? "")" @onchange="args => ChangeFamilyAsync(component, args.Value?.ToString())">
+                        <option value="">— discretă —</option>
+                        @foreach (var family in catalog.Families.Where(family => family.Active || family.Id == component.FamilyId)) { <option value="@family.Id" selected="@(component.FamilyId == family.Id)">@family.Name</option> }
+                    </select>
+                </td>
+                <td><ToggleSwitch Compact Value="component.Active" ValueChanged="value => SetComponentActiveAsync(component, value)" Disabled="busy" AriaLabel="@($"Activ: {component.Name}")" /></td>
+            </tr>
+        }
+    </tbody></table></div>;
+
+    // Runs one operation: busy while it runs; the message of a refused operation (or a stale version) is shown and the lists are reloaded after a stale version.
+    private async Task RunAsync(Func<Task> operation, string? success)
+    {
+        if (busy) return;
+        busy = true; error = null; notice = null;
+        try { await operation(); notice = success; }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (Exception ex) when (ex is MaintenanceComponentOperationException or AccessDeniedException)
+        {
+            error = ex.Message;
+            if (ex.Message == MaintenanceComponentRules.StaleMessage) { try { await ReloadAsync(); } catch (Exception) { } }
+        }
+        catch (Exception ex) { Logger.LogError("Maintenance component operation failed ({ErrorType}).", ex.GetType().Name); error = "Operația nu a putut fi salvată. Reîncarcă pagina și reîncearcă."; }
+        finally { busy = false; }
+    }
+
+    private Task AddFamilyAsync() => RunAsync(async () => { await Repository.CreateFamilyAsync(newFamily, lifetime.Token); newFamily = ""; await ReloadAsync(); }, "Familia a fost adăugată.");
+
+    private Task AddComponentAsync() => RunAsync(async () =>
+    {
+        await Repository.CreateComponentAsync(newComponent, int.TryParse(newComponentFamily, out var familyId) ? familyId : null, lifetime.Token);
+        newComponent = "";
+        await ReloadAsync();
+    }, "Componenta a fost adăugată.");
+
+    private void StartRenameFamily(MaintenanceFamily family) { renamingFamilyId = family.Id; renamingComponentId = null; renameText = family.Name; error = notice = null; }
+    private void StartRenameComponent(MaintenanceComponent component) { renamingComponentId = component.Id; renamingFamilyId = null; renameText = component.Name; error = notice = null; }
+
+    private Task RenameFamilyAsync(MaintenanceFamily family) => RunAsync(async () => { await Repository.RenameFamilyAsync(family, renameText, lifetime.Token); renamingFamilyId = null; await ReloadAsync(); }, "Denumirea familiei a fost modificată.");
+    private Task RenameComponentAsync(MaintenanceComponent component) => RunAsync(async () => { await Repository.RenameComponentAsync(component, renameText, lifetime.Token); renamingComponentId = null; await ReloadAsync(); }, "Denumirea componentei a fost modificată.");
+
+    private Task SetFamilyActiveAsync(MaintenanceFamily family, bool active) => RunAsync(async () => { await Repository.SetFamilyActiveAsync(family, active, lifetime.Token); await ReloadAsync(); },
+        active ? "Familia a fost activată." : "Familia a fost dezactivată: nu mai apare la alegeri noi.");
+    private Task SetComponentActiveAsync(MaintenanceComponent component, bool active) => RunAsync(async () => { await Repository.SetComponentActiveAsync(component, active, lifetime.Token); await ReloadAsync(); },
+        active ? "Componenta a fost activată." : "Componenta a fost dezactivată: nu mai apare la alegeri noi.");
+
+    private Task MoveFamilyAsync(MaintenanceFamily family, int direction) => RunAsync(async () => { await Repository.MoveFamilyAsync(family, direction, lifetime.Token); await ReloadAsync(); }, null);
+    private Task MoveComponentAsync(MaintenanceComponent component, int direction) => RunAsync(async () => { await Repository.MoveComponentAsync(component, direction, lifetime.Token); await ReloadAsync(); }, null);
+
+    private Task ChangeFamilyAsync(MaintenanceComponent component, string? value) => RunAsync(async () =>
+    {
+        await Repository.ChangeFamilyAsync(component, int.TryParse(value, out var familyId) ? familyId : null, lifetime.Token);
+        await ReloadAsync();
+    }, "Componenta a fost mutată; este la finalul listei noii familii.");
+
+    private Task AddAliasAsync(MaintenanceComponent component) => RunAsync(async () =>
+    {
+        await Repository.AddAliasAsync(component, AliasText(component.Id), lifetime.Token);
+        aliasTexts.Remove(component.Id);
+        await ReloadAsync();
+    }, "Denumirea alternativă a fost adăugată.");
+
+    private Task RemoveAliasAsync(MaintenanceComponent component, string alias) => RunAsync(async () => { await Repository.RemoveAliasAsync(component, alias, lifetime.Token); await ReloadAsync(); }, "Denumirea alternativă a fost ștearsă.");
+
+    public void Dispose() { lifetime.Cancel(); lifetime.Dispose(); }
+}

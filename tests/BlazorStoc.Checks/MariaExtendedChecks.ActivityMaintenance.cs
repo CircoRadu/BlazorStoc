@@ -84,7 +84,7 @@ public static partial class MariaExtendedChecks
             {
                 NumberText = "77 din 01.01.2026", CycleMonths = 6, ValidUntil = new DateOnly(2027, 12, 31),
                 Points = [new ServiceContractPointInput { WorkPointId = main.Id, NextDue = new DateOnly(2026, 2, 1) }]
-            });
+            }.Complete(await ContractTestUnits.DiscreteAsync(configuration, admin, audit)));
             ActivityTicket Ticket(long id, long point, DateTime end, string done, long type = 4) =>
                 new(id, type, 7601, point, new DateTime(2026, 3, 1), "T-" + id, "Lucrare " + id, "Nu merge", "Ion", id + 1000, end, 1, "Nu merge\n" + done);
             fake.TicketRows =

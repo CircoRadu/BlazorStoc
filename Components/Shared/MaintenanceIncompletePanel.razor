@@ -1,0 +1,77 @@
+@namespace BlazorStoc.Components.Shared
+@using BlazorStoc.Services
+@inject IServiceContractRepository Contracts
+@inject IMaintenanceComponentRepository ComponentCatalog
+@inject ILogger<MaintenanceIncompletePanel> Logger
+@implements IDisposable
+
+@* The list of the frozen maintenance contracts (incomplete data) with what each one is missing. It belongs to the Maintenance module; the Notifications page shows it through this wrapper. *@
+<ModuleGate ModuleId="@BlazorStoc.Modules.Maintenance.MaintenanceModule.ModuleId">
+<section class="catalog" aria-labelledby="incomplete-title">
+    <div class="catalog-heading"><h2 id="incomplete-title">Contracte de mentenanță incomplete <span class="count-badge">@items.Count</span></h2>
+        <div class="heading-actions"><button class="refresh act-reload" type="button" disabled="@loading" @onclick="LoadAsync">↻ Actualizează</button></div></div>
+    <div class="catalog-body">
+        <p class="muted">Un contract căruia îi lipsesc date (data de referință, ciclicitatea, componentele sau punctele de lucru) este înghețat: nu produce scadențe și notificări de scadență, iar intervențiile lui nu mută scadențe. Deschide beneficiarul, apoi editează contractul și completează ce lipsește; contractul se dezgheață singur.</p>
+    </div>
+    @if (error is not null) { <div class="error-banner" role="alert">@error</div> }
+    @if (loading && !loaded) { <div class="empty-state" role="status"><div class="spinner"></div><h3>Se încarcă contractele</h3></div> }
+    else if (items.Count == 0)
+    {
+        <div class="empty-state"><span class="empty-icon">▦</span><h3>Toate contractele sunt complete</h3><p>Nu există contracte de mentenanță înghețate.</p></div>
+    }
+    else
+    {
+        <Paged Items="items" Id="contracts-incomplete-size" Context="pageRows">
+            <div class="table-scroll"><table id="contracts-incomplete-table"><thead><tr><th>BENEFICIAR</th><th>CONTRACT</th><th>STARE</th><th>CE LIPSEȘTE</th><th></th></tr></thead><tbody>
+            @foreach (var item in pageRows)
+            {
+                var contract = item.Details.Contract;
+                <tr @key="contract.Id">
+                    <td><strong>@item.BeneficiaryName</strong></td>
+                    <td>@contract.Label</td>
+                    <td><span class="contract-state @(contract.IsActive ? "on" : "off")">@(contract.IsActive ? "On" : "Off")</span><span class="contract-state frozen">Înghețat</span></td>
+                    <td>@ServiceContractFreeze.Summary(ServiceContractFreeze.Missing(item.Details, name => UnitName(name)))</td>
+                    <td><a class="row-icon view" href="@($"/beneficiari/{item.BeneficiaryId}")" aria-label="@($"Deschide beneficiarul {item.BeneficiaryName}")" title="@($"Deschide beneficiarul {item.BeneficiaryName}")"></a></td>
+                </tr>
+            }
+            </tbody></table></div>
+        </Paged>
+    }
+</section>
+</ModuleGate>
+
+@code {
+    private IReadOnlyList<ServiceContractFrozenItem> items = [];
+    private MaintenanceCatalog? catalog;
+    private bool loading, loaded;
+    private string? error;
+    private readonly CancellationTokenSource lifetime = new();
+
+    private string UnitName(ServiceContractUnit unit) => unit.FamilyId is { } familyId ? catalog?.Family(familyId)?.Name ?? "familie"
+        : catalog?.Components.FirstOrDefault(component => component.Id == unit.ComponentId)?.Name ?? "componentă";
+
+    protected override Task OnInitializedAsync() => LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        if (loading) return;
+        loading = true;
+        error = null;
+        try
+        {
+            catalog = await ComponentCatalog.GetCatalogAsync(lifetime.Token);
+            items = await Contracts.GetFrozenAsync(lifetime.Token);
+            loaded = true;
+        }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (Exception exception) when (exception is AccessDeniedException or BlazorStoc.Modules.ModuleUnavailableException) { error = exception.Message; }
+        catch (Exception exception)
+        {
+            Logger.LogError("Frozen maintenance contracts loading failed ({ErrorType}).", exception.GetType().Name);
+            error = "Lista contractelor incomplete nu a putut fi încărcată.";
+        }
+        finally { loading = false; }
+    }
+
+    public void Dispose() { lifetime.Cancel(); lifetime.Dispose(); }
+}

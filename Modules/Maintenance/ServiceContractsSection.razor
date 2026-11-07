@@ -1,6 +1,8 @@
 @using BlazorStoc.Services
 @namespace BlazorStoc.Components.Pages
 @inject IServiceContractRepository Repository
+@inject IMaintenanceComponentRepository ComponentCatalog
+@inject IServiceContractAddendumRepository AddendaRepository
 @inject TimeProvider Clock
 @inject ILogger<ServiceContractsSection> Logger
 @implements IDisposable
@@ -13,6 +15,22 @@
                                    Saved="SavedAsync" Closed="CloseEditorAsync" />
         </div>
     </div>
+}
+
+@if (addendumFor is not null)
+{
+    <div class="delete-overlay">
+        <div class="delete-dialog template-popup" role="dialog" aria-modal="true" tabindex="-1" aria-labelledby="addendum-editor-title">
+            <ServiceContractAddendumEditor @key="addendumKey" Details="addendumFor" WorkPoints="WorkPoints" Contracts="Contracts" Saved="AddendumSavedAsync" Closed="CloseAddendumAsync" />
+        </div>
+    </div>
+}
+
+@if (addendumAction is not null)
+{
+    <ServiceContractAddendumReasonDialog @key="addendumAction.Item.Id" Title="@(addendumAction.Cancel ? "Anulezi actul adițional?" : "Ștergi actul adițional?")" ObjectLabel="@($"{addendumAction.Item.Label} · contract {addendumAction.ContractLabel}")"
+        Description="@(addendumAction.Cancel ? "Contractul revine la valorile de dinainte de act (valabilitate, ciclicitate, referință, componente, puncte). Datele următoarelor vizite deja mutate nu se pun înapoi." : "Actul se șterge definitiv; jurnalul păstrează ce conținea.")"
+        ConfirmText="@(addendumAction.Cancel ? "Anulează actul" : "Șterge actul")" Danger="true" Busy="@busy" Error="@addendumError" Confirmed="ConfirmAddendumActionAsync" Cancelled="CancelAddendumActionAsync" />
 }
 
 @if (activation is not null)
@@ -37,7 +55,7 @@
     }
     else
     {
-        <div class="table-scroll"><table><thead><tr><th>CONTRACT</th><th>EXPIRĂ</th><th>STARE</th><th>CICLICITATE</th><th class="number">PUNCTE</th><th>URMĂTOAREA SCADENȚĂ</th>@if (CanManage) { <th></th> }</tr></thead><tbody>
+        <div class="table-scroll"><table><thead><tr><th>CONTRACT</th><th>EXPIRĂ</th><th>STARE</th><th>CICLICITATE</th><th>COMPONENTE</th><th class="number">PUNCTE</th><th>URMĂTOAREA SCADENȚĂ</th>@if (CanManage) { <th></th> }</tr></thead><tbody>
         @foreach (var details in Visible)
         {
             var contract = details.Contract;
@@ -45,11 +63,13 @@
             <tr @key="contract.Id" class="@(contract.IsActive ? null : "contract-row-off")">
                 <td><strong>@contract.Label</strong>@if (contract.Notes.Length > 0) { <br /><small class="muted" title="@contract.Notes">@Shorten(contract.Notes)</small> }</td>
                 <td>@ServiceContractRules.ValidUntilText(contract.ValidUntil)@if (expired) { <text> <span class="contract-state expired">Expirat</span></text> }</td>
-                <td><span class="contract-state @(contract.IsActive ? "on" : "off")">@(contract.IsActive ? "On" : "Off")</span></td>
-                <td>@ServiceContractRules.CycleText(contract.CycleMonths)</td>
+                <td><span class="contract-state @(contract.IsActive ? "on" : "off")">@(contract.IsActive ? "On" : "Off")</span>@if (contract.IsFrozen) { <span class="contract-state frozen" title="@MissingText(details)">Înghețat</span> }</td>
+                <td>@ServiceContractRules.CycleText(contract.CycleMonths)<br /><small class="muted">referință @ServiceContractRules.ReferenceDateText(contract.ReferenceDate)</small></td>
+                <td>@if (details.Units.Count == 0) { <span class="muted">—</span> } else { @foreach (var unit in details.Units) { <span class="unit-chip @(unit.Covers ? "" : "off")" title="@UnitTitle(unit)">@UnitName(unit)</span> } }</td>
                 <td class="number"><button type="button" class="link-button" aria-expanded="@expanded.Contains(contract.Id)" @onclick="() => Toggle(contract.Id)">@details.Points.Count @(expanded.Contains(contract.Id) ? "▴" : "▾")</button></td>
                 <td>
                     @if (!contract.IsActive) { <span class="muted">—</span> }
+                    else if (contract.IsFrozen) { <span class="muted" title="@MissingText(details)">înghețat: lipsesc date</span> }
                     else if (details.NextDue is { } due) { <span>@StockMovementRules.DisplayDate(due) <span class="due-chip @ServiceDueRules.CssClass(ServiceDueRules.State(due, Today, ThresholdDays))">@ServiceDueRules.Label(ServiceDueRules.State(due, Today, ThresholdDays))</span></span> }
                     else { <span class="muted">fără puncte</span> }
                 </td>
@@ -57,6 +77,7 @@
                 {
                     <td>
                         <ToggleSwitch Compact Value="@contract.IsActive" ValueChanged="@(value => value ? OpenActivationAsync(contract) : DeactivateAsync(contract))" Disabled="Locked" AriaLabel="@($"Contractul {contract.Label} activ (On/Off)")" />
+                        <button class="row-icon add" disabled="@Locked" aria-label="@($"Adaugă act adițional la contractul {contract.Label}")" title="@($"Adaugă act adițional la contractul {contract.Label}")" @onclick="() => OpenAddendum(details)"></button>
                         <button class="row-icon edit" disabled="@Locked" aria-label="@($"Editează contractul {contract.Label}")" title="@($"Editează contractul {contract.Label}")" @onclick="() => OpenEdit(details)"></button>
                         <button class="row-icon delete" disabled="@Locked" aria-label="@($"Șterge contractul {contract.Label}")" title="@($"Șterge contractul {contract.Label}")" @onclick="() => OpenDelete(contract)"></button>
                     </td>
@@ -64,18 +85,44 @@
             </tr>
             @if (expanded.Contains(contract.Id))
             {
-                <tr class="contract-points-row" @key="@($"points-{contract.Id}")"><td colspan="@(CanManage ? 7 : 6)">
+                <tr class="contract-points-row" @key="@($"points-{contract.Id}")"><td colspan="@(CanManage ? 8 : 7)">
+                    @if (contract.IsFrozen) { <div class="form-note freeze-note" role="status"><strong>Contract înghețat</strong> (fără scadențe și notificări de scadență) până se completează: @MissingText(details).</div> }
+                    @{ var contractAddenda = addenda.Where(item => item.ContractId == contract.Id).ToList(); }
+                    @if (contractAddenda.Count > 0)
+                    {
+                        <div class="contract-addenda"><strong>Acte adiționale <span class="count-badge">@contractAddenda.Count</span></strong>
+                            <div class="table-scroll"><table class="contract-points-table"><thead><tr><th>ACT</th><th>EFECT DE LA</th><th>CE MODIFICĂ</th><th>STARE</th>@if (CanManage) { <th></th> }</tr></thead><tbody>
+                            @foreach (var addendum in contractAddenda)
+                            {
+                                <tr @key="addendum.Id" class="@(addendum.IsApplied ? null : "contract-row-off")">
+                                    <td><strong>@addendum.Label</strong>@if (addendum.Summary.Length > 0) { <br /><small class="muted" title="@addendum.Summary">@Shorten(addendum.Summary)</small> }</td>
+                                    <td>@(addendum.EffectiveDate is { } effective ? StockMovementRules.DisplayDate(effective) : StockMovementRules.DisplayDate(addendum.Date))</td>
+                                    <td>@addendum.Changes</td>
+                                    <td><span class="contract-state @(addendum.IsApplied ? "on" : "off")">@addendum.Status</span></td>
+                                    @if (CanManage)
+                                    {
+                                        <td>
+                                            @if (addendum.IsApplied && addendum.HasEffect && contractAddenda.First(item => item.IsApplied).Id == addendum.Id) { <button class="row-icon undo" disabled="@Locked" aria-label="@($"Anulează actul {addendum.Label}")" title="@($"Anulează actul {addendum.Label}")" @onclick="() => OpenAddendumAction(addendum, contract, true)"></button> }
+                                            @if (!addendum.IsApplied || !addendum.HasEffect) { <button class="row-icon delete" disabled="@Locked" aria-label="@($"Șterge actul {addendum.Label}")" title="@($"Șterge actul {addendum.Label}")" @onclick="() => OpenAddendumAction(addendum, contract, false)"></button> }
+                                        </td>
+                                    }
+                                </tr>
+                            }
+                            </tbody></table></div>
+                        </div>
+                    }
                     @if (details.Points.Count == 0) { <span class="muted">Contractul nu acoperă niciun punct de lucru.</span> }
                     else
                     {
                         <div class="table-scroll">
-                        <table class="contract-points-table"><thead><tr><th>PUNCT DE LUCRU</th><th>CICLICITATE</th><th>SCADENȚĂ</th><th>STARE</th></tr></thead><tbody>
+                        <table class="contract-points-table"><thead><tr><th>PUNCT DE LUCRU</th><th>CICLICITATE</th><th>SCADENȚĂ</th><th>PE COMPONENTE</th><th>STARE</th></tr></thead><tbody>
                         @foreach (var point in details.Points)
                         {
                             <tr @key="point.Point.Id"><td><strong>@point.WorkPointName</strong>@if (point.WorkPointIsPrimary) { <text> <span class="anaf-source ok">Principal</span></text> }<br /><small class="muted">@point.WorkPointAddress</small></td>
                                 <td>@ServiceContractRules.PointCycleText(point.Point.CycleMonths, contract.CycleMonths)</td>
                                 <td>@StockMovementRules.DisplayDate(point.Point.NextDue)</td>
-                                <td>@if (contract.IsActive) { <span class="due-chip @ServiceDueRules.CssClass(ServiceDueRules.State(point.Point.NextDue, Today, ThresholdDays))">@ServiceDueRules.Label(ServiceDueRules.State(point.Point.NextDue, Today, ThresholdDays))</span> } else { <span class="contract-state off">Contract Off</span> }</td></tr>
+                                <td><ServiceUnitDues Dues="@details.Dues.Where(due => due.PointId == point.Point.Id).ToList()" Catalog="catalog" Today="Today" Threshold="ThresholdDays" /></td>
+                                <td>@if (contract.IsFrozen) { <span class="contract-state frozen">Înghețat</span> } else if (contract.IsActive) { <span class="due-chip @ServiceDueRules.CssClass(ServiceDueRules.State(point.Point.NextDue, Today, ThresholdDays))">@ServiceDueRules.Label(ServiceDueRules.State(point.Point.NextDue, Today, ThresholdDays))</span> } else { <span class="contract-state off">Contract Off</span> }</td></tr>
                         }
                         </tbody></table>
                         </div>
@@ -118,7 +165,88 @@
     private DateOnly Today => DateOnly.FromDateTime(Clock.GetLocalNow().DateTime);
     private int OffCount => Contracts.Count(item => !item.Contract.IsActive);
     private IReadOnlyList<ServiceContractDetails> Visible => Contracts.Where(item => item.Contract.IsActive || showOff).ToList();
-    private bool Locked => busy || adding || editing is not null || activation is not null;
+    private bool Locked => busy || adding || editing is not null || activation is not null || addendumFor is not null || addendumAction is not null;
+
+    private sealed record AddendumAction(ServiceContractAddendum Item, string ContractLabel, bool Cancel);
+
+    private IReadOnlyList<ServiceContractAddendum> addenda = [];
+    private ServiceContractDetails? addendumFor;
+    private Guid addendumKey;
+    private AddendumAction? addendumAction;
+    private string? addendumError;
+    private IReadOnlyList<ServiceContractDetails>? loadedFor;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (ReferenceEquals(loadedFor, Contracts)) return;
+        loadedFor = Contracts;
+        try { addenda = await AddendaRepository.GetAddendaForBeneficiaryAsync(BeneficiaryId, lifetime.Token); }
+        catch (Exception exception) when (exception is OperationCanceledException or AccessDeniedException or BlazorStoc.Modules.ModuleUnavailableException) { addenda = []; }
+        catch (Exception) { addenda = []; }
+    }
+
+    private void OpenAddendum(ServiceContractDetails details) { addendumFor = details; addendumKey = Guid.NewGuid(); notice = error = null; }
+    private Task CloseAddendumAsync() { addendumFor = null; return Task.CompletedTask; }
+
+    private async Task AddendumSavedAsync()
+    {
+        notice = $"Actul adițional a fost adăugat și aplicat contractului {addendumFor?.Contract.Label}.";
+        addendumFor = null;
+        await Changed.InvokeAsync();
+    }
+
+    private void OpenAddendumAction(ServiceContractAddendum item, ServiceContract contract, bool cancel) { addendumAction = new(item, contract.Label, cancel); addendumError = null; notice = error = null; }
+    private Task CancelAddendumActionAsync() { addendumAction = null; addendumError = null; return Task.CompletedTask; }
+
+    private async Task ConfirmAddendumActionAsync(string reason)
+    {
+        if (busy || addendumAction is not { } action) return;
+        busy = true;
+        addendumError = null;
+        var done = false;
+        try
+        {
+            if (action.Cancel) await AddendaRepository.CancelAsync(action.Item, reason, lifetime.Token);
+            else await AddendaRepository.DeleteAsync(action.Item, reason, lifetime.Token);
+            notice = action.Cancel ? $"Actul {action.Item.Label} a fost anulat; contractul are valorile de dinainte." : $"Actul {action.Item.Label} a fost șters.";
+            done = true;
+        }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (ServiceContractOperationException exception) { addendumError = exception.Message; }
+        catch (AccessDeniedException exception) { addendumError = exception.Message; }
+        catch (Exception exception)
+        {
+            Logger.LogError("Service contract addendum operation failed ({ErrorType}).", exception.GetType().Name);
+            addendumError = "Operația nu a putut fi efectuată.";
+        }
+        finally { busy = false; }
+        if (done) { addendumAction = null; await Changed.InvokeAsync(); }
+    }
+
+    private MaintenanceCatalog? catalog;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try { catalog = await ComponentCatalog.GetCatalogAsync(lifetime.Token); }
+        catch (Exception exception) when (exception is OperationCanceledException or AccessDeniedException or BlazorStoc.Modules.ModuleUnavailableException) { catalog = null; }
+        catch (Exception) { catalog = null; }
+    }
+
+    private string UnitName(ServiceContractUnit unit) => unit.FamilyId is { } familyId ? catalog?.Family(familyId)?.Name ?? "familie"
+        : catalog?.Components.FirstOrDefault(component => component.Id == unit.ComponentId)?.Name ?? "componentă";
+
+    private string UnitTitle(ServiceContractUnit unit)
+    {
+        var parts = new List<string> { unit.IsFamily ? "familie" : "componentă discretă" };
+        if (!unit.IsActive) parts.Add("oprită (Off)");
+        if (unit.IsFamily)
+            parts.Add("elemente: " + string.Join(", ", unit.Members.Select(member => (catalog?.Components.FirstOrDefault(component => component.Id == member.ComponentId)?.Name ?? "element") + (member.IsActive ? "" : " (Off)"))));
+        if (unit.CycleMonths is { } months) parts.Add("ciclicitate " + ServiceContractRules.CycleText(months));
+        if (unit.ReferenceDate is { } date) parts.Add("referință " + StockMovementRules.DisplayDate(date));
+        return string.Join("; ", parts);
+    }
+
+    private string MissingText(ServiceContractDetails details) => ServiceContractFreeze.Summary(ServiceContractFreeze.Missing(details, UnitName));
 
     private static string Shorten(string text) => text.Length <= 60 ? text : text[..60] + "…";
 

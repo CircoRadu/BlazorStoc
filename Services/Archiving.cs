@@ -191,14 +191,17 @@ public static class ArchiveRequests
     }
 
     public const string ServiceContractPointRelation = "PunctContractMentenanta";
+    public const string ServiceContractUnitRelation = "ComponentaContractMentenanta";
 
     // The coverage (the work points of the contract with their due dates) travels with the contract as relations.
     public static ArchiveRequest ServiceContract(ServiceContractDetails value, string beneficiaryName, string motif)
     {
         var contract = value.Contract;
         var details = AuditDetails.Identification(("Contract", contract.Label), ("Beneficiar", beneficiaryName),
-            ("Stare", contract.IsActive ? "activ (On)" : "inactiv (Off)"), ("Puncte de lucru", value.Points.Count.ToString()));
-        var relations = value.Points.Select(point => ArchiveRelationSnapshot.Create(ServiceContractPointRelation, point.Point.Id.ToString(), point));
+            ("Stare", contract.IsActive ? "activ (On)" : "inactiv (Off)"), ("Puncte de lucru", value.Points.Count.ToString()),
+            ("Componente", value.Units.Count.ToString()));
+        var relations = value.Points.Select(point => ArchiveRelationSnapshot.Create(ServiceContractPointRelation, point.Point.Id.ToString(), point))
+            .Concat(value.Units.Select(unit => ArchiveRelationSnapshot.Create(ServiceContractUnitRelation, unit.Id.ToString(), unit)));
         return new(ArchiveSnapshot.Create(AuditEntities.ServiceContract, contract.Id.ToString(), contract.Version, contract, relations),
             ServiceContractRules.Target(contract.BeneficiaryId, beneficiaryName, contract.Label), details, motif);
     }

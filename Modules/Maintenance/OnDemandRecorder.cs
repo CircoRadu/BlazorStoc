@@ -16,6 +16,12 @@ internal sealed class OnDemandInterventionRecorder(IServiceInterventionRepositor
     public Task<int> RecordMaintenanceUncoveredAsync(int beneficiaryId, int workPointId, DateOnly performedOn, string notes, CancellationToken cancellationToken = default) =>
         RecordAsync(ServiceInterventionKind.Maintenance, beneficiaryId, workPointId, performedOn, notes, cancellationToken, allowUncovered: true);
 
+    public Task<int> RecordMaintenanceUncoveredAsync(int beneficiaryId, int workPointId, DateOnly performedOn, string notes, IReadOnlyList<int> componentIds, CancellationToken cancellationToken = default) =>
+        RecordAsync(ServiceInterventionKind.Maintenance, beneficiaryId, workPointId, performedOn, notes, cancellationToken, allowUncovered: true, componentIds: componentIds);
+
+    public Task<InterventionComponentChoice> GetComponentChoiceAsync(int beneficiaryId, int workPointId, CancellationToken cancellationToken = default) =>
+        interventions.GetComponentChoiceAsync(beneficiaryId, workPointId, cancellationToken);
+
     public Task<bool> IsCoveredAsync(int beneficiaryId, int workPointId, CancellationToken cancellationToken = default) =>
         interventions.IsCoveredAsync(beneficiaryId, workPointId, cancellationToken);
 
@@ -46,13 +52,14 @@ internal sealed class OnDemandInterventionRecorder(IServiceInterventionRepositor
         catch (ServiceInterventionOperationException) { return false; }
     }
 
-    private async Task<int> RecordAsync(ServiceInterventionKind kind, int beneficiaryId, int workPointId, DateOnly performedOn, string notes, CancellationToken cancellationToken, bool allowUncovered = false)
+    private async Task<int> RecordAsync(ServiceInterventionKind kind, int beneficiaryId, int workPointId, DateOnly performedOn, string notes, CancellationToken cancellationToken, bool allowUncovered = false, IReadOnlyList<int>? componentIds = null)
     {
         try
         {
             var saved = await interventions.RecordAsync(beneficiaryId, new ServiceInterventionInput
             {
-                Kind = kind, WorkPointId = workPointId, PerformedOn = performedOn, Notes = notes, Basis = ServiceNextDueBasis.FromPerformed, AllowUncovered = allowUncovered
+                Kind = kind, WorkPointId = workPointId, PerformedOn = performedOn, Notes = notes, Basis = ServiceNextDueBasis.FromPerformed, AllowUncovered = allowUncovered,
+                ComponentIds = componentIds is null ? [] : [.. componentIds]
             }, cancellationToken).ConfigureAwait(false);
             return saved.Intervention.Id;
         }

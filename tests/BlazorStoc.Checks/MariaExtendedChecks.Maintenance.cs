@@ -177,7 +177,8 @@ public static partial class MariaExtendedChecks
         var workPoints = new MariaWorkPointRepository(configuration, admin, audit);
         var contracts = new MariaServiceContractRepository(configuration, admin, audit);
         async Task<long> Count(string sql, params (string, object)[] parameters) => await ScalarLongAsync(probe, sql, parameters);
-        ServiceContractInput Input(string number, params ServiceContractPointInput[] points) => new() { NumberText = number, CycleMonths = 3, Points = [.. points] };
+        var unit = await ContractTestUnits.DiscreteAsync(configuration, admin, audit);
+        ServiceContractInput Input(string number, params ServiceContractPointInput[] points) => new ServiceContractInput { NumberText = number, CycleMonths = 3, Points = [.. points] }.Complete(unit);
         ServiceContractPointInput Point(WorkPoint point, DateOnly? due = null, int? cycle = null, bool move = false) => new() { WorkPointId = point.Id, NextDue = due, CycleMonths = cycle, MoveFromOtherContract = move };
         async Task<ServiceContractDetails> Fresh(int beneficiaryId, int contractId) => (await contracts.GetForBeneficiaryAsync(beneficiaryId)).Single(item => item.Contract.Id == contractId);
         var since = DateTime.UtcNow;
@@ -198,7 +199,7 @@ public static partial class MariaExtendedChecks
 
             // A contract is created On with its points: first due dates, an individual cycle, the key of the active coverage.
             var c1 = await contracts.CreateAsync(owner.Id, new ServiceContractInput { NumberText = "26 din 23.09.2025", CycleMonths = 3, ValidUntil = new DateOnly(2026, 9, 23),
-                Notes = "Contract test", Points = [Point(main, d1), Point(depozit, d2, 6)] });
+                Notes = "Contract test", Points = [Point(main, d1), Point(depozit, d2, 6)] }.Complete(unit));
             var mainRow = c1.Points.Single(item => item.Point.WorkPointId == main.Id).Point;
             Check(c1.Contract.IsActive && c1.Contract.Version == 0 && c1.Contract.Label == "26/23.09.2025" && c1.Contract.CycleMonths == 3 && c1.Contract.ValidUntil == new DateOnly(2026, 9, 23) &&
                   c1.Points.Count == 2 && mainRow.NextDue == d1 && mainRow.CycleMonths is null && c1.Points.Single(item => item.Point.WorkPointId == depozit.Id).Point.CycleMonths == 6 && c1.NextDue == d1,
@@ -393,7 +394,8 @@ public static partial class MariaExtendedChecks
             var foreignPoint = (await workPoints.GetAsync(stranger.Id)).Single();
             var today = DateOnly.FromDateTime(DateTime.Now);
             var c1 = await contracts.CreateAsync(owner.Id, new ServiceContractInput { NumberText = "26/23.09.2025", CycleMonths = 3,
-                Points = [new() { WorkPointId = main.Id, NextDue = new DateOnly(2025, 10, 15) }, new() { WorkPointId = depozit.Id, NextDue = new DateOnly(2025, 10, 20), CycleMonths = 6 }] });
+                Points = [new() { WorkPointId = main.Id, NextDue = new DateOnly(2025, 10, 15) }, new() { WorkPointId = depozit.Id, NextDue = new DateOnly(2025, 10, 20), CycleMonths = 6 }] }
+                .Complete(await ContractTestUnits.DiscreteAsync(configuration, admin, audit)));
 
             // Maintenance under an active contract moves the due date; the choice of the next due date is E / P / O.
             var i1 = await interventions.RecordAsync(owner.Id, Maintenance(main, new DateOnly(2025, 10, 18), notes: "Prima vizita"));
@@ -629,9 +631,12 @@ public static partial class MariaExtendedChecks
             var main = (await workPoints.GetAsync(owner.Id)).Single();
             var depozit = await workPoints.CreateAsync(owner.Id, new WorkPointInput { Name = "Depozit", Address = "Str. Depozitului 1, Cluj" });
             var c1 = await contracts.CreateAsync(owner.Id, new ServiceContractInput { NumberText = "26/23.09.2025", CycleMonths = 3, ValidUntil = today.AddDays(20),
-                Points = [new() { WorkPointId = main.Id, NextDue = today.AddDays(10) }, new() { WorkPointId = depozit.Id, NextDue = today.AddDays(100) }] });
-            var coverageMain = c1.Points.Single(item => item.Point.WorkPointId == main.Id).Point.Id;
-            var coverageDepozit = c1.Points.Single(item => item.Point.WorkPointId == depozit.Id).Point.Id;
+                Points = [new() { WorkPointId = main.Id, NextDue = today.AddDays(10) }, new() { WorkPointId = depozit.Id, NextDue = today.AddDays(100) }] }
+                .Complete(await ContractTestUnits.DiscreteAsync(configuration, admin, audit)));
+            // A due notification is one per point AND unit: its object id is the id of the date of the unit (offset 1,000,000), its label names the component.
+            async Task<int> DueNotificationId(int workPointId) => checked((int)(1_000_000 + await ScalarLongAsync(probe, "SELECT d.id FROM service_contract_unit_dues d JOIN service_contract_points p ON p.id = d.point_id WHERE p.work_point_id=@p LIMIT 1", ("@p", workPointId))));
+            var coverageMain = await DueNotificationId(main.Id);
+            var coverageDepozit = await DueNotificationId(depozit.Id);
 
             // The templates of the two sources (same rules as the others: administrator only, one active per event); the form proposes a text.
             Check(dueSource.Category == "Mentenanță" && dueSource.EventName == "Intervenție de mentenanță" && expirySource.Category == "Mentenanță" && expirySource.EventName == "Expirare contract" &&
@@ -645,7 +650,7 @@ public static partial class MariaExtendedChecks
             await Session("ana", false).EvaluateAsync();
             var dueViews = (await boss.GetViewsAsync()).Where(item => item.Template.Id == dueTemplate.Id && item.ObjectLabel.Contains(owner.Name)).ToList();
             var dueMain = dueViews.SingleOrDefault(item => item.Notification.ObjectId == coverageMain);
-            Check(dueViews.Count == 1 && dueMain is not null && dueMain.Notification.ExpiryDate == today.AddDays(10) && dueMain.ObjectLabel == $"{owner.Name} · {main.Name}" && dueMain.Url == $"/beneficiari/{owner.Id}" &&
+            Check(dueViews.Count == 1 && dueMain is not null && dueMain.Notification.ExpiryDate == today.AddDays(10) && dueMain.ObjectLabel == $"{owner.Name} · {main.Name} · {ContractTestUnits.ComponentName}" && dueMain.Url == $"/beneficiari/{owner.Id}" &&
                   dueMain.Subject == $"Scadență mentenanță – {owner.Name}, {main.Name}" && dueMain.Body.Contains(main.Address) && dueMain.Body.Contains("26/23.09.2025") &&
                   dueMain.Body.Contains(StockMovementRules.DisplayDate(today.AddDays(10))) && dueMain.Body.Contains("Ultima intervenție de mentenanță: nicio intervenție"),
                 "A point of an active contract inside the period gets a notification with the beneficiary, point, address, contract and last intervention; the one outside the period does not");

@@ -4,6 +4,37 @@ Fluxul: Mentenanta -> puncte de lucru (adresa, poze, coordonate) -> contracte de
 
 ## Modificari de testat
 
+### 07.11.2026 - Scadente pe componente, interventii cu componente si acte aditionale (migrarile 77, 78, 79; branch claude/acte-aditionale-componente-mentenanta)
+
+**Ce s-a adaugat:** (1) fiecare punct acoperit are o scadenta pentru fiecare familie / componenta a contractului (scadenta punctului ramane cea mai apropiata); lista Scadente si fisa beneficiarului arata scadentele pe componente, iar notificarile de scadenta sunt cate una pe punct si componenta. (2) Interventia de mentenanta alege componentele acoperite (formularul din fisa beneficiarului si fereastra tichetului preluat de operator): scadentele se muta numai pentru componentele alese. (3) Actul aditional se adauga din fisa beneficiarului (iconita + de pe randul contractului) si poate modifica valabilitatea, ciclicitatea, data de referinta, componentele (On/Off), punctele sau alte clauze; actele apar in randul expandat al contractului, cu anulare (iconita) si stergere.
+
+**Ce face acum:** o schimbare de componente / referinta / ciclicitate printr-un act propune scadentele pe baza ultimei interventii care a acoperit fiecare componenta; interventiile fara componente pot fi verificate in fereastra actului.
+
+1. Fisa beneficiarului -> Contracte -> extinde un contract complet: tabelul punctelor are coloana "PE COMPONENTE" cu chip-uri `Componenta · data` (rosu depasita, galben in curand). Mentenanta -> Scadente: la un punct cu mai multe componente, sub data apar chip-urile lor.
+2. Notificari -> Active: o scadenta de mentenanta apare pentru fiecare pereche punct si componenta (titlul are si componenta).
+3. Fisa beneficiarului -> Intervenție nouă -> Mentenanta, alege un punct dintr-un contract complet: apare "Componente acoperite *" cu componentele contractului; fara nicio componenta alesa salvarea este refuzata. Alege una (de exemplu TVCI): se muta scadenta numai a componentei alese, celelalte raman. La editarea intervenției se vad componentele (doar citire).
+4. La un punct fara contract complet (sau contract inghetat) lista contine toate componentele din nomenclator (nu sunt obligatorii) si scadentele nu se muta.
+5. Notificari -> Tichete de validat -> Editeaza si preia: la categoria Mentenanta apare aceeasi lista de componente (obligatorie sub contract complet) si se schimba cand schimbi punctul de lucru. "Preia ca propus" muta scadentele tuturor componentelor punctului (nu are alegere).
+6. Corectarea datei ultimei interventii si stergerea ei readuc exact scadentele componentelor mutate de ea.
+7. Fisa beneficiarului -> randul contractului -> iconita + (Adauga act aditional): alege Data de referinta si/sau Componente (On/Off, adauga familii sau componente din nomenclator, ciclicitate si referinta pe familie / componenta); sub "Intervenții de mentenanță de verificat" alege componentele intervențiilor vechi; tabelul punctelor propune scadentele noi, pe care le poti modifica; rezumatul "Inainte -> Dupa" arata schimbarile. Salveaza si aplica.
+8. Dupa act, contractul are componentele si data de referinta noi, randul expandat arata actul (Aplicat) cu "componente: +N -M" / "data de referinta: ... -> ..."; iconita de anulare (doar la ultimul act aplicat) readuce componentele si referinta de dinainte; un act anulat se poate sterge.
+9. Jurnal activitate: actul, anularea lui si modificarile de componente apar cu actiunile proprii.
+
+### 07.11.2026 - Contracte de mentenanta cu componente, data de referinta si contracte inghetate (branch claude/acte-aditionale-componente-mentenanta, migrarea 76)
+
+**Ce s-a adaugat:** formularul de contract (fisa beneficiarului -> Contracte de mentenanta) are data de referinta (obligatorie), ciclicitate globala (optionala) si sectiunea "Componente acoperite": familii (cu elementele On/Off) si componente discrete din Nomenclator -> Componente mentenanta, fiecare cu ciclicitate si data de referinta proprii sau globale. Un contract careia ii lipsesc date este INGHETAT: fara scadente (lista, harta), fara notificari de scadenta, iar interventiile lui nu muta scadente. Notificari are un tab nou "Contracte incomplete" (rosu cand exista contracte On inghetate).
+
+**Ce face acum:** toate contractele existente au devenit inghetate la actualizare (nu au data de referinta si nici componente); fiecare apare in tabul Notificari -> Contracte incomplete cu ce lipseste si se dezgheata singur dupa ce il completezi.
+
+1. Nomenclator -> Componente mentenanta: ai o familie (de exemplu Securitate fizica cu Efractie, TVCI, Control acces) si cateva componente discrete (Incendiu, Retelistica). Daca nu, adauga-le.
+2. Notificari -> tabul "Contracte incomplete": apare rosu, cu numarul contractelor On inghetate; lista arata beneficiarul, contractul si "Data de referinta (...)" / "Nicio componenta sau familie activa in contract"; iconita de pe rand deschide beneficiarul.
+3. Mentenanta -> Scadente: un contract inghetat nu are scadente in lista si pe harta; in fisa beneficiarului randul lui are insigna "Inghetat" (indicatia arata ce lipseste) si "inghetat: lipsesc date" la urmatoarea scadenta.
+4. Editeaza un contract inghetat: formularul arata "Contractul va fi inghetat ... pana se completeaza: ...". Alege data de referinta, adauga familia Securitate fizica: apar elementele ei cu comutatoare; opreste TVCI; alege pentru familie ciclicitatea 4 luni; adauga Incendiu (ciclicitatea ramane "Globala"). Nota despre inghetare dispare. Salveaza: contractul nu mai este inghetat, coloana COMPONENTE arata insignele (indicatia insignei familiei spune "TVCI (Off)" si ciclicitatea), scadenta reapare in lista.
+5. In formular, o componenta dintr-o familie nu se poate alege separat (lista de adaugare are doar familii si componente discrete); o componenta inactiva in nomenclator nu apare. Poti scoate o componenta cu iconita cos si poti reveni la data de referinta globala cu iconita X de langa data unitatii.
+6. Salvarea fara data de referinta este refuzata cu mesaj. Dupa ce opresti singura componenta activa, contractul se ingheata din nou.
+7. Jurnal activitate: operatiile apar cu actiuni proprii: "Modificare componente contract mentenanta", "Modificare data de referinta contract mentenanta", "Inghetare contract mentenanta" (cu ce lipseste) si "Dezghetare contract mentenanta".
+8. Inregistreaza o interventie de mentenanta pe un punct dintr-un contract inghetat: se salveaza sub contract, iar mesajul din jurnal spune ca scadenta nu s-a modificat (contract inghetat).
+
 ### 26.10.2026 - Fundal satelit pe harta (comutator Harta / Satelit)
 
 **Ce s-a adaugat:** in Setari -> Harta -> Motor harta, sectiunea „Fundal satelit (optional)”: adresa dalelor satelit, text si adresa atribuirii, „Cheie satelit” si butonul „Testeaza satelitul”.

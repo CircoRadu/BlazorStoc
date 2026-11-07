@@ -35,6 +35,10 @@ public static partial class MariaExtendedChecks
             await Section("Product locks: contention, takeover, forced release", () => LocksAsync(configuration, admin, audit, probe));
             await Section("Work points: main point, description, coordinates, photos, archive, backfill", () => WorkPointsAsync(configuration, admin, audit, probe, assets));
             await Section("Maintenance contracts: coverage, one active contract per point, On/Off, moves, archive", () => ServiceContractsAsync(configuration, admin, audit, probe));
+            await Section("Maintenance components nomenclator: families, components, alternative names, order, administrators only, journal", () => MaintenanceComponentsAsync(configuration, admin, audit, probe));
+            await Section("Maintenance contract units: reference date, families and components On/Off, frozen contracts, notifications tab, archive", () => ContractUnitsAsync(configuration, admin, audit, probe));
+            await Section("Maintenance unit dues: dates per point and unit, interventions with components, acts with reference and components", () => ContractUnitDuesAsync(configuration, admin, audit, probe));
+            await Section("Maintenance contract addenda: validity, cycle and points applied, cancel (last only), edit, delete, journal", () => ContractAddendaAsync(configuration, admin, audit, probe));
             await Section("Maintenance interventions: register, due date choices, corrections, photos, archive, guards", () => ServiceInterventionsAsync(configuration, admin, audit, probe, assets));
             await Section("Maintenance notifications: due dates and contract expiry sources, automatic close and reopen, threshold", () => MaintenanceNotificationsAsync(configuration, admin, audit, probe));
             await Section("Risk analyses: one active per point, renewals and history, notification, replace, guards, archive", () => RiskAnalysesAsync(configuration, admin, audit, probe));

@@ -1,0 +1,103 @@
+@namespace BlazorStoc.Components.Pages
+@using BlazorStoc.Services
+@* The families and components of a contract in a form: On/Off per unit and per element of a family, cycle and reference date of a unit (empty = the global ones). It edits the list it is given and tells the form
+   when something changed. Used by the window of an addendum; the contract form has the same section built in. *@
+<div class="contract-global-date">
+    <label for="@($"{IdPrefix}-add")">Adaugă o familie sau o componentă<select @key="addVersion" id="@($"{IdPrefix}-add")" value="" @onchange="AddUnit" disabled="@(Disabled || AddOptions.Count == 0)">
+        <option value="">@(AddOptions.Count == 0 ? "Nu mai sunt componente de adăugat" : "— alege —")</option>
+        @if (AddOptions.Any(option => option.IsFamily)) { <optgroup label="Familii">@foreach (var option in AddOptions.Where(option => option.IsFamily)) { <option value="@option.Key">@option.Name</option> }</optgroup> }
+        @if (AddOptions.Any(option => !option.IsFamily)) { <optgroup label="Componente discrete">@foreach (var option in AddOptions.Where(option => !option.IsFamily)) { <option value="@option.Key">@option.Name</option> }</optgroup> }
+    </select></label>
+</div>
+@if (Units.Count == 0)
+{
+    <p class="muted">Nicio familie sau componentă.</p>
+}
+else
+{
+    <div class="table-scroll"><table class="contract-points-table"><thead><tr><th></th><th>FAMILIE / COMPONENTĂ</th><th>CICLICITATE</th><th>DATA DE REFERINȚĂ</th><th></th></tr></thead><tbody>
+    @foreach (var unit in Units)
+    {
+        <tr @key="unit.Key">
+            <td><ToggleSwitch Compact Value="@unit.IsActive" ValueChanged="@(value => Set(() => unit.IsActive = value))" Disabled="Disabled" AriaLabel="@($"Include {NameOf(unit)} în contract")" /></td>
+            <td>
+                <strong>@NameOf(unit)</strong> <span class="anaf-source @(unit.FamilyId is null ? "" : "ok")">@(unit.FamilyId is null ? "Componentă discretă" : "Familie")</span>
+                @if (unit.FamilyId is { } familyId)
+                {
+                    <div class="unit-members">
+                        @foreach (var component in Catalog.MembersOf(familyId))
+                        {
+                            <span class="unit-member"><ToggleSwitch Compact Value="@MemberOn(unit, component.Id)" ValueChanged="@(value => Set(() => SetMember(unit, component.Id, value)))" Disabled="@(Disabled || !unit.IsActive)" AriaLabel="@($"{component.Name} din {NameOf(unit)}")" /><span class="unit-member-name">@component.Name</span></span>
+                        }
+                    </div>
+                }
+            </td>
+            <td>
+                <select aria-label="@($"Ciclicitate pentru {NameOf(unit)}")" disabled="@(Disabled || !unit.IsActive)" @onchange="e => Set(() => unit.CycleMonths = ParseCycle(e.Value))">
+                    <option value="" selected="@(unit.CycleMonths is null)">Globală (@ServiceContractRules.CycleText(GlobalCycle))</option>
+                    @for (var months = ServiceContractRules.MinimumCycle; months <= ServiceContractRules.MaximumCycle; months++) { <option value="@months" selected="@(unit.CycleMonths == months)">@ServiceContractRules.CycleText(months)</option> }
+                </select>
+            </td>
+            <td>
+                <PickOnlyDate Id="@($"{IdPrefix}-ref-{unit.Key}")" Value="unit.ReferenceDate" ValueChanged="@(value => Set(() => unit.ReferenceDate = value))" Disabled="@(Disabled || !unit.IsActive)" />
+                @if (unit.ReferenceDate is null) { <small class="muted">globală (@ServiceContractRules.ReferenceDateText(GlobalReference))</small> }
+            </td>
+            <td>
+                @if (unit.ReferenceDate is not null) { <button type="button" class="row-icon close" disabled="@Disabled" aria-label="@($"Folosește data de referință globală pentru {NameOf(unit)}")" title="@($"Folosește data de referință globală pentru {NameOf(unit)}")" @onclick="() => Set(() => unit.ReferenceDate = null)"></button> }
+                <button type="button" class="row-icon delete" disabled="@Disabled" aria-label="@($"Scoate {NameOf(unit)} din contract")" title="@($"Scoate {NameOf(unit)} din contract")" @onclick="() => Set(() => Units.Remove(unit))"></button>
+            </td>
+        </tr>
+    }
+    </tbody></table></div>
+}
+
+@code {
+    [Parameter, EditorRequired] public MaintenanceCatalog Catalog { get; set; } = default!;
+    [Parameter, EditorRequired] public List<ServiceContractUnitInput> Units { get; set; } = [];
+    [Parameter] public int? GlobalCycle { get; set; }
+    [Parameter] public DateOnly? GlobalReference { get; set; }
+    [Parameter] public bool Disabled { get; set; }
+    [Parameter] public string IdPrefix { get; set; } = "units";
+    [Parameter] public EventCallback Changed { get; set; }
+
+    private sealed record AddOption(string Key, string Name, bool IsFamily);
+    private int addVersion;
+
+    private IReadOnlyList<AddOption> AddOptions =>
+    [
+        .. Catalog.Families.Where(family => family.Active && !Units.Any(unit => unit.FamilyId == family.Id)).Select(family => new AddOption($"F{family.Id}", family.Name, true)),
+        .. Catalog.Discrete.Where(component => component.Active && !Units.Any(unit => unit.ComponentId == component.Id)).Select(component => new AddOption($"C{component.Id}", component.Name, false))
+    ];
+
+    private string NameOf(ServiceContractUnitInput unit) => unit.FamilyId is { } familyId ? Catalog.Family(familyId)?.Name ?? "familie"
+        : Catalog.Components.FirstOrDefault(component => component.Id == unit.ComponentId)?.Name ?? "componentă";
+
+    private static bool MemberOn(ServiceContractUnitInput unit, int componentId) => unit.Members.FirstOrDefault(member => member.ComponentId == componentId)?.IsActive ?? true;
+
+    private static void SetMember(ServiceContractUnitInput unit, int componentId, bool on)
+    {
+        var member = unit.Members.FirstOrDefault(item => item.ComponentId == componentId);
+        if (member is null) unit.Members.Add(new ServiceContractUnitMemberInput { ComponentId = componentId, IsActive = on });
+        else member.IsActive = on;
+    }
+
+    private static int? ParseCycle(object? value) => int.TryParse(value?.ToString(), out var months) ? months : null;
+
+    private Task Set(Action change)
+    {
+        change();
+        return Changed.InvokeAsync();
+    }
+
+    private Task AddUnit(ChangeEventArgs e)
+    {
+        var key = e.Value?.ToString() ?? "";
+        addVersion++;
+        if (key.Length < 2 || !int.TryParse(key[1..], out var id)) return Task.CompletedTask;
+        if (key[0] == 'F' && Catalog.Family(id) is { } family)
+            Units.Add(new ServiceContractUnitInput { FamilyId = family.Id, Members = [.. Catalog.MembersOf(family.Id).Select(component => new ServiceContractUnitMemberInput { ComponentId = component.Id, IsActive = true })] });
+        else if (key[0] == 'C' && Catalog.Components.FirstOrDefault(component => component.Id == id) is { } component)
+            Units.Add(new ServiceContractUnitInput { ComponentId = component.Id });
+        return Changed.InvokeAsync();
+    }
+}

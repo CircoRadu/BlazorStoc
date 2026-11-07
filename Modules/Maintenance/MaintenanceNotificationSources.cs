@@ -9,7 +9,7 @@ namespace BlazorStoc.Services;
 // evaluation (the engine writes the reason). On-demand interventions never produce or close a notification.
 
 public sealed record MaintenanceDueItem(int CoverageId, int BeneficiaryId, string Beneficiary, string WorkPoint, string Address,
-    string ContractLabel, DateOnly NextDue, DateOnly? LastIntervention);
+    string ContractLabel, DateOnly NextDue, DateOnly? LastIntervention, string Component = "");
 
 public sealed record ContractExpiryItem(int ContractId, int BeneficiaryId, string Beneficiary, string ContractLabel, DateOnly ContractDate, DateOnly ValidUntil);
 
@@ -26,20 +26,35 @@ public sealed class MariaMaintenanceNotificationReader(IConfiguration configurat
     public async Task<IReadOnlyList<MaintenanceDueItem>> GetDueAsync(CancellationToken cancellationToken = default)
     {
         await using var connection = await MariaDb.OpenAsync(configuration, cancellationToken).ConfigureAwait(false);
+        // One date per point and unit (the id is offset so it never meets the id of a point); a point of a complete contract that has no date per unit yet keeps its own date.
         await using var command = new MySqlCommand("""
-            SELECT p.id, c.beneficiary_id, b.name, w.name, w.address, c.contract_number, c.contract_date, p.next_due,
-                   (SELECT MAX(i.performed_on) FROM service_interventions i WHERE i.work_point_id = p.work_point_id AND i.kind = 'M')
-            FROM service_contract_points p
-            JOIN service_contracts c ON c.id = p.contract_id AND c.is_active = 1
+            SELECT d.id + 1000000, c.beneficiary_id, b.name, w.name, w.address, c.contract_number, c.contract_date, d.next_due,
+                   (SELECT MAX(i.performed_on) FROM service_interventions i WHERE i.work_point_id = p.work_point_id AND i.kind = 'M'),
+                   COALESCE(f.name, m.name, ''), 0
+            FROM service_contract_unit_dues d
+            JOIN service_contract_units u ON u.id = d.unit_id
+            JOIN service_contract_points p ON p.id = d.point_id
+            JOIN service_contracts c ON c.id = p.contract_id AND c.is_active = 1 AND c.is_frozen = 0
             JOIN beneficiary_work_points w ON w.id = p.work_point_id
             JOIN beneficiaries b ON b.id = c.beneficiary_id
-            ORDER BY p.next_due, p.id
+            LEFT JOIN maintenance_families f ON f.id = u.family_id
+            LEFT JOIN maintenance_components m ON m.id = u.component_id
+            UNION ALL
+            SELECT p.id, c.beneficiary_id, b.name, w.name, w.address, c.contract_number, c.contract_date, p.next_due,
+                   (SELECT MAX(i.performed_on) FROM service_interventions i WHERE i.work_point_id = p.work_point_id AND i.kind = 'M'),
+                   '', 1
+            FROM service_contract_points p
+            JOIN service_contracts c ON c.id = p.contract_id AND c.is_active = 1 AND c.is_frozen = 0
+            JOIN beneficiary_work_points w ON w.id = p.work_point_id
+            JOIN beneficiaries b ON b.id = c.beneficiary_id
+            WHERE NOT EXISTS (SELECT 1 FROM service_contract_unit_dues d WHERE d.point_id = p.id)
+            ORDER BY 8, 1
             """, connection);
         await using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
         var result = new List<MaintenanceDueItem>();
         while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
             result.Add(new(checked((int)reader.GetInt64(0)), checked((int)reader.GetInt64(1)), reader.GetString(2), reader.GetString(3), reader.GetString(4),
-                ServiceContractNumber.Format(reader.GetString(5), ReadDate(reader, 6)), ReadDate(reader, 7), reader.IsDBNull(8) ? null : ReadDate(reader, 8)));
+                ServiceContractNumber.Format(reader.GetString(5), ReadDate(reader, 6)), ReadDate(reader, 7), reader.IsDBNull(8) ? null : ReadDate(reader, 8), reader.GetString(9)));
         return result;
     }
 
@@ -73,6 +88,7 @@ public sealed class MaintenanceDueSource(IMaintenanceNotificationReader reader, 
     public const string AddressName = "adresa punct de lucru";
     public const string ContractName = "numar contract";
     public const string LastInterventionName = "data ultima interventie";
+    public const string ComponentName = "componenta";
     // Written in place of the date when the point never had a maintenance intervention.
     public const string NoIntervention = "nicio intervenție";
 
@@ -91,7 +107,8 @@ public sealed class MaintenanceDueSource(IMaintenanceNotificationReader reader, 
         new(WorkPointName, "Numele punctului de lucru", "Sediu central"),
         new(AddressName, "Adresa punctului de lucru", "Strada Demo 10, Timișoara"),
         new(ContractName, "Numărul contractului, ca număr/data", "26/23.09.2025"),
-        new(LastInterventionName, "Data ultimei intervenții de mentenanță a punctului (cele la cerere nu se numără)", "18.01.2026")
+        new(LastInterventionName, "Data ultimei intervenții de mentenanță a punctului (cele la cerere nu se numără)", "18.01.2026"),
+        new(ComponentName, "Familia sau componenta contractului la care se referă scadența (gol pentru un contract fără scadențe pe componente)", "TVCI")
     ];
 
     public string DateChangedReason(DateOnly from, DateOnly to, ExpiryInstance current) =>
@@ -99,11 +116,13 @@ public sealed class MaintenanceDueSource(IMaintenanceNotificationReader reader, 
         (current.Values.TryGetValue(LastInterventionName, out var last) && last != NoIntervention ? $" (ultima intervenție de mentenanță: {last})." : ".");
 
     public async Task<IReadOnlyList<ExpiryInstance>> GetInstancesAsync(CancellationToken cancellationToken = default) =>
-        (await reader.GetDueAsync(cancellationToken).ConfigureAwait(false)).Select(item => new ExpiryInstance(item.CoverageId, $"{item.Beneficiary} · {item.WorkPoint}", item.NextDue,
+        (await reader.GetDueAsync(cancellationToken).ConfigureAwait(false)).Select(item => new ExpiryInstance(item.CoverageId,
+            item.Component.Length > 0 ? $"{item.Beneficiary} · {item.WorkPoint} · {item.Component}" : $"{item.Beneficiary} · {item.WorkPoint}", item.NextDue,
             new Dictionary<string, string>
             {
                 [BeneficiaryName] = item.Beneficiary, [WorkPointName] = item.WorkPoint, [AddressName] = item.Address, [ContractName] = item.ContractLabel,
-                [LastInterventionName] = item.LastIntervention is { } last ? StockMovementRules.DisplayDate(last) : NoIntervention
+                [LastInterventionName] = item.LastIntervention is { } last ? StockMovementRules.DisplayDate(last) : NoIntervention,
+                [ComponentName] = item.Component
             }, $"/beneficiari/{item.BeneficiaryId}")).ToList();
 }
 

@@ -7,10 +7,23 @@ namespace BlazorStoc.Services;
 // A maintenance contract of a beneficiary (service_contracts). The number is kept structured (number + date) and shown as
 // "26/23.09.2025". IsActive is the On/Off switch: Off keeps everything (coverage, due dates, history) but the points of the contract
 // stop producing due dates. ValidUntil (optional) only drives the "Expirat" chip and, later, the expiry notification.
-public sealed record ServiceContract(int Id, int BeneficiaryId, string Number, DateOnly Date, int CycleMonths,
-    DateOnly? ValidUntil, bool IsActive, string Notes, long Version)
+public sealed record ServiceContract(int Id, int BeneficiaryId, string Number, DateOnly Date, int? CycleMonths,
+    DateOnly? ValidUntil, bool IsActive, string Notes, long Version, DateOnly? ReferenceDate = null, bool IsFrozen = false)
 {
     public string Label => ServiceContractNumber.Format(Number, Date);
+}
+
+// A UNIT of a contract: a maintenance family (FamilyId; its members are switched On/Off one by one) or a discrete component (ComponentId). Cycle and reference date are global
+// (null here = the ones of the contract) or given for the unit; the members of a family never have their own. A unit that is Off covers nothing.
+public sealed record ServiceContractUnitMember(int ComponentId, bool IsActive);
+
+public sealed record ServiceContractUnit(int Id, int ContractId, int? FamilyId, int? ComponentId, int? CycleMonths, DateOnly? ReferenceDate, bool IsActive, int Position,
+    IReadOnlyList<ServiceContractUnitMember> Members)
+{
+    public bool IsFamily => FamilyId is not null;
+    public int? CatalogId => FamilyId ?? ComponentId;
+    /// <summary>A unit takes part in the contract when it is On and, for a family, at least one member is On.</summary>
+    public bool Covers => IsActive && (!IsFamily || Members.Any(member => member.IsActive));
 }
 
 // The coverage of a work point by a contract (service_contract_points). CycleMonths null = inherits the cycle of the contract;
@@ -22,17 +35,26 @@ public sealed record ServiceContractPointView(ServiceContractPoint Point, string
 // One covered work point on the "Scadente" list of /mentenanta, with its beneficiary and contract.
 // Latitude/Longitude are those of the work point (both or none); LastIntervention is the date of its latest maintenance intervention.
 public sealed record ServiceDueRow(int BeneficiaryId, string BeneficiaryName, ServiceContract Contract, ServiceContractPointView Point,
-    decimal? Latitude = null, decimal? Longitude = null, DateOnly? LastIntervention = null)
+    decimal? Latitude = null, decimal? Longitude = null, DateOnly? LastIntervention = null, IReadOnlyList<ServiceUnitDue>? UnitDueList = null)
 {
+    /// <summary>The due date of each unit (family / component) at this point; Point.Point.NextDue is the earliest of them.</summary>
+    public IReadOnlyList<ServiceUnitDue> UnitDues => UnitDueList ?? [];
     public bool HasCoordinates => Latitude is not null && Longitude is not null && !(Latitude == 0 && Longitude == 0);
 }
 
-public sealed record ServiceContractDetails(ServiceContract Contract, IReadOnlyList<ServiceContractPointView> Points)
+// The due date of one unit at one covered point (service_contract_unit_dues).
+public sealed record ServiceUnitDue(int PointId, int UnitId, int? FamilyId, int? ComponentId, DateOnly NextDue);
+
+public sealed record ServiceContractDetails(ServiceContract Contract, IReadOnlyList<ServiceContractPointView> Points, IReadOnlyList<ServiceContractUnit>? UnitList = null,
+    IReadOnlyList<ServiceUnitDue>? DueList = null)
 {
+    public IReadOnlyList<ServiceUnitDue> Dues => DueList ?? [];
+    public IReadOnlyList<ServiceContractUnit> Units => UnitList ?? [];
+
     /// <summary>The earliest due date among the covered points (null when the contract covers no point).</summary>
     public DateOnly? NextDue => Points.Count == 0 ? null : Points.Min(point => point.Point.NextDue);
 
-    public int EffectiveCycle(ServiceContractPoint point) => ServiceDueRules.EffectiveCycle(point.CycleMonths, Contract.CycleMonths);
+    public int? EffectiveCycle(ServiceContractPoint point) => ServiceDueRules.EffectiveCycle(point.CycleMonths, Contract.CycleMonths);
 }
 
 // A work point of the beneficiary that is covered by another ACTIVE contract (a point is in at most one active contract).
@@ -51,6 +73,25 @@ public sealed class ServiceContractPointInput
     public bool MoveFromOtherContract { get; set; }
 }
 
+// One unit of the contract in the form. A family lists all its members with their On/Off; a discrete component has no members.
+public sealed class ServiceContractUnitMemberInput
+{
+    public int ComponentId { get; set; }
+    public bool IsActive { get; set; } = true;
+}
+
+public sealed class ServiceContractUnitInput
+{
+    public int? FamilyId { get; set; }
+    public int? ComponentId { get; set; }
+    public int? CycleMonths { get; set; }
+    public DateOnly? ReferenceDate { get; set; }
+    public bool IsActive { get; set; } = true;
+    public List<ServiceContractUnitMemberInput> Members { get; set; } = [];
+
+    public string Key => FamilyId is { } family ? $"F{family}" : $"C{ComponentId}";
+}
+
 public sealed class ServiceContractInput : IValidatableObject
 {
     public const int NotesMaximumLength = 1000;
@@ -60,7 +101,10 @@ public sealed class ServiceContractInput : IValidatableObject
     public string NumberText { get; set; } = "";
 
     public DateOnly? ValidUntil { get; set; }
-    public int CycleMonths { get; set; } = 3;
+    // The global cycle is optional (each unit may carry its own); the reference date is the day the cycle is counted from and is mandatory.
+    public int? CycleMonths { get; set; }
+    public DateOnly? ReferenceDate { get; set; }
+    public List<ServiceContractUnitInput> Units { get; set; } = [];
 
     [StringLength(NotesMaximumLength, ErrorMessage = "Observațiile pot avea cel mult 1000 de caractere.")]
     public string Notes { get; set; } = "";
@@ -77,8 +121,22 @@ public sealed class ServiceContractInput : IValidatableObject
         if (!ServiceContractNumber.TryParse(NumberText, out _, out var parsedDate, out var numberError))
             yield return new(numberError!, [nameof(NumberText)]);
         else date = parsedDate;
-        if (CycleMonths is < ServiceContractRules.MinimumCycle or > ServiceContractRules.MaximumCycle)
+        if (CycleMonths is { } globalCycle && globalCycle is < ServiceContractRules.MinimumCycle or > ServiceContractRules.MaximumCycle)
             yield return new($"Ciclicitatea trebuie să fie între {ServiceContractRules.MinimumCycle} și {ServiceContractRules.MaximumCycle} luni.", [nameof(CycleMonths)]);
+        if (ReferenceDate is not { } referenceDate) yield return new("Completează data de referință a contractului (data de la care se numără ciclul).", [nameof(ReferenceDate)]);
+        else if (!ServiceContractRules.InRange(referenceDate)) yield return new("Data de referință nu este validă.", [nameof(ReferenceDate)]);
+        foreach (var unit in Units)
+        {
+            if ((unit.FamilyId is null) == (unit.ComponentId is null)) yield return new("O componentă a contractului este fie o familie, fie o componentă discretă.", [nameof(Units)]);
+            if (unit.CycleMonths is { } unitCycle && unitCycle is < ServiceContractRules.MinimumCycle or > ServiceContractRules.MaximumCycle)
+                yield return new($"Ciclicitatea unei componente trebuie să fie între {ServiceContractRules.MinimumCycle} și {ServiceContractRules.MaximumCycle} luni.", [nameof(Units)]);
+            if (unit.ReferenceDate is { } unitReference && !ServiceContractRules.InRange(unitReference))
+                yield return new("Data de referință a unei componente nu este validă.", [nameof(Units)]);
+            if (unit.FamilyId is null && unit.Members.Count > 0) yield return new("O componentă discretă nu are elemente.", [nameof(Units)]);
+            if (unit.Members.GroupBy(member => member.ComponentId).Any(group => group.Count() > 1)) yield return new("Un element apare de două ori în aceeași familie.", [nameof(Units)]);
+        }
+        if (Units.GroupBy(unit => unit.Key).Any(group => group.Count() > 1))
+            yield return new("O familie sau o componentă poate apărea o singură dată în contract.", [nameof(Units)]);
         if (ValidUntil is { } validUntil)
         {
             if (!ServiceContractRules.InRange(validUntil)) yield return new("Data de expirare nu este validă.", [nameof(ValidUntil)]);
@@ -105,6 +163,12 @@ public sealed class ServiceContractInput : IValidatableObject
             NumberText = TextNormalization.ForObjectNameOrCode(NumberText),
             ValidUntil = ValidUntil,
             CycleMonths = CycleMonths,
+            ReferenceDate = ReferenceDate,
+            Units = Units.Select(unit => new ServiceContractUnitInput
+            {
+                FamilyId = unit.FamilyId, ComponentId = unit.ComponentId, CycleMonths = unit.CycleMonths, ReferenceDate = unit.ReferenceDate, IsActive = unit.IsActive,
+                Members = unit.Members.Select(member => new ServiceContractUnitMemberInput { ComponentId = member.ComponentId, IsActive = member.IsActive }).ToList()
+            }).ToList(),
             Notes = TextNormalization.ForStorage((Notes ?? "").Replace("\r\n", "\n")),
             Points = Points.Select(point => new ServiceContractPointInput
             {
@@ -122,7 +186,13 @@ public sealed class ServiceContractInput : IValidatableObject
 
     public static ServiceContractInput From(ServiceContractDetails value) => new()
     {
-        NumberText = value.Contract.Label, ValidUntil = value.Contract.ValidUntil, CycleMonths = value.Contract.CycleMonths, Notes = value.Contract.Notes,
+        NumberText = value.Contract.Label, ValidUntil = value.Contract.ValidUntil, CycleMonths = value.Contract.CycleMonths, ReferenceDate = value.Contract.ReferenceDate,
+        Notes = value.Contract.Notes,
+        Units = value.Units.Select(unit => new ServiceContractUnitInput
+        {
+            FamilyId = unit.FamilyId, ComponentId = unit.ComponentId, CycleMonths = unit.CycleMonths, ReferenceDate = unit.ReferenceDate, IsActive = unit.IsActive,
+            Members = unit.Members.Select(member => new ServiceContractUnitMemberInput { ComponentId = member.ComponentId, IsActive = member.IsActive }).ToList()
+        }).ToList(),
         Points = value.Points.Select(point => new ServiceContractPointInput
         {
             WorkPointId = point.Point.WorkPointId, NextDue = point.Point.NextDue, CycleMonths = point.Point.CycleMonths
@@ -205,7 +275,7 @@ public static class ServiceDueRules
         _ => "due-ok"
     };
 
-    public static int EffectiveCycle(int? individualCycle, int contractCycle) => individualCycle ?? contractCycle;
+    public static int? EffectiveCycle(int? individualCycle, int? contractCycle) => individualCycle ?? contractCycle;
 
     public static bool IsExpired(ServiceContract contract, DateOnly today) => contract.ValidUntil is { } validUntil && validUntil < today;
 
@@ -229,8 +299,15 @@ public static class ServiceDueRules
     }
 }
 
+// A frozen contract (incomplete data) with the name of its beneficiary, for the "Contracte incomplete" tab of the notifications.
+public sealed record ServiceContractFrozenItem(int BeneficiaryId, string BeneficiaryName, ServiceContractDetails Details);
+
 public interface IServiceContractRepository
 {
+    /// <summary>Every frozen contract (On or Off) with its units and points, by beneficiary.</summary>
+    Task<IReadOnlyList<ServiceContractFrozenItem>> GetFrozenAsync(CancellationToken cancellationToken = default);
+    /// <summary>The number of frozen contracts that are On (the red number of the notifications tab).</summary>
+    Task<int> CountFrozenAsync(CancellationToken cancellationToken = default);
     /// <summary>Every contract of the beneficiary (On and Off) with its covered work points, newest contract date first.</summary>
     Task<IReadOnlyList<ServiceContractDetails>> GetForBeneficiaryAsync(int beneficiaryId, CancellationToken cancellationToken = default);
     /// <summary>Every covered work point of every beneficiary, earliest due date first; contracts that are Off only with includeOff.</summary>
@@ -295,18 +372,23 @@ public static class ServiceContractRules
 
     public static string CycleText(int months) => months == 1 ? "1 lună" : $"{months} luni";
 
-    public static string PointCycleText(int? individual, int contractCycle) =>
-        individual is { } value ? $"{CycleText(value)} (individuală)" : $"{CycleText(contractCycle)} (din contract)";
+    public static string CycleText(int? months) => months is { } value ? CycleText(value) : "nestabilită";
+
+    public static string PointCycleText(int? individual, int? contractCycle) =>
+        individual is { } value ? $"{CycleText(value)} (individuală)" : contractCycle is { } cycle ? $"{CycleText(cycle)} (din contract)" : "nestabilită";
+
+    public static string ReferenceDateText(DateOnly? value) => value is { } date ? StockMovementRules.DisplayDate(date) : "nestabilită";
 
     public static string Identification(ServiceContract value) => AuditDetails.Identification(new (string Field, string Value)[]
     {
-        ("Contract", value.Label), ("Ciclicitate", CycleText(value.CycleMonths)),
+        ("Contract", value.Label), ("Ciclicitate", CycleText(value.CycleMonths)), ("Data de referință", ReferenceDateText(value.ReferenceDate)),
         ("Expiră", value.ValidUntil is { } validUntil ? StockMovementRules.DisplayDate(validUntil) : "fără termen"), ("Observații", value.Notes)
     }.Where(item => item.Value.Length > 0).ToArray());
 
     public static IReadOnlyList<AuditChange> Changes(ServiceContract before, ServiceContract after) =>
     [
         new("Număr și dată", before.Label, after.Label), new("Ciclicitate", CycleText(before.CycleMonths), CycleText(after.CycleMonths)),
+        new("Data de referință", ReferenceDateText(before.ReferenceDate), ReferenceDateText(after.ReferenceDate)),
         new("Expiră", ValidUntilText(before.ValidUntil), ValidUntilText(after.ValidUntil)), new("Observații", before.Notes, after.Notes)
     ];
 
@@ -317,7 +399,9 @@ public static class ServiceContractRules
     {
         var expiryChanged = before.ValidUntil != after.ValidUntil;
         var cycleChanged = before.CycleMonths != after.CycleMonths;
+        var referenceChanged = before.ReferenceDate != after.ReferenceDate;
         var othersChanged = before.Number != after.Number || before.Date != after.Date || before.Notes != after.Notes;
+        if (referenceChanged && !othersChanged && !expiryChanged && !cycleChanged) return AuditActions.EditContractReferenceDate;
         if (othersChanged || (expiryChanged && cycleChanged) || (!expiryChanged && !cycleChanged)) return AuditActions.EditServiceContract;
         return expiryChanged ? AuditActions.EditServiceContractExpiry : AuditActions.EditMaintenanceCycle;
     }

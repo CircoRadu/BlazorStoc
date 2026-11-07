@@ -1,8 +1,8 @@
 {
     "modules":  {
                     "ActivityImport":  {
-                                           "version":  "0.12.0",
-                                           "hash":  "73af2f3f35074298b100ecbfa4b13ae31b4129b39c2ef081c5cb01ffbeedab83",
+                                           "version":  "0.13.0",
+                                           "hash":  "6772b8eabe48feddfc3861c61c920bc073e9dfca33a6674509935a5a6132eb98",
                                            "history":  [
                                                            {
                                                                "version":  "0.1.0",
@@ -78,6 +78,11 @@
                                                                "version":  "0.12.0",
                                                                "date":  "06.11.2026",
                                                                "note":  "Tichet exemplu, nume editabile, verificarea structurii tichetelor si notificarea"
+                                                           },
+                                                           {
+                                                               "version":  "0.13.0",
+                                                               "date":  "07.11.2026",
+                                                               "note":  "Fereastra tichetului preluat de operator alege componentele acoperite de intervenția de mentenanta"
                                                            }
                                                        ]
                                        },
@@ -156,8 +161,8 @@
                                                  ]
                                  },
                     "Journal":  {
-                                    "version":  "1.4.15",
-                                    "hash":  "0f5117dc41f9de92380faba8c0ee75ed957d36c43c12d8868cf5e0ec0ce3d41b",
+                                    "version":  "1.4.17",
+                                    "hash":  "9907d365ed71de8ec7eff22c294852d6ef2088c4ceaf8a7afde8045afff210e6",
                                     "history":  [
                                                     {
                                                         "version":  "1.0.0",
@@ -273,12 +278,22 @@
                                                         "version":  "1.4.15",
                                                         "date":  "07.11.2026",
                                                         "note":  "Filtrul de evenimente cunoaste rapoartele de erori (entitate si actiuni: creare, schimbare stare, stergere, export)"
+                                                    },
+                                                    {
+                                                        "version":  "1.4.16",
+                                                        "date":  "07.11.2026",
+                                                        "note":  "Filtrul de evenimente cunoaste componentele de mentenanta si actele aditionale (entitati si actiuni noi)"
+                                                    },
+                                                    {
+                                                        "version":  "1.4.17",
+                                                        "date":  "07.11.2026",
+                                                        "note":  "Filtrul de evenimente cunoaste actiunile contractelor cu componente (data de referinta, componentele contractului, inghetare, dezghetare)"
                                                     }
                                                 ]
                                 },
                     "Maintenance":  {
-                                        "version":  "1.7.2",
-                                        "hash":  "40cc189a1eeba9fc5959a4db8d829d751c2bc46d76861ac919fe51198c0092f9",
+                                        "version":  "1.10.0",
+                                        "hash":  "0b72cbdc915b11eb1ea05175b900821d9533ff52810a4157e267f2a6f96c9fd9",
                                         "history":  [
                                                         {
                                                             "version":  "1.0.0",
@@ -374,12 +389,27 @@
                                                             "version":  "1.7.2",
                                                             "date":  "06.11.2026",
                                                             "note":  "Campurile suplimentare ale tichetului in fereastra interventiei; observatiile unei interventii se pot reinnoi din tichet"
+                                                        },
+                                                        {
+                                                            "version":  "1.8.0",
+                                                            "date":  "07.11.2026",
+                                                            "note":  "Acte aditionale ale contractelor (efect, motiv, anulare, reprogramare) si nomenclatorul Componente mentenanta (familii, componente, sinonime) ca baza pentru contractele pe componente"
+                                                        },
+                                                        {
+                                                            "version":  "1.9.0",
+                                                            "date":  "07.11.2026",
+                                                            "note":  "Contracte cu componente: data de referinta obligatorie, familii si componente discrete (elemente On/Off, ciclicitate si referinta globale sau pe unitate), contract inghetat cu date incomplete (fara scadente, fara mutarea scadentelor de catre interventii), lista contractelor inghetate"
+                                                        },
+                                                        {
+                                                            "version":  "1.10.0",
+                                                            "date":  "07.11.2026",
+                                                            "note":  "Scadente pe punct si componenta, interventii cu componente (mutarea scadentelor numai pentru componentele alese), acte aditionale complete (data de referinta, componente On/Off, verificarea interventiilor, scadente propuse, anulare) legate in fisa beneficiarului"
                                                         }
                                                     ]
                                     },
                     "Notifications":  {
-                                          "version":  "1.3.2",
-                                          "hash":  "ea4c39fdc33e3bad0bdbb4824ad916a56214194858f8d1eb1eb82d5059e54a8d",
+                                          "version":  "1.4.0",
+                                          "hash":  "cdd89b09bf618d3cec8b87c9027605721640bd1cfc3fc31bb2998842796a8f14",
                                           "history":  [
                                                           {
                                                               "version":  "1.0.0",
@@ -415,6 +445,11 @@
                                                               "version":  "1.3.2",
                                                               "date":  "05.11.2026",
                                                               "note":  "Motivul rezolvarii automate poate fi compus de sursa notificarii (RemovedReasonAsync)"
+                                                          },
+                                                          {
+                                                              "version":  "1.4.0",
+                                                              "date":  "07.11.2026",
+                                                              "note":  "Tab nou Contracte incomplete (contractele de mentenanta inghetate, cu ce lipseste)"
                                                           }
                                                       ]
                                       },

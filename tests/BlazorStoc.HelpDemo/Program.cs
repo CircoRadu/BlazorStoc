@@ -201,9 +201,17 @@ await minStock.SetAsync(Find("CENTR-INC-2L").Id, 3);
 await minStock.SetAsync(Find("CAM-IP-8MP-PTZ").Id, 5);
 
 // ---- Maintenance: contracts and interventions -----------------------------------------------------------------------------------------------------------------------
+// A maintenance contract needs a reference date and at least one family or component (otherwise it is frozen and shows nothing in the lists).
+var maintenanceComponents = new MariaMaintenanceComponentRepository(configuration, admin, audit);
+var securityFamily = await maintenanceComponents.CreateFamilyAsync("Securitate fizică");
+await maintenanceComponents.CreateComponentAsync("Efracție", securityFamily.Id);
+await maintenanceComponents.CreateComponentAsync("TVCI", securityFamily.Id);
+await maintenanceComponents.CreateComponentAsync("Control acces", securityFamily.Id);
+var fireComponent = await maintenanceComponents.CreateComponentAsync("Incendiu", null);
 async Task ContractAsync(int beneficiary, string number, int cycle, int[] pointIndexes, int firstDueInDays)
 {
-    var input = new ServiceContractInput { NumberText = number, CycleMonths = cycle, ValidUntil = today.AddYears(1), Notes = "Verificări periodice ale sistemelor instalate." };
+    var input = new ServiceContractInput { NumberText = number, CycleMonths = cycle, ReferenceDate = today.AddDays(firstDueInDays).AddMonths(-cycle), ValidUntil = today.AddYears(1), Notes = "Verificări periodice ale sistemelor instalate.",
+        Units = [new ServiceContractUnitInput { ComponentId = fireComponent.Id }] };
     foreach (var index in pointIndexes) input.Points.Add(new ServiceContractPointInput { WorkPointId = workPointRecords[index].Id, NextDue = today.AddDays(firstDueInDays + index * 9) });
     await contracts.CreateAsync(beneficiaryRecords[beneficiary].Id, input);
 }
@@ -217,7 +225,8 @@ await interventions.RecordAsync(beneficiaryRecords[4].Id, new ServiceInterventio
 // A contract that was switched off (the list shows it only with "Arată și contractele Off") and the reactivation dialog that goes with it.
 var offContract = await contracts.CreateAsync(beneficiaryRecords[3].Id, new ServiceContractInput
 {
-    NumberText = $"7/{Ago(300):dd.MM.yyyy}", CycleMonths = 6, ValidUntil = today.AddMonths(-2), Notes = "Contract suspendat la cererea asociației.",
+    NumberText = $"7/{Ago(300):dd.MM.yyyy}", CycleMonths = 6, ReferenceDate = Ago(300), ValidUntil = today.AddMonths(-2), Notes = "Contract suspendat la cererea asociației.",
+    Units = [new ServiceContractUnitInput { ComponentId = fireComponent.Id }],
     Points = [new ServiceContractPointInput { WorkPointId = workPointRecords[6].Id, NextDue = today.AddDays(60) }]
 });
 await contracts.DeactivateAsync(offContract.Contract);

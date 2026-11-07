@@ -1,0 +1,29 @@
+# Nomenclator · Componente mentenanță
+Ruta: /nomenclator
+Tab: Componente mentenanță
+Cautare: nomenclator componente mentenanta familie familii componenta discreta denumiri alternative contract tichet activ ordine
+
+Familiile și componentele pe care le acoperă contractele de mentenanță și intervențiile (inclusiv tichetele preluate de un operator). O familie grupează componente (de exemplu „Securitate fizică”: efracție, TVCI, control acces); o componentă fără familie este discretă. Nimic nu se șterge: ce nu mai trebuie se dezactivează.
+
+## Elemente
+### Adăugare
+- Denumirea unei familii noi | câmp | Numele familiei; „Adaugă familia” o adaugă la final.
+- Denumirea unei componente noi | câmp | Numele componentei; se alege familia ei sau „componentă discretă”.
+### Familii și componente
+- Secțiunea explicativă | text | Cum funcționează familiile, componentele discrete și denumirile alternative; închisă implicit. | sel: .bug-help
+- Familia | titlu | Numele familiei, numărul de componente, mutarea (sus/jos), redenumirea și comutatorul Activ.
+- Ordine | iconita:up | Mută familia sau componenta mai sus în lista de alegeri.
+- Ordine | iconita:down | O mută mai jos.
+- Redenumește | iconita:edit | Deschide câmpul de redenumire.
+- Denumiri alternative | coloană | Cuvintele din tichete pentru aceeași componentă (de exemplu „CCTV” pentru „TVCI”).
+- Familie | listă | Mută componenta în altă familie (la finalul ei) sau o face discretă.
+- Stare | comutator | Activ sau inactiv: ce este inactiv nu mai apare la alegeri noi.
+
+## Flux: Cum definesc o familie cu componente
+1. Scrie numele familiei și apasă „Adaugă familia”.
+2. Scrie numele unei componente, alege familia și apasă „Adaugă componenta”.
+3. Adaugă denumirile alternative ale componentei, dacă tichetele o numesc altfel.
+
+## Flux: Cum fac o componentă discretă
+1. Alege „— discretă —” în coloana Familie a componentei sau creeaz-o direct discretă.
+2. O componentă discretă se alege singură la un contract și poate avea ciclicitate și dată de referință proprii.

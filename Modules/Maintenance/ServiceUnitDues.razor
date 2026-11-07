@@ -1,0 +1,17 @@
+@namespace BlazorStoc.Components.Pages
+@using BlazorStoc.Services
+@* The due date of each family / component at a covered point (the date of the point is the earliest of them). *@
+@foreach (var due in Dues)
+{
+    <span class="unit-due @ServiceDueRules.CssClass(ServiceDueRules.State(due.NextDue, Today, Threshold))" title="@($"{Name(due)}: {StockMovementRules.DisplayDate(due.NextDue)}")">@Name(due) · @StockMovementRules.DisplayDate(due.NextDue)</span>
+}
+
+@code {
+    [Parameter] public IReadOnlyList<ServiceUnitDue> Dues { get; set; } = [];
+    [Parameter] public MaintenanceCatalog? Catalog { get; set; }
+    [Parameter] public DateOnly Today { get; set; }
+    [Parameter] public int Threshold { get; set; } = ServiceDueRules.DefaultThresholdDays;
+
+    private string Name(ServiceUnitDue due) => due.FamilyId is { } family ? Catalog?.Family(family)?.Name ?? "familie"
+        : Catalog?.Components.FirstOrDefault(component => component.Id == due.ComponentId)?.Name ?? "componentă";
+}

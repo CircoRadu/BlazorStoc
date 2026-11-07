@@ -222,7 +222,11 @@ public static class HelpChecks
         // New 06.11.2026: needs an ActivityApp connection to be photographed; the picture is made on request (docs/HELP_DE_REGENERAT.md).
         "setari-tichet-exemplu",
         // New 07.11.2026: the popup of the menu entry "Raporteaza o eroare"; the picture is made on request (docs/HELP_DE_REGENERAT.md).
-        "raportare-eroare"
+        "raportare-eroare",
+        // New 07.11.2026: the tab "Componente mentenanta" of the Nomenclator; the picture is made on request (docs/HELP_DE_REGENERAT.md).
+        "nomenclator-componente-mentenanta",
+        // New 07.11.2026: the window of an addendum of a maintenance contract (not wired into the page yet); the description is completed with the components stage.
+        "mentenanta-act-aditional"
     };
 
     // Elements that the demo environment cannot show in the state they describe (topic key|element name); the list only shrinks.
@@ -351,7 +355,7 @@ public static class HelpChecks
     // Files with a window over the page that need no help button of their own: confirmations (they explain themselves) and files that only wrap a form with its own help button.
     private static readonly HashSet<string> DialogFilesWithoutHelp = new(StringComparer.OrdinalIgnoreCase)
     {
-        "MainLayout.razor", "AdminOperationDialog.razor", "DeleteConfirmationDialog.razor", "SaveConfirmationDialog.razor", "UnsavedChangesDialog.razor", "RestoreConfirmationDialog.razor", "ForceUnlockDialog.razor",
+        "MainLayout.razor", "AdminOperationDialog.razor", "DeleteConfirmationDialog.razor", "SaveConfirmationDialog.razor", "UnsavedChangesDialog.razor", "RestoreConfirmationDialog.razor", "ForceUnlockDialog.razor", "ServiceContractAddendumReasonDialog.razor",
         "ParameterValueEditDialog.razor", "BackupSettingsPanel.razor", "AccessSecurityPanel.razor", "AuthenticatorActions.razor", "ProjectComponentsSection.razor",
         "Home.razor", "Beneficiaries.razor", "Suppliers.razor", "Vehicles.razor", "InvoiceTemplatesList.razor", "OfferPickup.razor",
         // The editors of the beneficiary page open in a window made here around forms that have their own help button; the file panel has a delete confirmation and a plain file preview.

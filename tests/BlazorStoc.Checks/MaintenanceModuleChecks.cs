@@ -20,6 +20,8 @@ public static class MaintenanceModuleChecks
         private Task<T> Fail<T>() { Calls++; return Failure is null ? Task.FromResult(default(T)!) : Task.FromException<T>(Failure); }
         public Task<IReadOnlyList<ServiceContractDetails>> GetForBeneficiaryAsync(int beneficiaryId, CancellationToken cancellationToken = default) => Fail<IReadOnlyList<ServiceContractDetails>>();
         public Task<IReadOnlyList<ServiceDueRow>> GetDueListAsync(bool includeOff, CancellationToken cancellationToken = default) => Fail<IReadOnlyList<ServiceDueRow>>();
+        public Task<IReadOnlyList<ServiceContractFrozenItem>> GetFrozenAsync(CancellationToken cancellationToken = default) => Fail<IReadOnlyList<ServiceContractFrozenItem>>();
+        public Task<int> CountFrozenAsync(CancellationToken cancellationToken = default) => Fail<int>();
         public Task<ServiceContractDetails> CreateAsync(int beneficiaryId, ServiceContractInput input, CancellationToken cancellationToken = default) => Fail<ServiceContractDetails>();
         public Task<ServiceContractDetails> UpdateAsync(ServiceContract original, ServiceContractInput input, CancellationToken cancellationToken = default) => Fail<ServiceContractDetails>();
         public Task<ServiceContractActivationPlan> PrepareActivationAsync(int contractId, CancellationToken cancellationToken = default) => Fail<ServiceContractActivationPlan>();

@@ -4,6 +4,22 @@ Fluxul: Administrare -> Nomenclator (sau cardul de pe pagina principala) -> adau
 
 ## Modificari de testat
 
+### 07.11.2026 - Tabul "Componente mentenanta"
+
+**Ce s-a adaugat:** tab nou in Nomenclator, "Componente mentenanta": familii (ex. Securitate fizica) si componente (discrete sau in familie), cu denumiri alternative, ordine, activ/inactiv si mutarea unei componente intre familii. Tabul "Cuvinte cheie mentenanta" ramane separat.
+
+**Ce face acum:** familiile si componentele pot fi definite si ordonate; ce nu mai trebuie se dezactiveaza (nu se sterge). Contractele si tichetele le vor folosi in etapele urmatoare (in aceasta etapa nu se schimba inca niciun contract).
+
+| Nr | Pas | Rezultat asteptat | Rezultat obtinut |
+|---|---|---|---|
+| 1 | Nomenclator -> tabul "Componente mentenanta"; deschide sectiunea explicativa | Sectiunea este inchisa implicit si se deschide la clic | |
+| 2 | Adauga o familie (ex. "TEST Securitate") | Apare ca sectiune noua, cu 0 componente | |
+| 3 | Adauga o componenta in familie si una "componenta discreta" | Prima apare in familie, a doua la "Componente discrete" | |
+| 4 | Adauga o denumire alternativa (ex. CCTV pentru TVCI); incearca aceeasi denumire la alta componenta | Prima se adauga; a doua este refuzata (denumire existenta) | |
+| 5 | Muta o componenta intre familii si apoi la discreta din coloana "Familie" | Ajunge la finalul listei noii familii / la discrete | |
+| 6 | Dezactiveaza o familie si incearca sa adaugi in ea o componenta | Familia inactiva nu mai apare la alegerea familiei noii componente | |
+| 7 | Verifica Jurnal activitate | Adaugarile, redenumirile, mutarile si dezactivarile apar cu actiuni proprii | |
+
 ### 07.10.2026 - Tipuri de sisteme
 
 **Ce s-a adaugat:** pagina `Nomenclator` (`SystemTypes.razor`), serviciul `ISystemTypeRepository` / `MariaSystemTypeRepository`, tabelele `system_types` si `system_type_aliases` (migrarea 22), intrare in meniul Administrare si card pe pagina principala (doar administrator). Un tip are denumire, ordine, stare Activ/Inactiv si denumiri alternative; nu se sterge, se dezactiveaza. Unicitatea ignora litera mare/mica, diacriticele si separatorii, atat la denumiri cat si la denumirile alternative. Jurnal cu actiune exacta pentru fiecare operatie.

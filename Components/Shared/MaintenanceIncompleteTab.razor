@@ -1,0 +1,29 @@
+@namespace BlazorStoc.Components.Shared
+@using BlazorStoc.Services
+@inject IServiceContractRepository Contracts
+
+@* The tab "Contracte incomplete" of the Notifications page: red with the number of ACTIVE maintenance contracts that are frozen (data missing). It belongs to the Maintenance module; the page of
+   another module (Notifications) shows it through this wrapper, because modules do not refer to each other. Shown only to who may see the maintenance and while the module runs. *@
+<AuthorizeView Policy="perm:mentenanta.view">
+    <Authorized>
+        <ModuleGate ModuleId="@BlazorStoc.Modules.Maintenance.MaintenanceModule.ModuleId" Notice="false">
+            <button type="button" role="tab" id="tab-contracts-incomplete" class="settings-tab @(Active ? "active" : "") @(frozen > 0 ? "needs-attention" : "")" aria-selected="@(Active ? "true" : "false")" aria-controls="panel-notifications" @onclick="Select">Contracte incomplete <span class="count-badge">@frozen</span></button>
+        </ModuleGate>
+    </Authorized>
+</AuthorizeView>
+
+@code {
+    [Parameter] public bool Active { get; set; }
+    [Parameter] public EventCallback Selected { get; set; }
+
+    private int frozen;
+
+    private Task Select() => Selected.InvokeAsync();
+
+    // Read again each time the page renders the tab for a new visit; a failure only leaves the number at zero.
+    protected override async Task OnInitializedAsync()
+    {
+        try { frozen = await Contracts.CountFrozenAsync(); }
+        catch (Exception) { frozen = 0; }
+    }
+}

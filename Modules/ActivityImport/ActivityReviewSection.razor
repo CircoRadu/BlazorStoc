@@ -77,11 +77,29 @@
             <fieldset disabled="@busy">
                 <div class="editor-grid">
                     <label for="review-category">Categorie<select id="review-category" value="@category" @onchange="CategoryChanged"><option value="@nameof(ReviewCategory.Maintenance)">Mentenanță</option><option value="@nameof(ReviewCategory.Service)">Service la cerere</option></select></label>
-                    <label for="review-point">Punct de lucru<select id="review-point" @bind="workPointId">@foreach (var point in edit.WorkPoints) { <option value="@point.Id">@point.Name · @point.Address</option> }</select></label>
+                    <label for="review-point">Punct de lucru<select id="review-point" value="@workPointId" @onchange="PointChangedAsync">@foreach (var point in edit.WorkPoints) { <option value="@point.Id">@point.Name · @point.Address</option> }</select></label>
                     <label for="review-date">Data efectuării *<PickOnlyDate Id="review-date" @bind-Value="performedOn" Min="@MinDate" Disabled="busy" /></label>
                     @if (category == nameof(ReviewCategory.Maintenance))
                     {
                         <p class="full-width muted"><small>@(edit.Covered ? "Punctul are un contract activ: mentenanța mută scadența următoare după ciclicitatea contractului." : "Dacă punctul nu are un contract de mentenanță activ, mentenanța se înregistrează fără contract și nu mută nicio scadență (contractul poate fi adăugat ulterior).")</small></p>
+                    }
+                    @if (category == nameof(ReviewCategory.Maintenance) && choice.Options.Count > 0)
+                    {
+                        <fieldset class="full-width intervention-components">
+                            <legend>Componente acoperite@(choice.Required ? " *" : "")</legend>
+                            <p class="form-note">@(choice.Required ? "Alege ce componente ale contractului a acoperit intervenția: scadențele se mută numai pentru ele." : "Alege componentele acoperite de intervenție (punctul nu are un contract complet, scadențele nu se mută).")</p>
+                            @foreach (var group in choice.Options.GroupBy(option => option.Group))
+                            {
+                                <div class="unit-group"><strong>@group.Key</strong>
+                                    <div class="unit-members">
+                                        @foreach (var option in group)
+                                        {
+                                            <span class="unit-member"><ToggleSwitch Compact Value="@chosen.Contains(option.ComponentId)" ValueChanged="@(value => ToggleComponent(option.ComponentId, value))" AriaLabel="@($"Componenta {option.Name}")" /><span class="unit-member-name">@option.Name</span></span>
+                                        }
+                                    </div>
+                                </div>
+                            }
+                        </fieldset>
                     }
                     <label for="review-notes" class="full-width">Observații<textarea id="review-notes" rows="8" maxlength="@OnDemandInterventionRules.NotesMaximumLength" @bind="notes" @bind:event="oninput"></textarea></label>
                 </div>
@@ -190,8 +208,27 @@
         performedOn = loaded.Item.PerformedOn;
         notes = category == nameof(ReviewCategory.Maintenance) ? loaded.NotesMaintenance : loaded.NotesService;
         notesTouched = false;
+        choice = loaded.Components ?? InterventionComponentChoice.None;
+        chosen.Clear();
         error = null;
         popup = Popup.Edit;
+    }
+
+    private InterventionComponentChoice choice = InterventionComponentChoice.None;
+    private readonly HashSet<int> chosen = [];
+
+    private void ToggleComponent(int id, bool on)
+    {
+        if (on) chosen.Add(id); else chosen.Remove(id);
+    }
+
+    // The components offered follow the work point: the ones its contract covers, or the whole nomenclator for a point without a complete contract.
+    private async Task PointChangedAsync(ChangeEventArgs args)
+    {
+        workPointId = int.TryParse(args.Value?.ToString(), out var id) ? id : workPointId;
+        chosen.Clear();
+        try { choice = detail is { } loaded ? await Reviews.GetComponentChoiceAsync(loaded.Item.Id, workPointId, lifetime.Token) : InterventionComponentChoice.None; }
+        catch (Exception exception) when (exception is not OperationCanceledException) { choice = InterventionComponentChoice.None; }
     }
 
     // The notes follow the category until the operator types in them.
@@ -214,7 +251,9 @@
     private Task SaveEditAsync()
     {
         var loaded = detail!;
-        return RunAsync(() => Reviews.TakeAsync(loaded.Item.Id, new ReviewTakeInput(category == nameof(ReviewCategory.Maintenance) ? ReviewCategory.Maintenance : ReviewCategory.Service, workPointId, performedOn!.Value, notes), lifetime.Token),
+        var maintenance = category == nameof(ReviewCategory.Maintenance);
+        if (maintenance && choice.Required && chosen.Count == 0) { error = "Alege cel puțin o componentă acoperită de intervenție."; return Task.CompletedTask; }
+        return RunAsync(() => Reviews.TakeAsync(loaded.Item.Id, new ReviewTakeInput(maintenance ? ReviewCategory.Maintenance : ReviewCategory.Service, workPointId, performedOn!.Value, notes, maintenance ? [.. chosen] : null), lifetime.Token),
             $"Tichetul {loaded.Item.TicketNumber} a fost preluat: intervenția este înregistrată cu ce ai ales.");
     }
 

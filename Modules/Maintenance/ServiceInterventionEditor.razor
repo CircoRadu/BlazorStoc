@@ -3,6 +3,7 @@
 @using System.Globalization
 @using BlazorStoc.Services
 @inject IServiceInterventionRepository Repository
+@inject IMaintenanceComponentRepository ComponentCatalog
 @inject IServicePhotoStore PhotoStore
 @inject TimeProvider Clock
 @inject ILogger<ServiceInterventionEditor> Logger
@@ -54,6 +55,28 @@
                 }
                 <label for="intervention-date">Data efectuării *<PickOnlyDate Id="intervention-date" @bind-Value="input.PerformedOn" @bind-Value:after="DateChanged" Min="2000-01-01" Max="@TodayIso" Disabled="@(saving || !DateEditable)" />
                     @if (Original is not null && !DateEditable) { <small>Data se poate corecta numai la ultima intervenție de mentenanță a punctului; pentru aceasta se pot schimba doar observațiile.</small> }</label>
+                @if (Original is null && input.Kind == ServiceInterventionKind.Maintenance && input.WorkPointId > 0 && choice.Options.Count > 0)
+                {
+                    <fieldset class="full-width intervention-components">
+                        <legend>Componente acoperite@(choice.Required ? " *" : "")</legend>
+                        <p class="form-note">@(choice.Required ? "Alege ce componente ale contractului a acoperit intervenția: scadențele se mută numai pentru ele." : "Punctul nu are un contract complet: alege componentele acoperite (scadențele nu se mută).")</p>
+                        @foreach (var group in choice.Options.GroupBy(option => option.Group))
+                        {
+                            <div class="unit-group"><strong>@group.Key</strong>
+                                <div class="unit-members">
+                                    @foreach (var option in group)
+                                    {
+                                        <span class="unit-member"><ToggleSwitch Compact Value="@chosen.Contains(option.ComponentId)" ValueChanged="@(value => ToggleComponent(option.ComponentId, value))" AriaLabel="@($"Componenta {option.Name}")" /><span class="unit-member-name">@option.Name</span></span>
+                                    }
+                                </div>
+                            </div>
+                        }
+                    </fieldset>
+                }
+                else if (Original is not null && savedComponents.Count > 0)
+                {
+                    <div class="field-static full-width"><span class="field-caption">Componente acoperite</span><strong>@string.Join(", ", savedComponents.Select(ComponentName))</strong></div>
+                }
                 <label for="intervention-notes" class="full-width">Observații<textarea id="intervention-notes" rows="3" maxlength="@ServiceInterventionInput.NotesMaximumLength" @bind="input.Notes" @bind:event="oninput"></textarea></label>
             </div>
 
@@ -193,7 +216,7 @@
     private bool DateEditable => Original is null || !Original.IsMaintenance || IsLatestMoving || input.Kind != Original.Kind;
 
     private DateOnly? PlannedDue => Original is null ? CurrentCoverage()?.Coverage.NextDue : Original.PlannedDue;
-    private int Cycle => CurrentCoverage() is { } current ? current.Details.EffectiveCycle(current.Coverage) : ServiceContractRules.MinimumCycle;
+    private int Cycle => CurrentCoverage() is { } current ? current.Details.EffectiveCycle(current.Coverage) ?? ServiceContractRules.MinimumCycle : ServiceContractRules.MinimumCycle;
 
     private bool MovesDue
     {
@@ -212,8 +235,31 @@
 
     private string ChosenMin => input.PerformedOn is { } performed ? performed.AddDays(1).ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) : "2000-01-01";
 
+    private InterventionComponentChoice choice = InterventionComponentChoice.None;
+    private readonly HashSet<int> chosen = [];
+    private IReadOnlyList<int> savedComponents = [];
+    private MaintenanceCatalog? componentCatalog;
+
+    private string ComponentName(int id) => componentCatalog?.Components.FirstOrDefault(component => component.Id == id)?.Name ?? "componentă";
+
+    private void ToggleComponent(int id, bool on)
+    {
+        if (on) chosen.Add(id); else chosen.Remove(id);
+    }
+
+    // The components offered for the chosen point (the ones its contract covers, or the whole nomenclator for a point without a complete contract).
+    private async Task LoadChoiceAsync()
+    {
+        chosen.Clear();
+        choice = InterventionComponentChoice.None;
+        if (Original is not null || input.Kind != ServiceInterventionKind.Maintenance || input.WorkPointId <= 0) return;
+        try { choice = await Repository.GetComponentChoiceAsync(BeneficiaryId, input.WorkPointId, lifetime.Token); }
+        catch (Exception exception) when (exception is not OperationCanceledException) { choice = InterventionComponentChoice.None; }
+    }
+
     protected override async Task OnInitializedAsync()
     {
+        try { componentCatalog = await ComponentCatalog.GetCatalogAsync(lifetime.Token); } catch (Exception exception) when (exception is not OperationCanceledException) { componentCatalog = null; }
         input = Original is null ? new() { Kind = CoveredPoints.Count > 0 ? ServiceInterventionKind.Maintenance : ServiceInterventionKind.OnDemand } : ServiceInterventionInput.From(Original);
         if (Original is null)
         {
@@ -221,20 +267,28 @@
             if (InitialWorkPointId > 0 && Choices.Any(point => point.Id == InitialWorkPointId)) input.WorkPointId = InitialWorkPointId;
             else if (InitialWorkPointId > 0 && WorkPoints.Any(point => point.Id == InitialWorkPointId)) { input.Kind = ServiceInterventionKind.OnDemand; input.WorkPointId = InitialWorkPointId; }
         }
-        if (Original is { Id: > 0 }) await LoadPhotosAsync();
+        if (Original is { Id: > 0 })
+        {
+            await LoadPhotosAsync();
+            try { savedComponents = (await Repository.GetComponentsAsync([Original.Id], lifetime.Token)).TryGetValue(Original.Id, out var saved) ? saved : []; }
+            catch (Exception exception) when (exception is not OperationCanceledException) { savedComponents = []; }
+        }
+        else await LoadChoiceAsync();
     }
 
-    private void SetKind(ServiceInterventionKind kind)
+    private async Task SetKind(ServiceInterventionKind kind)
     {
         input.Kind = kind;
         if (!Choices.Any(point => point.Id == input.WorkPointId)) input.WorkPointId = 0;
         EnsureBasis();
+        await LoadChoiceAsync();
     }
 
-    private void SetPoint(object? value)
+    private async Task SetPoint(object? value)
     {
         input.WorkPointId = int.TryParse(value?.ToString(), CultureInfo.InvariantCulture, out var id) ? id : 0;
         EnsureBasis();
+        await LoadChoiceAsync();
     }
 
     private void DateChanged() => EnsureBasis();
@@ -266,6 +320,8 @@
             return;
         }
         if (input.PerformedOn is { } performed && ServiceInterventionRules.PerformedOnError(performed, Today) is { } dateError) { errors = [dateError]; return; }
+        if (Original is null && input.Kind == ServiceInterventionKind.Maintenance && choice.Required && chosen.Count == 0) { errors = ["Alege cel puțin o componentă acoperită de intervenție."]; return; }
+        if (Original is null) input.ComponentIds = input.Kind == ServiceInterventionKind.Maintenance ? [.. chosen] : [];
         if (ShowsDueChoice && ServiceInterventionRules.ResolveDue(input.Basis, input.PerformedOn!.Value, PlannedDue!.Value, Cycle, input.ChosenDue, out var dueError) is null) { errors = [dueError!]; return; }
         saving = true;
         ServiceInterventionSaved? saved = null;

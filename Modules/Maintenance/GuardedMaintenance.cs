@@ -13,6 +13,10 @@ internal sealed class GuardedServiceContractRepository(IServiceContractRepositor
 
     public Task<IReadOnlyList<ServiceDueRow>> GetDueListAsync(bool includeOff, CancellationToken cancellationToken = default) =>
         modules.RunAsync(Id, () => inner.GetDueListAsync(includeOff, cancellationToken));
+    public Task<IReadOnlyList<ServiceContractFrozenItem>> GetFrozenAsync(CancellationToken cancellationToken = default) =>
+        modules.RunAsync(Id, () => inner.GetFrozenAsync(cancellationToken));
+    public Task<int> CountFrozenAsync(CancellationToken cancellationToken = default) =>
+        modules.RunAsync(Id, () => inner.CountFrozenAsync(cancellationToken));
 
     public Task<ServiceContractDetails> CreateAsync(int beneficiaryId, ServiceContractInput input, CancellationToken cancellationToken = default) =>
         modules.RunAsync(Id, () => inner.CreateAsync(beneficiaryId, input, cancellationToken));
@@ -56,6 +60,10 @@ internal sealed class GuardedServiceInterventionRepository(IServiceInterventionR
 
     public Task<InterventionTicket?> GetTicketAsync(int interventionId, CancellationToken cancellationToken = default) =>
         modules.RunAsync(Id, () => inner.GetTicketAsync(interventionId, cancellationToken));
+    public Task<IReadOnlyDictionary<int, IReadOnlyList<int>>> GetComponentsAsync(IReadOnlyCollection<int> interventionIds, CancellationToken cancellationToken = default) =>
+        modules.RunAsync(Id, () => inner.GetComponentsAsync(interventionIds, cancellationToken));
+    public Task<InterventionComponentChoice> GetComponentChoiceAsync(int beneficiaryId, int workPointId, CancellationToken cancellationToken = default) =>
+        modules.RunAsync(Id, () => inner.GetComponentChoiceAsync(beneficiaryId, workPointId, cancellationToken));
 }
 
 // The notification engine treats an exception of a source as "unknown" (it keeps the notifications it has); through the circuit breaker the failures of the
@@ -99,6 +107,8 @@ internal sealed class UnavailableServiceContractRepository : IServiceContractRep
 
     public Task<IReadOnlyList<ServiceContractDetails>> GetForBeneficiaryAsync(int beneficiaryId, CancellationToken cancellationToken = default) => Out<IReadOnlyList<ServiceContractDetails>>();
     public Task<IReadOnlyList<ServiceDueRow>> GetDueListAsync(bool includeOff, CancellationToken cancellationToken = default) => Out<IReadOnlyList<ServiceDueRow>>();
+    public Task<IReadOnlyList<ServiceContractFrozenItem>> GetFrozenAsync(CancellationToken cancellationToken = default) => Out<IReadOnlyList<ServiceContractFrozenItem>>();
+    public Task<int> CountFrozenAsync(CancellationToken cancellationToken = default) => Out<int>();
     public Task<ServiceContractDetails> CreateAsync(int beneficiaryId, ServiceContractInput input, CancellationToken cancellationToken = default) => Out<ServiceContractDetails>();
     public Task<ServiceContractDetails> UpdateAsync(ServiceContract original, ServiceContractInput input, CancellationToken cancellationToken = default) => Out<ServiceContractDetails>();
     public Task<ServiceContractActivationPlan> PrepareActivationAsync(int contractId, CancellationToken cancellationToken = default) => Out<ServiceContractActivationPlan>();
@@ -118,6 +128,8 @@ internal sealed class UnavailableServiceInterventionRepository : IServiceInterve
     public Task<ServiceInterventionSaved> UpdateAsync(ServiceIntervention original, ServiceInterventionInput input, CancellationToken cancellationToken = default) => Out<ServiceInterventionSaved>();
     public Task DeleteAsync(ServiceIntervention original, string reason, CancellationToken cancellationToken = default) => Out<object>();
     public Task<InterventionTicket?> GetTicketAsync(int interventionId, CancellationToken cancellationToken = default) => Out<InterventionTicket?>();
+    public Task<IReadOnlyDictionary<int, IReadOnlyList<int>>> GetComponentsAsync(IReadOnlyCollection<int> interventionIds, CancellationToken cancellationToken = default) => Out<IReadOnlyDictionary<int, IReadOnlyList<int>>>();
+    public Task<InterventionComponentChoice> GetComponentChoiceAsync(int beneficiaryId, int workPointId, CancellationToken cancellationToken = default) => Out<InterventionComponentChoice>();
 }
 
 internal sealed class UnavailableMapConfigurationService : IMapConfigurationService

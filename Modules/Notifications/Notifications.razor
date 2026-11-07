@@ -45,9 +45,10 @@
         <button type="button" role="tab" id="tab-issues" class="settings-tab @(validationTab == "issues" ? "active" : "")" aria-selected="@(validationTab == "issues" ? "true" : "false")" aria-controls="panel-notifications" @onclick="() => OpenIssues()">Probleme import</button>
     }
     <ElcomturBalancesTab Active="@(validationTab == "balances")" Selected="OpenBalances" />
+    <MaintenanceIncompleteTab Active="@(validationTab == "incomplete")" Selected="OpenIncomplete" />
 </div>
 
-<div id="panel-notifications" role="tabpanel" aria-labelledby="@(validationTab == "tickets" ? "tab-tickets" : validationTab == "beneficiaries" ? "tab-beneficiaries" : validationTab == "issues" ? "tab-issues" : validationTab == "balances" ? "tab-balances" : showResolved ? "tab-resolved" : "tab-active")">
+<div id="panel-notifications" role="tabpanel" aria-labelledby="@(validationTab == "tickets" ? "tab-tickets" : validationTab == "beneficiaries" ? "tab-beneficiaries" : validationTab == "issues" ? "tab-issues" : validationTab == "balances" ? "tab-balances" : validationTab == "incomplete" ? "tab-contracts-incomplete" : showResolved ? "tab-resolved" : "tab-active")">
 @if (validationTab == "tickets")
 {
     <ValidationQueuePanel ShowDiscarded="true" Changed="RefreshQueuesAsync" />
@@ -55,6 +56,10 @@
 else if (validationTab == "balances")
 {
     <ElcomturBalancesPanel />
+}
+else if (validationTab == "incomplete")
+{
+    <MaintenanceIncompletePanel />
 }
 else if (validationTab == "issues")
 {
@@ -188,6 +193,7 @@ else if (loaded)
     private void OpenBeneficiaries() => OpenTab("beneficiaries", false);
     private void OpenIssues() => OpenTab("issues", false);
     private void OpenBalances() => OpenTab("balances", false);
+    private void OpenIncomplete() => OpenTab("incomplete", false);
     // The id of the Elcomtur module (a module does not refer to another: the tab is shown only while that module runs; its content comes through ElcomturBalancesPanel).
     private const string ElcomturModuleId = "elcomtur";
 
@@ -218,6 +224,7 @@ else if (loaded)
         else if (TabQuery == "beneficiari" && queues.CanBeneficiaries) validationTab = "beneficiaries";
         else if (TabQuery == "probleme" && (queues.CanTickets || queues.CanBeneficiaries)) validationTab = "issues";
         else if (TabQuery == "balante" && Modules.IsAvailable(ElcomturModuleId)) validationTab = "balances";
+        else if (TabQuery == "contracte-incomplete" && Modules.IsAvailable("mentenanta")) validationTab = "incomplete";
         await LoadAsync(true);
         RefreshPeriodicallyAsync().FireAndForget(Logger, "periodic refresh");
     }

@@ -7,6 +7,7 @@
 @inject IAccessControl Access
 @inject IValidationQueues Queues
 @inject IServiceContractRepository Contracts
+@inject IMaintenanceComponentRepository ComponentCatalog
 @inject IServiceInterventionRepository Interventions
 @inject IExpiryNotificationService NotificationService
 @inject TimeProvider Clock
@@ -69,7 +70,7 @@ else if (!showRegister)
                 var active = row.Contract.IsActive;
                 var state = ServiceDueRules.State(row.Point.Point.NextDue, Today, thresholdDays);
                 <tr @key="row.Point.Point.Id" class="@(active ? null : "contract-row-off")">
-                    <td>@StockMovementRules.DisplayDate(row.Point.Point.NextDue)</td>
+                    <td>@StockMovementRules.DisplayDate(row.Point.Point.NextDue)@if (row.UnitDues.Count > 1) { <br /><ServiceUnitDues Dues="row.UnitDues" Catalog="catalog" Today="Today" Threshold="thresholdDays" /> }</td>
                     <td>@if (active) { <span class="due-chip @ServiceDueRules.CssClass(state)">@ServiceDueRules.Label(state)</span> } else { <span class="contract-state off">Contract Off</span> }</td>
                     <td><a class="category-table-link" href="@($"/beneficiari/{row.BeneficiaryId}")"><strong>@row.BeneficiaryName</strong></a></td>
                     <td><strong>@row.Point.WorkPointName</strong><br /><small class="muted">@row.Point.WorkPointAddress</small></td>
@@ -150,6 +151,7 @@ else
     private int thresholdDays = ServiceDueRules.DefaultThresholdDays;
 
     private IReadOnlyList<ServiceDueRow> dueRows = Array.Empty<ServiceDueRow>();
+    private MaintenanceCatalog? catalog;
     private ServiceInterventionPage register = new(Array.Empty<ServiceInterventionRow>(), 0);
     private int waitingValidation;
     private bool showRegister, showValidation, canValidate, showOff, loading, dueLoaded, registerLoaded;
@@ -197,6 +199,7 @@ else
         {
             thresholdDays = await NotificationService.GetThresholdDaysAsync(ExpirySourceKeys.MaintenanceDue, ServiceDueRules.DefaultThresholdDays, lifetime.Token);
             var all = await Contracts.GetDueListAsync(true, lifetime.Token);
+            try { catalog = await ComponentCatalog.GetCatalogAsync(lifetime.Token); } catch (Exception exception) when (exception is not OperationCanceledException) { catalog = null; }
             offCount = all.Count(row => !row.Contract.IsActive);
             dueRows = showOff ? all : all.Where(row => row.Contract.IsActive).ToList();
             dueLoaded = true;

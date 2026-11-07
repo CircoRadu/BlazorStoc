@@ -49,6 +49,7 @@ public static class AuditEntities
     public const string SupplierInvoice = "FacturaFurnizor";
     // Nomenclator -> Tipuri de sisteme.
     public const string SystemType = "TipSistem";
+    public const string MaintenanceComponent = "ComponentaMentenanta";
     // Nomenclator -> Analizor de risc.
     public const string RiskAnalyzer = "AnalizorRisc";
     // Oferte -> Sabloane: the templates of offer sheets (.xlsx).
@@ -127,6 +128,10 @@ public static class AuditActions
     public const string RemoveContractPoint = "Scoatere punct din contract";
     public const string EditMaintenanceCycle = "Modificare ciclicitate mentenanță";
     public const string RescheduleMaintenance = "Reprogramare intervenție mentenanță";
+    public const string EditContractReferenceDate = "Modificare dată de referință contract mentenanță";
+    public const string EditContractComponents = "Modificare componente contract mentenanță";
+    public const string FreezeServiceContract = "Înghețare contract mentenanță";
+    public const string UnfreezeServiceContract = "Dezghețare contract mentenanță";
     public const string MoveContractPoint = "Mutare punct de lucru în alt contract";
     // Risk analyses of work points: each kind of change is named exactly. Deleting one is the archived "Ștergere".
     public const string CreateRiskAnalysis = "Adăugare analiză de risc";
@@ -247,6 +252,10 @@ public static class AuditActions
     public const string TestNasBackup = "Testare conexiune NAS";
     public const string SetActivityImport = "Modificare setări preluare ActivityApp";
     public const string SetJournalDisplay = "Modificare evenimente afișate în jurnal";
+    public const string CreateServiceContractAddendum = "Adăugare act adițional contract";
+    public const string EditServiceContractAddendum = "Modificare act adițional contract";
+    public const string CancelServiceContractAddendum = "Anulare act adițional contract";
+    public const string DeleteServiceContractAddendum = "Ștergere act adițional contract";
     public const string CreateBugReport = "Raportare eroare creată";
     public const string ChangeBugReportState = "Raportare eroare: stare schimbată";
     public const string DeleteBugReport = "Raportare eroare ștearsă";
@@ -340,6 +349,19 @@ public static class AuditActions
     public const string AddRiskAnalyzer = "Adăugare analizor de risc";
     public const string EditRiskAnalyzer = "Modificare analizor de risc";
     public const string DeleteRiskAnalyzer = "Ștergere analizor de risc";
+    public const string AddMaintenanceFamily = "Adăugare familie de componente mentenanță";
+    public const string RenameMaintenanceFamily = "Modificare denumire familie de componente mentenanță";
+    public const string ActivateMaintenanceFamily = "Activare familie de componente mentenanță";
+    public const string DeactivateMaintenanceFamily = "Dezactivare familie de componente mentenanță";
+    public const string MoveMaintenanceFamily = "Schimbare ordine familie de componente mentenanță";
+    public const string AddMaintenanceComponent = "Adăugare componentă mentenanță";
+    public const string RenameMaintenanceComponent = "Modificare denumire componentă mentenanță";
+    public const string ActivateMaintenanceComponent = "Activare componentă mentenanță";
+    public const string DeactivateMaintenanceComponent = "Dezactivare componentă mentenanță";
+    public const string MoveMaintenanceComponent = "Schimbare ordine componentă mentenanță";
+    public const string ChangeMaintenanceComponentFamily = "Schimbare familie componentă mentenanță";
+    public const string AddMaintenanceComponentAlias = "Adăugare denumire alternativă componentă mentenanță";
+    public const string RemoveMaintenanceComponentAlias = "Ștergere denumire alternativă componentă mentenanță";
     public const string AddSystemType = "Adăugare tip de sistem";
     public const string RenameSystemType = "Modificare denumire tip de sistem";
     public const string ActivateSystemType = "Activare tip de sistem";
@@ -380,8 +402,9 @@ public static class AuditActions
             or CreateNotificationTemplate or EditNotificationTemplate or NotificationCreated or AcknowledgeNotification or SnoozeNotification
             or ResolveNotification or AutoResolveNotification or ReopenNotification or EditNotificationSettings
             or CreateWorkPoint or EditWorkPoint or EditWorkPointDescription or EditWorkPointCoordinates or AddWorkPointPhoto or AddAttachedFile or DeleteAttachedFile or RenameAttachedFile
-            or CreateServiceContract or EditServiceContract or EditServiceContractExpiry or ActivateServiceContract or DeactivateServiceContract
+            or CreateServiceContract or EditServiceContract or CreateServiceContractAddendum or EditServiceContractAddendum or CancelServiceContractAddendum or EditServiceContractExpiry or ActivateServiceContract or DeactivateServiceContract
             or AddContractPoint or RemoveContractPoint or EditMaintenanceCycle or RescheduleMaintenance or MoveContractPoint
+            or EditContractReferenceDate or EditContractComponents or FreezeServiceContract or UnfreezeServiceContract
             or CreateRiskAnalysis or EditRiskAnalysis or EditRiskAnalysisValidity or RenewRiskAnalysis or UndoRiskAnalysisRenewal or ActivateRiskAnalysis or DeactivateRiskAnalysis
             or RecordMaintenance or EditMaintenanceIntervention or RecordOnDemand or EditOnDemandIntervention or ChangeInterventionKind or AddInterventionPhoto
             or EditMapEngine or ResetMapEngine or EditMapGeocoding or CreateMapPinType or EditMapPinType
@@ -392,6 +415,7 @@ public static class AuditActions
             or ImportOffer or ReviseOffer or LinkOfferLine or AddBeneficiaryAlias
             or CreateOfferTemplate or EditOfferTemplate or ActivateOfferTemplate or DeactivateOfferTemplate
             or AddProjectComponent or ChangeProjectComponentState or ArchiveProjectComponent or ReactivateProjectComponent or SetVehicleTarget or RemoveVehicleTarget or SetMinStock or RemoveMinStock or SetProjectDeadline or RemoveProjectDeadline or ReserveStock or ReduceReservation or ReleaseReservation or ReservationConsumed or ReservationReducedByExit or ReservationReleasedByComponent or ComponentExitReturned or ComponentExitLeft or ComponentExitMoved or ComponentExitConsumed
+            or AddMaintenanceFamily or RenameMaintenanceFamily or ActivateMaintenanceFamily or DeactivateMaintenanceFamily or MoveMaintenanceFamily or AddMaintenanceComponent or RenameMaintenanceComponent or ActivateMaintenanceComponent or DeactivateMaintenanceComponent or MoveMaintenanceComponent or ChangeMaintenanceComponentFamily or AddMaintenanceComponentAlias or RemoveMaintenanceComponentAlias
             or AddRiskAnalyzer or EditRiskAnalyzer or CreateInstallerAdministrator or AddSystemType or RenameSystemType or ActivateSystemType or DeactivateSystemType or MoveSystemType or AddSystemTypeAlias or RemoveSystemTypeAlias or DeleteAnafVersion or ActivateAnafVersion;
 
     public static string Normalize(string? action) =>

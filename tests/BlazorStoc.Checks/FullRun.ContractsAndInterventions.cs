@@ -34,7 +34,7 @@ public static partial class FullRun
 
             static ServiceContractInput Contract(Action<ServiceContractInput>? change = null)
             {
-                var value = new ServiceContractInput { NumberText = "26 din 23.09.2025", CycleMonths = 3, Points = [new() { WorkPointId = 5, NextDue = new DateOnly(2025, 10, 15) }] };
+                var value = new ServiceContractInput { NumberText = "26 din 23.09.2025", CycleMonths = 3, ReferenceDate = new DateOnly(2025, 9, 1), Points = [new() { WorkPointId = 5, NextDue = new DateOnly(2025, 10, 15) }] };
                 change?.Invoke(value);
                 return value;
             }

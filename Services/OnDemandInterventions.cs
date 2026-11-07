@@ -14,6 +14,11 @@ public interface IOnDemandInterventionRecorder
     Task<int> RecordMaintenanceAsync(int beneficiaryId, int workPointId, DateOnly performedOn, string notes, CancellationToken cancellationToken = default);
     /// <summary>Records a maintenance intervention even when no active contract covers the point (a contract that was not recorded yet): then it has no contract and moves no due date; with a contract it is the same as <see cref="RecordMaintenanceAsync"/>.</summary>
     Task<int> RecordMaintenanceUncoveredAsync(int beneficiaryId, int workPointId, DateOnly performedOn, string notes, CancellationToken cancellationToken = default);
+    /// <summary>The same, with the components the intervention covered (nomenclator Componente mentenanta): under a complete contract only the units that cover them have their due dates moved.</summary>
+    Task<int> RecordMaintenanceUncoveredAsync(int beneficiaryId, int workPointId, DateOnly performedOn, string notes, IReadOnlyList<int> componentIds, CancellationToken cancellationToken = default) =>
+        RecordMaintenanceUncoveredAsync(beneficiaryId, workPointId, performedOn, notes, cancellationToken);
+    /// <summary>The components the operator can choose for a maintenance intervention at the work point.</summary>
+    Task<InterventionComponentChoice> GetComponentChoiceAsync(int beneficiaryId, int workPointId, CancellationToken cancellationToken = default) => Task.FromResult(InterventionComponentChoice.None);
     /// <summary>Deletes an intervention of the beneficiary (archived, with the reason). An intervention that does not exist any more is not an error.</summary>
     Task DeleteAsync(int beneficiaryId, int interventionId, string reason, CancellationToken cancellationToken = default);
     /// <summary>The notes of an intervention of the beneficiary, or null when it does not exist (or the register cannot tell).</summary>

@@ -3,6 +3,7 @@
 @using System.Globalization
 @using BlazorStoc.Services
 @inject IServiceContractRepository Repository
+@inject IMaintenanceComponentRepository ComponentCatalog
 @inject ILogger<ServiceContractEditor> Logger
 @implements IDisposable
 
@@ -18,10 +19,71 @@
         <fieldset disabled="@saving">
             <div class="editor-grid">
                 <label for="contract-number">Număr / dată contract *<InputTextLive id="contract-number" @bind-Value="input.NumberText" maxlength="60" autocomplete="off" placeholder="26/23.09.2025" /><small>Se acceptă 26/23.09.2025, 26 / 23.09.2025 sau 26 din 23.09.2025; se afișează ca număr/dată.</small></label>
-                <label for="contract-cycle">Ciclicitate (luni) *<select id="contract-cycle" @bind="input.CycleMonths">@for (var months = ServiceContractRules.MinimumCycle; months <= ServiceContractRules.MaximumCycle; months++) { <option value="@months">@ServiceContractRules.CycleText(months)</option> }</select><small>Ciclicitatea globală a contractului; fiecare punct o poate înlocui cu una proprie.</small></label>
+                <label for="contract-reference">Data de referință *<PickOnlyDate Id="contract-reference" @bind-Value="input.ReferenceDate" Disabled="saving" /><small>Data de la care se numără ciclul (începutul contractului sau ultima mentenanță dinainte). Fără ea contractul rămâne înghețat.</small></label>
+                <label for="contract-cycle">Ciclicitate globală (luni)<select id="contract-cycle" @onchange="e => input.CycleMonths = ParseCycle(e.Value)"><option value="" selected="@(input.CycleMonths is null)">Fără ciclicitate globală</option>@for (var months = ServiceContractRules.MinimumCycle; months <= ServiceContractRules.MaximumCycle; months++) { <option value="@months" selected="@(input.CycleMonths == months)">@ServiceContractRules.CycleText(months)</option> }</select><small>Se aplică componentelor fără ciclicitate proprie; fiecare familie sau componentă discretă o poate înlocui.</small></label>
                 <label for="contract-valid-until">Valabil până la (opțional)<span class="valid-until-field"><PickOnlyDate Id="contract-valid-until" @bind-Value="input.ValidUntil" Min="@ValidUntilMin" Disabled="saving" /><button type="button" class="refresh act-nav" disabled="@(input.ValidUntil is null)" @onclick="ClearValidUntil">Fără termen</button></span><small>Data de expirare a contractului; fără ea contractul nu are termen. Nu oprește singură mentenanța.</small></label>
                 <label for="contract-notes" class="full-width">Observații<textarea id="contract-notes" rows="3" maxlength="@ServiceContractInput.NotesMaximumLength" @bind="input.Notes" @bind:event="oninput"></textarea></label>
             </div>
+
+            <div class="catalog-heading contract-points-heading"><h3>Componente acoperite <span>@units.Count</span></h3></div>
+            <p class="form-note">Alege familiile și componentele discrete pe care le acoperă contractul (Nomenclator, Componente mentenanță). La o familie poți opri elementele care nu se aplică; elementele unei familii nu au ciclicitate sau dată proprie, doar familia. O componentă dintr-o familie se adaugă prin familie.</p>
+            @if (catalogError is not null) { <div class="error-banner" role="alert">@catalogError</div> }
+            else if (catalog is null) { <p class="muted">Se încarcă componentele…</p> }
+            else
+            {
+                <div class="contract-global-date">
+                    <label for="unit-add">Adaugă o familie sau o componentă<select @key="addVersion" id="unit-add" value="@addChoice" @onchange="AddUnit" disabled="@(AddOptions.Count == 0)">
+                        <option value="">@(AddOptions.Count == 0 ? "Nu mai sunt componente de adăugat" : "— alege —")</option>
+                        @if (AddOptions.Any(option => option.IsFamily)) { <optgroup label="Familii">@foreach (var option in AddOptions.Where(option => option.IsFamily)) { <option value="@option.Key">@option.Name</option> }</optgroup> }
+                        @if (AddOptions.Any(option => !option.IsFamily)) { <optgroup label="Componente discrete">@foreach (var option in AddOptions.Where(option => !option.IsFamily)) { <option value="@option.Key">@option.Name</option> }</optgroup> }
+                    </select></label>
+                </div>
+                @if (units.Count == 0)
+                {
+                    <p class="muted">Contractul nu are încă nicio familie sau componentă.</p>
+                }
+                else
+                {
+                    <div class="table-scroll"><table class="contract-points-table"><thead><tr><th></th><th>FAMILIE / COMPONENTĂ</th><th>CICLICITATE</th><th>DATA DE REFERINȚĂ</th><th></th></tr></thead><tbody>
+                    @foreach (var unit in units)
+                    {
+                        <tr @key="unit.Key">
+                            <td><ToggleSwitch Compact Value="@unit.Active" ValueChanged="@(value => unit.Active = value)" AriaLabel="@($"Include {unit.Name} în contract")" /></td>
+                            <td>
+                                <strong>@unit.Name</strong> <span class="anaf-source @(unit.IsFamily ? "ok" : "")">@(unit.IsFamily ? "Familie" : "Componentă discretă")</span>
+                                @if (unit.IsFamily)
+                                {
+                                    <div class="unit-members">
+                                        @foreach (var member in unit.Members)
+                                        {
+                                            <span class="unit-member"><ToggleSwitch Compact Value="@member.Active" ValueChanged="@(value => member.Active = value)" Disabled="@(!unit.Active)" AriaLabel="@($"{member.Name} din {unit.Name}")" /><span class="unit-member-name">@member.Name</span></span>
+                                        }
+                                    </div>
+                                }
+                            </td>
+                            <td>
+                                <select aria-label="@($"Ciclicitate pentru {unit.Name}")" disabled="@(!unit.Active)" @onchange="e => unit.Cycle = ParseCycle(e.Value)">
+                                    <option value="" selected="@(unit.Cycle is null)">Globală (@ServiceContractRules.CycleText(input.CycleMonths))</option>
+                                    @for (var months = ServiceContractRules.MinimumCycle; months <= ServiceContractRules.MaximumCycle; months++) { <option value="@months" selected="@(unit.Cycle == months)">@ServiceContractRules.CycleText(months)</option> }
+                                </select>
+                            </td>
+                            <td>
+                                <PickOnlyDate Id="@($"unit-reference-{unit.Key}")" @bind-Value="unit.Reference" Disabled="@(saving || !unit.Active)" />
+                                @if (unit.Reference is null) { <small class="muted">globală (@ServiceContractRules.ReferenceDateText(input.ReferenceDate))</small> }
+                            </td>
+                            <td>
+                                @if (unit.Reference is not null) { <button type="button" class="row-icon close" aria-label="@($"Folosește data de referință globală pentru {unit.Name}")" title="@($"Folosește data de referință globală pentru {unit.Name}")" @onclick="() => unit.Reference = null"></button> }
+                                <button type="button" class="row-icon delete" aria-label="@($"Scoate {unit.Name} din contract")" title="@($"Scoate {unit.Name} din contract")" @onclick="() => RemoveUnit(unit)"></button>
+                            </td>
+                        </tr>
+                    }
+                    </tbody></table></div>
+                }
+            }
+            @if (FreezeMissing.Count > 0)
+            {
+                <div class="form-note freeze-note" role="status"><strong>Contractul va fi înghețat</strong> (nu produce scadențe și notificări) până se completează: @ServiceContractFreeze.Summary(FreezeMissing).</div>
+            }
 
             <div class="catalog-heading contract-points-heading"><h3>Puncte de lucru din contract <span>@rows.Count(row => row.Included)</span></h3></div>
             @if (rows.Count == 0)
@@ -98,6 +160,66 @@
         public DateOnly? ConflictDue { get; init; }
     }
 
+    private sealed class UnitMemberRow { public int ComponentId { get; init; } public required string Name { get; init; } public bool Active { get; set; } = true; }
+
+    private sealed class UnitRow
+    {
+        public int? FamilyId { get; init; }
+        public int? ComponentId { get; init; }
+        public required string Name { get; init; }
+        public bool Active { get; set; } = true;
+        public int? Cycle { get; set; }
+        public DateOnly? Reference { get; set; }
+        public List<UnitMemberRow> Members { get; init; } = [];
+        public bool IsFamily => FamilyId is not null;
+        public string Key => FamilyId is { } family ? $"F{family}" : $"C{ComponentId}";
+    }
+
+    private sealed record AddOption(string Key, string Name, bool IsFamily);
+
+    private MaintenanceCatalog? catalog;
+    private string? catalogError;
+    private List<UnitRow> units = [];
+    private string addChoice = "";
+    // A new key re-creates the list after each choice, so it shows "— alege —" again.
+    private int addVersion;
+
+    private IReadOnlyList<AddOption> AddOptions => catalog is null ? [] :
+    [
+        .. catalog.Families.Where(family => family.Active && !units.Any(unit => unit.FamilyId == family.Id)).Select(family => new AddOption($"F{family.Id}", family.Name, true)),
+        .. catalog.Discrete.Where(component => component.Active && !units.Any(unit => unit.ComponentId == component.Id)).Select(component => new AddOption($"C{component.Id}", component.Name, false))
+    ];
+
+    private IReadOnlyList<string> FreezeMissing => ServiceContractFreeze.Missing(input.ReferenceDate, input.CycleMonths, ServiceContractFreeze.FromInput(UnitInputs()),
+        rows.Count(row => row.Included), unit => unit.IsFamily ? catalog?.Family(unit.FamilyId)?.Name ?? "familie" : catalog?.Components.FirstOrDefault(item => item.Id == unit.ComponentId)?.Name ?? "componentă");
+
+    private List<ServiceContractUnitInput> UnitInputs() => [.. units.Select(unit => new ServiceContractUnitInput
+    {
+        FamilyId = unit.FamilyId, ComponentId = unit.ComponentId, CycleMonths = unit.Cycle, ReferenceDate = unit.Reference, IsActive = unit.Active,
+        Members = [.. unit.Members.Select(member => new ServiceContractUnitMemberInput { ComponentId = member.ComponentId, IsActive = member.Active })]
+    })];
+
+    private UnitRow NewFamilyRow(MaintenanceFamily family, IEnumerable<ServiceContractUnitMember>? stored) => new()
+    {
+        FamilyId = family.Id, Name = family.Name,
+        Members = [.. catalog!.MembersOf(family.Id).Select(component => new UnitMemberRow
+        {
+            ComponentId = component.Id, Name = component.Name, Active = stored?.FirstOrDefault(member => member.ComponentId == component.Id)?.IsActive ?? true
+        })]
+    };
+
+    private void AddUnit(ChangeEventArgs e)
+    {
+        var key = e.Value?.ToString() ?? "";
+        addChoice = "";
+        addVersion++;
+        if (catalog is null || key.Length < 2 || !int.TryParse(key[1..], out var id)) return;
+        if (key[0] == 'F' && catalog.Family(id) is { } family) units.Add(NewFamilyRow(family, null));
+        else if (key[0] == 'C' && catalog.Components.FirstOrDefault(component => component.Id == id) is { } component) units.Add(new UnitRow { ComponentId = component.Id, Name = component.Name });
+    }
+
+    private void RemoveUnit(UnitRow unit) => units.Remove(unit);
+
     private UnsavedChangesTracker? tracker;
     private ServiceContractInput input = new();
     private List<Row> rows = [];
@@ -111,9 +233,41 @@
         ? date.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) : "2000-01-01";
 
     private string CurrentSnapshot() => FormSnapshot.Of(input,
-        string.Join('|', rows.Where(row => row.Included).Select(row => $"{row.Point.Id}:{row.Move}:{row.NextDue:yyyy-MM-dd}:{row.Cycle}")));
+        string.Join('|', rows.Where(row => row.Included).Select(row => $"{row.Point.Id}:{row.Move}:{row.NextDue:yyyy-MM-dd}:{row.Cycle}")),
+        string.Join('|', units.Select(unit => $"{unit.Key}:{unit.Active}:{unit.Cycle}:{unit.Reference:yyyy-MM-dd}:{string.Join(',', unit.Members.Select(member => member.Active ? 1 : 0))}")));
     private Task DiscardAsync() => Closed.InvokeAsync();
     private Task CloseAsync() => saving ? Task.CompletedTask : tracker is null ? Closed.InvokeAsync() : tracker.RunAfterConfirmAsync(() => Closed.InvokeAsync());
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            catalog = await ComponentCatalog.GetCatalogAsync(lifetime.Token);
+            units = [];
+            foreach (var unit in Original?.Units ?? [])
+            {
+                var row = unit.FamilyId is { } familyId && catalog.Family(familyId) is { } family
+                    ? NewFamilyRow(family, unit.Members)
+                    : new UnitRow { ComponentId = unit.ComponentId, Name = catalog.Components.FirstOrDefault(component => component.Id == unit.ComponentId)?.Name ?? "componentă" };
+                row.Active = unit.IsActive;
+                row.Cycle = unit.CycleMonths;
+                row.Reference = unit.ReferenceDate;
+                units.Add(row);
+            }
+        }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (Exception exception) when (exception is AccessDeniedException or BlazorStoc.Modules.ModuleUnavailableException)
+        {
+            catalogError = "Componentele nu se pot încărca acum: " + exception.Message;
+        }
+        catch (Exception exception)
+        {
+            Logger.LogError("Maintenance components loading failed ({ErrorType}).", exception.GetType().Name);
+            catalogError = "Componentele nu se pot încărca acum. Închide formularul și reîncearcă.";
+        }
+        // The units arrive after the first render: they belong to the initial state of the form, not to the user's changes.
+        tracker?.Rebase();
+    }
 
     protected override void OnInitialized()
     {
@@ -153,6 +307,7 @@
         if (saving) return;
         error = null;
         errors = [];
+        input.Units = UnitInputs();
         input.Points = rows.Where(row => row.Included).Select(row => new ServiceContractPointInput
         {
             WorkPointId = row.Point.Id, NextDue = row.Move ? null : row.NextDue, CycleMonths = row.Move ? null : row.Cycle, MoveFromOtherContract = row.Move

@@ -1607,3 +1607,24 @@ tr[data-depth="0"] > td { border-top: 4px solid var(--c-d6e4df); }
 .delete-dialog.recovery-dialog { width:min(640px, 94vw); max-width:94vw; box-sizing:border-box; }
 .recovery-codes { margin:14px 0 0; padding:14px 16px; background:var(--c-f5f8f6); border:1px solid var(--line); border-radius:8px; font-family:Consolas,monospace; font-size:15px; line-height:1.7; white-space:pre-wrap; overflow-wrap:anywhere; word-break:break-word; max-width:100%; box-sizing:border-box; }
 .recovery-dialog .muted { overflow-wrap:anywhere; }
+
+/* Nomenclator -> Componente mentenanta */
+.maint-family { margin-top:18px; }
+.maint-family-head { display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; }
+.maint-family-head h2 { display:flex; align-items:center; gap:10px; }
+.maint-empty { margin:12px 24px; }
+.inline-select { display:inline-flex; align-items:center; gap:8px; font-size:13px; font-weight:600; }
+.inline-form { display:inline-flex; align-items:center; gap:6px; }
+.panel-note { margin:16px 0 8px; }
+
+/* Contracte de mentenanta cu componente */
+.contract-state.frozen { background: var(--c-fbf4e6); color: var(--c-9a7420); }
+.unit-chip { display: inline-block; padding: 3px 10px; margin: 2px 4px 2px 0; border-radius: 6px; font-size: 12px; font-weight: 600; background: var(--c-eaf5ee); color: var(--c-2f7d55); }
+.unit-chip.off { background: var(--c-eceff0); color: var(--c-5d6b6e); }
+.unit-members { display: flex; flex-wrap: wrap; gap: 6px 16px; margin-top: 8px; }
+.unit-member { display: inline-flex; align-items: center; gap: 6px; }
+.unit-member-name { font-size: 13px; }
+.freeze-note { background: var(--c-fbf4e6); color: var(--c-9a7420); border-radius: 8px; padding: 10px 14px; margin: 10px 0; }
+.unit-due { display: inline-block; padding: 2px 8px; margin: 2px 4px 2px 0; border-radius: 6px; font-size: 12px; font-weight: 600; background: var(--c-eaf5ee); color: var(--c-2f7d55); }
+.unit-due.due-soon { background: var(--c-fbf4e6); color: var(--c-9a7420); }
+.unit-due.due-overdue { background: var(--c-fdf0ee); color: var(--c-a3241b); }
