@@ -121,11 +121,21 @@ public interface IBeneficiaryRepository
     Task DeleteAsync(Beneficiary original, string reason, CancellationToken cancellationToken = default);
 }
 
+/// <summary>Simple: name and CUI. Extended: name, CUI, address and phone.</summary>
+public enum BeneficiarySearchMode { Simple, Extended }
+
 public static class BeneficiarySearch
 {
-    public static IEnumerable<Beneficiary> Filter(IEnumerable<Beneficiary> beneficiaries, string query)
+    public static IEnumerable<Beneficiary> Filter(IEnumerable<Beneficiary> beneficiaries, string query) =>
+        Filter(beneficiaries, query, BeneficiarySearchMode.Extended);
+
+    public static IEnumerable<Beneficiary> Filter(IEnumerable<Beneficiary> beneficiaries, string query, BeneficiarySearchMode mode)
     {
         query = query.Trim();
+        if (query.Length > 0 && mode == BeneficiarySearchMode.Simple)
+            return beneficiaries.Where(beneficiary =>
+                beneficiary.Name.Contains(query, StringComparison.OrdinalIgnoreCase) ||
+                beneficiary.Cui.Contains(query.Replace(" ", ""), StringComparison.OrdinalIgnoreCase));
         return query.Length == 0 ? beneficiaries : beneficiaries.Where(beneficiary =>
             beneficiary.Name.Contains(query, StringComparison.OrdinalIgnoreCase) ||
             beneficiary.Cui.Contains(query.Replace(" ", ""), StringComparison.OrdinalIgnoreCase) ||

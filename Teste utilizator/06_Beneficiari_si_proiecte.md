@@ -2,6 +2,20 @@
 
 Fluxul: Administrare -> Beneficiari (PF sau PJ cu preluare ANAF) -> pagina beneficiarului -> proiecte -> observatii, echipamente si fisiere. Iesirile din stoc spre beneficiar/proiect se aleg din combobox.
 
+### 09.11.2026 - Registru beneficiari: Cautare simpla si Cautare extinsa
+
+**Ce s-a adaugat:** sub campul de cautare din Beneficiari -> Registru beneficiari, un comutator intre „Căutare simplă” (implicit, oprit) si „Căutare extinsă”. Totul ramane in aceeasi pagina, fara file.
+
+**Ce face acum:** Cautarea simpla gaseste dupa denumirea beneficiarului si dupa CUI. Cautarea extinsa face cautarea de pana acum: denumire, CUI, adresa si telefon. Placeholder-ul din camp se schimba dupa optiune; textul scris ramane la schimbarea optiunii.
+
+Pasi:
+
+1. Deschide Beneficiari: sub campul de cautare, comutatorul arata „Căutare simplă”; placeholder „Caută după denumire sau CUI…”.
+2. Scrie o parte din denumire, apoi un CUI: ambele gasesc beneficiarul.
+3. Scrie o strada sau un telefon al unui beneficiar: in cautarea simpla nu apare nimic.
+4. Porneste comutatorul de sub camp („Căutare extinsă”): acelasi text gaseste acum beneficiarul dupa adresa/telefon.
+5. Opreste din nou comutatorul („Căutare simplă”): revine la rezultatele dupa denumire/CUI. Nu se schimba pagina si nu exista file.
+
 ### 27.10.2026 - Cautarea coordonatelor dupa adresa scoasa; ramane doar introducerea manuala
 **Ce s-a scos:** butonul „Caută coordonate după adresă” (Geoapify) din editorul punctului de lucru si sectiunea „Cautare adrese (Geoapify)” din Setari -> Harta -> Motor harta. Coordonatele se introduc manual (sau se trage pinul pe harta). Ramane butonul „Caută în Google Maps” (simplu link, fara cheie).
 

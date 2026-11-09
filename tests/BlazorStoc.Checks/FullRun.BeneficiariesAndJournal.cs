@@ -184,6 +184,17 @@ demoBeneficiaries = new DemoBeneficiaryRepository(limitedAccess, null, auditTrai
 beneficiary = await demoBeneficiaries.CreateAsync(LegalInput("  Beneficiár   nou   SRL  ", "  ro12345678  "));
         Check(beneficiary.Name == "Beneficiar nou SRL" && beneficiary.Cui == "ro12345678", "Beneficiary values keep letter case and remove diacritics");
         Check(BeneficiarySearch.Filter(await demoBeneficiaries.GetBeneficiariesAsync(), "12345678").Single().Id == beneficiary.Id, "Beneficiaries can be searched by CUI");
+        {
+            var all = await demoBeneficiaries.GetBeneficiariesAsync();
+            Check(BeneficiarySearch.Filter(all, "12345678", BeneficiarySearchMode.Simple).Any(b => b.Id == beneficiary.Id), "Simple beneficiary search finds by CUI");
+            Check(BeneficiarySearch.Filter(all, "nou srl", BeneficiarySearchMode.Simple).Any(b => b.Id == beneficiary.Id), "Simple beneficiary search finds by name");
+            var withAddress = all.FirstOrDefault(b => b.Address.Length >= 4 && !b.Name.Contains(b.Address, StringComparison.OrdinalIgnoreCase) && !b.Cui.Contains(b.Address, StringComparison.OrdinalIgnoreCase));
+            if (withAddress is not null)
+            {
+                Check(!BeneficiarySearch.Filter(all, withAddress.Address, BeneficiarySearchMode.Simple).Any(b => b.Id == withAddress.Id), "Simple beneficiary search does not look in the address");
+                Check(BeneficiarySearch.Filter(all, withAddress.Address, BeneficiarySearchMode.Extended).Any(b => b.Id == withAddress.Id), "Extended beneficiary search looks in the address");
+            }
+        }
         try { await demoBeneficiaries.CreateAsync(LegalInput("Duplicat", "RO12345678")); throw new Exception("Duplicate CUI accepted"); }
         catch (BeneficiaryOperationException exception)
         {

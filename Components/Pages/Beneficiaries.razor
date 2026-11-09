@@ -34,7 +34,12 @@ else if (editing) { <BeneficiaryEditor @key="editorKey" Original="editingBenefic
 
 <section class="catalog">
     <div class="catalog-heading"><h2>Registru beneficiari <span>@Filtered.Count</span></h2><small>CUI-ul (persoană juridică) sau numele complet (persoană fizică) identifică în mod unic fiecare beneficiar</small></div>
-    <div class="filters"><label class="search-box"><span>⌕</span><input aria-label="Caută beneficiari" placeholder="Caută după nume, CUI, adresă sau telefon…" @bind="query" @bind:event="oninput" /></label></div>
+    <div class="filters"><label class="search-box"><span>⌕</span><input aria-label="Caută beneficiari" placeholder="@(searchMode == BeneficiarySearchMode.Simple ? "Caută după denumire sau CUI…" : "Caută după nume, CUI, adresă sau telefon…")" @bind="query" @bind:event="oninput" /></label></div>
+    <div class="catalog-body">
+        <ToggleSwitch Id="beneficiary-search-mode" Value="@(searchMode == BeneficiarySearchMode.Extended)" ValueChanged="value => searchMode = value ? BeneficiarySearchMode.Extended : BeneficiarySearchMode.Simple"
+                      OnText="Căutare extinsă" OffText="Căutare simplă" AriaLabel="Tipul căutării: simplă (denumire și CUI) sau extinsă (denumire, CUI, adresă și telefon)"
+                      Title="Căutare simplă: denumire și CUI. Căutare extinsă: denumire, CUI, adresă și telefon." />
+    </div>
     @if (loading) { <div class="empty-state" role="status"><div class="spinner"></div><h3>Se încarcă beneficiarii</h3></div> }
     else if (Filtered.Count == 0) { <div class="empty-state"><span class="empty-icon">♧</span><h3>Nu există beneficiari pentru căutarea curentă</h3><p>Adaugă primul beneficiar sau șterge textul din câmpul de căutare.</p></div> }
     else
@@ -78,11 +83,12 @@ else if (editing) { <BeneficiaryEditor @key="editorKey" Original="editingBenefic
     private IReadOnlyList<Beneficiary> beneficiaries = Array.Empty<Beneficiary>();
     private Beneficiary? editingBeneficiary, deleting;
     private string query = "";
+    private BeneficiarySearchMode searchMode = BeneficiarySearchMode.Simple;
     private bool loading, syncing, loaded, editing, deleteBusy;
     private string? error, notice, deleteError;
     private Guid editorKey;
     private readonly CancellationTokenSource lifetime = new();
-    private List<Beneficiary> Filtered => BeneficiarySearch.Filter(beneficiaries, query).ToList();
+    private List<Beneficiary> Filtered => BeneficiarySearch.Filter(beneficiaries, query, searchMode).ToList();
 
     protected override async Task OnInitializedAsync()
     {

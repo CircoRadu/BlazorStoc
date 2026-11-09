@@ -1,3 +1,9 @@
+## 0.5.54 | 09.11.2026
+- Registrul de beneficiari: căutarea simplă / extinsă este un singur comutator sub câmpul de căutare, în aceeași pagină („Căutare simplă” implicit: denumirea și CUI-ul; „Căutare extinsă”: și adresa, telefonul). Nu mai sunt două opțiuni deasupra câmpului.
+
+## 0.5.53 | 09.11.2026
+- Registrul de beneficiari: două opțiuni exclusive deasupra câmpului de căutare, „Căutare simplă” (implicit; denumirea și CUI-ul) și „Căutare extinsă” (denumirea, CUI-ul, adresa și telefonul). Textul de ajutor din câmp se schimbă după opțiunea aleasă.
+
 ## 0.5.52 | 09.11.2026
 - Contractele de mentenanță au acum dată de referință obligatorie și componente: familii (cu elemente On/Off) și componente discrete din Nomenclator, Componente mentenanță. Ciclicitatea și data de referință se dau global sau pe familie / componentă. Un contract căruia îi lipsesc date este înghețat: nu produce scadențe și notificări, iar intervențiile lui nu mută scadențe. Toate contractele existente devin înghețate la actualizare; apar în Notificări, tabul nou „Contracte incomplete”, cu ce le lipsește, și se dezgheață singure după ce le completezi (dată de referință și componente).
 - Scadențele sunt pe punct de lucru și componentă (lista Scadențe, fișa beneficiarului, notificările). Intervenția de mentenanță alege componentele acoperite (și în fereastra tichetului preluat de operator): scadențele se mută numai pentru ele.
