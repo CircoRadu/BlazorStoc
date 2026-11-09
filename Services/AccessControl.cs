@@ -19,6 +19,8 @@ public interface IAccessControl
     Task<bool> CanManageProductsAsync(CancellationToken cancellationToken = default);
     Task<bool> CanManageBeneficiariesAsync(CancellationToken cancellationToken = default);
     Task<string?> GetUsernameAsync(CancellationToken cancellationToken = default);
+    // The identifier (web_users.id) of the signed-in account; null for the administrator of the settings file (no row in web_users) and when nobody is signed in.
+    Task<int?> GetUserIdAsync(CancellationToken cancellationToken = default) => Task.FromResult<int?>(null);
     // The role of the signed-in user as shown to people (Administrator / Utilizator); the default keeps every other implementation working.
     async Task<string?> GetRoleAsync(CancellationToken cancellationToken = default) =>
         await IsAdministratorAsync(cancellationToken).ConfigureAwait(false) ? AccessRoles.Administrator : AccessRoles.LimitedUser;
@@ -113,6 +115,13 @@ public sealed class CurrentUserAccess(AuthenticationStateProvider authentication
         var user = await CurrentUserAsync();
         cancellationToken.ThrowIfCancellationRequested();
         return user.Identity?.Name;
+    }
+
+    public async Task<int?> GetUserIdAsync(CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        var user = await CurrentUserAsync();
+        return user.Identity?.IsAuthenticated == true && int.TryParse(user.FindFirstValue(ClaimTypes.NameIdentifier), out var id) && id > 0 ? id : null;
     }
 
     public async Task EnsureAdministratorAsync(CancellationToken cancellationToken = default)

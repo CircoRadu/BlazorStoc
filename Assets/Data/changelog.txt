@@ -1,3 +1,14 @@
+## 0.5.57 | 09.11.2026
+- Versiune de reunire: conține comutatorul de căutare simplă / extinsă din registrul de beneficiari (0.5.54) și modulul Taskuri utilizatori (0.5.55 și 0.5.56), împreună.
+
+## 0.5.56 | 09.11.2026
+- Taskuri: butonul „Anulează” din formularul paginii „Adaugă task utilizator” închide acum formularul și revine la alegerea beneficiarului; câmpul „Utilizator” are etichetă și este aliniat cu „Titlu”. Fișierele unui task pot fi de orice tip (imaginile, PDF-urile și textele se văd în fereastră, restul se descarcă). Versiune de modul: Taskuri 1.0.3.
+
+## 0.5.55 | 09.11.2026
+- Taskuri pentru utilizatori: administratorul dă unui utilizator un task pe un beneficiar (titlu, descriere, stare „În viitor” / „În lucru” / „Finalizat”, termen limită opțional, fișiere). Intrare nouă în Administrare, „Adaugă task utilizator”, cu căutare după beneficiar și adăugare de beneficiar din aceeași pagină, plus tabelele taskurilor active și finalizate cu etichete de filtrare (stare, utilizator), editare și ștergere; secțiunea „Taskuri” apare și pe fișa beneficiarului.
+- Utilizatorul are pagina „Taskurile mele” (din meniul numelui, cu insignă roșie pentru taskurile nepreluate): task nou pe fond roșu până îl preia, își schimbă starea, adaugă fișiere și le șterge doar pe ale lui. Fila nouă „Taskuri” din Notificări arată doar alertele utilizatorului (nepreluate, termen depășit, termen în curând); zilele de avertizare (3 implicit) se setează în Setări → Notificări.
+- Toate operațiile asupra taskurilor au acțiuni distincte în Jurnal; un beneficiar cu taskuri nu poate fi șters. Versiuni de modul: Taskuri 1.0.1, Notificări 1.5.0, Jurnal 1.4.18. Schema bazei: migrarea 81.
+
 ## 0.5.54 | 09.11.2026
 - Registrul de beneficiari: căutarea simplă / extinsă este un singur comutator sub câmpul de căutare, în aceeași pagină („Căutare simplă” implicit: denumirea și CUI-ul; „Căutare extinsă”: și adresa, telefonul). Nu mai sunt două opțiuni deasupra câmpului.
 

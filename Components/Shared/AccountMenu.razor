@@ -1,20 +1,24 @@
 @using System.Security.Claims
 @using BlazorStoc.Services
+@using BlazorStoc.Modules.Tasks
+@implements IDisposable
 @inject AuthenticationStateProvider Auth
 @inject IOwnAccountService Account
+@inject IUserTaskAlerts TaskAlerts
 @* The name of the signed-in user in the top bar opens an overlay over the page with the options of their account: the state of their authenticator, a change of their own password
    (a window over the page) and the sign-out (the confirmation window of the layout). Every user has it; it needs no right of the permission matrix. *@
 
 <div class="account-menu" @onkeydown="KeyDown">
     <button type="button" id="account-trigger" class="account-trigger" aria-haspopup="menu" aria-expanded="@(open ? "true" : "false")" aria-controls="account-panel"
             title="Contul tău" @onclick="Toggle">
-        <span>@name · @role</span><span class="account-caret" aria-hidden="true">▾</span>
+        <span>@name · @role</span>@if (tasks.NotAccepted > 0) { <span class="account-badge" title="@($"{tasks.NotAccepted} taskuri nepreluate")">@tasks.NotAccepted</span> }<span class="account-caret" aria-hidden="true">▾</span>
     </button>
     @if (open)
     {
         <div class="account-backdrop" @onclick="Close"></div>
         <div id="account-panel" class="account-panel" role="menu" aria-labelledby="account-trigger">
             <div class="account-head"><strong>@display</strong><small>@name · @role</small></div>
+            @if (tasks.HasUser) { <a class="account-item" role="menuitem" href="/taskurile-mele" @onclick="Close">Taskurile mele @if (tasks.NotAccepted > 0) { <span class="account-badge">@tasks.NotAccepted</span> }</a> }
             <a class="account-item" role="menuitem" href="/Account/TwoFactor" @onclick="Close">Autentificatorul meu</a>
             <button type="button" class="account-item" role="menuitem" disabled="@(!canChangePassword)" @onclick="OpenPassword"
                     title="@(canChangePassword ? "Schimbă parola contului tău" : "Parola administratorului din configurare se schimbă din fișierul de configurare")">Schimbă parola</button>
@@ -29,6 +33,7 @@
 @code {
     private bool open, changingPassword, canChangePassword;
     private string name = "", display = "", role = "Utilizator";
+    private UserTaskAlertSummary tasks = UserTaskAlertSummary.Empty;
 
     protected override async Task OnInitializedAsync()
     {
@@ -39,7 +44,13 @@
         role = user.IsInRole("Administrator") ? "Administrator" : "Utilizator";
         try { canChangePassword = await Account.CanChangePasswordAsync(); }
         catch (Exception exception) when (exception is not OperationCanceledException) { canChangePassword = false; }
+        TaskAlerts.Changed += OnTasksChanged;
+        tasks = await TaskAlerts.GetAsync();
     }
+
+    // A task of this application changed: the number of tasks not taken over is read again.
+    private void OnTasksChanged() => InvokeAsync(async () => { tasks = await TaskAlerts.GetAsync(); StateHasChanged(); });
+    public void Dispose() => TaskAlerts.Changed -= OnTasksChanged;
 
     private void Toggle() => open = !open;
     private void Close() => open = false;

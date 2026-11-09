@@ -1,0 +1,16 @@
+# Detaliile taskului
+Cautare: detalii task descriere stare preia preluare fisiere termen utilizator
+
+Fereastra cu detaliile unui task: pentru utilizator (din „Taskurile mele” sau din notificări) și pentru administrator (taskurile finalizate).
+
+## Elemente
+### Campurile si butoanele
+- Preia taskul | buton | Doar utilizatorului căruia îi este dat taskul și doar cât nu l-a preluat.
+- Stare | listă | O schimbă utilizatorul taskului sau cine poate edita taskuri; un task finalizat se poate redeschide.
+- Descriere | text | Ce are de făcut utilizatorul.
+- Fișiere | zonă | Descarci fișierele, adaugi fișiere și ștergi fișierele adăugate de tine; fișierele administratorului nu se pot șterge de utilizator.
+- Închide | buton | Închide fereastra.
+
+## Flux: Cum închei un task
+1. Deschide taskul.
+2. La „Stare” alege „Finalizat”; taskul trece în fila „Finalizate”.

@@ -7,6 +7,7 @@
 @inject ISubcategoryTree SubcategoryTree
 @inject IOperationLockService OperationLock
 @inject IExpiryNotificationService Notifications
+@inject BlazorStoc.Modules.Tasks.IUserTaskAlerts TaskAlerts
 @inject NavigationManager Navigation
 @inject ILogger<MainLayout> Logger
 
@@ -87,6 +88,7 @@
                         <AuthorizeView Policy="perm:facturi.view"><Authorized><NavLink href="/facturi" Match="NavLinkMatch.Prefix">Facturi</NavLink></Authorized></AuthorizeView>
                     }
                     @if (Modules.IsAvailable(BlazorStoc.Modules.Vehicles.VehiclesModule.ModuleId)) { <AuthorizeView Policy="perm:vehicule.view"><Authorized><NavLink href="/vehicule" Match="NavLinkMatch.Prefix">Vehicule</NavLink></Authorized></AuthorizeView> }
+                    @if (Modules.IsAvailable(BlazorStoc.Modules.Tasks.TasksModule.ModuleId)) { <AuthorizeView Policy="perm:taskuri.view"><Authorized><NavLink href="/taskuri/adauga" Match="NavLinkMatch.Prefix">Adaugă task utilizator</NavLink></Authorized></AuthorizeView> }
                     @if (Modules.IsAvailable(BlazorStoc.Modules.Elcomtur.ElcomturModule.ModuleId)) { <AuthorizeView Policy="perm:elcomtur.import"><Authorized><NavLink href="/preluare-elcomtur" Match="NavLinkMatch.Prefix">Preluare Elcomtur</NavLink></Authorized></AuthorizeView> }
                     <AuthorizeView Policy="perm:nomenclator.view"><Authorized><NavLink href="/nomenclator" Match="NavLinkMatch.Prefix">Nomenclator</NavLink></Authorized></AuthorizeView>
                 </ChildContent>
@@ -144,6 +146,7 @@
         Navigation.LocationChanged += LocationChanged;
         // A module stopped or started again (Setări -> Module) changes the menu at once, not at the next navigation.
         Modules.Changed += ModulesChanged;
+        TaskAlerts.Changed += TaskAlertsChanged;
         ReadLocation();
         await LoadOpenedProductAsync();
         if (productSection) await LoadGroupsAsync();
@@ -169,6 +172,8 @@
         {
             await Notifications.EvaluateAsync(TimeSpan.FromMinutes(5), lifetime.Token);
             alertCount = await Notifications.AlertCountAsync(lifetime.Token);
+            // The tasks of the signed-in user that need attention (not taken over, past or near the deadline) count in the same triangle.
+            alertCount += (await TaskAlerts.GetAsync(lifetime.Token)).Total;
         }
         catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
         catch (Exception) { alertCount = 0; }
@@ -178,6 +183,8 @@
     {
         RefreshNavigationAsync().FireAndForget(Logger, "layout navigation refresh");
     }
+
+    private void TaskAlertsChanged() => InvokeAsync(async () => { await LoadAlertCountAsync(); StateHasChanged(); }).FireAndForget(Logger, "layout task alerts refresh");
 
     private void ModulesChanged()
     {
@@ -359,6 +366,7 @@
     {
         Navigation.LocationChanged -= LocationChanged;
         Modules.Changed -= ModulesChanged;
+        TaskAlerts.Changed -= TaskAlertsChanged;
         lifetime.Cancel();
         lifetime.Dispose();
     }

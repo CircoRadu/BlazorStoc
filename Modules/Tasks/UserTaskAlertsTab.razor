@@ -1,0 +1,34 @@
+@namespace BlazorStoc.Components.Shared
+@using BlazorStoc.Modules.Tasks
+@implements IDisposable
+@inject IUserTaskAlerts Alerts
+
+@* The tab "Taskuri" of the Notifications page: the alerts about the tasks of the signed-in user only (not taken over, past the deadline, due soon), red when there are any.
+   It belongs to the Tasks module; the page of another module (Notifications) shows it through this wrapper, because modules do not refer to each other. Shown only to an account that
+   has tasks (not the administrator of the settings file) and while the module runs. *@
+<ModuleGate ModuleId="@TasksModule.ModuleId" Notice="false">
+    @if (summary.HasUser)
+    {
+        <button type="button" role="tab" id="tab-user-tasks" class="settings-tab @(Active ? "active" : "") @(summary.Total > 0 ? "needs-attention" : "")" aria-selected="@(Active ? "true" : "false")" aria-controls="panel-notifications" @onclick="Select">Taskuri <span class="count-badge">@summary.Total</span></button>
+    }
+</ModuleGate>
+
+@code {
+    [Parameter] public bool Active { get; set; }
+    [Parameter] public EventCallback Selected { get; set; }
+
+    private UserTaskAlertSummary summary = UserTaskAlertSummary.Empty;
+
+    private Task Select() => Selected.InvokeAsync();
+
+    protected override async Task OnInitializedAsync()
+    {
+        Alerts.Changed += OnChanged;
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync() => summary = await Alerts.GetAsync();
+    private void OnChanged() => InvokeAsync(async () => { await LoadAsync(); StateHasChanged(); });
+
+    public void Dispose() => Alerts.Changed -= OnChanged;
+}

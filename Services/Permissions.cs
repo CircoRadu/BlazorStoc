@@ -52,6 +52,8 @@ public static class Permissions
         new("oferte", "Oferte", "Oferte", Plus(Crud(export: true), new PermissionAction("sabloane", "Sabloane de oferta"))),
         new("mentenanta", "Mentenanta", "Mentenanta", Plus(Plus(Crud(export: true), new PermissionAction("contracte", "Activare contracte")), new PermissionAction("validare", "Validare tichete ActivityApp", false))),
         new("analize-risc", "Analize de risc", "Analize de risc", Crud()),
+        // Tasks given to users on a beneficiary (Modules/Tasks): the administrator has them all; a user of any type sees and works on the tasks addressed to them without a key.
+        new("taskuri", "Taskuri utilizatori", "Administrare", Crud(admin: true, noun: "task")),
         new("elcomtur", "Balante Elcomtur", "Administrare", [new(View, "Vizualizare balante", false), new("import", "Preluare date Elcomtur", false)]),
         new("notificari", "Notificari", "Notificari", [new(View, "Vizualizare"), new(Edit, "Marcare / rezolvare")]),
         new("setari-facturi", "Setari: Facturi (sabloane)", "Setari", [new(View, "Vizualizare"), new(Add, "Creare sablon"), new(Edit, "Modificare sablon"), new(Delete, "Stergere sablon", false)]),
@@ -91,6 +93,8 @@ public static class Permissions
         ["mentenanta.validare"] = ["mentenanta.add", "mentenanta.delete"],
         // Accepting a beneficiary of ActivityApp creates or changes the beneficiary.
         ["beneficiari.validare"] = ["beneficiari.add", "beneficiari.edit"],
+        // The tasks are listed and created per beneficiary (search of the beneficiary, link to the page).
+        ["taskuri.view"] = ["beneficiari.view"],
         // The import shows its result (the balances) to who runs it.
         ["elcomtur.import"] = ["elcomtur.view", "beneficiari.view"]
     };

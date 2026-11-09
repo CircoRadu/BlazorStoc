@@ -226,7 +226,9 @@ public static class HelpChecks
         // New 07.11.2026: the tab "Componente mentenanta" of the Nomenclator; the picture is made on request (docs/HELP_DE_REGENERAT.md).
         "nomenclator-componente-mentenanta",
         // New 07.11.2026: the window of an addendum of a maintenance contract (not wired into the page yet); the description is completed with the components stage.
-        "mentenanta-act-aditional"
+        "mentenanta-act-aditional",
+        // New 09.11.2026: tasks of users on beneficiaries (module Taskuri); the pictures are made on request (docs/HELP_DE_REGENERAT.md).
+        "taskuri-adauga", "taskurile-mele", "task-formular", "task-detalii", "notificari-taskuri"
     };
 
     // Elements that the demo environment cannot show in the state they describe (topic key|element name); the list only shrinks.
@@ -360,6 +362,8 @@ public static class HelpChecks
         "Home.razor", "Beneficiaries.razor", "Suppliers.razor", "Vehicles.razor", "InvoiceTemplatesList.razor", "OfferPickup.razor",
         // The editors of the beneficiary page open in a window made here around forms that have their own help button; the file panel has a delete confirmation and a plain file preview.
         "EntityFilePreview.razor", "BeneficiaryDetail.razor", "ServiceContractsSection.razor", "ServiceInterventionsSection.razor", "RiskAnalysesSection.razor", "EntityFilesPanel.razor",
+        // Module Taskuri: the page wraps the existing beneficiary editor, the tables wrap the task form (own help button), the file panel only confirms a deletion and previews a file.
+        "AddUserTaskPage.razor", "TaskTables.razor", "TaskFilesPanel.razor",
         // The popups of the validation queue of the tickets (view, edit + take, discard confirmation) and the view of a discarded ticket: their topic is to be written (listed in docs/HELP_DE_REGENERAT.md).
         "ActivityReviewSection.razor", "ActivityDiscardedSection.razor"
     };

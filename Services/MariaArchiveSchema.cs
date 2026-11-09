@@ -31,7 +31,7 @@ public static class MariaArchiveSchema
     // Tables created by schema migrations (MariaSchemaMigrations). Until 30.09.2026 "beneficiary_work_points" (migration 2)
     // was missing from the list used by backup/restore, so backups exported it in dump.sql but left it out of the
     // manifest and of the canonical row hash. Add every future migration-created table here.
-    private static readonly string[] MigratedTables = ["beneficiary_work_points", "notification_templates", "expiry_notifications", "notification_settings",
+    private static readonly string[] MigratedTables = ["beneficiary_work_points", "beneficiary_tasks", "task_settings", "notification_templates", "expiry_notifications", "notification_settings",
         "service_photos", "entity_files", "archive_work_points", "archive_service_photos", "service_contracts", "service_contract_points", "archive_service_contracts", "service_interventions", "archive_service_interventions",
         "invoice_templates", "invoice_template_versions", "invoice_template_models", "suppliers", "archive_suppliers", "supplier_invoices", "supplier_aliases", "supplier_recognitions", "supplier_invoice_lines",
         "system_types", "system_type_aliases", "maintenance_families", "maintenance_components", "maintenance_component_aliases", "project_components", "offer_templates", "offers", "offer_lines", "offer_line_matches", "beneficiary_aliases", "project_reservations", "vehicle_target_levels", "product_min_stock", "project_deadlines", "backup_nas_settings", "notification_template_seeds", "backup_settings", "supplier_product_codes",

@@ -11,6 +11,8 @@ public sealed record EntityFileContent(byte[] Content, string ContentType, strin
 public static class EntityFileOwners
 {
     public const string WorkPoint = "workpoint", Contract = "contract", Intervention = "intervention", Risk = "risk", Beneficiary = "beneficiary";
+    // The files of a task given to a user (Modules/Tasks, its own store): the general store does not handle this kind.
+    public const string UserTask = "task";
 
     public static string Label(string kind) => kind switch
     {

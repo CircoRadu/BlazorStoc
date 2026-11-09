@@ -1,0 +1,111 @@
+@inject IUserTaskRepository Repository
+@inject IAccessControl Access
+@inject ILogger<TaskDetailsDialog> Logger
+@implements IDisposable
+@* The details of a task: read-only text, the files, the status (for the user the task is addressed to and for who may edit tasks) and the "Preia" action (the user only).
+   Used by the dashboard of the user and for the finished tasks of the administrator tables. *@
+
+<div class="delete-overlay" @onkeydown="KeyAsync">
+    <div class="delete-dialog template-popup" role="dialog" aria-modal="true" tabindex="-1" aria-labelledby="task-details-title">
+        @if (task is null)
+        {
+            <div class="catalog-heading"><h2 id="task-details-title">Task</h2><span class="heading-actions"><button type="button" class="refresh act-close" @onclick="() => Closed.InvokeAsync()">Închide</button></span></div>
+            @if (loadError is not null) { <div class="error-banner" role="alert">@loadError</div> }
+            else { <div class="empty-state" role="status"><div class="spinner"></div><h3>Se încarcă taskul</h3></div> }
+        }
+        else
+        {
+            <div class="catalog-heading"><h2 id="task-details-title">@task.Title</h2><span class="heading-actions"><HelpButton Topic="task-detalii" About="Detaliile taskului" /><button type="button" class="refresh act-close" @onclick="() => Closed.InvokeAsync()">Închide</button></span></div>
+            @if (error is not null) { <div class="error-banner" role="alert">@error</div> }
+            @if (!task.IsAccepted && isAssignee)
+            {
+                <div class="error-banner task-new-note" role="status"><span>Taskul nu a fost preluat.</span>
+                    <button type="button" class="refresh act-confirm" disabled="@busy" @onclick="AcceptAsync">@(busy ? "Se preia…" : "Preia taskul")</button></div>
+            }
+            <dl class="database-facts task-facts">
+                <div><dt>Beneficiar</dt><dd>@task.BeneficiaryName</dd></div>
+                <div><dt>Utilizator</dt><dd>@task.AssignedUserName</dd></div>
+                <div><dt>Creat</dt><dd>@task.CreatedUtc.ToLocalTime().ToString("dd.MM.yyyy HH:mm", System.Globalization.CultureInfo.InvariantCulture) · @task.CreatedBy</dd></div>
+                <div><dt>Termen limită</dt><dd class="@DueClass">@UserTaskRules.DueText(task.DueDate)</dd></div>
+                <div><dt>Preluat</dt><dd>@(task.IsAccepted ? $"{task.AcceptedUtc!.Value.ToLocalTime():dd.MM.yyyy HH:mm} · {task.AcceptedBy}" : "nu")</dd></div>
+                @if (task.FinishedUtc is { } finished) { <div><dt>Finalizat</dt><dd>@finished.ToLocalTime().ToString("dd.MM.yyyy HH:mm", System.Globalization.CultureInfo.InvariantCulture)</dd></div> }
+            </dl>
+            <label for="task-details-status">Stare
+                <select id="task-details-status" value="@((int)task.Status)" disabled="@(busy || !canChangeStatus)" title="@(canChangeStatus ? "Schimbă starea taskului" : "Starea o poate schimba doar utilizatorul căruia îi este dat taskul")" @onchange="StatusChangedAsync">
+                    @foreach (var status in UserTaskRules.Statuses) { <option value="@((int)status)">@UserTaskRules.StatusLabel(status)</option> }
+                </select></label>
+            <div class="task-description"><strong>Descriere</strong><p>@task.Description</p></div>
+            <TaskFilesPanel TaskId="task.Id" Changed="ReloadAsync" />
+        }
+    </div>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public int TaskId { get; set; }
+    // Raised after the task changed (status, taken over, a file added or deleted), so the list behind the dialog follows.
+    [Parameter] public EventCallback Changed { get; set; }
+    [Parameter] public EventCallback Closed { get; set; }
+
+    private UserTask? task;
+    private bool isAssignee, canChangeStatus, busy;
+    private string? error, loadError;
+    private readonly CancellationTokenSource lifetime = new();
+
+    private string DueClass => task is { DueDate: { } due, Status: not UserTaskStatus.Done } && due < DateOnly.FromDateTime(DateTime.Now) ? "task-due-overdue" : "";
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            task = await Repository.GetAsync(TaskId, lifetime.Token);
+            if (task is null) { loadError = "Taskul nu mai există sau nu îți este dat."; return; }
+            isAssignee = await Access.GetUserIdAsync(lifetime.Token) == task.AssignedUserId;
+            canChangeStatus = isAssignee || await Access.HasAsync("taskuri.edit", lifetime.Token);
+        }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (Exception exception)
+        {
+            Logger.LogWarning("Task loading failed ({ErrorType}).", exception.GetType().Name);
+            loadError = "Taskul nu a putut fi încărcat.";
+        }
+    }
+
+    private async Task ReloadAsync()
+    {
+        try { task = await Repository.GetAsync(TaskId, lifetime.Token) ?? task; }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { return; }
+        catch (Exception exception) { Logger.LogWarning("Task reload failed ({ErrorType}).", exception.GetType().Name); }
+        await Changed.InvokeAsync();
+    }
+
+    private async Task StatusChangedAsync(ChangeEventArgs args)
+    {
+        if (task is null || busy || !int.TryParse(args.Value?.ToString(), out var value) || !Enum.IsDefined((UserTaskStatus)value)) return;
+        await RunAsync(() => Repository.SetStatusAsync(task, (UserTaskStatus)value, lifetime.Token), "Starea taskului nu a putut fi schimbată.");
+    }
+
+    private async Task AcceptAsync()
+    {
+        if (task is null || busy) return;
+        await RunAsync(() => Repository.AcceptAsync(task, lifetime.Token), "Taskul nu a putut fi preluat.");
+    }
+
+    private async Task RunAsync(Func<Task<UserTask>> operation, string fallback)
+    {
+        busy = true; error = null;
+        try { task = await operation(); await Changed.InvokeAsync(); }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (UserTaskOperationException exception) { error = exception.Message; await ReloadAsync(); }
+        catch (AccessDeniedException exception) { error = exception.Message; }
+        catch (Exception exception)
+        {
+            Logger.LogError("Task operation failed ({ErrorType}).", exception.GetType().Name);
+            error = fallback;
+        }
+        finally { busy = false; }
+    }
+
+    private Task KeyAsync(KeyboardEventArgs e) => e.Key == "Escape" && !busy ? Closed.InvokeAsync() : Task.CompletedTask;
+
+    public void Dispose() { lifetime.Cancel(); lifetime.Dispose(); }
+}

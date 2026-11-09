@@ -121,6 +121,9 @@ public sealed class MariaBeneficiaryRepository(
                     await using (var projects = Command(connection, transaction,
                         "SELECT COUNT(*) FROM projects WHERE beneficiary_id=@id", ("@id", original.Id)))
                         BeneficiaryRules.CheckNoLiveProjects(Convert.ToInt32(await projects.ExecuteScalarAsync(token).ConfigureAwait(false)));
+                    await using (var tasks = Command(connection, transaction,
+                        "SELECT COUNT(*) FROM beneficiary_tasks WHERE beneficiary_id=@id", ("@id", original.Id)))
+                        BeneficiaryRules.CheckNoTasks(Convert.ToInt32(await tasks.ExecuteScalarAsync(token).ConfigureAwait(false)));
                     if (await MariaServiceContractRepository.CountForBeneficiaryAsync(connection, transaction, original.Id, token).ConfigureAwait(false) is var contractCount and > 0)
                         throw ServiceContractRules.BeneficiaryHasContracts(contractCount);
                     if (await MariaRiskAnalysisRepository.CountForBeneficiaryAsync(connection, transaction, original.Id, token).ConfigureAwait(false) is var analysisCount and > 0)

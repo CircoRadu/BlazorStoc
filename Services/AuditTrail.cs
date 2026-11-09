@@ -13,6 +13,7 @@ public static class AuditEntities
     public const string Project = "Proiect";
     public const string ProjectObservation = "Observatie";
     public const string ProjectObservationFile = "FisierObservatie";
+    public const string UserTask = "Task";
     public const string StockMovement = "MiscareStoc";
     public const string Vehicle = "Vehicul";
     public const string Inventory = "Inventar";
@@ -232,6 +233,17 @@ public static class AuditActions
     public const string ReviseOffer = "Revizie ofertă";
     public const string LinkOfferLine = "Legare linie ofertă de produs";
     public const string AddBeneficiaryAlias = "Adăugare denumire alternativă beneficiar";
+    // Tasks of a user on a beneficiary (Modules/Tasks).
+    public const string CreateUserTask = "Adăugare task";
+    public const string EditUserTask = "Modificare task";
+    public const string EditUserTaskDueDate = "Modificare termen task";
+    public const string MoveUserTask = "Mutare task la alt utilizator";
+    public const string DeleteUserTask = "Ștergere task";
+    public const string ChangeUserTaskStatus = "Schimbare status task";
+    public const string AcceptUserTask = "Preluare task";
+    public const string AddUserTaskFile = "Adăugare fișier task";
+    public const string DeleteUserTaskFile = "Ștergere fișier task";
+    public const string EditTaskWarningDays = "Modificare zile avertizare taskuri";
     public const string CreateOfferTemplate = "Creare șablon ofertă";
     public const string EditOfferTemplate = "Modificare șablon ofertă";
     public const string ActivateOfferTemplate = "Activare șablon ofertă";
@@ -394,7 +406,7 @@ public static class AuditActions
     public const string ApplicationUpdateAcknowledged = "Confirmare eșec actualizare";
 
     // Operations that remove their object: earlier events about it stop linking to its page.
-    public static bool IsDeletion(string? action) => action is Delete or DeleteInvoiceTemplate;
+    public static bool IsDeletion(string? action) => action is Delete or DeleteInvoiceTemplate or DeleteUserTask;
 
     // Events whose object still has a live page (a plain edit or one of the specific edit operations).
     public static bool IsCreateOrEdit(string? action) =>
@@ -413,6 +425,7 @@ public static class AuditActions
             or RecordFreeEntry or AttachEntryToInvoice or DetachEntryFromInvoice or DuplicateEntryOnInvoice or RegularizeNegativeStock or ExitOverStock
             or ExitToBeneficiary or ExitToVehicle or GenericSale or StockCorrection or DuplicateExit or VoidExitOperation or ReturnFromBeneficiary
             or ImportOffer or ReviseOffer or LinkOfferLine or AddBeneficiaryAlias
+            or CreateUserTask or EditUserTask or EditUserTaskDueDate or MoveUserTask or ChangeUserTaskStatus or AcceptUserTask or AddUserTaskFile or DeleteUserTaskFile
             or CreateOfferTemplate or EditOfferTemplate or ActivateOfferTemplate or DeactivateOfferTemplate
             or AddProjectComponent or ChangeProjectComponentState or ArchiveProjectComponent or ReactivateProjectComponent or SetVehicleTarget or RemoveVehicleTarget or SetMinStock or RemoveMinStock or SetProjectDeadline or RemoveProjectDeadline or ReserveStock or ReduceReservation or ReleaseReservation or ReservationConsumed or ReservationReducedByExit or ReservationReleasedByComponent or ComponentExitReturned or ComponentExitLeft or ComponentExitMoved or ComponentExitConsumed
             or AddMaintenanceFamily or RenameMaintenanceFamily or ActivateMaintenanceFamily or DeactivateMaintenanceFamily or MoveMaintenanceFamily or AddMaintenanceComponent or RenameMaintenanceComponent or ActivateMaintenanceComponent or DeactivateMaintenanceComponent or MoveMaintenanceComponent or ChangeMaintenanceComponentFamily or AddMaintenanceComponentAlias or RemoveMaintenanceComponentAlias
@@ -464,6 +477,8 @@ public static class AuditNavigation
         [AuditEntities.Project] = ProjectNavigation.ProjectUrl,
         // The event stores the observation id; /observatii/{id} resolves it to the page under its project.
         [AuditEntities.ProjectObservation] = ProjectNavigation.ObservationUrl,
+        // The administrator page of the tasks opens the task given in the address.
+        [AuditEntities.UserTask] = id => $"/taskuri/adauga?task={id}",
         // The event stores the movement id; /miscari/{id} resolves it to the product's movements page.
         [AuditEntities.StockMovement] = StockMovementNavigation.MovementUrl,
         // The vehicle page (its equipment, edit and delete actions).

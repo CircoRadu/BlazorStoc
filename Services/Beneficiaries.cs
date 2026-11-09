@@ -223,6 +223,15 @@ public static class BeneficiaryRules
             throw new BeneficiaryOperationException("Beneficiarul are mișcări de stoc asociate și nu poate fi șters.");
     }
 
+    // The tasks given to users on the beneficiary (module Taskuri) must be deleted first.
+    public static void CheckNoTasks(int taskCount)
+    {
+        if (taskCount > 0)
+            throw new BeneficiaryOperationException(taskCount == 1
+                ? "Beneficiarul are un task asociat și nu poate fi șters. Șterge mai întâi taskul."
+                : $"Beneficiarul are {taskCount} taskuri asociate și nu poate fi șters. Șterge mai întâi taskurile.");
+    }
+
     // Live projects must be moved to another beneficiary or archived first; archived projects do not block deletion.
     public static void CheckNoLiveProjects(int liveProjectCount)
     {
