@@ -184,13 +184,13 @@ UNLOCK TABLES;
 
 LOCK TABLES `backup_nas_settings` WRITE;
 /*!40000 ALTER TABLE `backup_nas_settings` DISABLE KEYS */;
-REPLACE INTO `backup_nas_settings` (`id`, `unc_path`, `username`, `password_protected`, `copy_enabled`, `schedule_enabled`, `schedule_time`, `last_scheduled_date`, `last_attempt_utc`, `last_ok`, `last_message`, `updated_by`, `updated_utc`, `max_age_days`, `last_error_utc`, `last_error`) VALUES (1,'\\\\192.168.100.50\\BackupStocDepozit','EspStoc','CfDJ8K0zpf6bAUBDhx3Tp8Qg3Xav6-YSC473xDg_-5Es-Xeb0VlR6nNgopDby_NVUByUlbuSC9dwi2qq2xCHZ3boQt1MyvdM1n0h3JLOKAI7SWCrjIvwV387zr0s1A9cCxH2kA',1,1,'11:10','2026-10-08','2026-11-06T08:00:37.841Z',1,'Copiate 1, deja pe NAS 5.','administrator.demo','2026-10-19T05:43:21.076Z',2,NULL,NULL);
+REPLACE INTO `backup_nas_settings` (`id`, `unc_path`, `username`, `password_protected`, `copy_enabled`, `schedule_enabled`, `schedule_time`, `last_scheduled_date`, `last_attempt_utc`, `last_ok`, `last_message`, `updated_by`, `updated_utc`, `max_age_days`, `last_error_utc`, `last_error`) VALUES (1,'\\\\192.168.100.50\\BackupStocDepozit','EspStoc','CfDJ8K0zpf6bAUBDhx3Tp8Qg3Xav6-YSC473xDg_-5Es-Xeb0VlR6nNgopDby_NVUByUlbuSC9dwi2qq2xCHZ3boQt1MyvdM1n0h3JLOKAI7SWCrjIvwV387zr0s1A9cCxH2kA',1,1,'11:10','2026-10-08','2026-11-09T08:00:31.191Z',1,'Copiate 1, deja pe NAS 5.','administrator.demo','2026-10-19T05:43:21.076Z',2,NULL,NULL);
 /*!40000 ALTER TABLE `backup_nas_settings` ENABLE KEYS */;
 UNLOCK TABLES;
 
 LOCK TABLES `backup_settings` WRITE;
 /*!40000 ALTER TABLE `backup_settings` DISABLE KEYS */;
-REPLACE INTO `backup_settings` (`id`, `schedule_enabled`, `schedule_time`, `last_scheduled_date`, `max_age_days`, `retention_enabled`, `retention_days`, `last_error_utc`, `last_error`, `updated_by`, `updated_utc`, `ntp_check_enabled`, `ntp_servers`, `clock_issue_utc`, `clock_skew_minutes`, `schedule_days`) VALUES (1,1,'10:00','2026-11-06',2,1,7,'2026-10-15T10:06:40.073Z','Copia de siguranta nu a putut fi generata (eroare la exportul bazei de date). Cauza: utilitarul mariadb-dump nu a fost gasit pe server (se seteaza Database:MariaDumpExecutablePath la calea lui).','administrator.demo','2026-10-09T06:41:42.369Z',1,'time.cloudflare.com, pool.ntp.org, time.windows.com',NULL,0,31);
+REPLACE INTO `backup_settings` (`id`, `schedule_enabled`, `schedule_time`, `last_scheduled_date`, `max_age_days`, `retention_enabled`, `retention_days`, `last_error_utc`, `last_error`, `updated_by`, `updated_utc`, `ntp_check_enabled`, `ntp_servers`, `clock_issue_utc`, `clock_skew_minutes`, `schedule_days`) VALUES (1,1,'10:00','2026-11-09',2,1,7,'2026-10-15T10:06:40.073Z','Copia de siguranta nu a putut fi generata (eroare la exportul bazei de date). Cauza: utilitarul mariadb-dump nu a fost gasit pe server (se seteaza Database:MariaDumpExecutablePath la calea lui).','administrator.demo','2026-10-09T06:41:42.369Z',1,'time.cloudflare.com, pool.ntp.org, time.windows.com',NULL,0,31);
 /*!40000 ALTER TABLE `backup_settings` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -293,7 +293,9 @@ REPLACE INTO `expiry_notifications` (`id`, `template_id`, `source_key`, `object_
 (10,12,'sistem.copie-nas-lipsa',1,'2026-10-27','2026-10-26T07:09:23.062Z',NULL,NULL,NULL,NULL,1,'sistem','2026-10-26T08:00:44.264Z','S-a făcut o încercare nouă de copiere: termenul s-a mutat de la 27.10.2026 la 30.10.2026.',1,'Copia backup-urilor pe NAS','{\"ultima copiere\":\"23.10.2026 10:00\",\"cauza copiere\":\"Copiate 1, deja pe NAS 22.\"}','Copie pe NAS lipsă','Backup-ul nu a ajuns pe NAS. Ultima încercare: 26.10.2026 10:00. Cauza: Copiate 1, deja pe NAS 8.. Verifică Setări → Backup NAS: conexiunea, contul și spațiul de pe NAS.','Sistem · Copie pe NAS lipsă'),
 (11,16,'sistem.mentenanta-activityapp-de-validat',1,'2026-10-30','2026-10-30T10:41:51.991Z',NULL,NULL,NULL,NULL,3,'sistem','2026-10-30T10:43:06.108Z','Evenimentul a fost validat, respins sau discardat.',1,'2 evenimente ActivityApp de validat','{\"tichet de validat\":\"2 tichete\",\"detalii validare\":\"2 evenimente ActivityApp a\\u0219teapt\\u0103 validarea (1 propuse ca mentenan\\u021B\\u0103, 1 ca service); cel mai vechi este din 30.10.2026.\"}','Validează mentenanța: 2 tichete','2 evenimente ActivityApp așteaptă validarea (1 propuse ca mentenanță, 1 ca service); cel mai vechi este din 30.10.2026. Vezi Setări → Preluare ActivityApp, „Evenimente de validat”.','Sistem · Evenimente ActivityApp de validat ca mentenanță'),
 (12,18,'sistem.preluare-elcomtur',2,'2026-11-05','2026-11-05T11:55:09.854Z',NULL,NULL,NULL,NULL,1,'sistem','2026-11-05T11:55:32.527Z','O verificare ulterioară a reușit sau preluarea automată a fost oprită.',1,'Preluarea automată Elcomtur','{\"situatie elcomtur\":\"preluare e\\u0219uat\\u0103\",\"detalii elcomtur\":\"Ultima verificare (05.11.2026 13:55) a e\\u0219uat: \\u00CEn directorul C:\\\\Users\\\\Alex\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\695cbb0e11510863\\\\d9628788-3100-4729-ac9c-61812c76bcbf\\\\scratchpad\\\\elc-nas nu exist\\u0103 niciun fi\\u0219ier care s\\u0103 corespund\\u0103 m\\u0103\\u0219tii \\u201E*lipsa*\\u201D. Verific\\u0103 masca \\u0219i dac\\u0103 backup-ul Elcomtur se salveaz\\u0103 \\u00EEn acel director.\"}','Elcomtur: preluare eșuată','Ultima verificare (05.11.2026 13:55) a eșuat: În directorul C:\\Users\\Alex\\AppData\\Local\\Temp\\claude\\695cbb0e11510863\\d9628788-3100-4729-ac9c-61812c76bcbf\\scratchpad\\elc-nas nu există niciun fișier care să corespundă măștii „*lipsa*”. Verifică masca și dacă backup-ul Elcomtur se salvează în acel director. Vezi Setări → Preluare Elcomtur.','Sistem · Preluare automată backup Elcomtur'),
-(13,18,'sistem.preluare-elcomtur',3,'2026-11-05','2026-11-05T11:55:09.858Z',NULL,NULL,NULL,NULL,1,'claude.dev','2026-11-05T11:56:10.241Z','Marcată manual ca rezolvată.',0,'Backup Elcomtur preluat','{\"situatie elcomtur\":\"backup preluat\",\"detalii elcomtur\":\"Backup-ul Backup_elcomtur_sintetic.elc a fost preluat la 05.11.2026 13:54 pentru firma3 \\u2014 KS TEST ENERGY SRL, date din 30.10.2026: 0 beneficiari cu balan\\u021B\\u0103, 0 cu pl\\u0103\\u021Bi restante (total 0,00 RON).\"}','Elcomtur: backup preluat','Backup-ul Backup_elcomtur_sintetic.elc a fost preluat la 05.11.2026 13:54 pentru firma3 — KS TEST ENERGY SRL, date din 30.10.2026: 0 beneficiari cu balanță, 0 cu plăți restante (total 0,00 RON). Vezi Setări → Preluare Elcomtur.','Sistem · Preluare automată backup Elcomtur');
+(13,18,'sistem.preluare-elcomtur',3,'2026-11-05','2026-11-05T11:55:09.858Z',NULL,NULL,NULL,NULL,1,'claude.dev','2026-11-05T11:56:10.241Z','Marcată manual ca rezolvată.',0,'Backup Elcomtur preluat','{\"situatie elcomtur\":\"backup preluat\",\"detalii elcomtur\":\"Backup-ul Backup_elcomtur_sintetic.elc a fost preluat la 05.11.2026 13:54 pentru firma3 \\u2014 KS TEST ENERGY SRL, date din 30.10.2026: 0 beneficiari cu balan\\u021B\\u0103, 0 cu pl\\u0103\\u021Bi restante (total 0,00 RON).\"}','Elcomtur: backup preluat','Backup-ul Backup_elcomtur_sintetic.elc a fost preluat la 05.11.2026 13:54 pentru firma3 — KS TEST ENERGY SRL, date din 30.10.2026: 0 beneficiari cu balanță, 0 cu plăți restante (total 0,00 RON). Vezi Setări → Preluare Elcomtur.','Sistem · Preluare automată backup Elcomtur'),
+(14,4,'mentenanta.scadenta',1000001,'2026-10-20','2026-11-07T15:57:23.687Z',NULL,NULL,NULL,NULL,1,'sistem','2026-11-09T08:07:50.369Z','Punctul de lucru nu mai este acoperit de un contract activ (contractul a fost dezactivat sau șters, ori punctul a fost scos din contract).',1,'Atelier Tehnic SRL 22 · test · Securitate fizica','{\"beneficiar\":\"Atelier Tehnic SRL 22\",\"punct de lucru\":\"test\",\"adresa punct de lucru\":\"1111\",\"numar contract\":\"26/03.10.2026\",\"data ultima interventie\":\"nicio interven\\u021Bie\",\"componenta\":\"Securitate fizica\"}','Scadență mentenanță – Atelier Tehnic SRL 22, test','Intervenția de mentenanță la punctul de lucru test (1111) al beneficiarului Atelier Tehnic SRL 22, contract 26/03.10.2026, este programată pentru 20.10.2026 (zile rămase: 0; zile de depășire: 20). Ultima intervenție de mentenanță: nicio intervenție.','Mentenanță · Intervenție de mentenanță'),
+(15,4,'mentenanta.scadenta',1000002,'2026-10-20','2026-11-07T15:57:23.691Z',NULL,NULL,NULL,NULL,1,'sistem','2026-11-09T08:07:50.371Z','Punctul de lucru nu mai este acoperit de un contract activ (contractul a fost dezactivat sau șters, ori punctul a fost scos din contract).',1,'Atelier Tehnic SRL 22 · test · Incendiu','{\"beneficiar\":\"Atelier Tehnic SRL 22\",\"punct de lucru\":\"test\",\"adresa punct de lucru\":\"1111\",\"numar contract\":\"26/03.10.2026\",\"data ultima interventie\":\"nicio interven\\u021Bie\",\"componenta\":\"Incendiu\"}','Scadență mentenanță – Atelier Tehnic SRL 22, test','Intervenția de mentenanță la punctul de lucru test (1111) al beneficiarului Atelier Tehnic SRL 22, contract 26/03.10.2026, este programată pentru 20.10.2026 (zile rămase: 0; zile de depășire: 20). Ultima intervenție de mentenanță: nicio intervenție.','Mentenanță · Intervenție de mentenanță');
 /*!40000 ALTER TABLE `expiry_notifications` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -325,6 +327,21 @@ UNLOCK TABLES;
 LOCK TABLES `journal_settings` WRITE;
 /*!40000 ALTER TABLE `journal_settings` DISABLE KEYS */;
 /*!40000 ALTER TABLE `journal_settings` ENABLE KEYS */;
+UNLOCK TABLES;
+
+LOCK TABLES `maintenance_component_aliases` WRITE;
+/*!40000 ALTER TABLE `maintenance_component_aliases` DISABLE KEYS */;
+/*!40000 ALTER TABLE `maintenance_component_aliases` ENABLE KEYS */;
+UNLOCK TABLES;
+
+LOCK TABLES `maintenance_components` WRITE;
+/*!40000 ALTER TABLE `maintenance_components` DISABLE KEYS */;
+/*!40000 ALTER TABLE `maintenance_components` ENABLE KEYS */;
+UNLOCK TABLES;
+
+LOCK TABLES `maintenance_families` WRITE;
+/*!40000 ALTER TABLE `maintenance_families` DISABLE KEYS */;
+/*!40000 ALTER TABLE `maintenance_families` ENABLE KEYS */;
 UNLOCK TABLES;
 
 LOCK TABLES `module_state` WRITE;
@@ -954,25 +971,62 @@ REPLACE INTO `schema_migrations` (`version`, `description`, `checksum`, `origin`
 (70,'Autentificatorul asociat de administrator: stare suspendata (cont inactiv), ultima folosire (data si IP), cine l-a asociat si cine l-a confirmat: web_user_totp.suspended_utc, last_used_utc, last_used_ip, enrolled_by, confirmed_by','4247bf59c28f925c0790375176c83c5b043bc836a09e8584cf5d6ea46a0210c3','applied','2026-11-06 13:17:37','0.5.45'),
 (71,'Inlocuirea atomica a secretului autentificatorului (schimbarea telefonului): web_user_totp.pending_secret_protected','ff7236438b8db8f23501231ddd19cbbd13bc9832edd54d76d8372dd5fc5cc293','applied','2026-11-06 13:32:46','0.5.45'),
 (72,'Schimbarea parolei la prima autentificare: web_users.must_change_password','4854d1cb46e1ccbac890c1543a0e1c2fb7a553beea5c41f74a99bc62062f5922','applied','2026-11-06 15:11:42','0.5.46'),
-(73,'Raportare erori: rapoartele utilizatorilor (bug_reports) si imaginile lor (bug_report_files)','369a8048a88c0d4d3682377ea931882d346438d2eec3aa670416642deccc62fe','applied','2026-11-07 12:58:11','0.5.49');
+(73,'Raportare erori: rapoartele utilizatorilor (bug_reports) si imaginile lor (bug_report_files)','369a8048a88c0d4d3682377ea931882d346438d2eec3aa670416642deccc62fe','applied','2026-11-07 12:58:11','0.5.49'),
+(74,'Module oprite manual: rolul utilizatorului care a oprit modulul','5604b185cee1fc20883bf87fe980c9ba59eadfa8cf354a9c0fcc96c868e255a7','applied','2026-11-09 07:55:55','0.5.52'),
+(75,'Acte aditionale la contractele de mentenanta (service_contract_addenda)','bd81ad42bf6eca5fcb827ed6ee4c7e41e441e0ac2c27c9b8944f7df7626b3c75','applied','2026-11-09 07:55:55','0.5.52'),
+(76,'Nomenclator Mentenanta: familii de componente si componente ale interventiilor de mentenanta','11e23e220eb2ff057a26a6ad0d98745317480fc6de0a2818660d6cf6df5b6472','applied','2026-11-09 07:55:55','0.5.52'),
+(77,'Contracte de mentenanta cu componente: data de referinta, inghetare si unitati (familii / componente discrete)','55355d2eb38e865f20994e6c66cb1e883c3554ffec2cbae365ac9c2b3acde100','applied','2026-11-09 07:55:55','0.5.52'),
+(78,'Scadente de mentenanta pe punct de lucru si componenta (unitate de contract)','fa8be64df56905971e08e6827f5376eb7f188bee3a4e6ae30df54ded5d872c64','applied','2026-11-09 07:55:55','0.5.52'),
+(79,'Componentele acoperite de o interventie de mentenanta','e5fbaa8766b89608095b76fc4156c0212687e8712c0685a548f0518041acca9e','applied','2026-11-09 07:55:55','0.5.52'),
+(80,'Acte aditionale: data de referinta si componentele contractului inainte / dupa act','8f8bf9719b519edcdfa5bcc6cc5bfbc083f99f9541ffa5393b4ddd6e8a31b39d','applied','2026-11-09 07:55:55','0.5.52');
 /*!40000 ALTER TABLE `schema_migrations` ENABLE KEYS */;
+UNLOCK TABLES;
+
+LOCK TABLES `service_contract_addenda` WRITE;
+/*!40000 ALTER TABLE `service_contract_addenda` DISABLE KEYS */;
+/*!40000 ALTER TABLE `service_contract_addenda` ENABLE KEYS */;
 UNLOCK TABLES;
 
 LOCK TABLES `service_contract_points` WRITE;
 /*!40000 ALTER TABLE `service_contract_points` DISABLE KEYS */;
-REPLACE INTO `service_contract_points` (`id`, `contract_id`, `work_point_id`, `active_work_point_id`, `cycle_months`, `next_due`, `version`) VALUES (1,1,11,11,NULL,'2026-10-20',0);
+REPLACE INTO `service_contract_points` (`id`, `contract_id`, `work_point_id`, `active_work_point_id`, `cycle_months`, `next_due`, `version`) VALUES (1,1,11,11,NULL,'2026-10-20',2);
 /*!40000 ALTER TABLE `service_contract_points` ENABLE KEYS */;
+UNLOCK TABLES;
+
+LOCK TABLES `service_contract_unit_dues` WRITE;
+/*!40000 ALTER TABLE `service_contract_unit_dues` DISABLE KEYS */;
+/*!40000 ALTER TABLE `service_contract_unit_dues` ENABLE KEYS */;
+UNLOCK TABLES;
+
+LOCK TABLES `service_contract_unit_members` WRITE;
+/*!40000 ALTER TABLE `service_contract_unit_members` DISABLE KEYS */;
+/*!40000 ALTER TABLE `service_contract_unit_members` ENABLE KEYS */;
+UNLOCK TABLES;
+
+LOCK TABLES `service_contract_units` WRITE;
+/*!40000 ALTER TABLE `service_contract_units` DISABLE KEYS */;
+/*!40000 ALTER TABLE `service_contract_units` ENABLE KEYS */;
 UNLOCK TABLES;
 
 LOCK TABLES `service_contracts` WRITE;
 /*!40000 ALTER TABLE `service_contracts` DISABLE KEYS */;
-REPLACE INTO `service_contracts` (`id`, `beneficiary_id`, `contract_number`, `contract_date`, `cycle_months`, `valid_until`, `is_active`, `notes`, `version`) VALUES (1,2,'26','2026-10-03',3,'2027-10-10',1,'',0);
+REPLACE INTO `service_contracts` (`id`, `beneficiary_id`, `contract_number`, `contract_date`, `cycle_months`, `valid_until`, `is_active`, `notes`, `version`, `reference_date`, `is_frozen`, `missing_info`) VALUES (1,2,'26','2026-10-03',3,'2027-10-10',1,'',4,NULL,1,'');
 /*!40000 ALTER TABLE `service_contracts` ENABLE KEYS */;
+UNLOCK TABLES;
+
+LOCK TABLES `service_intervention_components` WRITE;
+/*!40000 ALTER TABLE `service_intervention_components` DISABLE KEYS */;
+/*!40000 ALTER TABLE `service_intervention_components` ENABLE KEYS */;
 UNLOCK TABLES;
 
 LOCK TABLES `service_intervention_source` WRITE;
 /*!40000 ALTER TABLE `service_intervention_source` DISABLE KEYS */;
 /*!40000 ALTER TABLE `service_intervention_source` ENABLE KEYS */;
+UNLOCK TABLES;
+
+LOCK TABLES `service_intervention_unit_dues` WRITE;
+/*!40000 ALTER TABLE `service_intervention_unit_dues` DISABLE KEYS */;
+/*!40000 ALTER TABLE `service_intervention_unit_dues` ENABLE KEYS */;
 UNLOCK TABLES;
 
 LOCK TABLES `service_interventions` WRITE;
