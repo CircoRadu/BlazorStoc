@@ -156,7 +156,15 @@
     else if (activeTab == BugTab && allowedTabs.Contains(BugTab))
     {
         <div role="tabpanel" id="panel-@BugTab" aria-labelledby="tab-@BugTab" class="settings-body">
-            <ModuleGate ModuleId="@BlazorStoc.Modules.BugReports.BugReportsModule.ModuleId" Section="Rapoarte erori"><BugReportsPanel /></ModuleGate>
+            @SubtabBar(DevSubtabs, "Secțiuni dezvoltare")
+            @if (devSubtab == DevProposalsSubtab)
+            {
+                <div role="tabpanel" id="subpanel-@DevProposalsSubtab" aria-labelledby="subtab-@DevProposalsSubtab"><ModuleGate ModuleId="@BlazorStoc.Modules.Proposals.ProposalsModule.ModuleId" Section="Propuneri"><BlazorStoc.Modules.Proposals.ProposalsPanel /></ModuleGate></div>
+            }
+            else
+            {
+                <div role="tabpanel" id="subpanel-@DevErrorsSubtab" aria-labelledby="subtab-@DevErrorsSubtab"><ModuleGate ModuleId="@BlazorStoc.Modules.BugReports.BugReportsModule.ModuleId" Section="Rapoarte erori"><BugReportsPanel /></ModuleGate></div>
+            }
         </div>
     }
     else if (activeTab == ModulesTab && allowedTabs.Contains(ModulesTab))
@@ -202,7 +210,10 @@
     private const string InvoicesTab = SettingsNavigation.InvoicesTab;
     private const string BackupTab = "backup";
     private const string JournalTab = "jurnal";
-    private const string BugTab = "rapoarte-erori";
+    private const string BugTab = "dezvoltare";
+    private const string DevErrorsSubtab = "erori", DevProposalsSubtab = "propuneri";
+    private static readonly (string Id, string Title)[] DevSubtabs = [(DevErrorsSubtab, "Erori"), (DevProposalsSubtab, "Propuneri")];
+    private string devSubtab = DevErrorsSubtab;
     // The Administrator role sees this tab (adancimea maxima a arborelui de subcategorii); like the Database tab it is not a key of the catalog.
     private const string CatalogTab = "catalog";
     // The Administrator role (every administrator, also the one configured in the private file) sees this tab; it is not a key of the catalog.
@@ -232,7 +243,7 @@
     private const string BackupTimeSubtab = "backup-time";
     private static readonly (string Id, string Title)[] BackupSubtabs = [(BackupMainSubtab, "Backup și restaurare"), (NasTab, "Backup NAS"), (BackupTimeSubtab, "Verificare oră")];
     private string backupSubtab = BackupMainSubtab;
-    private static readonly (string Id, string Title)[] Tabs = [(AnafTab, "Preluare date ANAF"), (ActivityImportTab, "Preluare date ActivityApp"), (ElcomturTab, "Preluare date Elcomtur"), (NotificationsTab, "Notificări"), (MapTab, "Hartă"), (InvoicesTab, "Facturi"), (BackupTab, "Backup"), (JournalTab, "Jurnal activitate"), (BugTab, "Rapoarte erori"), (CatalogTab, "Catalog"), (ModulesTab, "Module"), (UpdateTab, "Actualizare"), (UsersTab, "Utilizatori"), (AuthTab, "Autentificare"), (DatabaseTab, "Bază de date")];
+    private static readonly (string Id, string Title)[] Tabs = [(AnafTab, "Preluare date ANAF"), (ActivityImportTab, "Preluare date ActivityApp"), (ElcomturTab, "Preluare date Elcomtur"), (NotificationsTab, "Notificări"), (MapTab, "Hartă"), (InvoicesTab, "Facturi"), (BackupTab, "Backup"), (JournalTab, "Jurnal activitate"), (BugTab, "Dezvoltare"), (CatalogTab, "Catalog"), (ModulesTab, "Module"), (UpdateTab, "Actualizare"), (UsersTab, "Utilizatori"), (AuthTab, "Autentificare"), (DatabaseTab, "Bază de date")];
     // The key that opens each tab (what the user type of the signed-in user allows).
     private static readonly Dictionary<string, string> TabKeys = new()
     {
@@ -275,7 +286,7 @@
         BackupTab => "Backup, restaurare, copiere pe NAS și verificarea orei.",
         ModulesTab => "Starea modulelor și oprirea sau pornirea lor.",
         JournalTab => "Câte evenimente recente arată implicit pagina Jurnal activitate.",
-        BugTab => "Rapoartele de eroare trimise de utilizatori: stare, note și export ZIP.",
+        BugTab => "Rapoartele de eroare și propunerile de modificări trimise de utilizatori: stare, răspunsuri și export ZIP.",
         CatalogTab => "Adâncimea maximă a arborelui de subcategorii.",
         UpdateTab => "Versiunea aplicației, pachetele de actualizare și istoricul lor.",
         UsersTab => "Conturile utilizatorilor și drepturile fiecărui tip de utilizator.",
@@ -396,7 +407,7 @@
     }
 
     private string CurrentSubtab((string Id, string Title)[] subtabs) =>
-        subtabs == MapSubtabs ? mapSubtab : subtabs == InvoiceSubtabs ? invoiceSubtab : subtabs == BackupSubtabs ? backupSubtab : subtabs == DatabaseSubtabs ? databaseSubtab : subtabs == UserSubtabs ? userSubtab : notificationSubtab;
+        subtabs == MapSubtabs ? mapSubtab : subtabs == InvoiceSubtabs ? invoiceSubtab : subtabs == BackupSubtabs ? backupSubtab : subtabs == DatabaseSubtabs ? databaseSubtab : subtabs == UserSubtabs ? userSubtab : subtabs == DevSubtabs ? devSubtab : notificationSubtab;
 
     // Deep links (for example from the Journal) open the named tab, sub-tab and object; later clicks on the tabs win.
     [SupplyParameterFromQuery(Name = SettingsNavigation.TabParameter)] public string? TabQuery { get; set; }
@@ -432,6 +443,7 @@
         if (allowedTabs.Contains(DatabaseTab) && TabQuery == DatabaseTab && DatabaseSubtabs.Any(tab => tab.Id == SubtabQuery)) databaseSubtab = SubtabQuery!;
         if (NotificationSubtabs.Any(tab => tab.Id == SubtabQuery)) notificationSubtab = SubtabQuery!;
         if (MapSubtabs.Any(tab => tab.Id == SubtabQuery)) mapSubtab = SubtabQuery!;
+        if (TabQuery == BugTab && DevSubtabs.Any(tab => tab.Id == SubtabQuery)) devSubtab = SubtabQuery!;
         if (InvoiceSubtabs.Any(tab => tab.Id == SubtabQuery)) invoiceSubtab = SubtabQuery!;
         if (InvoiceEditParameter is { } editId && editTemplate?.Info.Id != editId)
         {
@@ -501,6 +513,7 @@
         else if (subtabs == BackupSubtabs) backupSubtab = id;
         else if (subtabs == DatabaseSubtabs) databaseSubtab = id;
         else if (subtabs == UserSubtabs) userSubtab = id;
+        else if (subtabs == DevSubtabs) devSubtab = id;
         else if (subtabs == InvoiceSubtabs) { if (id != InvoiceEditSubtab && editTemplate is not null) AfterEditingClosed(() => invoiceSubtab = id); else invoiceSubtab = id; }
         else notificationSubtab = id;
     }

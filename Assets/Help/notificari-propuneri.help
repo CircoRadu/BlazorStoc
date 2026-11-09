@@ -1,0 +1,16 @@
+# Notificări · Propuneri
+Ruta: /notificari
+Tab: Propuneri
+Cautare: notificari propuneri propunere noua raspuns stare schimbata autor administrator
+
+Fila cu propunerile care cer atenția ta: propuneri noi (pentru administrator) și schimbările de stare sau răspunsurile la propunerile tale. Fila se colorează în roșu cât timp există ceva de văzut.
+
+## Elemente
+### Lista de propuneri
+- Motiv | coloană | „Propunere nouă”, „Răspuns nou” sau „Stare: …”.
+- Deschide propunerea | iconita:view | Deschide propunerea în fereastra „Propune o modificare” ([[propunere-modificare]]); autorul care o deschide nu mai primește avertizarea.
+
+## Flux: Cum văd răspunsul la propunerea mea
+1. Deschide fila „Propuneri” din pagina Notificări.
+2. Pe rândul propunerii apasă ochiul.
+3. Citește răspunsul administratorului și, dacă vrei, scrie un răspuns.

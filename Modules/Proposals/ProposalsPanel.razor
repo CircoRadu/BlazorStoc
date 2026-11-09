@@ -1,0 +1,291 @@
+@inject IProposalService Proposals
+@inject IAccessControl Access
+@inject IJSRuntime JS
+@inject ILogger<ProposalsPanel> Logger
+@implements IAsyncDisposable
+@* Setari -> Dezvoltare -> Propuneri (administrator): the proposals sent from the menu entry "Propune o modificare". Two tabs (open and closed ones), filters, a paged table (server side), the proposal
+   with its pictures and the thread of answers, the change of state (with the version it was implemented in) and a first answer, the deletion and the ZIP export. *@
+<section class="catalog" aria-labelledby="proposal-admin-title">
+    <div class="catalog-heading"><h2 id="proposal-admin-title">Propuneri <span class="count-badge">@total</span></h2></div>
+    <div class="catalog-body">
+        @if (error is not null) { <div class="error-banner" role="alert" id="proposal-admin-error">@error</div> }
+        @if (notice is not null) { <div class="success-banner" role="status" id="proposal-admin-notice">@notice</div> }
+        <CollapsibleSection Id="proposal-admin-flow" RootClass="bug-help" HeaderRowClass="collapsible-header" ToggleClass="bug-help-toggle" ContentClass="bug-help-body" Expanded="false">
+            <Header>Cum se lucrează cu propunerile</Header>
+            <ChildContent>
+                <ol>
+                    <li>Utilizatorii trimit propuneri din meniul „Propune o modificare”; fiecare primește un număr (PROP-0042) și starea <strong>Nouă</strong>. Propunerile (textul) și răspunsurile sunt vizibile tuturor utilizatorilor; imaginile doar autorului și administratorilor.</li>
+                    <li>Filele „Active” (Nouă, În analiză, Acceptată, Planificată) și „Închise” (Implementată, Amânată, Respinsă). Filtrezi după stare, tip, importanță, autor sau perioadă și deschizi o propunere cu pictograma ochi.</li>
+                    <li>Alegi starea; la „Implementată” scrii versiunea în care a intrat. Poți scrie și un răspuns: autorul îl vede în „Propunerile mele” și în Notificări, fila „Propuneri”. Fiecare schimbare intră în jurnalul de activitate.</li>
+                    <li><strong>Exportă propunerea</strong> descarcă un ZIP cu <code>propunere.json</code>, <code>propunere.txt</code> și imaginile; <strong>Exportă lista filtrată</strong> pune toate propunerile din filtre într-un ZIP, cu un <code>index.csv</code>.</li>
+                    <li>Pictograma coșului șterge definitiv propunerea, răspunsurile și imaginile (după confirmare); ștergerea intră în jurnal.</li>
+                </ol>
+            </ChildContent>
+        </CollapsibleSection>
+
+        <div class="settings-tabs" role="tablist" aria-label="Propuneri">
+            <button type="button" role="tab" id="tab-proposals-open" class="settings-tab @(showClosed ? "" : "active")" aria-selected="@(showClosed ? "false" : "true")" aria-controls="panel-proposals" @onclick="() => OpenTabAsync(false)">Active</button>
+            <button type="button" role="tab" id="tab-proposals-closed" class="settings-tab @(showClosed ? "active" : "")" aria-selected="@(showClosed ? "true" : "false")" aria-controls="panel-proposals" @onclick="() => OpenTabAsync(true)">Închise</button>
+        </div>
+        <div id="panel-proposals" role="tabpanel" aria-labelledby="@(showClosed ? "tab-proposals-closed" : "tab-proposals-open")">
+            <div class="audit-filters bug-filters">
+                <label>Stare
+                    <select id="proposal-filter-state" @bind="state" @bind:after="FilterChangedAsync">
+                        <option value="">Toate</option>
+                        @foreach (var item in ProposalRules.States.Where(item => ProposalRules.IsClosed(item) == showClosed)) { <option value="@item">@item</option> }
+                    </select></label>
+                <label>Tip
+                    <select id="proposal-filter-kind" @bind="kind" @bind:after="FilterChangedAsync">
+                        <option value="">Toate</option>
+                        @foreach (var item in ProposalRules.Kinds) { <option value="@item">@item</option> }
+                    </select></label>
+                <label>Importanță
+                    <select id="proposal-filter-importance" @bind="importance" @bind:after="FilterChangedAsync">
+                        <option value="">Toate</option>
+                        @foreach (var item in ProposalRules.Importances) { <option value="@item">@item</option> }
+                    </select></label>
+                <label>Caută <input id="proposal-filter-text" placeholder="număr, titlu sau zonă" @bind="text" @bind:event="onchange" @bind:after="FilterChangedAsync" /></label>
+                <label>Autor <input id="proposal-filter-user" @bind="user" @bind:event="onchange" @bind:after="FilterChangedAsync" /></label>
+                <label>De la <input id="proposal-filter-from" type="date" @bind="from" @bind:after="FilterChangedAsync" /></label>
+                <label>Până la <input id="proposal-filter-to" type="date" @bind="to" @bind:after="FilterChangedAsync" /></label>
+            </div>
+            <div class="editor-actions">
+                <button type="button" class="refresh act-reload" id="proposal-refresh" disabled="@busy" @onclick="LoadAsync">Actualizează</button>
+                @if (canExport) { <button type="button" class="refresh act-export" id="proposal-export-filter" disabled="@(busy || total == 0)" @onclick="ExportFilteredAsync">Exportă lista filtrată (ZIP)</button> }
+            </div>
+
+            @if (loading) { <div class="empty-state" role="status"><div class="spinner"></div><h3>Se încarcă</h3></div> }
+            else if (items.Count == 0) { <p class="muted" id="proposal-admin-empty">Nicio propunere pentru filtrele alese.</p> }
+            else
+            {
+                <div class="table-scroll">
+                    <table id="proposal-admin-table">
+                        <thead><tr><th>Număr</th><th>Titlu</th><th>Tip</th><th>Importanță</th><th>Stare</th><th>Autor</th><th>Trimis</th><th>Imagini</th><th>Răspunsuri</th><th>Operații</th></tr></thead>
+                        <tbody>
+                            @foreach (var proposal in items)
+                            {
+                                var item = proposal;
+                                <tr class="@(opened?.Id == item.Id ? "selected" : "")">
+                                    <td>@item.Number</td><td>@item.Title</td><td>@item.Kind</td><td>@item.WantedImportance</td><td>@item.State@(item.ImplementedVersion.Length > 0 ? $" ({item.ImplementedVersion})" : "")</td><td>@item.UserName</td>
+                                    <td>@ProposalRules.Display(item.CreatedUtc)</td><td>@item.FileCount</td><td>@item.NoteCount</td>
+                                    <td class="row-actions">
+                                        <button type="button" class="row-icon view" aria-label="Deschide propunerea @item.Number" title="Deschide propunerea @item.Number" @onclick="() => OpenAsync(item)"></button>
+                                        @if (canEdit) { <button type="button" class="row-icon delete" aria-label="Șterge propunerea @item.Number" title="Șterge propunerea @item.Number" @onclick="() => AskDelete(item)"></button> }
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+                <AuditPager Id="proposal-admin-size" Label="Propuneri pe pagină" PageSizes="sizes" PageSize="pageSize" Page="page" Total="total" PageChanged="PageChangedAsync" PageSizeChanged="SizeChangedAsync" />
+            }
+        </div>
+
+        @if (deleting is not null)
+        {
+            <div class="error-banner" role="alert" id="proposal-delete-confirm">Ștergi definitiv propunerea <strong>@deleting.Number</strong> („@deleting.Title”), răspunsurile și imaginile ei? Nu se poate anula.
+                <span class="editor-actions"><button type="button" class="danger" id="proposal-delete-yes" disabled="@busy" @onclick="DeleteAsync">Da, șterge</button>
+                    <button type="button" class="refresh act-nav" id="proposal-delete-no" @onclick="() => deleting = null">Nu, păstrează</button></span></div>
+        }
+
+        @if (zoomed is not null)
+        {
+            <ImageLightbox Src="@zoomed.Url" Title="@zoomed.Name" Closed="() => zoomed = null" />
+        }
+
+        @if (opened is not null)
+        {
+            <section class="catalog bug-detail" id="proposal-detail" aria-labelledby="proposal-detail-title">
+                <div class="catalog-heading"><h3 id="proposal-detail-title">@opened.Number · @opened.Title</h3></div>
+                <div class="catalog-body">
+                    <dl class="bug-facts">
+                        <dt>Tip</dt><dd>@opened.Kind</dd>
+                        <dt>Importanță pentru autor</dt><dd>@opened.WantedImportance</dd>
+                        <dt>Autor</dt><dd>@opened.UserName (@opened.UserRole)</dd>
+                        <dt>Trimis</dt><dd>@ProposalRules.Display(opened.CreatedUtc) · versiunea @opened.AppVersion</dd>
+                        <dt>Zona</dt><dd>@opened.AreaTitle <code>@opened.AreaRoute</code></dd>
+                    </dl>
+                    <h4>Descriere</h4>
+                    <p class="bug-description">@opened.Description</p>
+                    @if (opened.Benefit.Length > 0) { <h4>De ce</h4><p class="bug-description">@opened.Benefit</p> }
+                    <div class="bug-images" id="proposal-detail-images">
+                        @foreach (var picture in pictures)
+                        {
+                            var shown = picture;
+                            <figure class="bug-image"><button type="button" class="bug-image-zoom" aria-label="Mărește imaginea @shown.Name" title="Mărește imaginea @shown.Name" @onclick="() => zoomed = shown"><img src="@shown.Url" alt="@shown.Name" /><span class="bug-zoom-plus" aria-hidden="true">+</span></button><figcaption>@shown.Name</figcaption></figure>
+                        }
+                    </div>
+                    <h4>Răspunsuri <span class="count-badge">@notes.Count</span></h4>
+                    @if (notes.Count == 0) { <p class="muted">Nu există încă niciun răspuns.</p> }
+                    @foreach (var note in notes)
+                    {
+                        <div class="proposal-note @(note.AuthorRole == "Administrator" ? "from-admin" : "")"><strong>@note.Author</strong> <small class="muted">@(note.AuthorRole) · @ProposalRules.Display(note.CreatedUtc)</small><p>@note.Body</p></div>
+                    }
+                    <div class="editor-grid bug-form">
+                        <label>Stare
+                            <select id="proposal-detail-state" @bind="newState" disabled="@(!canEdit || busy)">
+                                @foreach (var item in ProposalRules.States) { <option value="@item">@item</option> }
+                            </select></label>
+                        @if (newState == ProposalRules.StateImplemented)
+                        {
+                            <label>Implementată în versiunea
+                                <input id="proposal-detail-version" maxlength="@ProposalRules.MaxVersion" @bind="implementedVersion" @bind:event="oninput" disabled="@(!canEdit || busy)" placeholder="ex.: 0.5.62" /></label>
+                        }
+                        <label class="wide">Răspuns pentru autor (opțional)
+                            <textarea id="proposal-detail-note" rows="3" maxlength="@ProposalRules.MaxNote" @bind="note" @bind:event="oninput" disabled="@(!canEdit || busy)"></textarea></label>
+                    </div>
+                    <div class="editor-actions">
+                        @if (canEdit) { <button type="button" class="primary" id="proposal-detail-save" disabled="@busy" @onclick="SaveStateAsync">@(busy ? "Se salvează…" : "Salvează")</button> }
+                        @if (canExport) { <button type="button" class="refresh act-export" id="proposal-detail-export" disabled="@busy" @onclick="ExportOpenedAsync">Exportă propunerea (ZIP)</button> }
+                        <button type="button" class="refresh act-close" id="proposal-detail-close" @onclick="CloseDetail">Închide propunerea</button>
+                    </div>
+                </div>
+            </section>
+        }
+    </div>
+</section>
+
+@code {
+    private sealed record Picture(string Name, string Url);
+
+    private readonly CancellationTokenSource lifetime = new();
+    private static readonly IReadOnlyList<int> sizes = [10, 25, 50, 100];
+    private IReadOnlyList<Proposal> items = [];
+    private IReadOnlyList<ProposalNote> notes = [];
+    private List<Picture> pictures = [];
+    private Proposal? opened, deleting;
+    private Picture? zoomed;
+    private string state = "", kind = "", importance = "", text = "", user = "", newState = ProposalRules.StateNew, implementedVersion = "", note = "";
+    private DateTime? from, to;
+    private int page = 1, pageSize = 25, total;
+    private bool loading = true, busy, canEdit, canExport, showClosed;
+    private string? error, notice;
+    private IJSObjectReference? downloads;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            canEdit = await Access.HasAsync("setari-propuneri.edit", lifetime.Token);
+            canExport = await Access.HasAsync("setari-propuneri.export", lifetime.Token);
+        }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        await LoadAsync();
+    }
+
+    private ProposalQuery Query => new(state.Length == 0 ? null : state, kind.Length == 0 ? null : kind, importance.Length == 0 ? null : importance, user,
+        from is { } f ? DateOnly.FromDateTime(f) : null, to is { } t ? DateOnly.FromDateTime(t) : null, showClosed, text);
+
+    private async Task OpenTabAsync(bool closed)
+    {
+        if (showClosed == closed) return;
+        showClosed = closed; state = ""; page = 1; opened = null; deleting = null; zoomed = null; pictures = [];
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        loading = true; error = null;
+        try
+        {
+            var result = await Proposals.QueryAsync(Query, page, pageSize, lifetime.Token);
+            if (result.Items.Count == 0 && result.Total > 0 && page > 1) { page = Math.Max(1, (result.Total + pageSize - 1) / pageSize); result = await Proposals.QueryAsync(Query, page, pageSize, lifetime.Token); }
+            items = result.Items; total = result.Total;
+        }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (Exception exception) when (exception is AccessDeniedException or ModuleUnavailableException or ProposalException) { error = exception.Message; }
+        catch (Exception exception)
+        {
+            Logger.LogError("The proposals could not be read ({ErrorType}).", exception.GetType().Name);
+            error = "Propunerile nu au putut fi citite. Încearcă din nou.";
+        }
+        finally { loading = false; }
+    }
+
+    private async Task FilterChangedAsync() { page = 1; await LoadAsync(); }
+    private async Task PageChangedAsync(int value) { page = value; await LoadAsync(); }
+    private async Task SizeChangedAsync(int value) { pageSize = value; page = 1; await LoadAsync(); }
+
+    private async Task OpenAsync(Proposal proposal)
+    {
+        error = notice = null; deleting = null; zoomed = null;
+        opened = proposal; newState = proposal.State; implementedVersion = proposal.ImplementedVersion; note = ""; pictures = []; notes = [];
+        try
+        {
+            notes = await Proposals.GetNotesAsync(proposal.Id, lifetime.Token);
+            foreach (var file in await Proposals.GetFilesAsync(proposal.Id, lifetime.Token))
+                if (await Proposals.GetFileContentAsync(file.Id, lifetime.Token) is { } content)
+                    pictures.Add(new Picture(file.Kind == ReportImageRulesKindScreenshot ? "Captura paginii" : file.FileName, $"data:{content.ContentType};base64,{Convert.ToBase64String(content.Content)}"));
+        }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (Exception exception) when (exception is AccessDeniedException or ModuleUnavailableException) { error = exception.Message; }
+    }
+
+    private const string ReportImageRulesKindScreenshot = BlazorStoc.Services.ReportImageRules.KindScreenshot;
+
+    private void CloseDetail() { opened = null; pictures = []; notes = []; zoomed = null; }
+    private void AskDelete(Proposal proposal) { deleting = proposal; error = notice = null; }
+
+    private async Task RunAsync(Func<Task> work, string failure)
+    {
+        if (busy) return;
+        busy = true; error = null;
+        try { await work(); }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (Exception exception) when (exception is ProposalException or AccessDeniedException or ModuleUnavailableException) { error = exception.Message; }
+        catch (Exception exception)
+        {
+            Logger.LogError("{Failure} ({ErrorType}).", failure, exception.GetType().Name);
+            error = failure + " Încearcă din nou.";
+        }
+        finally { busy = false; }
+    }
+
+    private Task SaveStateAsync() => RunAsync(async () =>
+    {
+        var saved = await Proposals.ChangeStateAsync(opened!.Id, newState, implementedVersion, note, lifetime.Token);
+        opened = saved; note = "";
+        notes = await Proposals.GetNotesAsync(saved.Id, lifetime.Token);
+        notice = $"Propunerea {saved.Number} este acum „{saved.State}”.";
+        await LoadAsync();
+    }, "Starea nu a putut fi salvată.");
+
+    private Task DeleteAsync() => RunAsync(async () =>
+    {
+        var gone = deleting!;
+        await Proposals.DeleteAsync(gone.Id, lifetime.Token);
+        if (opened?.Id == gone.Id) CloseDetail();
+        deleting = null;
+        notice = $"Propunerea {gone.Number} a fost ștearsă.";
+        await LoadAsync();
+    }, "Propunerea nu a putut fi ștearsă.");
+
+    private Task ExportOpenedAsync() => RunAsync(() => ExportAsync([opened!.Id]), "Exportul nu a putut fi făcut.");
+
+    private Task ExportFilteredAsync() => RunAsync(async () =>
+    {
+        var all = await Proposals.QueryAsync(Query, 1, 0, lifetime.Token);
+        await ExportAsync([.. all.Items.Select(item => item.Id)]);
+    }, "Exportul nu a putut fi făcut.");
+
+    private async Task ExportAsync(IReadOnlyList<int> ids)
+    {
+        var export = await Proposals.ExportAsync(ids, lifetime.Token);
+        downloads ??= await JS.InvokeAsync<IJSObjectReference>("import", "./file-download.js");
+        using var stream = new MemoryStream(export.Content);
+        using var reference = new DotNetStreamReference(stream);
+        await downloads.InvokeVoidAsync("downloadBinary", export.FileName, reference, "application/zip");
+        notice = $"Fișierul {export.FileName} a fost descărcat ({export.Proposals} {(export.Proposals == 1 ? "propunere" : "propuneri")}).";
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        lifetime.Cancel();
+        if (downloads is not null)
+        {
+            try { await downloads.DisposeAsync(); }
+            catch (Exception exception) when (exception is JSDisconnectedException or JSException or InvalidOperationException) { }
+        }
+        lifetime.Dispose();
+    }
+}

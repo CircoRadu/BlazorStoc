@@ -85,6 +85,11 @@
                     <button type="button" class="refresh act-nav" id="bug-delete-no" @onclick="() => deleting = null">Nu, păstrează</button></span></div>
         }
 
+        @if (zoomed is not null)
+        {
+            <ImageLightbox Src="@zoomed.Url" Title="@zoomed.Name" Closed="() => zoomed = null" />
+        }
+
         @if (opened is not null)
         {
             <section class="catalog bug-detail" id="bug-detail" aria-labelledby="bug-detail-title">
@@ -101,7 +106,8 @@
                     <div class="bug-images" id="bug-detail-images">
                         @foreach (var picture in pictures)
                         {
-                            <figure class="bug-image"><img src="@picture.Url" alt="@picture.Name" /><figcaption>@picture.Name</figcaption></figure>
+                            var shown = picture;
+                            <figure class="bug-image"><button type="button" class="bug-image-zoom" aria-label="Mărește imaginea @shown.Name" title="Mărește imaginea @shown.Name" @onclick="() => zoomed = shown"><img src="@shown.Url" alt="@shown.Name" /><span class="bug-zoom-plus" aria-hidden="true">+</span></button><figcaption>@shown.Name</figcaption></figure>
                         }
                     </div>
                     <CollapsibleSection Id="bug-detail-tech" RootClass="bug-help" HeaderRowClass="collapsible-header" ToggleClass="bug-help-toggle" ContentClass="bug-help-body" Expanded="false">
@@ -134,6 +140,7 @@
     private static readonly IReadOnlyList<int> sizes = [10, 25, 50, 100];
     private IReadOnlyList<BugReport> items = [];
     private List<Picture> pictures = [];
+    private Picture? zoomed;
     private BugReport? opened, deleting;
     private string state = "", severity = "", user = "", newState = BugReportRules.StateNew, note = "";
     private DateTime? from, to;
@@ -199,7 +206,7 @@
         catch (Exception exception) when (exception is AccessDeniedException or ModuleUnavailableException) { error = exception.Message; }
     }
 
-    private void CloseDetail() { opened = null; pictures = []; }
+    private void CloseDetail() { opened = null; pictures = []; zoomed = null; }
     private void AskDelete(BugReport report) { deleting = report; error = notice = null; }
 
     private async Task RunAsync(Func<Task> work, string failure)

@@ -22,6 +22,7 @@ public static class HelpContents
         ("Taskuri utilizatori", ["task", "taskuri", "taskurile-mele"]),
         ("Notificări și jurnal", ["notificari", "jurnal"]),
         ("Raportare erori", ["raportare-eroare"]),
+        ("Propuneri de modificări", ["propunere-modificare"]),
         ("Categorii și nomenclator", ["categorii", "nomenclator"]),
         ("Setări și utilizatori", ["setari", "utilizatori"])
     ];

@@ -50,6 +50,7 @@ Directorul contine, pentru fiecare componenta a aplicatiei, un fisier cu pasii p
 | 17_Help.md | Help contextual: iconita "?", popup cu fluxuri si elemente, cautare din pagina principala | toate ferestrele |
 | 20_Raportare_erori.md | Raportare erori: intrarea din meniu, captura automata, Ctrl+V, rapoartele mele, administrare si export ZIP | meniu (deasupra de Ajutor), /setari (Rapoarte erori) |
 | 21_Taskuri_utilizatori.md | Taskuri date unui utilizator pe un beneficiar, Taskurile mele, fila Taskuri din Notificari | /taskuri/adauga, /taskurile-mele, /notificari, /beneficiari/{id} |
+| 22_Propuneri.md | Propuneri de modificari: formularul, Propunerile mele, Toate propunerile, administrare in Setari -> Dezvoltare, fila Propuneri din Notificari | meniul principal, /setari, /notificari |
 
 ## Rularea testelor dintr-o pagina de lucru (unealta `tools/teste-utilizator.mjs`)
 

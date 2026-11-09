@@ -102,8 +102,11 @@
                 {
                     var item = image;
                     <figure class="bug-image">
-                        @if (item.DataUrl is not null) { <img src="@item.DataUrl" alt="@item.Label" /> }
-                        else { <div class="bug-image-large">@item.Name · @(item.Bytes.Length / 1024) KB</div> }
+                        <button type="button" class="bug-image-zoom" aria-label="Mărește imaginea @item.Label" title="Mărește imaginea @item.Label" @onclick="() => zoomed = item">
+                            @if (item.DataUrl is not null) { <img src="@item.DataUrl" alt="@item.Label" /> }
+                            else { <span class="bug-image-large">@item.Name · @(item.Bytes.Length / 1024) KB</span> }
+                            <span class="bug-zoom-plus" aria-hidden="true">+</span>
+                        </button>
                         <figcaption>@item.Label</figcaption>
                         <button type="button" class="row-icon delete" aria-label="Scoate imaginea @item.Label din raport" title="Scoate imaginea @item.Label din raport" disabled="@busy" @onclick="() => images.Remove(item)"></button>
                     </figure>
@@ -163,6 +166,10 @@
         }
         <div class="editor-actions"><button type="button" class="refresh act-close" id="bug-close-mine" @onclick="CloseAsync">Închide</button></div>
     }
+    @if (zoomed is not null)
+    {
+        <ImageLightbox Src="@zoomed.ZoomUrl" Title="@zoomed.Label" Closed="() => zoomed = null" />
+    }
 </dialog>
 
 @code {
@@ -172,11 +179,14 @@
         public string Name { get; } = name;
         public byte[] Bytes { get; } = bytes;
         public string? DataUrl { get; } = bytes.Length <= 1_500_000 ? $"data:{contentType};base64,{Convert.ToBase64String(bytes)}" : null;
+        // The enlarged picture is built on demand (it may be larger than the thumbnails allow).
+        public string ZoomUrl => DataUrl ?? $"data:{contentType};base64,{Convert.ToBase64String(bytes)}";
         public string Label => Kind switch { BugReportRules.KindScreenshot => "Captura paginii", BugReportRules.KindFile => Name, _ => "Imagine lipită" };
     }
 
     private static readonly string DescriptionHint = string.Join(Environment.NewLine, "Ce ai făcut (pașii)?", "Ce te așteptai să se întâmple?", "Ce s-a întâmplat de fapt (mesajul afișat, ce lipsește)?");
     private readonly List<PendingImage> images = [];
+    private PendingImage? zoomed;
     private DotNetObjectReference<BugReportDialog>? self;
     private string tab = "new", title = "", description = "", severity = BugReportRules.SeverityImportant, route = "", pageTitle = "", techJson = "";
     private bool attachTech = true, busy, capturedAuto = true, confirmDiscard;
@@ -222,6 +232,7 @@
             catch (Exception exception) when (exception is not OperationCanceledException) { Logger.LogWarning("The capture of the page could not be read ({ErrorType}).", exception.GetType().Name); }
         }
         if (sent is not null) ResetForm();
+        zoomed = null;
         tab = "new"; error = null; confirmDiscard = false;
         await InvokeAsync(StateHasChanged);
     }

@@ -869,3 +869,7 @@ Cerut de utilizator la 06.10.2026 (verificarea fluxului, apoi deciziile: facturi
 ## Finalizat la 09.11.2026 14:56 - Taskuri: prioritate, ordonare, editare de utilizator; popup-uri uniforme (0.5.58-0.5.60)
 
 - Prioritate la taskuri (Scazut/Mediu/Ridicat, culori), migrarea 82, jurnal Modificare prioritate task; ordonare pe Prioritate/Creat/Termen; Taskurile mele cu stare afisata si autor la Creat; vizualizare + editare de catre utilizator (stare, fisiere proprii); adaugare task in popup; meniu Taskuri utilizator.,Popup-uri: bara deasupra ferestrei cu Raporteaza o eroare si cerc rosu de inchidere, titluri Operatiune - Obiect, dialog de parasire cu obiectul, mesaj de sectiune indisponibila cu numele; rapoarte erori cu file Nerezolvate/Rezolvate; raport docs/RAPORT_ANTET_POPUP.md.,Verificari: suita completa 2218 trecute, MariaDB Task 53, componente 1765; pachetele 0.5.58, 0.5.59, 0.5.60.
+
+## Finalizat la 09.11.2026 15:54 - Modulul Propuneri (0.5.61)
+
+- Modul nou Propuneri: popup Propune o modificare (formular cu captura, imagini si marire, propuneri asemanatoare, Propunerile mele, Toate propunerile, fir de raspunsuri), Setari -> Dezvoltare cu file Erori/Propuneri (stari Active/Inchise, versiune implementare, raspuns, export ZIP), fila Propuneri in Notificari, jurnal si chei proprii, migrarea 83.,Fara Sustine si fara buton de creare task (deciziile din 09.11.2026); doar imagini ca atasamente.,Verificari: MariaDB Proposals (22 noi), componente 1765, help; browser pe instanta separata (formular, trimitere, liste, administrare, notificari, bara popup).

@@ -1,0 +1,65 @@
+@namespace BlazorStoc.Components.Shared
+@using BlazorStoc.Modules.Proposals
+@inject IProposalService Proposals
+@inject IJSRuntime JS
+@inject ILogger<ProposalAlertsPanel> Logger
+@* The content of the tab "Propuneri" of the Notifications page: what needs attention (see ProposalAlertsTab) with the reason; a proposal opens in the popup "Propune o modificare" (an answer
+   can be written there, and the author seeing it clears the alert). *@
+@if (error is not null) { <div class="error-banner" role="alert">@error</div> }
+<section class="catalog">
+    <div class="catalog-heading"><h2>Propuneri care cer atenție <span>@alerts.Count</span></h2><small>Propuneri noi (pentru administrator), schimbări de stare și răspunsuri la propunerile tale.</small></div>
+    @if (loading) { <div class="empty-state" role="status"><div class="spinner"></div><h3>Se încarcă propunerile</h3></div> }
+    else if (alerts.Count == 0)
+    {
+        <div class="empty-state"><span class="empty-icon">✓</span><h3>Nicio propunere nu cere atenție</h3><p>Aici apar propunerile noi (pentru administrator) și schimbările de stare sau răspunsurile la propunerile tale.</p></div>
+    }
+    else
+    {
+        <Paged Items="alerts" Id="proposal-alerts-size" Context="pageRows" DefaultSize="10">
+            <div class="table-scroll"><table id="proposal-alerts-table"><thead><tr><th>NUMĂR</th><th>TITLU</th><th>MOTIV</th><th>AUTOR</th><th>ACTUALIZAT</th><th><span class="sr-only">Acțiuni</span></th></tr></thead><tbody>
+            @foreach (var alert in pageRows)
+            {
+                var proposal = alert.Proposal;
+                <tr @key="proposal.Id">
+                    <td>@proposal.Number</td>
+                    <td><strong>@proposal.Title</strong></td>
+                    <td><span class="task-new-badge">@alert.Reason</span></td>
+                    <td>@proposal.UserName</td>
+                    <td>@ProposalRules.Display(proposal.UpdatedUtc ?? proposal.CreatedUtc)</td>
+                    <td class="row-actions"><button class="row-icon view" aria-label="@($"Deschide propunerea {proposal.Number}")" title="@($"Deschide propunerea {proposal.Number}")" @onclick="() => OpenAsync(proposal)"></button></td>
+                </tr>
+            }
+            </tbody></table></div>
+        </Paged>
+    }
+</section>
+
+@code {
+    private IReadOnlyList<ProposalAlert> alerts = [];
+    private bool loading = true;
+    private string? error;
+
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        try { alerts = await Proposals.GetAlertsAsync(); }
+        catch (Exception exception) when (exception is AccessDeniedException or ModuleUnavailableException) { error = exception.Message; alerts = []; }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            Logger.LogWarning("The proposal alerts could not be read ({ErrorType}).", exception.GetType().Name);
+            error = "Propunerile nu au putut fi încărcate. Reîncearcă după o clipă.";
+            alerts = [];
+        }
+        loading = false;
+    }
+
+    private async Task OpenAsync(Proposal proposal)
+    {
+        try { await JS.InvokeVoidAsync("bugReport.openProposal", proposal.Id); }
+        catch (Exception exception) when (exception is JSException or InvalidOperationException or TaskCanceledException) { }
+        // The author who opened it no longer needs the alert: read again.
+        await Task.Delay(400);
+        await LoadAsync();
+    }
+}

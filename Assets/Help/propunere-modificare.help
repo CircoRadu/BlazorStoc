@@ -1,0 +1,41 @@
+# Propune o modificare
+Cautare: propunere modificare functionalitate noua sugestie imagine captura ctrl v importanta stare raspuns notificari
+
+Fereastra se deschide din meniul din stânga, intrarea „Propune o modificare” de sub „Raportează o eroare”, sau din butonul „Propune” din bara de deasupra oricărei ferestre. Înainte să apară, aplicația fotografiază pagina pe care lucrai și o atașează propunerii ca primă imagine; o poți scoate.
+
+## Elemente
+### Propunere nouă
+- Tip | listă | Modificare a unei funcții existente, Funcționalitate nouă sau Altceva.
+- Importanța pentru tine | listă | Mare, Medie sau Mică. Este părerea ta; ordinea o hotărăște administratorul.
+- Zona aplicației | câmp | Pagina sau modulul la care se referă propunerea (completat cu pagina curentă); scrie „Toată aplicația” dacă e general.
+- Titlu scurt | câmp | Numele propunerii, în câteva cuvinte. Pe măsură ce scrii, apar propunerile asemănătoare deja făcute; verifică dacă nu e aceeași idee.
+- Ce vrei să se schimbe sau să poți face | câmp | Descrierea propunerii. Obligatoriu.
+- De ce, ce problemă rezolvă | câmp | Motivarea, opțional, dar ajută la prioritizare.
+- Imagini sau schițe | listă | Captura automată a paginii, imaginile lipite cu Ctrl+V și fișierele alese. Un clic pe imagine o mărește; coșul o scoate din propunere.
+- Alege fișiere | buton | Adaugă imagini PNG, JPEG, GIF sau WebP.
+- Trimite propunerea | buton | Salvează propunerea și arată numărul ei (PROP-0042).
+- Închide (păstrează ciorna) | buton | Închide fereastra; ce ai scris rămâne până la trimitere.
+- Renunță la propunere | buton | Șterge ciorna, după confirmare.
+### Propunerile mele
+- Tabelul | tabel | Propunerile tale, cu tipul, starea (și versiunea în care au fost implementate) și data. Ochiul deschide propunerea.
+### Toate propunerile
+- Caută în propuneri | câmp | Caută în titlu și descriere.
+- Doar cele deschise | comutator | Arată doar propunerile care nu sunt încă închise (Implementată, Amânată sau Respinsă).
+- Tabelul | tabel | Toate propunerile, cu autorul lor. Textul și răspunsurile sunt vizibile tuturor; imaginile doar autorului și administratorilor.
+### Propunerea deschisă
+- Răspunsuri | listă | Răspunsurile administratorului și ale autorului, în ordine.
+- Răspuns nou | câmp | Scris de autorul propunerii sau de administrator.
+- Trimite răspunsul | buton | Adaugă răspunsul; autorul îl vede în Notificări, fila „Propuneri”.
+- Înapoi la listă | buton | Revine la lista din care ai deschis propunerea.
+
+## Flux: Cum fac o propunere
+1. Apasă „Propune o modificare” din meniu, pe pagina la care se referă propunerea.
+2. Alege tipul și importanța, scrie titlul și verifică dacă nu există una asemănătoare.
+3. Descrie ce vrei să se schimbe și, dacă vrei, de ce.
+4. Verifică imaginile: scoate captura dacă arată date pe care nu vrei să le trimiți.
+5. Apasă „Trimite propunerea” și notează numărul primit.
+6. Urmărește starea în „Propunerile mele” și în Notificări, fila „Propuneri”.
+
+## Flux: Cum răspund la o propunere
+1. Deschide propunerea din „Propunerile mele” sau din Notificări.
+2. Scrie răspunsul în câmpul „Răspuns nou” și apasă „Trimite răspunsul”.

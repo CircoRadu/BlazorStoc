@@ -1,0 +1,478 @@
+@using Microsoft.AspNetCore.Components.Forms
+@inject IProposalService Proposals
+@inject IAccessControl Access
+@inject IJSRuntime JS
+@inject ILogger<ProposalDialog> Logger
+@implements IAsyncDisposable
+@* Propune o modificare: the popup opened by the menu entry under "Raportează o eroare" or by the button "Propune" of the bar above any popup (wwwroot/bug-report.js). The script photographs
+   the page BEFORE the popup shows and hands the picture to Opened; Ctrl+V pictures arrive through AddPasted. Three tabs: the form, "Propunerile mele" and "Toate propunerile" (every proposal,
+   text only, with the answers). A proposal opens in the same popup: its data, the answers and, for the author and the administrator, the pictures and the box of a new answer. *@
+<dialog id="proposal-dialog" class="delete-dialog bug-dialog proposal-dialog" aria-labelledby="proposal-title">
+    <div class="dialog-head"><h2 id="proposal-title">@(viewing is null ? "Propune o modificare" : $"{viewing.Number} – {viewing.Title}")</h2><HelpButton Topic="propunere-modificare" About="Propunerile de modificări" /></div>
+    @if (viewing is null)
+    {
+        <div class="bug-tabs" role="tablist" aria-label="Propuneri">
+            <button type="button" role="tab" id="proposal-tab-new" class="settings-tab @(tab == "new" ? "active" : "")" aria-selected="@(tab == "new")" @onclick="@(() => SelectTab("new"))">Propunere nouă</button>
+            <button type="button" role="tab" id="proposal-tab-mine" class="settings-tab @(tab == "mine" ? "active" : "")" aria-selected="@(tab == "mine")" @onclick="@(() => SelectTab("mine"))">Propunerile mele @if (mine is not null) { <span class="count-badge">@mine.Count</span> }</button>
+            <button type="button" role="tab" id="proposal-tab-all" class="settings-tab @(tab == "all" ? "active" : "")" aria-selected="@(tab == "all")" @onclick="@(() => SelectTab("all"))">Toate propunerile @if (board is not null) { <span class="count-badge">@board.Count</span> }</button>
+        </div>
+    }
+    @if (error is not null) { <div class="error-banner" role="alert" id="proposal-error">@error</div> }
+
+    @if (viewing is not null)
+    {
+        <dl class="bug-facts proposal-facts">
+            <dt>Tip</dt><dd>@viewing.Kind</dd>
+            <dt>Importanță pentru autor</dt><dd>@viewing.WantedImportance</dd>
+            <dt>Stare</dt><dd><strong>@viewing.State</strong>@(viewing.ImplementedVersion.Length > 0 ? $" · în versiunea {viewing.ImplementedVersion}" : "")</dd>
+            <dt>Autor</dt><dd>@viewing.UserName · @ProposalRules.Display(viewing.CreatedUtc)</dd>
+            <dt>Zona</dt><dd>@(viewing.AreaTitle.Length > 0 ? viewing.AreaTitle : "—")</dd>
+        </dl>
+        <h4>Descriere</h4>
+        <p class="bug-description">@viewing.Description</p>
+        @if (viewing.Benefit.Length > 0) { <h4>De ce</h4><p class="bug-description">@viewing.Benefit</p> }
+        @if (viewImages.Count > 0)
+        {
+            <div class="bug-images">
+                @foreach (var picture in viewImages)
+                {
+                    var shown = picture;
+                    <figure class="bug-image"><button type="button" class="bug-image-zoom" aria-label="Mărește imaginea @shown.Name" title="Mărește imaginea @shown.Name" @onclick="() => zoomedUrl = shown"><img src="@shown.Url" alt="@shown.Name" /><span class="bug-zoom-plus" aria-hidden="true">+</span></button><figcaption>@shown.Name</figcaption></figure>
+                }
+            </div>
+        }
+        <h4>Răspunsuri <span class="count-badge">@notes.Count</span></h4>
+        @if (notes.Count == 0) { <p class="muted" id="proposal-notes-empty">Nu există încă niciun răspuns.</p> }
+        @foreach (var note in notes)
+        {
+            <div class="proposal-note @(note.AuthorRole == "Administrator" ? "from-admin" : "")"><strong>@note.Author</strong> <small class="muted">@(note.AuthorRole) · @ProposalRules.Display(note.CreatedUtc)</small><p>@note.Body</p></div>
+        }
+        @if (canAnswer)
+        {
+            <label class="wide">Răspuns nou
+                <textarea id="proposal-note-input" rows="3" maxlength="@ProposalRules.MaxNote" @bind="newNote" @bind:event="oninput" disabled="@busy"></textarea></label>
+            <div class="editor-actions"><button type="button" class="primary" id="proposal-note-send" disabled="@(busy || newNote.Trim().Length == 0)" @onclick="SendNoteAsync">@(busy ? "Se trimite…" : "Trimite răspunsul")</button></div>
+        }
+        <div class="editor-actions">
+            <button type="button" class="refresh act-nav" id="proposal-back" @onclick="BackToList">Înapoi la listă</button>
+            <button type="button" class="refresh act-close" id="proposal-close-view" @onclick="CloseAsync">Închide</button>
+        </div>
+    }
+    else if (tab == "new")
+    {
+        @if (sent is not null)
+        {
+            <div class="success-banner" role="status" id="proposal-sent">Propunerea <strong>@sent.Number</strong> a fost trimisă. Mulțumim! O găsești în „Propunerile mele”, iar răspunsurile administratorului apar acolo și în Notificări.</div>
+            <div class="editor-actions">
+                <button type="button" class="refresh act-confirm" id="proposal-another" @onclick="NewProposal">Propune altceva</button>
+                <button type="button" class="refresh act-close" id="proposal-close-sent" @onclick="CloseAsync">Închide</button>
+            </div>
+        }
+        else
+        {
+            <p class="muted bug-intro">Spune-ne ce ai vrea să se schimbe sau ce ai vrea să poți face. Fereastra păstrează ce ai scris dacă o închizi; propunerea pleacă doar când apeși <strong>Trimite propunerea</strong>. O pot vedea toți utilizatorii (textul), iar imaginile doar tu și administratorii.</p>
+            <div class="editor-grid bug-form">
+                <label>Tip
+                    <select id="proposal-kind" @bind="kind" disabled="@busy">
+                        @foreach (var item in ProposalRules.Kinds) { <option value="@item">@item</option> }
+                    </select></label>
+                <label>Importanța pentru tine
+                    <select id="proposal-importance" @bind="importance" disabled="@busy">
+                        @foreach (var item in ProposalRules.Importances) { <option value="@item">@item</option> }
+                    </select></label>
+                <label class="wide">Zona aplicației
+                    <input id="proposal-area" maxlength="300" @bind="areaTitle" @bind:event="oninput" disabled="@busy" placeholder="Pagina sau modulul la care se referă; lasă „Toată aplicația” dacă e general" /></label>
+                <label class="wide">Titlu scurt
+                    <input id="proposal-title-input" maxlength="@ProposalRules.MaxTitle" @bind="title" @bind:event="oninput" @bind:after="SearchSimilarAsync" disabled="@busy" placeholder="Ex.: Căutare după CUI în lista de furnizori" /></label>
+                @if (similar.Count > 0)
+                {
+                    <div class="wide proposal-similar" id="proposal-similar" role="status">
+                        <strong>Propuneri asemănătoare deja făcute</strong> (verifică dacă nu e aceeași):
+                        <ul>
+                            @foreach (var item in similar)
+                            {
+                                var found = item;
+                                <li><button type="button" class="link-button" @onclick="() => OpenAsync(found)">@found.Number · @found.Title</button> <small class="muted">@found.State</small></li>
+                            }
+                        </ul>
+                    </div>
+                }
+                <label class="wide">Ce vrei să se schimbe sau să poți face
+                    <textarea id="proposal-description" rows="6" maxlength="@ProposalRules.MaxDescription" @bind="description" @bind:event="oninput" disabled="@busy"
+                              placeholder="@DescriptionHint"></textarea>
+                    <small>@description.Length.ToString("N0") / @ProposalRules.MaxDescription.ToString("N0") caractere</small>
+                </label>
+                <label class="wide">De ce, ce problemă rezolvă (opțional)
+                    <textarea id="proposal-benefit" rows="3" maxlength="@ProposalRules.MaxBenefit" @bind="benefit" @bind:event="oninput" disabled="@busy"></textarea></label>
+            </div>
+
+            <h3 class="bug-subtitle">Imagini sau schițe <span class="count-badge">@images.Count</span></h3>
+            @if (!capturedAuto)
+            {
+                <p class="muted" id="proposal-no-capture">Captura automată a paginii nu a putut fi făcută. Poți lipi o imagine cu <kbd>Ctrl</kbd>+<kbd>V</kbd> sau alege un fișier.</p>
+            }
+            <div class="bug-images" id="proposal-images">
+                @foreach (var image in images)
+                {
+                    var item = image;
+                    <figure class="bug-image">
+                        <button type="button" class="bug-image-zoom" aria-label="Mărește imaginea @item.Label" title="Mărește imaginea @item.Label" @onclick="() => zoomedUrl = new Picture(item.Label, item.ZoomUrl)">
+                            @if (item.DataUrl is not null) { <img src="@item.DataUrl" alt="@item.Label" /> }
+                            else { <span class="bug-image-large">@item.Name · @(item.Bytes.Length / 1024) KB</span> }
+                            <span class="bug-zoom-plus" aria-hidden="true">+</span>
+                        </button>
+                        <figcaption>@item.Label</figcaption>
+                        <button type="button" class="row-icon delete" aria-label="Scoate imaginea @item.Label din propunere" title="Scoate imaginea @item.Label din propunere" disabled="@busy" @onclick="() => images.Remove(item)"></button>
+                    </figure>
+                }
+            </div>
+            <div class="bug-add-images">
+                <label class="refresh act-confirm bug-file-button">Alege fișiere…<InputFile OnChange="OnFilesAsync" multiple accept="image/png,image/jpeg,image/gif,image/webp" disabled="@busy" /></label>
+                <span class="muted">sau apasă <kbd>Ctrl</kbd>+<kbd>V</kbd> cu o imagine copiată</span>
+            </div>
+
+            @if (confirmDiscard)
+            {
+                <div class="error-banner" role="alert" id="proposal-discard-confirm">Renunți la propunere? Textul și imaginile se pierd.
+                    <span class="editor-actions"><button type="button" class="danger" id="proposal-discard-yes" @onclick="DiscardAsync">Da, renunț</button><button type="button" class="refresh act-nav" id="proposal-discard-no" @onclick="() => confirmDiscard = false">Nu, păstrează</button></span></div>
+            }
+            <div class="editor-actions">
+                <button type="button" class="primary" id="proposal-send" disabled="@(busy)" @onclick="SendAsync">@(busy ? "Se trimite…" : "Trimite propunerea")</button>
+                <button type="button" class="refresh act-nav" id="proposal-hide" disabled="@busy" @onclick="CloseAsync">Închide (păstrează ciorna)</button>
+                <button type="button" class="refresh act-close" id="proposal-discard" disabled="@busy" @onclick="AskDiscard">Renunță la propunere</button>
+            </div>
+        }
+    }
+    else if (tab == "mine")
+    {
+        <p class="muted bug-intro">Propunerile tale, cele mai noi primele. Starea și răspunsurile le dă administratorul.</p>
+        @if (mine is null) { <div class="empty-state" role="status"><div class="spinner"></div><h3>Se încarcă</h3></div> }
+        else if (mine.Count == 0) { <p class="muted" id="proposal-mine-empty">Nu ai făcut nicio propunere.</p> }
+        else
+        {
+        <Paged Items="mine" Id="proposal-mine-size" Context="pageRows" DefaultSize="10">
+            <div class="table-scroll">
+                <table class="bug-mine" id="proposal-mine-table">
+                    <thead><tr><th>Număr</th><th>Titlu</th><th>Tip</th><th>Stare</th><th>Creat</th><th><span class="sr-only">Operații</span></th></tr></thead>
+                    <tbody>
+                        @foreach (var item in pageRows)
+                        {
+                            var proposal = item;
+                            <tr>
+                                <td>@proposal.Number</td><td>@proposal.Title</td><td>@proposal.Kind</td><td>@proposal.State@(proposal.ImplementedVersion.Length > 0 ? $" ({proposal.ImplementedVersion})" : "")</td><td>@ProposalRules.Display(proposal.CreatedUtc)</td>
+                                <td class="row-actions"><button type="button" class="row-icon view" aria-label="Deschide propunerea @proposal.Number" title="Deschide propunerea @proposal.Number" @onclick="() => OpenAsync(proposal)"></button></td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </Paged>
+        }
+        <div class="editor-actions"><button type="button" class="refresh act-close" id="proposal-close-mine" @onclick="CloseAsync">Închide</button></div>
+    }
+    else
+    {
+        <div class="proposal-filter">
+            <label class="search-box"><span>⌕</span><input id="proposal-search" aria-label="Caută în propuneri" placeholder="Caută în titlu și descriere…" @bind="boardText" @bind:event="onchange" @bind:after="LoadBoardAsync" /></label>
+            <ToggleSwitch Id="proposal-only-open" Value="onlyOpen" ValueChanged="OnlyOpenChangedAsync" OnText="Doar cele deschise" OffText="Toate, și cele închise" />
+        </div>
+        @if (board is null) { <div class="empty-state" role="status"><div class="spinner"></div><h3>Se încarcă</h3></div> }
+        else if (board.Count == 0) { <p class="muted" id="proposal-all-empty">Nicio propunere pentru filtrul ales.</p> }
+        else
+        {
+        <Paged Items="board" Id="proposal-all-size" Context="pageRows" DefaultSize="10">
+            <div class="table-scroll">
+                <table class="bug-mine" id="proposal-all-table">
+                    <thead><tr><th>Număr</th><th>Titlu</th><th>Tip</th><th>Stare</th><th>Autor</th><th>Creat</th><th><span class="sr-only">Operații</span></th></tr></thead>
+                    <tbody>
+                        @foreach (var item in pageRows)
+                        {
+                            var proposal = item;
+                            <tr>
+                                <td>@proposal.Number</td><td>@proposal.Title</td><td>@proposal.Kind</td><td>@proposal.State@(proposal.ImplementedVersion.Length > 0 ? $" ({proposal.ImplementedVersion})" : "")</td><td>@proposal.UserName</td><td>@ProposalRules.Display(proposal.CreatedUtc)</td>
+                                <td class="row-actions"><button type="button" class="row-icon view" aria-label="Deschide propunerea @proposal.Number" title="Deschide propunerea @proposal.Number" @onclick="() => OpenAsync(proposal)"></button></td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </Paged>
+        }
+        <div class="editor-actions"><button type="button" class="refresh act-close" id="proposal-close-all" @onclick="CloseAsync">Închide</button></div>
+    }
+    @if (zoomedUrl is not null)
+    {
+        <ImageLightbox Src="@zoomedUrl.Url" Title="@zoomedUrl.Name" Closed="() => zoomedUrl = null" />
+    }
+</dialog>
+
+@code {
+    private sealed record Picture(string Name, string Url);
+
+    private sealed class PendingImage(string kind, string name, byte[] bytes, string contentType)
+    {
+        public string Kind { get; } = kind;
+        public string Name { get; } = name;
+        public byte[] Bytes { get; } = bytes;
+        public string? DataUrl { get; } = bytes.Length <= 1_500_000 ? $"data:{contentType};base64,{Convert.ToBase64String(bytes)}" : null;
+        public string ZoomUrl => DataUrl ?? $"data:{contentType};base64,{Convert.ToBase64String(bytes)}";
+        public string Label => Kind switch { ReportImageRules.KindScreenshot => "Captura paginii", ReportImageRules.KindFile => Name, _ => "Imagine lipită" };
+    }
+
+    private static readonly string DescriptionHint = string.Join(Environment.NewLine, "Ce ai vrea să se schimbe sau să poți face?", "Cum ar trebui să arate sau să funcționeze?", "Dă un exemplu, dacă ajută.");
+    private readonly List<PendingImage> images = [];
+    private DotNetObjectReference<ProposalDialog>? self;
+    private string tab = "new", kind = ProposalRules.KindChange, importance = ProposalRules.ImportanceMedium, title = "", description = "", benefit = "", areaTitle = "", areaRoute = "", boardText = "", newNote = "";
+    private bool busy, capturedAuto = true, confirmDiscard, onlyOpen = true, canAnswer;
+    private string? error;
+    private Proposal? sent, viewing;
+    private IReadOnlyList<Proposal>? mine, board;
+    private IReadOnlyList<Proposal> similar = [];
+    private IReadOnlyList<ProposalNote> notes = [];
+    private List<Picture> viewImages = [];
+    private Picture? zoomedUrl;
+    private readonly CancellationTokenSource lifetime = new();
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+        self = DotNetObjectReference.Create(this);
+        try { await JS.InvokeVoidAsync("bugReport.registerProposal", self); }
+        catch (Exception exception) when (exception is JSException or InvalidOperationException or TaskCanceledException) { }
+    }
+
+    private static async Task<byte[]> ReadAsync(IJSStreamReference reference)
+    {
+        await using var stream = await reference.OpenReadStreamAsync(ReportImageRules.MaxImageBytes + 1);
+        using var buffer = new MemoryStream();
+        await stream.CopyToAsync(buffer);
+        return buffer.ToArray();
+    }
+
+    // Called by the script when the user opens the popup: the picture of the page under it (null when it could not be made), the address, the title and the technical details (not used here).
+    [JSInvokable]
+    public async Task Opened(IJSStreamReference? screenshot, string pageRoute, string pageName, string tech)
+    {
+        if (areaTitle.Length == 0 || sent is not null) { areaRoute = pageRoute; areaTitle = PageArea(pageName); }
+        images.RemoveAll(item => item.Kind == ReportImageRules.KindScreenshot);
+        capturedAuto = false;
+        if (screenshot is not null)
+        {
+            try
+            {
+                var bytes = await ReadAsync(screenshot);
+                if (ReportImageRules.DetectImageType(bytes) is { } type && bytes.Length <= ReportImageRules.MaxImageBytes)
+                {
+                    images.Insert(0, new PendingImage(ReportImageRules.KindScreenshot, "pagina" + ReportImageRules.Extension(type), bytes, type));
+                    capturedAuto = true;
+                }
+            }
+            catch (Exception exception) when (exception is not OperationCanceledException) { Logger.LogWarning("The capture of the page could not be read ({ErrorType}).", exception.GetType().Name); }
+        }
+        if (sent is not null) ResetForm();
+        viewing = null; zoomedUrl = null; tab = "new"; error = null; confirmDiscard = false;
+        await InvokeAsync(StateHasChanged);
+    }
+
+    // The title of the page without the name of the application and without the window that was open ("Setări · BlazorStoc · fereastra: Ajutor" -> "Setări").
+    private static string PageArea(string pageName)
+    {
+        var text = pageName;
+        var cut = text.IndexOf(" · fereastra:", StringComparison.Ordinal);
+        if (cut >= 0) text = text[..cut];
+        return text.Replace(" · BlazorStoc", "", StringComparison.Ordinal).Trim();
+    }
+
+    // Called by the script when a proposal is opened by its number (the tab "Propuneri" of Notificari).
+    [JSInvokable]
+    public async Task OpenById(int id)
+    {
+        try
+        {
+            if (await Proposals.GetAsync(id, lifetime.Token) is { } proposal)
+            {
+                tab = "mine"; zoomedUrl = null;
+                await OpenAsync(proposal);
+            }
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException) { error = "Propunerea nu a putut fi deschisă."; }
+        await InvokeAsync(StateHasChanged);
+    }
+
+    [JSInvokable]
+    public async Task AddPasted(IJSStreamReference picture, string name)
+    {
+        try
+        {
+            var bytes = await ReadAsync(picture);
+            AddImage(ReportImageRules.KindPasted, name, bytes);
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            Logger.LogWarning("A pasted picture could not be read ({ErrorType}).", exception.GetType().Name);
+            error = "Imaginea lipită nu a putut fi citită.";
+        }
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private void AddImage(string imageKind, string name, byte[] bytes)
+    {
+        if (sent is not null) return;
+        if (images.Count >= ReportImageRules.MaxImages) { error = $"Poți atașa cel mult {ReportImageRules.MaxImages} imagini."; return; }
+        if (bytes.Length > ReportImageRules.MaxImageBytes) { error = $"Imaginea „{name}” depășește {ReportImageRules.MaxImageBytes / 1024 / 1024} MB."; return; }
+        if (ReportImageRules.DetectImageType(bytes) is not { } type) { error = $"Fișierul „{name}” nu este o imagine (PNG, JPEG, GIF sau WebP)."; return; }
+        error = null;
+        images.Add(new PendingImage(imageKind, ReportImageRules.SafeName(name, "imagine" + ReportImageRules.Extension(type)), bytes, type));
+    }
+
+    private async Task OnFilesAsync(InputFileChangeEventArgs args)
+    {
+        error = null;
+        foreach (var file in args.GetMultipleFiles(ReportImageRules.MaxImages))
+        {
+            try
+            {
+                await using var stream = file.OpenReadStream(ReportImageRules.MaxImageBytes);
+                using var buffer = new MemoryStream();
+                await stream.CopyToAsync(buffer, lifetime.Token);
+                AddImage(ReportImageRules.KindFile, file.Name, buffer.ToArray());
+            }
+            catch (IOException) { error = $"Fișierul „{file.Name}” depășește {ReportImageRules.MaxImageBytes / 1024 / 1024} MB."; }
+        }
+    }
+
+    private async Task SelectTab(string value)
+    {
+        tab = value; error = null;
+        if (value == "mine") { mine = null; await RunReadAsync(async () => mine = await Proposals.GetMineAsync(lifetime.Token), () => mine = []); }
+        else if (value == "all") { board = null; await LoadBoardAsync(); }
+    }
+
+    private async Task LoadBoardAsync() => await RunReadAsync(async () => board = await Proposals.GetBoardAsync(boardText, onlyOpen, lifetime.Token), () => board = []);
+
+    private async Task OnlyOpenChangedAsync(bool value) { onlyOpen = value; await LoadBoardAsync(); }
+
+    private async Task RunReadAsync(Func<Task> read, Action onFailure)
+    {
+        try { await read(); }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (Exception exception) when (exception is AccessDeniedException or ModuleUnavailableException) { error = exception.Message; onFailure(); }
+        catch (Exception exception)
+        {
+            Logger.LogError("The proposals could not be read ({ErrorType}).", exception.GetType().Name);
+            error = "Propunerile nu au putut fi citite. Încearcă din nou.";
+            onFailure();
+        }
+    }
+
+    // While the title is written: the proposals that look alike (so the same idea is not made twice).
+    private async Task SearchSimilarAsync()
+    {
+        if (title.Trim().Length < 4) { similar = []; return; }
+        try { similar = [.. (await Proposals.GetBoardAsync(title, false, lifetime.Token)).Take(5)]; }
+        catch (Exception exception) when (exception is not OperationCanceledException) { similar = []; }
+    }
+
+    private async Task OpenAsync(Proposal proposal)
+    {
+        error = null; zoomedUrl = null; newNote = "";
+        viewing = proposal; notes = []; viewImages = [];
+        string? me = null;
+        try
+        {
+            me = await Access.GetUsernameAsync(lifetime.Token);
+            var isAdmin = await Access.HasAsync("setari-propuneri.edit", lifetime.Token);
+            var isAuthor = string.Equals(me, proposal.UserName, StringComparison.Ordinal);
+            canAnswer = isAdmin || isAuthor;
+            notes = await Proposals.GetNotesAsync(proposal.Id, lifetime.Token);
+            if (isAuthor) await Proposals.MarkSeenAsync(proposal.Id, lifetime.Token);
+            if (isAuthor || await Access.HasAsync("setari-propuneri.view", lifetime.Token))
+                foreach (var file in await Proposals.GetFilesAsync(proposal.Id, lifetime.Token))
+                    if (await Proposals.GetFileContentAsync(file.Id, lifetime.Token) is { } content)
+                        viewImages.Add(new Picture(file.Kind == ReportImageRules.KindScreenshot ? "Captura paginii" : file.FileName, $"data:{content.ContentType};base64,{Convert.ToBase64String(content.Content)}"));
+        }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (Exception exception) when (exception is AccessDeniedException or ModuleUnavailableException) { error = exception.Message; }
+        catch (Exception exception)
+        {
+            Logger.LogError("A proposal could not be opened ({ErrorType}).", exception.GetType().Name);
+            error = "Propunerea nu a putut fi citită. Încearcă din nou.";
+        }
+    }
+
+    private void BackToList() { viewing = null; zoomedUrl = null; error = null; }
+
+    private async Task SendNoteAsync()
+    {
+        if (busy || viewing is null) return;
+        busy = true; error = null;
+        try
+        {
+            await Proposals.AddNoteAsync(viewing.Id, newNote, lifetime.Token);
+            newNote = "";
+            notes = await Proposals.GetNotesAsync(viewing.Id, lifetime.Token);
+        }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (Exception exception) when (exception is ProposalException or AccessDeniedException or ModuleUnavailableException) { error = exception.Message; }
+        catch (Exception exception)
+        {
+            Logger.LogError("A proposal answer could not be saved ({ErrorType}).", exception.GetType().Name);
+            error = "Răspunsul nu a putut fi salvat. Încearcă din nou.";
+        }
+        finally { busy = false; }
+    }
+
+    private async Task SendAsync()
+    {
+        if (busy) return;
+        busy = true; error = null;
+        try
+        {
+            var input = new ProposalInput(kind, areaRoute, areaTitle.Trim().Length == 0 ? "Toată aplicația" : areaTitle.Trim(), title, description, benefit, importance,
+                [.. images.Select(item => new ReportImage(item.Kind, item.Name, item.Bytes))]);
+            sent = await Proposals.CreateAsync(input, lifetime.Token);
+            ResetForm(keepSent: true);
+            mine = null; board = null; similar = [];
+        }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (Exception exception) when (exception is ProposalException or AccessDeniedException or ModuleUnavailableException) { error = exception.Message; }
+        catch (Exception exception)
+        {
+            Logger.LogError("A proposal could not be saved ({ErrorType}).", exception.GetType().Name);
+            error = "Propunerea nu a putut fi salvată. Ce ai scris a rămas în fereastră; încearcă din nou.";
+        }
+        finally { busy = false; }
+    }
+
+    private void ResetForm(bool keepSent = false)
+    {
+        title = description = benefit = ""; kind = ProposalRules.KindChange; importance = ProposalRules.ImportanceMedium; confirmDiscard = false; similar = [];
+        images.RemoveAll(item => item.Kind != ReportImageRules.KindScreenshot || keepSent);
+        if (!keepSent) sent = null;
+    }
+
+    private void NewProposal() { sent = null; ResetForm(); error = null; }
+
+    private void AskDiscard()
+    {
+        if (title.Length == 0 && description.Length == 0 && benefit.Length == 0 && images.All(item => item.Kind == ReportImageRules.KindScreenshot)) { _ = CloseAsync(); return; }
+        confirmDiscard = true;
+    }
+
+    private async Task DiscardAsync() { ResetForm(); await CloseAsync(); }
+
+    private async Task CloseAsync()
+    {
+        try { await JS.InvokeVoidAsync("bugReport.closeProposal"); }
+        catch (Exception exception) when (exception is JSException or InvalidOperationException or TaskCanceledException) { }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        lifetime.Cancel();
+        try { await JS.InvokeVoidAsync("bugReport.unregisterProposal"); }
+        catch (Exception exception) when (exception is JSException or InvalidOperationException or TaskCanceledException or JSDisconnectedException) { }
+        self?.Dispose();
+        lifetime.Dispose();
+    }
+}

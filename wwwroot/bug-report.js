@@ -3,7 +3,8 @@
 // DOM cannot carry (a map, a frame) come out incomplete; the user can paste a screenshot instead. Pictures go to the Blazor component as JS stream references (a picture is
 // larger than a SignalR message).
 (() => {
-    const state = { ref: null, errors: [] };
+    const state = { ref: null, proposalRef: null, errors: [] };
+    const reportPopups = "#bug-dialog,#proposal-dialog";
     const maxWidth = 1600;
 
     const remember = (message) => {
@@ -16,7 +17,7 @@
     // The popups (modal or not) open right now, except the report popup itself: the report must say which window the author was looking at.
     const popupSelector = "dialog[open],[role=dialog],[role=alertdialog]";
     const isShown = (item) => { const box = item.getBoundingClientRect(); return box.width > 0 && box.height > 0; };
-    const openPopups = () => Array.from(document.querySelectorAll(popupSelector)).filter((item) => item.id !== "bug-dialog" && !item.closest("#bug-dialog") && !item.hasAttribute("data-no-bug") && isShown(item));
+    const openPopups = () => Array.from(document.querySelectorAll(popupSelector)).filter((item) => !item.matches(reportPopups) && !item.closest(reportPopups) && !item.hasAttribute("data-no-bug") && isShown(item));
     const popupName = (dialog) => {
         const heading = dialog.querySelector("h1,h2,h3,[aria-labelledby]");
         const labelled = dialog.getAttribute("aria-labelledby") ? document.getElementById(dialog.getAttribute("aria-labelledby")) : null;
@@ -96,7 +97,7 @@
                 const source = sources[i], target = targets[i];
                 if (!(source instanceof SVGElement) || source instanceof SVGSVGElement) target.setAttribute("style", computedText(source));
                 // An open popup lives in the top layer, which the picture does not have: it is lifted above everything and a dimming layer is put under it.
-                if (source instanceof HTMLDialogElement && source.open && source.id !== "bug-dialog") { target.style.zIndex = "2147483000"; hasPopup = true; }
+                if (source instanceof HTMLDialogElement && source.open && !source.matches(reportPopups)) { target.style.zIndex = "2147483000"; hasPopup = true; }
                 if (source instanceof HTMLInputElement) {
                     target.setAttribute("value", source.value);
                     if (source.checked) target.setAttribute("checked", "checked"); else target.removeAttribute("checked");
@@ -119,7 +120,7 @@
                 while (target.firstChild) wrapper.appendChild(target.firstChild);
                 target.appendChild(wrapper);
             }
-            clone.querySelectorAll("script,noscript,dialog:not([open]),#bug-dialog,iframe,#blazor-error-ui").forEach((node) => node.remove());
+            clone.querySelectorAll("script,noscript,dialog:not([open]),#bug-dialog,#proposal-dialog,iframe,#blazor-error-ui").forEach((node) => node.remove());
             if (hasPopup) {
                 const dim = document.createElement("div");
                 dim.setAttribute("style", "position:fixed;left:0;top:0;right:0;bottom:0;background:rgba(0,0,0,.45);z-index:2147482999");
@@ -169,8 +170,9 @@
         } catch { return file; }
     };
 
-    // Every popup (a native <dialog> or a div/section with role=dialog) gets a small bar: "Raportează o eroare" and a close icon. A <dialog> lives in the top layer, so its bar sits inside
-    // it; the other popups share ONE floating bar (outside the Blazor tree) placed above the topmost popup. Module out (no #bug-dialog): no report button at all.
+    // Every popup (a native <dialog> or a div/section with role=dialog) has ONE bar above it, outside its body, on the right: "Raportează o eroare" and the red round close icon. The bar is a
+    // manual popover, so it lives in the top layer too and is shown above a modal <dialog>; it is shown again each time another popup becomes the topmost one. Module out (no #bug-dialog):
+    // no report button, only the close icon.
     const makeBar = () => {
         const bar = document.createElement("div");
         bar.className = "bug-popup-bar";
@@ -183,20 +185,32 @@
         report.setAttribute("aria-haspopup", "dialog");
         report.title = "Raportează o eroare în această fereastră";
         report.textContent = "⚑ Raportează o eroare";
+        const propose = document.createElement("button");
+        propose.type = "button";
+        propose.className = "bug-popup-button";
+        propose.setAttribute("data-proposal-open", "");
+        propose.setAttribute("data-proposal-popup", "");
+        propose.setAttribute("aria-haspopup", "dialog");
+        propose.title = "Propune o modificare sau o funcționalitate nouă";
+        propose.textContent = "✎ Propune";
         const close = document.createElement("button");
         close.type = "button";
         close.className = "popup-close-icon";
         close.setAttribute("data-popup-close-icon", "");
         close.setAttribute("aria-label", "Închide fereastra");
         close.title = "Închide fereastra";
-        close.textContent = "✕";
-        bar.append(report, close);
+        bar.append(report, propose, close);
         return bar;
     };
     const floating = makeBar();
     floating.id = "bug-popup-float";
     floating.classList.add("bug-popup-float");
+    const hasPopover = typeof floating.showPopover === "function";
+    if (hasPopover) floating.setAttribute("popover", "manual");
     floating.hidden = true;
+
+    // Every popup that is shown, the report popup included (it only gets the close icon).
+    const shownPopups = () => Array.from(document.querySelectorAll(popupSelector)).filter((item) => !item.closest("[data-popup-bar]") && !item.hasAttribute("data-no-bug") && isShown(item));
 
     // The panel of a popup: a backdrop that fills the window is skipped for its first child.
     const panelOf = (popup) => {
@@ -212,12 +226,12 @@
     };
 
     // The button the form already has for closing: the close icon triggers exactly that action (so an unsaved-changes question, a discard and so on behave the same).
-    // Priority: marked with data-popup-close, the .act-close buttons, then the safe words ("Închide", "Anulează", "Nu, păstrează", "Înapoi", "Renunță").
+    // Priority: marked with data-popup-close or data-help-close, the .act-close buttons, then the safe words ("Închide", "Anulează", "Nu, păstrează", "Înapoi", "Renunță").
     const closeWords = [/^închide/i, /^anulează/i, /^nu[, ]/i, /^înapoi/i, /^renunță/i];
     const closeButtonOf = (popup) => {
         const buttons = Array.from(popup.querySelectorAll("button")).filter((item) => !item.closest("[data-popup-bar]") && !item.disabled && (isShown(item) || item.classList.contains("popup-close-moved")));
         const text = (item) => (item.textContent || "").trim().replace(/^[^\p{L}]+/u, "");
-        return buttons.find((item) => item.hasAttribute("data-popup-close"))
+        return buttons.find((item) => item.hasAttribute("data-popup-close") || item.hasAttribute("data-help-close"))
             || buttons.find((item) => item.classList.contains("act-close") && !item.classList.contains("row-icon"))
             || closeWords.map((word) => buttons.find((item) => word.test(text(item)))).find(Boolean)
             || null;
@@ -228,51 +242,63 @@
         if (popup instanceof HTMLDialogElement && popup.open) popup.close();
     };
 
-    const topmost = () => { const list = openPopups(); return list.length ? list[list.length - 1] : null; };
+    const topmost = () => { const list = shownPopups(); return list.length ? list[list.length - 1] : null; };
     document.addEventListener("click", (event) => {
         const icon = event.target instanceof Element ? event.target.closest("[data-popup-close-icon]") : null;
         if (!icon) return;
         event.preventDefault();
         event.stopPropagation();
-        const own = icon.closest("dialog");
-        const popup = own ? (own.open ? own : null) : topmost();
+        const popup = topmost();
         if (popup) closePopup(popup);
     }, true);
 
-    // The close button of a popup lives in the bar above the popup (next to "Raportează o eroare"): a close button that sits in the heading is hidden, and the icon of the bar triggers it.
-    // One placed elsewhere in the popup (the foot of a form) stays, and the icon is added in the bar as well.
-    const headingCloseOf = (popup) => {
-        const button = closeButtonOf(popup);
-        return button && button.closest(".catalog-heading,.dialog-head,.heading-actions,.map-panel-heading") && !button.closest("[data-popup-bar]") ? button : null;
+    // The close button that sits in the head of the popup (the title row) is hidden: its place is the bar, and the icon triggers it. One placed elsewhere (the foot of a form) stays.
+    const headingSelector = ".catalog-heading,.dialog-head,.heading-actions,.map-panel-heading,.help-header,.help-header-actions,header";
+    const inHead = (button, popup) => {
+        if (button.closest(headingSelector)) return true;
+        const top = panelOf(popup).getBoundingClientRect().top;
+        return button.getBoundingClientRect().top - top < 70 && !button.closest("form,.editor-actions");
     };
     const moveHeadingClose = () => {
-        const wanted = new Set(openPopups().map(headingCloseOf).filter(Boolean));
+        const wanted = new Set();
+        for (const popup of shownPopups()) { const button = closeButtonOf(popup); if (button && inHead(button, popup)) wanted.add(button); }
         for (const button of document.querySelectorAll(".popup-close-moved")) if (!wanted.has(button)) button.classList.remove("popup-close-moved");
-        for (const button of wanted) if (!button.classList.contains("popup-close-moved")) button.classList.add("popup-close-moved");
+        for (const button of wanted) button.classList.add("popup-close-moved");
     };
 
+    let lastTop = null;
     const place = () => {
         moveHeadingClose();
         const available = !!document.getElementById("bug-dialog");
+        const proposalsAvailable = !!document.getElementById("proposal-dialog");
+        const popup = topmost();
         if (!floating.isConnected) document.body.appendChild(floating);
-        const bugDialog = document.getElementById("bug-dialog");
-        // Native dialogs carry a bar inside.
-        for (const dialog of document.querySelectorAll("dialog[open]")) {
-            let bar = dialog.querySelector(":scope [data-popup-bar]");
-            if (!bar) { bar = makeBar(); (dialog.querySelector(".dialog-head") || dialog).appendChild(bar); }
-            // The report popup keeps only the close icon (it is the report itself).
-            bar.querySelector("[data-bug-popup]").hidden = !available || dialog.id === "bug-dialog" || dialog.hasAttribute("data-no-bug");
-            bar.querySelector("[data-popup-close-icon]").hidden = !closeButtonOf(dialog) && !(dialog instanceof HTMLDialogElement);
+        if (!popup) {
+            floating.hidden = true;
+            if (hasPopover && floating.matches(":popover-open")) floating.hidePopover();
+            lastTop = null;
+            return;
         }
-        const popups = !bugDialog?.open ? openPopups().filter((item) => !(item instanceof HTMLDialogElement)) : [];
-        if (popups.length === 0) { floating.hidden = true; return; }
-        const popup = popups[popups.length - 1];
-        const box = panelOf(popup).getBoundingClientRect();
+        const isReport = popup.matches(reportPopups) || !!popup.closest(reportPopups);
+        // Outside a modal <dialog> everything is inert, so over a <dialog> the bar is a child of that dialog (a popover is not clipped by its parent, it is drawn in the top layer, outside the box).
+        const host = popup instanceof HTMLDialogElement ? popup : (popup.closest("dialog[open]") || document.body);
+        if (floating.parentElement !== host) {
+            if (hasPopover && floating.matches(":popover-open")) floating.hidePopover();
+            host.appendChild(floating);
+        }
         floating.hidden = false;
-        floating.querySelector("[data-bug-popup]").hidden = !available;
-        floating.querySelector("[data-popup-close-icon]").hidden = !closeButtonOf(popup);
+        // Shown again when another popup became the topmost one, so the bar is above it in the top layer.
+        if (hasPopover && (popup !== lastTop || !floating.matches(":popover-open"))) {
+            if (floating.matches(":popover-open")) floating.hidePopover();
+            floating.showPopover();
+        }
+        lastTop = popup;
+        floating.querySelector("[data-bug-popup]").hidden = !available || isReport;
+        floating.querySelector("[data-proposal-popup]").hidden = !proposalsAvailable || isReport;
+        floating.querySelector("[data-popup-close-icon]").hidden = !closeButtonOf(popup) && !(popup instanceof HTMLDialogElement);
+        const box = panelOf(popup).getBoundingClientRect();
         const width = floating.offsetWidth || 200;
-        floating.style.top = Math.max(4, box.top - 36) + "px";
+        floating.style.top = Math.max(4, box.top - 40) + "px";
         floating.style.left = Math.max(4, Math.min(innerWidth - width - 4, box.right - width)) + "px";
     };
     let scheduled = false;
@@ -282,28 +308,36 @@
     document.addEventListener("scroll", schedule, true);
     document.addEventListener("DOMContentLoaded", schedule);
 
+    // The menu entries and the buttons of the bar: "Raportează o eroare" (data-bug-open) and "Propune" (data-proposal-open). The page is photographed BEFORE the popup shows.
+    const kinds = {
+        bug: { attribute: "[data-bug-open]", dialog: "bug-dialog", reference: () => state.ref },
+        proposal: { attribute: "[data-proposal-open]", dialog: "proposal-dialog", reference: () => state.proposalRef }
+    };
     document.addEventListener("click", async (event) => {
-        const target = event.target instanceof Element ? event.target.closest("[data-bug-open]") : null;
-        if (!target) return;
+        const origin = event.target instanceof Element ? event.target : null;
+        const kind = origin && origin.closest(kinds.proposal.attribute) ? kinds.proposal : origin && origin.closest(kinds.bug.attribute) ? kinds.bug : null;
+        if (!kind) return;
+        const target = origin.closest(kind.attribute);
         event.preventDefault();
-        const dialog = document.getElementById("bug-dialog");
+        const dialog = document.getElementById(kind.dialog);
         if (!(dialog instanceof HTMLDialogElement) || dialog.open || target.dataset.busy === "1") return;
         target.dataset.busy = "1";
         try {
             const shot = await capturePage();
             const info = environment();
-            if (state.ref) {
+            const reference = kind.reference();
+            if (reference) {
                 try {
-                    await state.ref.invokeMethodAsync("Opened", shot ? DotNet.createJSStreamReference(shot) : null, info.url, info.title, JSON.stringify(info, null, 2));
-                } catch (error) { remember(`Fereastra de raportare nu a raspuns: ${error}`); }
+                    await reference.invokeMethodAsync("Opened", shot ? DotNet.createJSStreamReference(shot) : null, info.url, info.title, JSON.stringify(info, null, 2));
+                } catch (error) { remember(`Fereastra nu a raspuns: ${error}`); }
             }
             if (!dialog.open) dialog.showModal();
         } finally { delete target.dataset.busy; }
     });
 
     document.addEventListener("paste", async (event) => {
-        const dialog = document.getElementById("bug-dialog");
-        if (!(dialog instanceof HTMLDialogElement) || !dialog.open || !state.ref) return;
+        const kind = [kinds.bug, kinds.proposal].find((item) => { const dialog = document.getElementById(item.dialog); return dialog instanceof HTMLDialogElement && dialog.open && item.reference(); });
+        if (!kind) return;
         const items = Array.from(event.clipboardData ? event.clipboardData.items : []).filter((item) => item.kind === "file" && item.type.startsWith("image/"));
         if (items.length === 0) return;
         event.preventDefault();
@@ -312,13 +346,31 @@
             if (!file) continue;
             const blob = await shrink(file);
             const extension = blob.type === "image/png" ? ".png" : ".jpg";
-            await state.ref.invokeMethodAsync("AddPasted", DotNet.createJSStreamReference(blob), `lipit-${Date.now()}${extension}`);
+            await kind.reference().invokeMethodAsync("AddPasted", DotNet.createJSStreamReference(blob), `lipit-${Date.now()}${extension}`);
         }
     });
+
+    // Escape inside an enlarged picture closes the picture only, not the popup that holds it.
+    document.addEventListener("cancel", (event) => {
+        const dialog = event.target;
+        if (!(dialog instanceof HTMLDialogElement)) return;
+        const lightbox = dialog.querySelector(".image-lightbox [data-popup-close]");
+        if (lightbox) { event.preventDefault(); lightbox.click(); }
+    }, true);
 
     window.bugReport = {
         register: (reference) => { state.ref = reference; },
         unregister: () => { state.ref = null; },
-        close: () => { const dialog = document.getElementById("bug-dialog"); if (dialog instanceof HTMLDialogElement && dialog.open) dialog.close(); }
+        close: () => { const dialog = document.getElementById("bug-dialog"); if (dialog instanceof HTMLDialogElement && dialog.open) dialog.close(); },
+        // A proposal opened by its id (from the tab "Propuneri" of Notificari): no capture of the page, the popup shows the proposal.
+        openProposal: async (id) => {
+            const dialog = document.getElementById("proposal-dialog");
+            if (!(dialog instanceof HTMLDialogElement) || !state.proposalRef) return;
+            try { await state.proposalRef.invokeMethodAsync("OpenById", id); } catch (error) { remember(`Propunerea nu s-a deschis: ${error}`); }
+            if (!dialog.open) dialog.showModal();
+        },
+        registerProposal: (reference) => { state.proposalRef = reference; },
+        unregisterProposal: () => { state.proposalRef = null; },
+        closeProposal: () => { const dialog = document.getElementById("proposal-dialog"); if (dialog instanceof HTMLDialogElement && dialog.open) dialog.close(); }
     };
 })();

@@ -1652,9 +1652,6 @@ tr.task-row-new td:first-child { box-shadow:inset 4px 0 0 var(--c-a3241b); }
 
 /* Bara popup-ului (bug-report.js): Raporteaza o eroare + iconita de inchidere; pentru <dialog> sta in antet, pentru celelalte e o bara plutitoare deasupra ferestrei. */
 .bug-popup-bar { display:inline-flex; align-items:center; gap:6px; margin-left:auto; flex:none; align-self:flex-start; }
-dialog > .bug-popup-bar { position:absolute; top:8px; right:8px; z-index:2; }
-.bug-popup-bar[hidden], .bug-popup-bar [hidden] { display:none; }
-.bug-popup-float { position:fixed; z-index:2147483000; }
 .bug-popup-button { padding:4px 10px; font-size:.8rem; border:1px solid var(--c-d8e2de, #c9ced6); border-radius:6px; background:var(--c-ffffff, #fff); color:inherit; cursor:pointer; box-shadow:0 2px 8px rgba(0,0,0,.18); }
 .bug-popup-button:hover { background:rgba(127,127,127,.15); }
 /* Taskuri: prioritate (ridicat rosiatic, mediu galben, scazut alb), antet ordonabil, eticheta de stare doar afisata. */
@@ -1679,3 +1676,27 @@ select.prio-high, select.prio-medium, select.prio-low { font-weight:600; }
 .popup-close-icon::after { transform:rotate(-45deg); }
 .bug-popup-bar { gap:8px; align-items:center; }
 .bug-popup-button { height:32px; padding:0 12px; display:inline-flex; align-items:center; }
+
+.bug-popup-float { position:fixed; inset:auto; margin:0; padding:0; border:0; background:transparent; overflow:visible; width:auto; height:auto; z-index:2147483000; display:inline-flex; }
+.bug-popup-float[hidden], .bug-popup-bar [hidden] { display:none !important; }
+.bug-popup-float[popover]:not(:popover-open) { display:none; }
+/* Un popup randat in interiorul unei celule de tabel (ex. Asociaza autentificator din coloana Operatii) mostenea white-space:nowrap si text-align:right de la td.row-actions: textul nu se rupea si iesea din fereastra. Popup-urile reseteaza ambele. */
+.delete-overlay, .invoice-modal-backdrop, .detail-overlay, dialog { white-space:normal; text-align:left; }
+/* Imaginile unui raport de eroare: miniatura se mareste cu un clic (cerc cu + in centru), intr-un overlay peste pagina sau peste fereastra. */
+.bug-image-zoom { position:relative; display:block; width:100%; padding:0; border:0; background:none; cursor:zoom-in; border-radius:4px; }
+.bug-image-zoom .bug-image-large { display:flex; }
+.bug-zoom-plus { position:absolute; left:50%; top:50%; width:38px; height:38px; margin:-19px 0 0 -19px; border-radius:50%; display:grid; place-items:center; font-size:26px; line-height:1; font-weight:300; color:#fff; background:rgba(20,45,40,.62); box-shadow:0 2px 8px rgba(0,0,0,.3); transition:background .15s; pointer-events:none; }
+.bug-image-zoom:hover .bug-zoom-plus, .bug-image-zoom:focus-visible .bug-zoom-plus { background:rgba(20,45,40,.85); }
+.image-lightbox { position:fixed; inset:0; z-index:2000; display:grid; place-items:center; background:rgba(8,18,16,.78); padding:48px 16px 16px; }
+.image-lightbox-panel { display:flex; flex-direction:column; gap:8px; max-width:min(96vw, 1800px); max-height:calc(100vh - 80px); background:var(--c-ffffff); border-radius:10px; padding:10px; box-shadow:0 12px 50px #0006; }
+.image-lightbox-head { display:flex; align-items:center; justify-content:space-between; gap:12px; font-size:13px; }
+.image-lightbox-panel img { display:block; max-width:100%; max-height:calc(100vh - 160px); width:auto; height:auto; object-fit:contain; margin:0 auto; background:var(--c-f5f8f6); border-radius:4px; }
+/* Propuneri: fir de raspunsuri, propuneri asemanatoare, filtrul listei. */
+.proposal-note { border:1px solid var(--line); border-radius:8px; padding:8px 12px; margin:8px 0; background:var(--c-ffffff); }
+.proposal-note.from-admin { border-left:4px solid var(--green); }
+.proposal-note p { margin:6px 0 0; white-space:pre-wrap; overflow-wrap:anywhere; }
+.proposal-similar { padding:10px 14px; border:1px solid var(--c-eacbc0); border-radius:8px; background:var(--c-fff0eb); }
+.proposal-similar ul { margin:6px 0 0; padding-left:18px; }
+.proposal-filter { display:flex; flex-wrap:wrap; gap:14px; align-items:center; margin:8px 0 12px; }
+.proposal-filter .search-box { flex:1 1 260px; }
+.proposal-facts { margin-bottom:8px; }

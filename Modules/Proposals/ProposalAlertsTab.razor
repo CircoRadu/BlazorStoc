@@ -1,0 +1,24 @@
+@namespace BlazorStoc.Components.Shared
+@using BlazorStoc.Modules.Proposals
+@inject IProposalService Proposals
+@* The tab "Propuneri" of the Notifications page: the proposals that need the attention of the signed-in user (new proposals for the administrator; a change of state or an answer on one's own proposal
+   for its author), red when there are any. It belongs to the Proposals module; the page of another module (Notifications) shows it through this wrapper, because modules do not refer to each other.
+   Shown while the module runs. *@
+<ModuleGate ModuleId="@ProposalsModule.ModuleId" Notice="false">
+    <button type="button" role="tab" id="tab-proposals" class="settings-tab @(Active ? "active" : "") @(total > 0 ? "needs-attention" : "")" aria-selected="@(Active ? "true" : "false")" aria-controls="panel-notifications" @onclick="Select">Propuneri <span class="count-badge">@total</span></button>
+</ModuleGate>
+
+@code {
+    [Parameter] public bool Active { get; set; }
+    [Parameter] public EventCallback Selected { get; set; }
+
+    private int total;
+
+    private Task Select() => Selected.InvokeAsync();
+
+    protected override async Task OnInitializedAsync()
+    {
+        try { total = (await Proposals.GetAlertsAsync()).Count; }
+        catch (Exception exception) when (exception is not OperationCanceledException) { total = 0; }
+    }
+}

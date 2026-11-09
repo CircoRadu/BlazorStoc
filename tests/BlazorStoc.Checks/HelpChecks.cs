@@ -215,6 +215,7 @@ public static class HelpChecks
     // The list only shrinks: a topic that gets a "Captura:" must be taken out, a new topic without capture must be added (or get one).
     private static readonly HashSet<string> WithoutCapture = new(StringComparer.OrdinalIgnoreCase)
     {
+        "propunere-modificare", "notificari-propuneri",
         // The window was restructured on 27.10.2026 (three sections); the old picture was removed and is made again on request (docs/HELP_DE_REGENERAT.md), then the key leaves this list.
         "categorii-parametri", "schimbare-parola",
         // New 30.10.2026: the pictures are made on request (docs/HELP_DE_REGENERAT.md).
@@ -357,7 +358,7 @@ public static class HelpChecks
     // Files with a window over the page that need no help button of their own: confirmations (they explain themselves) and files that only wrap a form with its own help button.
     private static readonly HashSet<string> DialogFilesWithoutHelp = new(StringComparer.OrdinalIgnoreCase)
     {
-        "MainLayout.razor", "AdminOperationDialog.razor", "DeleteConfirmationDialog.razor", "SaveConfirmationDialog.razor", "UnsavedChangesDialog.razor", "RestoreConfirmationDialog.razor", "ForceUnlockDialog.razor", "ServiceContractAddendumReasonDialog.razor",
+        "MainLayout.razor", "ImageLightbox.razor", "AdminOperationDialog.razor", "DeleteConfirmationDialog.razor", "SaveConfirmationDialog.razor", "UnsavedChangesDialog.razor", "RestoreConfirmationDialog.razor", "ForceUnlockDialog.razor", "ServiceContractAddendumReasonDialog.razor",
         "ParameterValueEditDialog.razor", "BackupSettingsPanel.razor", "AccessSecurityPanel.razor", "AuthenticatorActions.razor", "ProjectComponentsSection.razor",
         "Home.razor", "Beneficiaries.razor", "Suppliers.razor", "Vehicles.razor", "InvoiceTemplatesList.razor", "OfferPickup.razor",
         // The editors of the beneficiary page open in a window made here around forms that have their own help button; the file panel has a delete confirmation and a plain file preview.

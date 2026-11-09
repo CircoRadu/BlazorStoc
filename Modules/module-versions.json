@@ -171,8 +171,8 @@
                                                  ]
                                  },
                     "Journal":  {
-                                    "version":  "1.4.19",
-                                    "hash":  "c0418eaa3c812b6d1deda9344f841cf4e6be5b788743722451608a978d728d6d",
+                                    "version":  "1.4.20",
+                                    "hash":  "ccdc2300ca7dccc86f551e746f28a12f1c070ebcf625cd15c1769ef64529d43b",
                                     "history":  [
                                                     {
                                                         "version":  "1.0.0",
@@ -308,6 +308,11 @@
                                                         "version":  "1.4.19",
                                                         "date":  "09.11.2026",
                                                         "note":  "Actiune Modificare prioritate task"
+                                                    },
+                                                    {
+                                                        "version":  "1.4.20",
+                                                        "date":  "09.11.2026",
+                                                        "note":  "Propuneri: bara popup-ului cu Propune, Setari -\u003e Dezvoltare, fila Propuneri in Notificari"
                                                     }
                                                 ]
                                 },
@@ -438,8 +443,8 @@
                                                     ]
                                     },
                     "Notifications":  {
-                                          "version":  "1.5.0",
-                                          "hash":  "083edb06eee6425f202aa4fa47eebd1091b6dafbd66af258888b36eb19609447",
+                                          "version":  "1.5.1",
+                                          "hash":  "e5431c5d0b9613ae4c2706ac5235ffc2a6bbdbf71f49e7e9e9c2032f778599d5",
                                           "history":  [
                                                           {
                                                               "version":  "1.0.0",
@@ -485,6 +490,11 @@
                                                               "version":  "1.5.0",
                                                               "date":  "09.11.2026",
                                                               "note":  "Fila Taskuri a utilizatorului (alerte de task: nepreluat, termen depasit, termen in curand)"
+                                                          },
+                                                          {
+                                                              "version":  "1.5.1",
+                                                              "date":  "09.11.2026",
+                                                              "note":  "Propuneri: bara popup-ului cu Propune, Setari -\u003e Dezvoltare, fila Propuneri in Notificari"
                                                           }
                                                       ]
                                       },
@@ -677,8 +687,8 @@
                                                  ]
                                  },
                     "BugReports":  {
-                                       "version":  "1.1.0",
-                                       "hash":  "5ec8c4e44fb1a9cd37e58bf7971ec2f4f78043e14b8021403c26b179a6eb47be",
+                                       "version":  "1.1.2",
+                                       "hash":  "fe021682a29af22240f40b825ee1f3552d9e67bb9e3adb238fcac4cc2e1db3ab",
                                        "history":  [
                                                        {
                                                            "version":  "1.0.0",
@@ -689,6 +699,16 @@
                                                            "version":  "1.1.0",
                                                            "date":  "09.11.2026",
                                                            "note":  "Rapoarte erori: taburi Nerezolvate/Rezolvate; buton de raportare in orice popup (ascuns cand modulul e oprit)"
+                                                       },
+                                                       {
+                                                           "version":  "1.1.1",
+                                                           "date":  "09.11.2026",
+                                                           "note":  "Imaginile raportului se maresc (overlay cu +) in formular si in Setari"
+                                                       },
+                                                       {
+                                                           "version":  "1.1.2",
+                                                           "date":  "09.11.2026",
+                                                           "note":  "Propuneri: bara popup-ului cu Propune, Setari -\u003e Dezvoltare, fila Propuneri in Notificari"
                                                        }
                                                    ]
                                    },
@@ -737,6 +757,17 @@
                                                       "note":  "Prioritate la taskuri, ordonare pe coloane, vizualizare/editare utilizator"
                                                   }
                                               ]
-                              }
+                              },
+                    "Proposals":  {
+                                      "version":  "1.0.0",
+                                      "hash":  "28a0d716b01d1ad935d522e56cc7837e9a9db41753f8933c8b721b490a79d5a9",
+                                      "history":  [
+                                                      {
+                                                          "version":  "1.0.0",
+                                                          "date":  "09.11.2026",
+                                                          "note":  "Versiune de pornire (inceputul versionarii modulelor)"
+                                                      }
+                                                  ]
+                                  }
                 }
 }
