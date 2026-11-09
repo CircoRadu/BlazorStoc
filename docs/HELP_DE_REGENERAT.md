@@ -101,3 +101,4 @@ Stare: **text** = topicul `.help` este la zi; **captura** = imaginea si harta el
 | Fisa beneficiarului -> formularul intervenției de mentenanta | Sectiunea Componente acoperite (obligatorie sub contract complet) | mentenanta-interventie (de completat) | de facut la cerere | 07.11.2026 |
 | Notificari -> Tichete de validat -> fereastra Editeaza si preia | Alegerea componentelor la categoria Mentenanta | activity-review (de completat) | de facut la cerere | 07.11.2026 |
 | Fereastra actului aditional | Toggle-uri noi Data de referinta si Componente, panoul de componente On/Off, verificarea interventiilor, scadentele propuse | mentenanta-act-aditional (de completat) | de facut la cerere | 07.11.2026 |
+| Bannerul "Modul oprit temporar" (pagina modulului oprit) si randul din Setari -> Module | Numeste utilizatorul si rolul celui care a oprit modulul (nu mai e generic) | setari-module (pasul cu bannerul, daca il descrie) | de facut la cerere | 07.11.2026 |

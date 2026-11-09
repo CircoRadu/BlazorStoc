@@ -97,9 +97,12 @@ public static class ModuleSwitchChecks
         registry.Changed += () => changed++;
         var startupChanges = changes.Count;
 
-        check(registry.Stop("alpha", "mentenanta baza", "admin.demo") == ModuleToggleResult.Done && registry.StatusOf("alpha") == ModuleStatus.Disabled && !registry.IsAvailable("alpha"),
+        check(registry.Stop("alpha", "mentenanta baza", "admin.demo", "Administrator") == ModuleToggleResult.Done && registry.StatusOf("alpha") == ModuleStatus.Disabled && !registry.IsAvailable("alpha"),
             "Switch: a module stopped by hand is out at once");
         var info = registry.Snapshot().Single(item => item.Id == "alpha");
+        check(info.StoppedRole == "Administrator" && ModuleOrigins.StoppedByText(info.StoppedBy, info.StoppedRole) == "admin.demo (Administrator)"
+            && ModuleOrigins.StoppedByText("admin.demo", "") == "admin.demo" && ModuleOrigins.StoppedByText(null, null) == "necunoscut",
+            "Switch: the notice names who stopped the module with the role (just the name for a stop saved without a role)");
         check(info.Origin == ModuleOrigins.Manual && info.Reason == "mentenanta baza" && info.StoppedBy == "admin.demo" && info.SinceUtc == clock.GetUtcNow().UtcDateTime,
             "Switch: the screen learns why, by whom and since when the module is stopped");
         check(!registry.NavItems().Any(item => item.Href == "/alpha") && registry.NavItems().Any(item => item.Href == "/beta"), "Switch: a stopped module leaves the menu, the others stay");
@@ -304,9 +307,9 @@ public static class ModuleSwitchChecks
         var unavailable = context.Render<ModuleUnavailable>(parameters => parameters.Add(p => p.ModuleId, "alpha"));
         check(unavailable.Markup.Contains("Modul indisponibil"), "Notice: a module out for failures keeps the usual notice");
         registry.Start("beta");
-        registry.Stop("beta", "motiv intern", "admin.demo");
+        registry.Stop("beta", "motiv intern", "admin.demo", "Administrator");
         var stopped = context.Render<ModuleUnavailable>(parameters => parameters.Add(p => p.ModuleId, "beta"));
-        check(stopped.Markup.Contains("Modul oprit temporar") && stopped.Markup.Contains("oprită de administrator") && !stopped.Markup.Contains("motiv intern"),
+        check(stopped.Markup.Contains("Modul oprit temporar") && stopped.Markup.Contains("oprită de") && stopped.Markup.Contains("admin.demo (Administrator)") && !stopped.Markup.Contains("motiv intern"),
             "Notice: the page of a module stopped by the administrator says so, without the reason");
     }
 

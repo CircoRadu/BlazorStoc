@@ -198,6 +198,9 @@ Pasi:
 2. Opreste un modul (de exemplu Analize de risc): se deschide confirmarea; apasa "Opreste modulul" fara motiv: apare mesajul de camp obligatoriu si nimic nu se opreste. Apasa "Renunta": comutatorul revine pe On.
 3. Opreste-l din nou cu motiv: randul arata "Oprit", "oprit de administrator (utilizatorul tau): motivul", iar sus apare bannerul. Intrarea din meniu dispare.
 4. Deschide pagina principala: placa modulului este gri, fara link, cu "Oprit temporar de administrator". Deschide direct adresa paginii modulului: apare "Modul oprit temporar".
+4b. (07.11.2026) Pe pagina modulului oprit, bannerul spune acum cine l-a oprit: "Aceasta parte a aplicatiei a fost oprita de <utilizator> (Administrator)" (numele contului si rolul lui). Motivul opririi nu se afiseaza utilizatorilor obisnuiti. Bannerul rosu de sus (vazut de administrator) arata "<modul> (oprit de administrator: <utilizator> (Administrator))", iar randul din Setari -> Module are acelasi text. Un modul oprit inainte de aceasta versiune arata doar numele contului, fara rol.
+   **Ce s-a adaugat:** coloana module_state.stopped_role (migrarea 74) si textul cu utilizatorul si rolul in bannerul "Modul oprit temporar".
+   **Ce face acum:** bannerul nu mai este generic, numeste utilizatorul si rolul celui care a oprit modulul.
 5. In Jurnal, filtreaza dupa actiunea "Oprire manuala modul": intrarea este pe numele tau, cu starea veche/noua si motivul.
 6. Opreste aplicatia si porneste-o din nou (`tools\supervisor.ps1`): modulul ramane oprit. Porneste-l din comutator: intrarea "Pornire manuala modul" arata cine l-a oprit, de cand, cat a durat oprirea si motivul.
 7. Cu un utilizator obisnuit: nu vede fila Module, nici bannerul; placa gri o vede doar daca are permisiunea modulului.

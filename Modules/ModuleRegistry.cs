@@ -44,6 +44,7 @@ public sealed class ModuleRegistry(TimeProvider? clock = null)
         // Stopped by the administrator: independent of the circuit breaker, the module stays out until it is started by hand (and across restarts, see ModuleStateStore).
         public bool ManualStop;
         public string? StoppedBy;
+        public string? StoppedRole;
     }
 
     /// <summary>The modules that cannot be stopped by hand: the journal reads what the administrator did, so it is always there.</summary>
@@ -207,7 +208,7 @@ public sealed class ModuleRegistry(TimeProvider? clock = null)
                 var status = Current(entry);
                 return new ModuleInfo(id, entry.Module.Name, entry.Module.Version.ToString(), status, entry.SinceUtc,
                     status == ModuleStatus.Healthy ? null : entry.Reason, status == ModuleStatus.Healthy ? null : entry.Origin, entry.Failures,
-                    entry.ManualStop ? entry.StoppedBy : null);
+                    entry.ManualStop ? entry.StoppedBy : null, entry.ManualStop ? entry.StoppedRole : null);
             })];
     }
 
@@ -229,14 +230,14 @@ public sealed class ModuleRegistry(TimeProvider? clock = null)
     /// dashboard tile, guarded entry points), the calls already running finish. The circuit breaker no longer counts for it until <see cref="Start"/>.
     /// The journal entry is the caller's (it carries the administrator's name); no "system" change is raised.
     /// </summary>
-    public ModuleToggleResult Stop(string moduleId, string reason, string user)
+    public ModuleToggleResult Stop(string moduleId, string reason, string user, string role = "")
     {
         lock (gate)
         {
             if (!entries.TryGetValue(moduleId, out var entry)) return ModuleToggleResult.Unknown;
             if (Protected.Contains(moduleId)) return ModuleToggleResult.Protected;
             if (entry.StartupFailed || entry.ManualStop) return ModuleToggleResult.NoChange;
-            MarkStopped(entry, reason, user, time.GetUtcNow().UtcDateTime);
+            MarkStopped(entry, reason, user, time.GetUtcNow().UtcDateTime, role);
         }
         NotifyChanged();
         logger?.LogWarning("Module {ModuleId} was stopped by the administrator.", moduleId);
@@ -253,6 +254,7 @@ public sealed class ModuleRegistry(TimeProvider? clock = null)
             if (!entry.ManualStop) return ModuleToggleResult.NoChange;
             entry.ManualStop = false;
             entry.StoppedBy = null;
+            entry.StoppedRole = null;
             entry.Failures = 0;
             entry.HalfOpen = false;
             entry.Announced = false;
@@ -275,7 +277,7 @@ public sealed class ModuleRegistry(TimeProvider? clock = null)
             foreach (var item in stopped)
             {
                 if (!entries.TryGetValue(item.ModuleId, out var entry) || entry.StartupFailed || entry.ManualStop || Protected.Contains(item.ModuleId)) continue;
-                MarkStopped(entry, item.Reason, item.StoppedBy, item.StoppedUtc);
+                MarkStopped(entry, item.Reason, item.StoppedBy, item.StoppedUtc, item.StoppedRole);
                 applied++;
             }
         }
@@ -287,10 +289,11 @@ public sealed class ModuleRegistry(TimeProvider? clock = null)
         return applied;
     }
 
-    private static void MarkStopped(Entry entry, string reason, string user, DateTime atUtc)
+    private static void MarkStopped(Entry entry, string reason, string user, DateTime atUtc, string role = "")
     {
         entry.ManualStop = true;
         entry.StoppedBy = user;
+        entry.StoppedRole = role;
         entry.Failures = 0;
         entry.HalfOpen = false;
         entry.Status = ModuleStatus.Disabled;

@@ -854,3 +854,9 @@ Cerut de utilizator la 06.10.2026 (verificarea fluxului, apoi deciziile: facturi
 - Fereastra Coduri de recuperare (AuthenticatorActions): mai lata, codurile se rup la margine, buton Salveaza codurile (.txt).
 - Module: BugReports 1.0.0, Journal 1.4.15, Elcomtur 1.3.1 (versiune restanta din 0.5.49).
 - Verificat: suita completa in memorie 2210, MariaDB 3550, browser pe instanta separata (trimitere, captura, Ctrl+V, administrare, export ZIP, stergere). Neverificat cap-la-cap: descarcarea .txt a codurilor (cere asocierea unui autentificator real); help doar minim (docs/HELP_DE_REGENERAT.md).
+
+## Finalizat la 07.11.2026 16:50 - Versiunea 0.5.51: banner modul oprit cu utilizatorul si rolul
+
+- Notificarea Modul oprit temporar (ModuleUnavailable.razor), bannerul de sus (ModuleAlertBanner.razor) si randul din Setari -> Module (ModulesPanel.razor) numesc utilizatorul si rolul celui care a oprit modulul (ModuleOrigins.StoppedByText); motivul ramane ascuns utilizatorilor obisnuiti. Rolul se salveaza in module_state.stopped_role (migrarea 74); un stop salvat inainte arata doar numele contului.
+- Corectat in teste: panoul Elcomtur automat are doua intrerupatoare (verificarea astepta unul).
+- Verificat: suita completa la release (rulata de release.ps1); neverificat vizual in browser pe instanta separata.

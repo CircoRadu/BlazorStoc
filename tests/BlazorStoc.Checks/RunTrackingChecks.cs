@@ -369,6 +369,20 @@ public static class RunTrackingChecks
         check(ordinary.Render<ModuleAlertBanner>().FindAll(".module-alert").Count == 0, "Screen: an ordinary user never sees the administrator's banner");
         check(ordinary.Render<ModulesPanel>().FindAll("button.row-icon.renew").Count == 0, "Screen: without the permission the status screen has no \"try again\"");
 
+        // The notice shown in place of a page of a module the administrator stopped names who stopped it, with the role; the reason stays hidden.
+        var byHand = new ModuleRegistry(clock);
+        byHand.Add(new FakeModule("byhand"), new ServiceCollection(), Empty());
+        byHand.Stop("byhand", "motiv intern", "ion.popescu", "Administrator");
+        byHand.Add(new FakeModule("older"), new ServiceCollection(), Empty());
+        byHand.ApplyStopped([new StoppedModule("older", "x", "vechi.admin", clock.GetUtcNow().UtcDateTime)]);
+        using var notice = new BunitContext();
+        notice.Services.AddSingleton(byHand);
+        var noticeMarkup = notice.Render<ModuleUnavailable>(parameters => parameters.Add(item => item.ModuleId, "byhand")).Markup;
+        check(noticeMarkup.Contains("Modul oprit temporar") && noticeMarkup.Contains("ion.popescu (Administrator)") && !noticeMarkup.Contains("motiv intern"),
+            "Screen: the notice of a stopped module names the user and the role of who stopped it, without the reason");
+        var olderMarkup = notice.Render<ModuleUnavailable>(parameters => parameters.Add(item => item.ModuleId, "older")).Markup;
+        check(olderMarkup.Contains("vechi.admin") && !olderMarkup.Contains("vechi.admin ("), "Screen: a stop saved without a role shows the user name only");
+
         var healthy = new ModuleRegistry(clock);
         healthy.Add(new FakeModule("a"), new ServiceCollection(), Empty());
         using var quiet = new BunitContext();

@@ -21,11 +21,11 @@ public sealed class MariaModuleStateStore(IConfiguration configuration) : IModul
     public async Task<IReadOnlyList<StoppedModule>> ReadStoppedAsync(CancellationToken cancellationToken = default)
     {
         await using var connection = await MariaDb.OpenAsync(configuration, cancellationToken).ConfigureAwait(false);
-        await using var command = new MySqlCommand("SELECT module_id, reason, stopped_by, stopped_utc FROM module_state ORDER BY stopped_utc", connection);
+        await using var command = new MySqlCommand("SELECT module_id, reason, stopped_by, stopped_utc, stopped_role FROM module_state ORDER BY stopped_utc", connection);
         var result = new List<StoppedModule>();
         await using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
         while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
-            result.Add(new StoppedModule(reader.GetString(0), reader.GetString(1), reader.GetString(2), DateTime.SpecifyKind(reader.GetDateTime(3), DateTimeKind.Utc)));
+            result.Add(new StoppedModule(reader.GetString(0), reader.GetString(1), reader.GetString(2), DateTime.SpecifyKind(reader.GetDateTime(3), DateTimeKind.Utc), reader.GetString(4)));
         return result;
     }
 
@@ -33,9 +33,10 @@ public sealed class MariaModuleStateStore(IConfiguration configuration) : IModul
         MariaDb.WriteAsync(configuration, async (connection, transaction) =>
         {
             await using var command = new MySqlCommand("""
-                INSERT INTO module_state (module_id, reason, stopped_by, stopped_utc) VALUES (@id, @reason, @by, @at)
-                ON DUPLICATE KEY UPDATE reason = VALUES(reason), stopped_by = VALUES(stopped_by), stopped_utc = VALUES(stopped_utc)
+                INSERT INTO module_state (module_id, reason, stopped_by, stopped_utc, stopped_role) VALUES (@id, @reason, @by, @at, @role)
+                ON DUPLICATE KEY UPDATE reason = VALUES(reason), stopped_by = VALUES(stopped_by), stopped_utc = VALUES(stopped_utc), stopped_role = VALUES(stopped_role)
                 """, connection, transaction);
+            command.Parameters.AddWithValue("@role", stopped.StoppedRole);
             command.Parameters.AddWithValue("@id", stopped.ModuleId);
             command.Parameters.AddWithValue("@reason", stopped.Reason);
             command.Parameters.AddWithValue("@by", stopped.StoppedBy);

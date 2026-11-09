@@ -24,8 +24,9 @@ public sealed class ModuleControl(ModuleRegistry registry, IModuleStateStore sto
         if (!registry.CanToggle(moduleId) || registry.IsManuallyStopped(moduleId)) return ModuleToggleResult.NoChange;
         var user = await access.GetUsernameAsync(cancellationToken).ConfigureAwait(false) ?? "necunoscut";
         var at = clock.GetUtcNow().UtcDateTime;
-        await store.SaveStoppedAsync(new StoppedModule(moduleId, reason, user, at), cancellationToken).ConfigureAwait(false);
-        var result = registry.Stop(moduleId, reason, user);
+        var role = await access.GetRoleAsync(cancellationToken).ConfigureAwait(false) ?? "";
+        await store.SaveStoppedAsync(new StoppedModule(moduleId, reason, user, at, role), cancellationToken).ConfigureAwait(false);
+        var result = registry.Stop(moduleId, reason, user, role);
         if (result != ModuleToggleResult.Done)
         {
             await store.ClearStoppedAsync(moduleId, CancellationToken.None).ConfigureAwait(false);
@@ -52,7 +53,7 @@ public sealed class ModuleControl(ModuleRegistry registry, IModuleStateStore sto
         if (module is null) return ModuleToggleResult.Unknown;
         if (!registry.CanToggle(moduleId)) return ModuleToggleResult.NeedsRestart;
         if (!registry.IsManuallyStopped(moduleId)) return ModuleToggleResult.NoChange;
-        var previous = new StoppedModule(moduleId, module.Reason ?? "", module.StoppedBy ?? "necunoscut", module.SinceUtc);
+        var previous = new StoppedModule(moduleId, module.Reason ?? "", module.StoppedBy ?? "necunoscut", module.SinceUtc, module.StoppedRole ?? "");
         await store.ClearStoppedAsync(moduleId, cancellationToken).ConfigureAwait(false);
         var result = registry.Start(moduleId);
         if (result != ModuleToggleResult.Done)
