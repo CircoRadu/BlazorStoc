@@ -1,3 +1,10 @@
+## 0.5.52 | 09.11.2026
+- Contractele de mentenanță au acum dată de referință obligatorie și componente: familii (cu elemente On/Off) și componente discrete din Nomenclator, Componente mentenanță. Ciclicitatea și data de referință se dau global sau pe familie / componentă. Un contract căruia îi lipsesc date este înghețat: nu produce scadențe și notificări, iar intervențiile lui nu mută scadențe. Toate contractele existente devin înghețate la actualizare; apar în Notificări, tabul nou „Contracte incomplete”, cu ce le lipsește, și se dezgheață singure după ce le completezi (dată de referință și componente).
+- Scadențele sunt pe punct de lucru și componentă (lista Scadențe, fișa beneficiarului, notificările). Intervenția de mentenanță alege componentele acoperite (și în fereastra tichetului preluat de operator): scadențele se mută numai pentru ele.
+- Acte adiționale la contracte (fișa beneficiarului, iconița + de pe rândul contractului): valabilitate, ciclicitate, dată de referință, componente (On/Off), puncte sau alte clauze; scadențele sunt propuse și pot fi modificate, intervențiile beneficiarului se verifică, actul se poate anula (ultimul) sau șterge.
+- Nomenclator: tab nou „Componente mentenanță” (familii, componente, denumiri alternative).
+- Versiuni de modul: Mentenanță 1.10.0, Notificări 1.4.0, Jurnal 1.4.17, Preluare ActivityApp 0.13.0.
+
 ## 0.5.51 | 07.11.2026
 - Notificarea „Modul oprit temporar” (pagina unui modul oprit de administrator) spune acum cine l-a oprit: numele utilizatorului și rolul lui. Motivul opririi rămâne ascuns utilizatorilor obișnuiți. Bannerul roșu de sus (administrator) și lista din Setări, Module arată același text; un modul oprit înainte de această versiune arată doar numele contului.
 

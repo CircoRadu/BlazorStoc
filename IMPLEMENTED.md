@@ -860,3 +860,8 @@ Cerut de utilizator la 06.10.2026 (verificarea fluxului, apoi deciziile: facturi
 - Notificarea Modul oprit temporar (ModuleUnavailable.razor), bannerul de sus (ModuleAlertBanner.razor) si randul din Setari -> Module (ModulesPanel.razor) numesc utilizatorul si rolul celui care a oprit modulul (ModuleOrigins.StoppedByText); motivul ramane ascuns utilizatorilor obisnuiti. Rolul se salveaza in module_state.stopped_role (migrarea 74); un stop salvat inainte arata doar numele contului.
 - Corectat in teste: panoul Elcomtur automat are doua intrerupatoare (verificarea astepta unul).
 - Verificat: suita completa la release (rulata de release.ps1); neverificat vizual in browser pe instanta separata.
+
+## Finalizat la 09.11.2026 - Versiunea 0.5.52: mentenanta cu componente, scadente pe componenta si acte aditionale
+
+- Contracte cu data de referinta si componente (familii On/Off, componente discrete), inghetare la date incomplete, tab Notificari Contracte incomplete (migrarea 76 -> 77 dupa renumerotare: migrarile de mentenanta sunt 75-80); scadente pe punct x componenta (78), interventii cu componente (79), acte aditionale cu referinta si componente (80); nomenclator Componente mentenanta (76) si acte aditionale (75).
+- Verificat: suita completa (memorie si MariaDB), browser pe instanta separata (formular contract, lista, tab Notificari, interventie cu componente, act aditional). Neverificat in browser: anularea / stergerea actului, tabelul de verificare a interventiilor, fereastra tichetului cu componente; help doar minim (docs/HELP_DE_REGENERAT.md).
