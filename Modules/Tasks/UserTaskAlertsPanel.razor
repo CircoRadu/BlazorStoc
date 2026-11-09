@@ -1,0 +1,89 @@
+@namespace BlazorStoc.Components.Shared
+@using BlazorStoc.Modules.Tasks
+@implements IDisposable
+@inject IUserTaskAlerts Alerts
+@inject IUserTaskRepository Repository
+@inject ILogger<UserTaskAlertsPanel> Logger
+
+@* The content of the tab "Taskuri" of the Notifications page: the tasks of the signed-in user that need attention, with the reason; "Preia" and the details open from the row. *@
+@if (openId is { } id)
+{
+    <TaskDetailsDialog @key="id" TaskId="id" Changed="ReloadAsync" Closed="CloseDialogAsync" />
+}
+@if (error is not null) { <div class="error-banner" role="alert">@error</div> }
+<section class="catalog">
+    <div class="catalog-heading"><h2>Taskurile mele care cer atenție <span>@summary.Alerts.Count</span></h2><small>Nepreluate, cu termenul depășit sau care expiră în cel mult @summary.WarningDays @(summary.WarningDays == 1 ? "zi" : "zile")</small></div>
+    @if (loading) { <div class="empty-state" role="status"><div class="spinner"></div><h3>Se încarcă taskurile</h3></div> }
+    else if (summary.Alerts.Count == 0)
+    {
+        <div class="empty-state"><span class="empty-icon">✓</span><h3>Niciun task nu cere atenție</h3><p>Aici apar taskurile tale nepreluate, cele cu termenul depășit și cele care expiră curând. <a href="/taskurile-mele">Deschide toate taskurile mele</a>.</p></div>
+    }
+    else
+    {
+        <Paged Items="summary.Alerts" Id="user-task-alerts-size" Context="pageRows">
+            <div class="table-scroll"><table><thead><tr><th>TITLU</th><th>BENEFICIAR</th><th>MOTIV</th><th>TERMEN</th><th>STARE</th><th><span class="sr-only">Acțiuni</span></th></tr></thead><tbody>
+            @foreach (var alert in pageRows)
+            {
+                var task = alert.Task;
+                <tr @key="task.Id" class="@(alert.NotAccepted ? "task-row-new" : null)">
+                    <td><strong>@task.Title</strong></td>
+                    <td>@task.BeneficiaryName</td>
+                    <td>@foreach (var reason in Reasons(alert)) { <span class="task-new-badge">@reason</span><text> </text> }</td>
+                    <td class="@(alert.Overdue ? "task-due-overdue" : alert.DueSoon ? "task-due-soon" : "")">@UserTaskRules.DueText(task.DueDate)</td>
+                    <td>@UserTaskRules.StatusLabel(task.Status)</td>
+                    <td class="row-actions">
+                        @if (alert.NotAccepted) { <button class="row-icon check" disabled="@busy" aria-label="@($"Preia taskul {task.Title}")" title="@($"Preia taskul {task.Title}")" @onclick="() => AcceptAsync(task)"></button> }
+                        <button class="row-icon view" aria-label="@($"Deschide taskul {task.Title}")" title="@($"Deschide taskul {task.Title}")" @onclick="() => openId = task.Id"></button>
+                    </td>
+                </tr>
+            }
+            </tbody></table></div>
+        </Paged>
+    }
+</section>
+
+@code {
+    private UserTaskAlertSummary summary = UserTaskAlertSummary.Empty;
+    private bool loading = true, busy;
+    private int? openId;
+    private string? error;
+    private readonly CancellationTokenSource lifetime = new();
+
+    private static IEnumerable<string> Reasons(UserTaskAlert alert)
+    {
+        if (alert.NotAccepted) yield return "Nepreluat";
+        if (alert.Overdue) yield return $"Termen depășit cu {-alert.DaysLeft} {(alert.DaysLeft == -1 ? "zi" : "zile")}";
+        else if (alert.DueSoon) yield return alert.DaysLeft == 0 ? "Termen astăzi" : $"Termen în {alert.DaysLeft} {(alert.DaysLeft == 1 ? "zi" : "zile")}";
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        Alerts.Changed += OnChanged;
+        await LoadAsync();
+        loading = false;
+    }
+
+    private async Task LoadAsync() => summary = await Alerts.GetAsync(lifetime.Token);
+    private void OnChanged() => InvokeAsync(async () => { await LoadAsync(); StateHasChanged(); });
+    private async Task ReloadAsync() { await LoadAsync(); StateHasChanged(); }
+    private async Task CloseDialogAsync() { openId = null; await ReloadAsync(); }
+
+    private async Task AcceptAsync(UserTask task)
+    {
+        if (busy) return;
+        busy = true; error = null;
+        try { await Repository.AcceptAsync(task, lifetime.Token); }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (UserTaskOperationException exception) { error = exception.Message; }
+        catch (AccessDeniedException exception) { error = exception.Message; }
+        catch (Exception exception)
+        {
+            Logger.LogError("Task takeover failed ({ErrorType}).", exception.GetType().Name);
+            error = "Taskul nu a putut fi preluat.";
+        }
+        finally { busy = false; }
+        await ReloadAsync();
+    }
+
+    public void Dispose() { Alerts.Changed -= OnChanged; lifetime.Cancel(); lifetime.Dispose(); }
+}

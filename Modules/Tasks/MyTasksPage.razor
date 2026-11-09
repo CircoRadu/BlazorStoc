@@ -1,0 +1,170 @@
+@page "/taskurile-mele"
+@attribute [Authorize]
+@attribute [BlazorStoc.Modules.Module(BlazorStoc.Modules.Tasks.TasksModule.ModuleId)]
+@rendermode @(new InteractiveServerRenderMode(prerender: false))
+@inject IUserTaskRepository Repository
+@inject IAccessControl Access
+@inject IChangeFeed ChangeFeed
+@inject ChangeOrigin Origin
+@inject ILogger<MyTasksPage> Logger
+@implements IDisposable
+<PageBoundary>
+
+<PageTitle>Taskurile mele · BlazorStoc</PageTitle>
+<div class="page-heading">
+    <div><p class="eyebrow">CONTUL MEU</p><h1>Taskurile mele</h1><p class="muted">Taskurile primite de la administrator. Un task nou apare pe fond roșu până îl preiei.</p></div>
+</div>
+<LiveChangeNotice Visible="live?.HasPendingChange == true" Reload="ReloadLiveAsync" />
+@if (error is not null) { <div class="error-banner" role="alert">@error</div> }
+
+@if (openId is { } id)
+{
+    <TaskDetailsDialog @key="id" TaskId="id" Changed="ReloadAsync" Closed="CloseDialogAsync" />
+}
+
+<section class="catalog">
+    <div class="settings-tabs" role="tablist" aria-label="Taskurile mele">
+        <button type="button" role="tab" id="tab-my-active" class="settings-tab @(showDone ? "" : "active") @(NewCount > 0 ? "needs-attention" : "")" aria-selected="@(showDone ? "false" : "true")" aria-controls="panel-my-tasks" @onclick="() => OpenTab(false)">Active <span class="count-badge">@Scope(true).Count</span></button>
+        <button type="button" role="tab" id="tab-my-done" class="settings-tab @(showDone ? "active" : "")" aria-selected="@(showDone ? "true" : "false")" aria-controls="panel-my-tasks" @onclick="() => OpenTab(true)">Finalizate <span class="count-badge">@Scope(false).Count</span></button>
+    </div>
+    <div id="panel-my-tasks" role="tabpanel" aria-labelledby="@(showDone ? "tab-my-done" : "tab-my-active")">
+        @if (loading) { <div class="empty-state" role="status"><div class="spinner"></div><h3>Se încarcă taskurile</h3></div> }
+        else
+        {
+            var scope = Scope(!showDone);
+            @if (!showDone && scope.Count > 0)
+            {
+                <div class="task-label-bar" role="group" aria-label="Filtre taskuri">
+                    @foreach (var status in new[] { UserTaskStatus.Future, UserTaskStatus.InProgress })
+                    {
+                        var count = scope.Count(task => task.Status == status);
+                        @if (count > 0 || statusFilter.Contains(status))
+                        {
+                            <button type="button" class="task-label @(statusFilter.Contains(status) ? "active" : "")" aria-pressed="@(statusFilter.Contains(status) ? "true" : "false")" title="@($"Filtrează după starea {UserTaskRules.StatusLabel(status)}")" @onclick="() => ToggleStatus(status)">@UserTaskRules.StatusLabel(status) <span class="task-label-count">@count</span></button>
+                        }
+                    }
+                    @if (statusFilter.Count > 0) { <button type="button" class="refresh act-close" @onclick="() => statusFilter.Clear()">Șterge filtrele</button> }
+                </div>
+            }
+            IReadOnlyList<UserTask> rows = [.. scope.Where(task => statusFilter.Count == 0 || statusFilter.Contains(task.Status))
+                .OrderBy(task => task.IsAccepted ? 1 : 0).ThenBy(task => task.DueDate is null ? DateOnly.MaxValue : task.DueDate!.Value).ThenByDescending(task => task.CreatedUtc)];
+            @if (rows.Count == 0)
+            {
+                <div class="empty-state"><span class="empty-icon">▦</span><h3>@(scope.Count == 0 ? (showDone ? "Nu ai taskuri finalizate" : "Nu ai taskuri active") : "Niciun task pentru filtrul curent")</h3>
+                    <p>@(scope.Count == 0 ? (showDone ? "Taskurile pe care le marchezi „Finalizat” apar aici." : "Când administratorul îți dă un task, apare aici.") : "Șterge filtrul ca să vezi toate taskurile.")</p></div>
+            }
+            else
+            {
+                <Paged Items="rows" Id="@(showDone ? "my-tasks-done-size" : "my-tasks-active-size")" Context="pageRows">
+                    <div class="table-scroll"><table><thead><tr><th>BENEFICIAR</th><th>TITLU</th><th>CREAT</th><th>TERMEN</th><th>STARE</th><th class="number">FIȘIERE</th><th><span class="sr-only">Acțiuni</span></th></tr></thead><tbody>
+                    @foreach (var task in pageRows)
+                    {
+                        <tr @key="task.Id" class="@(task.IsActive && !task.IsAccepted ? "task-row-new" : null)">
+                            <td>@if (canSeeBeneficiary) { <a class="category-table-link" href="@($"/beneficiari/{task.BeneficiaryId}")">@task.BeneficiaryName</a> } else { <text>@task.BeneficiaryName</text> }</td>
+                            <td><strong>@task.Title</strong>@if (task.IsActive && !task.IsAccepted) { <text> </text><span class="task-new-badge">Nou</span> }<br /><small class="muted" title="@task.Description">@Shorten(task.Description)</small></td>
+                            <td>@task.CreatedUtc.ToLocalTime().ToString("dd.MM.yyyy HH:mm", System.Globalization.CultureInfo.InvariantCulture)</td>
+                            <td class="@DueClass(task)">@UserTaskRules.DueText(task.DueDate)</td>
+                            <td>
+                                <select aria-label="@($"Starea taskului {task.Title}")" value="@((int)task.Status)" disabled="@(busyId == task.Id)" @onchange="args => StatusChangedAsync(task, args)">
+                                    @foreach (var status in UserTaskRules.Statuses) { <option value="@((int)status)">@UserTaskRules.StatusLabel(status)</option> }
+                                </select>
+                            </td>
+                            <td class="number">@task.FileCount</td>
+                            <td class="row-actions">
+                                @if (task.IsActive && !task.IsAccepted) { <button class="row-icon check" disabled="@(busyId == task.Id)" aria-label="@($"Preia taskul {task.Title}")" title="@($"Preia taskul {task.Title}")" @onclick="() => AcceptAsync(task)"></button> }
+                                <button class="row-icon view" aria-label="@($"Deschide taskul {task.Title}")" title="@($"Deschide taskul {task.Title}")" @onclick="() => openId = task.Id"></button>
+                            </td>
+                        </tr>
+                    }
+                    </tbody></table></div>
+                </Paged>
+            }
+        }
+    </div>
+</section>
+
+</PageBoundary>
+
+@code {
+    private IReadOnlyList<UserTask> tasks = Array.Empty<UserTask>();
+    private readonly HashSet<UserTaskStatus> statusFilter = [];
+    private bool showDone, loading = true, canSeeBeneficiary;
+    private int? openId;
+    private int busyId;
+    private int warningDays = UserTaskRules.DefaultWarningDays;
+    private string? error;
+    private LiveRefresh? live;
+    private readonly CancellationTokenSource lifetime = new();
+
+    private DateOnly Today => DateOnly.FromDateTime(DateTime.Now);
+    private int NewCount => tasks.Count(task => task.IsActive && !task.IsAccepted);
+    private IReadOnlyList<UserTask> Scope(bool active) => [.. tasks.Where(task => task.IsActive == active)];
+    private static string Shorten(string text) => text.Length <= 90 ? text : text[..87] + "…";
+    private string DueClass(UserTask task) => !task.IsActive || task.DueDate is not { } due ? "" : due < Today ? "task-due-overdue" : due <= Today.AddDays(warningDays) ? "task-due-soon" : "";
+
+    protected override async Task OnInitializedAsync()
+    {
+        try { canSeeBeneficiary = await Access.HasAsync("beneficiari.view", lifetime.Token); } catch (Exception exception) when (exception is not OperationCanceledException) { }
+        live = new LiveRefresh(ChangeFeed, Origin.Id, change => change.EntityType == AuditEntities.UserTask, () => InvokeAsync(RefreshSilentlyAsync),
+            () => openId is not null, () => InvokeAsync(StateHasChanged), fallbackInterval: TimeSpan.FromSeconds(60));
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        error = null;
+        try
+        {
+            tasks = await Repository.GetMineAsync(lifetime.Token);
+            try { warningDays = await Repository.GetWarningDaysAsync(lifetime.Token); } catch (Exception exception) when (exception is not OperationCanceledException) { }
+        }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { return; }
+        catch (Exception exception)
+        {
+            Logger.LogWarning("My tasks loading failed ({ErrorType}).", exception.GetType().Name);
+            error = "Taskurile nu au putut fi încărcate. Reîncearcă după o clipă.";
+            tasks = [];
+        }
+        loading = false;
+    }
+
+    private async Task RefreshSilentlyAsync()
+    {
+        try { tasks = await Repository.GetMineAsync(lifetime.Token); StateHasChanged(); }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (Exception exception) { Logger.LogDebug("My tasks refresh failed ({ErrorType}).", exception.GetType().Name); }
+    }
+
+    private Task ReloadLiveAsync() => live?.ReloadPendingAsync() ?? Task.CompletedTask;
+    private async Task ReloadAsync() { await LoadAsync(); StateHasChanged(); }
+    private async Task CloseDialogAsync() { openId = null; await ReloadAsync(); }
+    private void OpenTab(bool done) { showDone = done; statusFilter.Clear(); }
+    private void ToggleStatus(UserTaskStatus status) { if (!statusFilter.Add(status)) statusFilter.Remove(status); }
+
+    private async Task AcceptAsync(UserTask task) => await RunAsync(task, () => Repository.AcceptAsync(task, lifetime.Token), "Taskul nu a putut fi preluat.");
+
+    private async Task StatusChangedAsync(UserTask task, ChangeEventArgs args)
+    {
+        if (!int.TryParse(args.Value?.ToString(), out var value) || !Enum.IsDefined((UserTaskStatus)value)) return;
+        await RunAsync(task, () => Repository.SetStatusAsync(task, (UserTaskStatus)value, lifetime.Token), "Starea taskului nu a putut fi schimbată.");
+    }
+
+    private async Task RunAsync(UserTask task, Func<Task<UserTask>> operation, string fallback)
+    {
+        if (busyId != 0) return;
+        busyId = task.Id; error = null;
+        try { await operation(); }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (UserTaskOperationException exception) { error = exception.Message; }
+        catch (AccessDeniedException exception) { error = exception.Message; }
+        catch (Exception exception)
+        {
+            Logger.LogError("Task operation failed ({ErrorType}).", exception.GetType().Name);
+            error = fallback;
+        }
+        finally { busyId = 0; }
+        await ReloadAsync();
+    }
+
+    public void Dispose() { live?.Dispose(); lifetime.Cancel(); lifetime.Dispose(); }
+}

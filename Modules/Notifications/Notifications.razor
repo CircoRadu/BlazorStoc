@@ -46,9 +46,10 @@
     }
     <ElcomturBalancesTab Active="@(validationTab == "balances")" Selected="OpenBalances" />
     <MaintenanceIncompleteTab Active="@(validationTab == "incomplete")" Selected="OpenIncomplete" />
+    <UserTaskAlertsTab Active="@(validationTab == "tasks")" Selected="OpenTasks" />
 </div>
 
-<div id="panel-notifications" role="tabpanel" aria-labelledby="@(validationTab == "tickets" ? "tab-tickets" : validationTab == "beneficiaries" ? "tab-beneficiaries" : validationTab == "issues" ? "tab-issues" : validationTab == "balances" ? "tab-balances" : validationTab == "incomplete" ? "tab-contracts-incomplete" : showResolved ? "tab-resolved" : "tab-active")">
+<div id="panel-notifications" role="tabpanel" aria-labelledby="@(validationTab == "tickets" ? "tab-tickets" : validationTab == "beneficiaries" ? "tab-beneficiaries" : validationTab == "issues" ? "tab-issues" : validationTab == "balances" ? "tab-balances" : validationTab == "incomplete" ? "tab-contracts-incomplete" : validationTab == "tasks" ? "tab-user-tasks" : showResolved ? "tab-resolved" : "tab-active")">
 @if (validationTab == "tickets")
 {
     <ValidationQueuePanel ShowDiscarded="true" Changed="RefreshQueuesAsync" />
@@ -56,6 +57,10 @@
 else if (validationTab == "balances")
 {
     <ElcomturBalancesPanel />
+}
+else if (validationTab == "tasks")
+{
+    <UserTaskAlertsPanel />
 }
 else if (validationTab == "incomplete")
 {
@@ -194,6 +199,7 @@ else if (loaded)
     private void OpenIssues() => OpenTab("issues", false);
     private void OpenBalances() => OpenTab("balances", false);
     private void OpenIncomplete() => OpenTab("incomplete", false);
+    private void OpenTasks() => OpenTab("tasks", false);
     // The id of the Elcomtur module (a module does not refer to another: the tab is shown only while that module runs; its content comes through ElcomturBalancesPanel).
     private const string ElcomturModuleId = "elcomtur";
 
@@ -224,6 +230,7 @@ else if (loaded)
         else if (TabQuery == "beneficiari" && queues.CanBeneficiaries) validationTab = "beneficiaries";
         else if (TabQuery == "probleme" && (queues.CanTickets || queues.CanBeneficiaries)) validationTab = "issues";
         else if (TabQuery == "balante" && Modules.IsAvailable(ElcomturModuleId)) validationTab = "balances";
+        else if (TabQuery == "taskuri") validationTab = "tasks";
         else if (TabQuery == "contracte-incomplete" && Modules.IsAvailable("mentenanta")) validationTab = "incomplete";
         await LoadAsync(true);
         RefreshPeriodicallyAsync().FireAndForget(Logger, "periodic refresh");

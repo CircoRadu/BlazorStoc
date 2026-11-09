@@ -1,0 +1,130 @@
+@inject IUserTaskRepository Repository
+@inject ILogger<TaskForm> Logger
+@implements IDisposable
+@* The form of a task (add / edit), shared by the popup on the page of the beneficiary and by the "Adaugă task utilizator" page. The beneficiary is fixed (given by the caller). After a
+   task is added the form stays open on it (edit mode), so files can be attached at once; Closed is raised by the button. *@
+
+<UnsavedChangesTracker @ref="tracker" Adding="@(current is null)" Snapshot="CurrentSnapshot" Discard="DiscardAsync" />
+<section class="product-editor" aria-labelledby="task-editor-title">
+    <div class="catalog-heading"><h2 id="task-editor-title">@(current is null ? "Adaugă task" : $"Editează taskul #{current.Id}")</h2><span class="heading-actions"><HelpButton Topic="task-formular" About="Formularul taskului" /></span></div>
+    <p class="form-note">Beneficiar: <strong>@BeneficiaryName</strong> · Data creării: <strong>@CreatedText</strong></p>
+    @if (notice is not null) { <div class="success-banner" role="status">@notice</div> }
+    @if (error is not null) { <div class="error-banner" role="alert">@error</div> }
+    <EditForm Model="input" OnSubmit="SubmitAsync" FormName="task-editor">
+        <fieldset disabled="@(saving || loading)">
+            <div class="editor-grid">
+                <label for="task-title">Titlu *<InputTextLive id="task-title" @bind-Value="input.Title" maxlength="@UserTaskRules.TitleMaxLength" autocomplete="off" /></label>
+                <label for="task-user">Utilizator *
+                    <SearchableSelect Id="task-user" Label="Utilizator *" Placeholder="Caută sau alege utilizatorul…" EmptyText="Niciun utilizator găsit."
+                                      Options="UserOptions" SelectedId="@(input.AssignedUserId > 0 ? input.AssignedUserId : null)" SelectedIdChanged="UserChanged" Disabled="saving" /></label>
+                <label for="task-status">Stare *
+                    <select id="task-status" value="@((int)input.Status)" @onchange="StatusChanged">
+                        @foreach (var status in UserTaskRules.Statuses) { <option value="@((int)status)">@UserTaskRules.StatusLabel(status)</option> }
+                    </select></label>
+                <div class="task-due-field">
+                    <ToggleSwitch Value="hasDue" ValueChanged="DueToggled" AriaLabel="Taskul are termen limită" OnText="Are termen" OffText="Fără termen">Termen limită</ToggleSwitch>
+                    @if (hasDue) { <PickOnlyDate Id="task-due" @bind-Value="input.DueDate" Disabled="saving" /> }
+                </div>
+                <label for="task-description" class="full-width">Descriere *<textarea id="task-description" rows="5" maxlength="@UserTaskRules.DescriptionMaxLength" @bind="input.Description" @bind:event="oninput"></textarea></label>
+            </div>
+            <div class="editor-actions">
+                <button class="primary" type="submit">@(saving ? "Se salvează…" : current is null ? "Adaugă taskul" : "Salvează taskul")</button>
+                <button class="danger" type="button" @onclick="CloseAsync">@(current is null ? "Anulează" : "Închide")</button>
+            </div>
+        </fieldset>
+    </EditForm>
+    <TaskFilesPanel TaskId="@(current?.Id ?? 0)" Changed="FilesChangedAsync" />
+</section>
+
+@code {
+    [Parameter, EditorRequired] public int BeneficiaryId { get; set; }
+    [Parameter] public string BeneficiaryName { get; set; } = "";
+    [Parameter] public UserTask? Original { get; set; }
+    // Raised after a task was added or changed (the form stays open).
+    [Parameter] public EventCallback<UserTask> Saved { get; set; }
+    [Parameter] public EventCallback Closed { get; set; }
+
+    private UnsavedChangesTracker? tracker;
+    private UserTask? current;
+    private UserTaskInput input = new();
+    private IReadOnlyList<UserTaskUser> users = Array.Empty<UserTaskUser>();
+    private bool saving, loading = true, hasDue;
+    private string? error, notice;
+    private readonly CancellationTokenSource lifetime = new();
+
+    private IReadOnlyList<SelectOption> UserOptions => [.. users.Where(user => user.IsActive || user.Id == input.AssignedUserId)
+        .Select(user => new SelectOption(user.Id, user.Name + (user.IsActive ? "" : " (dezactivat)"), user.Username))];
+
+    private string CreatedText => current is null ? StockMovementRules.DisplayDate(DateOnly.FromDateTime(DateTime.Now))
+        : current.CreatedUtc.ToLocalTime().ToString("dd.MM.yyyy HH:mm", System.Globalization.CultureInfo.InvariantCulture);
+
+    private string CurrentSnapshot() => FormSnapshot.Of(input, hasDue);
+    private Task DiscardAsync() => Closed.InvokeAsync();
+    private Task CloseAsync() => saving ? Task.CompletedTask : tracker is null ? Closed.InvokeAsync() : tracker.RunAfterConfirmAsync(() => Closed.InvokeAsync());
+
+    protected override async Task OnInitializedAsync()
+    {
+        current = Original;
+        input = Original is null ? new() { BeneficiaryId = BeneficiaryId } : UserTaskInput.From(Original);
+        hasDue = input.DueDate is not null;
+        try { users = await Repository.GetAssignableUsersAsync(lifetime.Token); }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (Exception exception)
+        {
+            Logger.LogWarning("Users for tasks loading failed ({ErrorType}).", exception.GetType().Name);
+            error = "Lista utilizatorilor nu a putut fi încărcată.";
+        }
+        loading = false;
+    }
+
+    private void UserChanged(int? id) => input.AssignedUserId = id ?? 0;
+    private void StatusChanged(ChangeEventArgs args) { if (int.TryParse(args.Value?.ToString(), out var value) && Enum.IsDefined((UserTaskStatus)value)) input.Status = (UserTaskStatus)value; }
+
+    private void DueToggled(bool value)
+    {
+        hasDue = value;
+        input.DueDate = value ? input.DueDate ?? DateOnly.FromDateTime(DateTime.Now).AddDays(7) : null;
+    }
+
+    private async Task FilesChangedAsync()
+    {
+        // Adding a file may change the task (taken over); the list behind the form follows.
+        if (current is null) return;
+        try { if (await Repository.GetAsync(current.Id, lifetime.Token) is { } fresh) { current = fresh; await Saved.InvokeAsync(fresh); } }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (Exception exception) { Logger.LogWarning("Task refresh failed ({ErrorType}).", exception.GetType().Name); }
+    }
+
+    private async Task SubmitAsync()
+    {
+        if (saving) return;
+        error = null; notice = null;
+        if (!hasDue) input.DueDate = null;
+        if (UserTaskRules.ValidationError(input) is { } problem) { error = problem; return; }
+        saving = true;
+        UserTask? saved = null;
+        try
+        {
+            saved = current is null ? await Repository.CreateAsync(input, lifetime.Token) : await Repository.UpdateAsync(current, input, lifetime.Token);
+        }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (UserTaskOperationException exception) { error = exception.Message; }
+        catch (AccessDeniedException exception) { error = exception.Message; }
+        catch (Exception exception)
+        {
+            Logger.LogError("Task saving failed ({ErrorType}).", exception.GetType().Name);
+            error = "Taskul nu a putut fi salvat. Datele formularului au fost păstrate; actualizează pagina înainte să reîncerci.";
+        }
+        finally { saving = false; }
+        if (saved is null) return;
+        var wasNew = current is null;
+        current = saved;
+        input = UserTaskInput.From(saved);
+        hasDue = input.DueDate is not null;
+        tracker?.Rebase();
+        notice = wasNew ? "Taskul a fost adăugat. Poți atașa fișiere sau închide fereastra." : "Taskul a fost salvat.";
+        await Saved.InvokeAsync(saved);
+    }
+
+    public void Dispose() { lifetime.Cancel(); lifetime.Dispose(); }
+}

@@ -1,14 +1,14 @@
 @using BlazorStoc.Services
 <div class="delete-overlay" @onkeydown="KeyAsync">
     <div class="delete-dialog template-popup file-preview" role="dialog" aria-modal="true" tabindex="-1" aria-labelledby="file-preview-title">
-        <div class="catalog-heading"><h2 id="file-preview-title">@File.OriginalName</h2><span class="heading-actions"><a class="refresh act-export" href="@($"/media/entity-files/{File.Id}")" download="@File.OriginalName">Descarcă</a><button type="button" class="danger" @onclick="() => Closed.InvokeAsync()">Închide</button></span></div>
+        <div class="catalog-heading"><h2 id="file-preview-title">@File.OriginalName</h2><span class="heading-actions"><a class="refresh act-export" href="@($"{BaseUrl}/{File.Id}")" download="@File.OriginalName">Descarcă</a><button type="button" class="danger" @onclick="() => Closed.InvokeAsync()">Închide</button></span></div>
         @if (File.ContentType.StartsWith("image/", StringComparison.Ordinal))
         {
-            <div class="file-preview-body"><img src="@($"/media/entity-files/{File.Id}?inline=1")" alt="@File.OriginalName" /></div>
+            <div class="file-preview-body"><img src="@($"{BaseUrl}/{File.Id}?inline=1")" alt="@File.OriginalName" /></div>
         }
         else if (File.ContentType is "application/pdf" or "text/plain" or "text/csv")
         {
-            <iframe class="file-preview-frame" title="@File.OriginalName" src="@($"/media/entity-files/{File.Id}?inline=1")"></iframe>
+            <iframe class="file-preview-frame" title="@File.OriginalName" src="@($"{BaseUrl}/{File.Id}?inline=1")"></iframe>
         }
         else
         {
@@ -20,6 +20,8 @@
 @code {
     [Parameter, EditorRequired] public EntityFile File { get; set; } = default!;
     [Parameter] public EventCallback Closed { get; set; }
+    // The download address of the files of this kind (the files of a task have their own).
+    [Parameter] public string BaseUrl { get; set; } = "/media/entity-files";
 
     private Task KeyAsync(KeyboardEventArgs e) => e.Key == "Escape" ? Closed.InvokeAsync() : Task.CompletedTask;
 }

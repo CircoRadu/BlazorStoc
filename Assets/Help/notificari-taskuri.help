@@ -1,0 +1,16 @@
+# Notificări · Taskuri
+Ruta: /notificari
+Tab: Taskuri
+Cautare: notificari taskuri nepreluat termen depasit termen in curand utilizator preia
+
+Fila cu avertizările despre taskurile tale (nu ale altora): taskuri nepreluate, cu termenul depășit sau cu termenul în următoarele zile (3, setare globală). Dispare singură când taskul se finalizează sau termenul se mută mai departe.
+
+## Elemente
+### Lista de taskuri
+- Motiv | coloană | „Nepreluat”, „Termen depășit cu N zile” sau „Termen în N zile”.
+- Preia taskul | iconita:check | Preia taskul din rând.
+- Deschide taskul | iconita:view | Deschide detaliile ([[task-detalii]]).
+
+## Flux: Cum preiau un task din notificari
+1. Deschide fila „Taskuri” din pagina Notificări.
+2. Pe rândul taskului nepreluat apasă iconița de bifă („Preia taskul”).

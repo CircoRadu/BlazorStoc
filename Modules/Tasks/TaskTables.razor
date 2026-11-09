@@ -1,0 +1,268 @@
+@inject IUserTaskRepository Repository
+@inject IAccessControl Access
+@inject IChangeFeed ChangeFeed
+@inject ChangeOrigin Origin
+@inject ILogger<TaskTables> Logger
+@implements IDisposable
+@* The tables of the administrator: the active tasks (not finished) and the finished ones, each paged. BeneficiaryId = 0 lists the tasks of everybody (the page of the Administration
+   menu), otherwise only those of that beneficiary (the section of its page). The status and the user are labels: a click on one adds a filter, the active filters are shown above the
+   table and removed with a click. Active tasks have edit and delete, finished tasks only view. *@
+
+<LiveChangeNotice Visible="live?.HasPendingChange == true" Reload="ReloadLiveAsync" />
+@if (error is not null) { <div class="error-banner" role="alert">@error</div> }
+@if (notice is not null) { <div class="success-banner" role="status">@notice</div> }
+
+@if (formOpen)
+{
+    <div class="delete-overlay"><div class="delete-dialog template-popup" role="dialog" aria-modal="true" tabindex="-1" aria-labelledby="task-editor-title">
+        <TaskForm @key="formKey" BeneficiaryId="@(editing?.BeneficiaryId ?? BeneficiaryId)" BeneficiaryName="@(editing?.BeneficiaryName ?? BeneficiaryName)" Original="editing" Saved="SavedAsync" Closed="CloseFormAsync" />
+    </div></div>
+}
+@if (viewingId is { } viewId)
+{
+    <TaskDetailsDialog @key="viewId" TaskId="viewId" Changed="ReloadAsync" Closed="CloseViewAsync" />
+}
+@if (deleting is not null)
+{
+    <DeleteConfirmationDialog @key="deleting.Id" Title="Ștergi taskul?" Subject="Taskul" ObjectLabel="@($"{deleting.Title} · {deleting.BeneficiaryName}")"
+                              Description="@($"Taskul și fișierele lui se șterg definitiv. Utilizator: {deleting.AssignedUserName}.")"
+                              ConfirmationNote="Operația este înregistrată în jurnal, cu toate datele taskului."
+                              Busy="@deleteBusy" Error="@deleteError" Confirmed="DeleteAsync" Cancelled="CancelDeleteAsync" />
+}
+
+<div class="settings-tabs" role="tablist" aria-label="Taskuri">
+    <button type="button" role="tab" id="tab-tasks-active" class="settings-tab @(showDone ? "" : "active")" aria-selected="@(showDone ? "false" : "true")" aria-controls="panel-tasks" @onclick="() => OpenTab(false)">Active <span class="count-badge">@Scope(true).Count</span></button>
+    <button type="button" role="tab" id="tab-tasks-done" class="settings-tab @(showDone ? "active" : "")" aria-selected="@(showDone ? "true" : "false")" aria-controls="panel-tasks" @onclick="() => OpenTab(true)">Finalizate <span class="count-badge">@Scope(false).Count</span></button>
+</div>
+<div id="panel-tasks" role="tabpanel" aria-labelledby="@(showDone ? "tab-tasks-done" : "tab-tasks-active")">
+    <div class="filters"><label class="search-box"><span>⌕</span><input aria-label="Caută taskuri" placeholder="Caută după titlu, descriere, beneficiar sau utilizator…" @bind="query" @bind:event="oninput" /></label></div>
+    @if (loading) { <div class="empty-state" role="status"><div class="spinner"></div><h3>Se încarcă taskurile</h3></div> }
+    else
+    {
+        var scope = Scope(!showDone);
+        <div class="task-label-bar" role="group" aria-label="Filtre taskuri">
+            @if (!showDone)
+            {
+                @foreach (var status in new[] { UserTaskStatus.Future, UserTaskStatus.InProgress })
+                {
+                    var count = scope.Count(task => task.Status == status);
+                    @if (count > 0 || statusFilter.Contains(status))
+                    {
+                        <button type="button" class="task-label @(statusFilter.Contains(status) ? "active" : "")" aria-pressed="@(statusFilter.Contains(status) ? "true" : "false")" title="@($"Filtrează după starea {UserTaskRules.StatusLabel(status)}")" @onclick="() => ToggleStatus(status)">@UserTaskRules.StatusLabel(status) <span class="task-label-count">@count</span></button>
+                    }
+                }
+                @if (scope.Any(IsOverdue) || overdueOnly)
+                {
+                    <button type="button" class="task-label @(overdueOnly ? "active" : "")" aria-pressed="@(overdueOnly ? "true" : "false")" title="Arată doar taskurile cu termenul depășit" @onclick="() => overdueOnly = !overdueOnly">Termen depășit <span class="task-label-count">@scope.Count(IsOverdue)</span></button>
+                }
+            }
+            @foreach (var group in scope.GroupBy(task => task.AssignedUserId).OrderBy(group => group.First().AssignedUserName, StringComparer.CurrentCultureIgnoreCase))
+            {
+                var userId = group.Key;
+                <button type="button" class="task-label @(userFilter.Contains(userId) ? "active" : "")" aria-pressed="@(userFilter.Contains(userId) ? "true" : "false")" title="@($"Filtrează după utilizatorul {group.First().AssignedUserName}")" @onclick="() => ToggleUser(userId)">@group.First().AssignedUserName <span class="task-label-count">@group.Count()</span></button>
+            }
+            @if (HasFilters) { <button type="button" class="refresh act-close" @onclick="ClearFilters">Șterge filtrele</button> }
+        </div>
+        @if (HasFilters)
+        {
+            <div class="movement-filter-chips" aria-label="Filtre active">
+                @foreach (var status in statusFilter) { var current = status; <strong class="audit-filter-chip">stare: @UserTaskRules.StatusLabel(current) <button type="button" aria-label="Elimină filtrul stare @UserTaskRules.StatusLabel(current)" title="Elimină filtrul stare @UserTaskRules.StatusLabel(current)" @onclick="() => ToggleStatus(current)">×</button></strong> }
+                @foreach (var userId in userFilter) { var id = userId; <strong class="audit-filter-chip">utilizator: @UserName(id) <button type="button" aria-label="Elimină filtrul utilizator @UserName(id)" title="Elimină filtrul utilizator @UserName(id)" @onclick="() => ToggleUser(id)">×</button></strong> }
+                @if (overdueOnly) { <strong class="audit-filter-chip">termen depășit <button type="button" aria-label="Elimină filtrul termen depășit" title="Elimină filtrul termen depășit" @onclick="() => overdueOnly = false">×</button></strong> }
+            </div>
+        }
+        var rows = Filtered();
+        @if (rows.Count == 0)
+        {
+            <div class="empty-state"><span class="empty-icon">▦</span><h3>@(scope.Count == 0 ? (showDone ? "Nu există taskuri finalizate" : "Nu există taskuri active") : "Niciun task pentru filtrele curente")</h3>
+                <p>@(scope.Count == 0 ? (showDone ? "Taskurile apar aici după ce utilizatorul le marchează „Finalizat”." : "Adaugă un task unui utilizator ca să apară aici.") : "Elimină un filtru sau șterge textul din câmpul de căutare.")</p></div>
+        }
+        else
+        {
+            <Paged Items="rows" Id="@(showDone ? "tasks-done-size" : "tasks-active-size")" Context="pageRows">
+                <div class="table-scroll"><table><thead><tr>
+                    @if (BeneficiaryId == 0) { <th>BENEFICIAR</th> }
+                    <th>TITLU</th><th>UTILIZATOR</th><th>CREAT</th><th>TERMEN</th><th>STARE</th><th>PRELUAT</th><th class="number">FIȘIERE</th><th><span class="sr-only">Acțiuni</span></th></tr></thead><tbody>
+                @foreach (var task in pageRows)
+                {
+                    <tr @key="task.Id" class="@(task.IsActive && !task.IsAccepted ? "task-row-new" : null)">
+                        @if (BeneficiaryId == 0) { <td><a class="category-table-link" href="@($"/beneficiari/{task.BeneficiaryId}")">@task.BeneficiaryName</a></td> }
+                        <td><strong>@task.Title</strong><br /><small class="muted" title="@task.Description">@Shorten(task.Description)</small></td>
+                        <td><button type="button" class="task-label @(userFilter.Contains(task.AssignedUserId) ? "active" : "")" aria-pressed="@(userFilter.Contains(task.AssignedUserId) ? "true" : "false")" title="@($"Filtrează după utilizatorul {task.AssignedUserName}")" @onclick="() => ToggleUser(task.AssignedUserId)">@task.AssignedUserName</button>@if (!task.AssignedUserActive) { <br /><small class="muted">dezactivat</small> }</td>
+                        <td>@task.CreatedUtc.ToLocalTime().ToString("dd.MM.yyyy HH:mm", System.Globalization.CultureInfo.InvariantCulture)<br /><small class="muted">@task.CreatedBy</small></td>
+                        <td class="@DueClass(task)">@UserTaskRules.DueText(task.DueDate)</td>
+                        <td><button type="button" class="task-label @(statusFilter.Contains(task.Status) ? "active" : "")" aria-pressed="@(statusFilter.Contains(task.Status) ? "true" : "false")" title="@($"Filtrează după starea {UserTaskRules.StatusLabel(task.Status)}")" @onclick="() => ToggleStatus(task.Status)">@UserTaskRules.StatusLabel(task.Status)</button></td>
+                        <td>@if (task.IsAccepted) { <text>@(task.AcceptedUtc!.Value.ToLocalTime().ToString("dd.MM.yyyy HH:mm", System.Globalization.CultureInfo.InvariantCulture))</text> } else if (task.IsActive) { <span class="task-new-badge">Nepreluat</span> } else { <text>—</text> }</td>
+                        <td class="number">@task.FileCount</td>
+                        <td class="row-actions">
+                            @if (task.IsActive)
+                            {
+                                @if (canEdit) { <button class="row-icon edit" aria-label="@($"Editează taskul {task.Title}")" title="@($"Editează taskul {task.Title}")" @onclick="() => OpenEdit(task)"></button> }
+                                @if (canDelete) { <button class="row-icon delete" aria-label="@($"Șterge taskul {task.Title}")" title="@($"Șterge taskul {task.Title}")" @onclick="() => deleting = task"></button> }
+                            }
+                            else { <button class="row-icon view" aria-label="@($"Vezi taskul {task.Title}")" title="@($"Vezi taskul {task.Title}")" @onclick="() => viewingId = task.Id"></button> }
+                        </td>
+                    </tr>
+                }
+                </tbody></table></div>
+            </Paged>
+        }
+    }
+</div>
+
+@code {
+    // 0 = every beneficiary; otherwise only the tasks of this beneficiary (and "Adaugă task" is for it).
+    [Parameter] public int BeneficiaryId { get; set; }
+    [Parameter] public string BeneficiaryName { get; set; } = "";
+    // A task to open once loaded (the link from the journal): an active one in the edit window, a finished one in the details.
+    [Parameter] public int OpenTaskId { get; set; }
+    // Raised with the number of tasks listed (the count shown in the heading of the section of a beneficiary).
+    [Parameter] public EventCallback<int> CountChanged { get; set; }
+
+    private IReadOnlyList<UserTask> tasks = Array.Empty<UserTask>();
+    private readonly HashSet<UserTaskStatus> statusFilter = [];
+    private readonly HashSet<int> userFilter = [];
+    private bool overdueOnly, showDone, loading = true, canEdit, canDelete, formOpen, deleteBusy;
+    private string query = "";
+    private string? error, notice, deleteError;
+    private UserTask? editing, deleting;
+    private int? viewingId;
+    private Guid formKey = Guid.NewGuid();
+    private LiveRefresh? live;
+    private bool openedLinked;
+    private readonly CancellationTokenSource lifetime = new();
+
+    private DateOnly Today => DateOnly.FromDateTime(DateTime.Now);
+    private bool HasFilters => statusFilter.Count > 0 || userFilter.Count > 0 || overdueOnly;
+    private bool IsOverdue(UserTask task) => task.IsActive && task.DueDate is { } due && due < Today;
+    private IReadOnlyList<UserTask> Scope(bool active) => [.. tasks.Where(task => task.IsActive == active)];
+    private string UserName(int id) => tasks.FirstOrDefault(task => task.AssignedUserId == id)?.AssignedUserName ?? $"#{id}";
+    private static string Shorten(string text) => text.Length <= 90 ? text : text[..87] + "…";
+
+    private string DueClass(UserTask task) => !task.IsActive || task.DueDate is not { } due ? "" : due < Today ? "task-due-overdue" : due <= Today.AddDays(warningDays) ? "task-due-soon" : "";
+    private int warningDays = UserTaskRules.DefaultWarningDays;
+
+    private IReadOnlyList<UserTask> Filtered()
+    {
+        var text = query.Trim();
+        return [.. Scope(!showDone).Where(task =>
+            (text.Length == 0 || task.Title.Contains(text, StringComparison.OrdinalIgnoreCase) || task.Description.Contains(text, StringComparison.OrdinalIgnoreCase) ||
+             task.BeneficiaryName.Contains(text, StringComparison.OrdinalIgnoreCase) || task.AssignedUserName.Contains(text, StringComparison.OrdinalIgnoreCase)) &&
+            (statusFilter.Count == 0 || statusFilter.Contains(task.Status)) && (userFilter.Count == 0 || userFilter.Contains(task.AssignedUserId)) && (!overdueOnly || IsOverdue(task)))
+            .OrderBy(task => showDone ? 0 : task.DueDate is null ? 1 : 0).ThenBy(task => showDone || task.DueDate is null ? DateOnly.MaxValue : task.DueDate!.Value)
+            .ThenByDescending(task => showDone ? task.FinishedUtc ?? task.CreatedUtc : task.CreatedUtc)];
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            canEdit = await Access.HasAsync("taskuri.edit", lifetime.Token);
+            canDelete = await Access.HasAsync("taskuri.delete", lifetime.Token);
+        }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { return; }
+        catch (Exception) { canEdit = canDelete = false; }
+        live = new LiveRefresh(ChangeFeed, Origin.Id, change => change.EntityType == AuditEntities.UserTask && (BeneficiaryId == 0 || change.BeneficiaryId == BeneficiaryId),
+            () => InvokeAsync(RefreshSilentlyAsync), () => formOpen || deleting is not null || viewingId is not null, () => InvokeAsync(StateHasChanged), fallbackInterval: TimeSpan.FromSeconds(60));
+        await LoadAsync();
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (OpenTaskId > 0 && !openedLinked && !loading)
+        {
+            openedLinked = true;
+            if (tasks.FirstOrDefault(task => task.Id == OpenTaskId) is { } linked)
+            {
+                if (linked.IsActive && canEdit) OpenEdit(linked);
+                else { showDone = !linked.IsActive; viewingId = linked.Id; }
+            }
+            else error = "Taskul din legătură nu mai există.";
+        }
+        await Task.CompletedTask;
+    }
+
+    private async Task LoadAsync()
+    {
+        loading = true;
+        error = null;
+        try
+        {
+            tasks = BeneficiaryId > 0 ? await Repository.GetForBeneficiaryAsync(BeneficiaryId, lifetime.Token) : await Repository.GetAllAsync(lifetime.Token);
+            try { warningDays = await Repository.GetWarningDaysAsync(lifetime.Token); } catch (Exception exception) when (exception is not OperationCanceledException) { }
+        }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { return; }
+        catch (AccessDeniedException exception) { error = exception.Message; tasks = []; }
+        catch (Exception exception)
+        {
+            Logger.LogWarning("Tasks loading failed ({ErrorType}).", exception.GetType().Name);
+            error = "Taskurile nu au putut fi încărcate. Reîncearcă după o clipă.";
+            tasks = [];
+        }
+        loading = false;
+        await CountChanged.InvokeAsync(tasks.Count);
+        await OnParametersSetAsync();
+    }
+
+    private async Task RefreshSilentlyAsync()
+    {
+        try
+        {
+            tasks = BeneficiaryId > 0 ? await Repository.GetForBeneficiaryAsync(BeneficiaryId, lifetime.Token) : await Repository.GetAllAsync(lifetime.Token);
+            await CountChanged.InvokeAsync(tasks.Count);
+            StateHasChanged();
+        }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (Exception exception) { Logger.LogDebug("Tasks refresh failed ({ErrorType}).", exception.GetType().Name); }
+    }
+
+    private Task ReloadLiveAsync() => live?.ReloadPendingAsync() ?? Task.CompletedTask;
+    private async Task ReloadAsync() { await LoadAsync(); StateHasChanged(); }
+
+    private void OpenTab(bool done) { showDone = done; statusFilter.Clear(); overdueOnly = false; }
+    private void ToggleStatus(UserTaskStatus status) { if (!statusFilter.Add(status)) statusFilter.Remove(status); }
+    private void ToggleUser(int id) { if (!userFilter.Add(id)) userFilter.Remove(id); }
+    private void ClearFilters() { statusFilter.Clear(); userFilter.Clear(); overdueOnly = false; }
+
+    // Reloads the lists after a task was added or changed elsewhere on the same page (the changes of this session are not announced back to it).
+    public Task RefreshAsync() => ReloadAsync();
+
+    // The add window of the section of a beneficiary (called from the heading of the section).
+    public Task AddAsync()
+    {
+        if (BeneficiaryId <= 0) return Task.CompletedTask;
+        editing = null; formKey = Guid.NewGuid(); formOpen = true; notice = null;
+        StateHasChanged();
+        return Task.CompletedTask;
+    }
+
+    private void OpenEdit(UserTask task) { editing = task; formKey = Guid.NewGuid(); formOpen = true; notice = null; }
+    private async Task SavedAsync(UserTask saved) { editing = saved; await ReloadAsync(); }
+    private async Task CloseFormAsync() { formOpen = false; editing = null; await ReloadAsync(); }
+    private async Task CloseViewAsync() { viewingId = null; await ReloadAsync(); }
+    private Task CancelDeleteAsync() { deleting = null; deleteError = null; return Task.CompletedTask; }
+
+    private async Task DeleteAsync(string reason)
+    {
+        if (deleting is not { } task || deleteBusy) return;
+        deleteBusy = true; deleteError = null;
+        try
+        {
+            await Repository.DeleteAsync(task, reason, lifetime.Token);
+            notice = $"Taskul „{task.Title}” a fost șters.";
+            deleting = null;
+        }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (UserTaskOperationException exception) { deleteError = exception.Message; }
+        catch (AccessDeniedException exception) { deleteError = exception.Message; }
+        catch (Exception exception)
+        {
+            Logger.LogError("Task deletion failed ({ErrorType}).", exception.GetType().Name);
+            deleteError = "Taskul nu a putut fi șters. Actualizează pagina înainte să reîncerci.";
+        }
+        finally { deleteBusy = false; }
+        await ReloadAsync();
+    }
+
+    public void Dispose() { live?.Dispose(); lifetime.Cancel(); lifetime.Dispose(); }
+}

@@ -46,6 +46,7 @@ public static partial class MariaExtendedChecks
             await Section("Elcomtur: import of the backup, balances of the beneficiaries, journal", () => ElcomturAsync(configuration, admin, audit, probe));
             await Section("Elcomtur automatic import: directory, mask, firm, integrity, retention, schedule, notifications", () => ElcomturAutoAsync(configuration, admin, audit, probe));
             await Section("Beneficiary files: free files, listing with sections, rename without extension, delete, journal", () => BeneficiaryFilesAsync(configuration, admin, audit, probe));
+            await Section("User tasks: creation, access of the user, taking over, status, files, moves, alerts, warning days, deletion, journal", () => UserTasksAsync(configuration, admin, audit, probe));
             await Section("User types: system types, catalog permissions, seeding, assignment", () => UserTypesAsync(configuration, admin, audit, probe));
             await Section("Stock permissions: each kind of movement asks for its own key", () => StockPermissionsAsync(configuration, admin, audit));
             await Section("Module state: modules stopped by hand are saved, put back at restart, journal", () => ModuleStateAsync(configuration, admin, audit, probe));

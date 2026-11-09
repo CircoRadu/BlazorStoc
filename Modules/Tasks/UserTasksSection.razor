@@ -1,0 +1,30 @@
+@inject IAccessControl Access
+@* The section "Taskuri" of the page of a beneficiary (inside the gate of the module and of taskuri.view): the tables of the tasks of this beneficiary and the button that adds one. *@
+
+<section class="catalog">
+    <details class="catalog-collapse" open="@StartOpen"><summary class="catalog-heading"><h2>Taskuri <span>@count</span></h2>
+        <div class="heading-actions">
+            @if (canAdd) { <button type="button" class="refresh act-confirm" @onclick="AddAsync">+ Adaugă task</button> }
+        </div>
+    </summary>
+    <TaskTables @ref="tables" BeneficiaryId="BeneficiaryId" BeneficiaryName="@BeneficiaryName" CountChanged="value => { count = value; StateHasChanged(); }" />
+    </details>
+</section>
+
+@code {
+    [Parameter, EditorRequired] public int BeneficiaryId { get; set; }
+    [Parameter] public string BeneficiaryName { get; set; } = "";
+    [Parameter] public bool StartOpen { get; set; }
+
+    private TaskTables? tables;
+    private bool canAdd;
+    private int count;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try { canAdd = await Access.HasAsync("taskuri.add"); }
+        catch (Exception) { canAdd = false; }
+    }
+
+    private Task AddAsync() => tables?.AddAsync() ?? Task.CompletedTask;
+}

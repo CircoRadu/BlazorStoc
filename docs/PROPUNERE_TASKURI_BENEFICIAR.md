@@ -143,4 +143,4 @@ Propunere: tab nou **"Taskuri"** in pagina Notificari, pe tiparul filelor aduse 
 
 Ramas de confirmat (au valori implicite): (a) taskurile finalizate au doar vizualizare (fara editare/stergere) — alternativa: aceleasi iconite si pe finalizate; (b) tabelele stau pe aceeasi pagina cu formularul de adaugare — alternativa: intrare separata "Taskuri utilizatori" in Administrare.
 
-Ramas de confirmat (are valoare implicita): perioada de avertizare inainte de termen = setare globala, implicit 3 zile (alternativa: pe fiecare task).
+12. Perioada de avertizare inainte de termen: setare globala, 3 zile (confirmat 09.11.2026).

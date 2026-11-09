@@ -1,0 +1,28 @@
+# Taskuri utilizatori (Administrare)
+Ruta: /taskuri/adauga
+Cautare: task taskuri utilizator beneficiar adauga termen limita stare activ finalizat preluat filtru eticheta fisiere
+
+Pagina din meniul Administrare unde dai un task unui utilizator, pe un beneficiar, și vezi taskurile tuturor utilizatorilor, active și finalizate. Un task are titlu, descriere, utilizator, stare (În viitor, În lucru, Finalizat), termen limită opțional și fișiere atașate.
+
+## Elemente
+### Task nou
+- Beneficiar | listă cu căutare | Scrie o parte din numele sau CUI-ul beneficiarului și alege-l.
+- + Adaugă beneficiar | buton | Deschide fereastra obișnuită de adăugare a unui beneficiar; după salvare, beneficiarul nou este ales automat. Doar cu dreptul de a adăuga beneficiari.
+- Schimbă beneficiarul | buton | Revii la alegerea beneficiarului.
+- Formularul taskului | formular | Titlu, utilizator, stare, termen limită și descriere ([[task-formular]]).
+### Tabelele de taskuri
+- Active | filă | Taskurile care nu sunt finalizate (În viitor și În lucru), cu numărul lor.
+- Finalizate | filă | Taskurile finalizate.
+- Caută | câmp | Caută în titlu, descriere, beneficiar sau utilizator.
+- Etichetele de filtrare | butoane | Starea și utilizatorul sunt etichete: un clic pe o etichetă filtrează după ea; filtrele active apar ca etichete cu „×”, iar „Șterge filtrele” le scoate pe toate. Tipuri diferite de filtre se combină (ȘI), valorile aceluiași tip se completează (SAU).
+- Nepreluat | insigna | Taskul nu a fost încă preluat de utilizator; rândul este pe fond roșu.
+- Termen | coloană | Roșu când termenul a trecut, galben în perioada de avertizare (3 zile, setare globală).
+- Editează taskul | iconita:edit | Doar la taskurile active: deschide formularul ([[task-formular]]).
+- Șterge taskul | iconita:delete | Doar la taskurile active: șterge taskul și fișierele lui, cu motiv; operația se înregistrează în jurnal.
+- Vezi taskul | iconita:view | La taskurile finalizate: deschide detaliile ([[task-detalii]]).
+
+## Flux: Cum dau un task unui utilizator
+1. Alege beneficiarul (sau adaugă-l cu „+ Adaugă beneficiar”).
+2. Completează titlul, alege utilizatorul și, dacă vrei, un termen limită; scrie descrierea.
+3. Apasă „Adaugă taskul”. Fereastra rămâne deschisă ca să poți atașa fișiere.
+Nota: utilizatorul vede taskul pe fond roșu până îl preia.

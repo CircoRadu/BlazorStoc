@@ -1,0 +1,128 @@
+@page "/taskuri/adauga"
+@attribute [Authorize(Policy = "perm:taskuri.view")]
+@attribute [BlazorStoc.Modules.Module(BlazorStoc.Modules.Tasks.TasksModule.ModuleId)]
+@rendermode @(new InteractiveServerRenderMode(prerender: false))
+@* BeneficiaryEditor (the existing form, opened as a window) lives in the namespace of the pages. *@
+@using BlazorStoc.Components.Pages
+@inject IBeneficiaryRepository Beneficiaries
+@inject IAccessControl Access
+@inject UnsavedChanges Guard
+@inject ILogger<AddUserTaskPage> Logger
+@implements IDisposable
+<PageBoundary>
+
+<PageTitle>Taskuri utilizatori · BlazorStoc</PageTitle>
+<UnsavedChangesHost />
+<div class="page-heading">
+    <div><p class="eyebrow">ADMINISTRARE</p><h1>Adaugă task utilizator</h1><p class="muted">Alege beneficiarul și dă un task unui utilizator. Taskurile tuturor utilizatorilor sunt în tabelele de mai jos.</p></div>
+</div>
+@if (error is not null) { <div class="error-banner" role="alert">@error</div> }
+@if (notice is not null) { <div class="success-banner" role="status">@notice</div> }
+
+@if (addingBeneficiary)
+{
+    <div class="delete-overlay"><div class="delete-dialog template-popup" role="dialog" aria-modal="true" tabindex="-1" aria-labelledby="beneficiary-editor-title"><BeneficiaryEditor Saved="BeneficiaryAddedAsync" Closed="CloseBeneficiaryAsync" /></div></div>
+}
+
+@if (canAdd)
+{
+    <section class="catalog">
+        <div class="catalog-heading"><h2>Task nou</h2></div>
+        <div class="catalog-body">
+            @if (chosen is null)
+            {
+                <div class="task-beneficiary-pick">
+                    <SearchableSelect Id="task-beneficiary" Label="Beneficiar *" Placeholder="Caută beneficiarul după nume sau CUI…" EmptyText="Niciun beneficiar găsit."
+                                      Options="BeneficiaryOptions" SelectedId="@chosenId" SelectedIdChanged="BeneficiaryChosen" Disabled="loading" />
+                    <button type="button" class="refresh act-confirm" disabled="@(!canAddBeneficiary || loading)"
+                            title="@(canAddBeneficiary ? "Adaugă un beneficiar nou" : "Nu ai dreptul să adaugi beneficiari")" @onclick="() => addingBeneficiary = true">+ Adaugă beneficiar</button>
+                </div>
+            }
+            else
+            {
+                <p class="form-note">Beneficiar: <strong>@chosen.Name</strong> <button type="button" class="link-button" @onclick="ChangeBeneficiaryAsync">Schimbă beneficiarul</button></p>
+            }
+        </div>
+        @if (chosen is not null)
+        {
+            <TaskForm @key="formKey" BeneficiaryId="chosen.Id" BeneficiaryName="@chosen.Name" Saved="TaskSavedAsync" Closed="TaskFormClosedAsync" />
+        }
+    </section>
+}
+
+<section class="catalog">
+    <div class="catalog-heading"><h2>Taskuri utilizatori</h2><small>Taskurile active și cele finalizate, ale tuturor utilizatorilor</small></div>
+    <TaskTables @ref="tables" BeneficiaryId="0" OpenTaskId="@(TaskId ?? 0)" />
+</section>
+
+</PageBoundary>
+
+@code {
+    [SupplyParameterFromQuery(Name = "task")] public int? TaskId { get; set; }
+
+    private TaskTables? tables;
+    private IReadOnlyList<Beneficiary> beneficiaries = Array.Empty<Beneficiary>();
+    private Beneficiary? chosen;
+    private int? chosenId;
+    private bool loading = true, canAdd, canAddBeneficiary, addingBeneficiary;
+    private string? error, notice;
+    private Guid formKey = Guid.NewGuid();
+    private readonly CancellationTokenSource lifetime = new();
+
+    private IReadOnlyList<SelectOption> BeneficiaryOptions => [.. beneficiaries.Select(item => new SelectOption(item.Id, item.Name, $"{item.Cui} {item.Phone}"))];
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            canAdd = await Access.HasAsync("taskuri.add", lifetime.Token);
+            canAddBeneficiary = await Access.HasAsync("beneficiari.add", lifetime.Token);
+            if (canAdd) await LoadBeneficiariesAsync();
+        }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { return; }
+        catch (Exception exception)
+        {
+            Logger.LogWarning("Task page loading failed ({ErrorType}).", exception.GetType().Name);
+            error = "Pagina nu a putut fi încărcată. Reîncarcă pagina.";
+        }
+        loading = false;
+    }
+
+    private async Task LoadBeneficiariesAsync() =>
+        beneficiaries = [.. (await Beneficiaries.GetBeneficiariesAsync(lifetime.Token)).OrderBy(item => item.Name, StringComparer.CurrentCultureIgnoreCase)];
+
+    private void BeneficiaryChosen(int? id)
+    {
+        chosenId = id;
+        chosen = id is { } value ? beneficiaries.FirstOrDefault(item => item.Id == value) : null;
+        formKey = Guid.NewGuid();
+        notice = null;
+    }
+
+    private void ChangeBeneficiaryAsync() { chosen = null; chosenId = null; formKey = Guid.NewGuid(); }
+
+    // The beneficiary was added with the existing form: the list is read again and the new beneficiary is the chosen one.
+    private async Task BeneficiaryAddedAsync(Beneficiary created)
+    {
+        addingBeneficiary = false;
+        try { await LoadBeneficiariesAsync(); } catch (Exception exception) when (exception is not OperationCanceledException) { Logger.LogWarning("Beneficiaries reload failed ({ErrorType}).", exception.GetType().Name); }
+        BeneficiaryChosen(created.Id);
+    }
+
+    private Task CloseBeneficiaryAsync() { addingBeneficiary = false; return Task.CompletedTask; }
+
+    private async Task TaskSavedAsync(UserTask saved)
+    {
+        notice = $"Taskul „{saved.Title}” pentru {saved.AssignedUserName} a fost salvat.";
+        if (tables is not null) await tables.RefreshAsync();
+    }
+
+    // "Anulează" / "Închide": the form goes away and the page is back at the choice of the beneficiary (a new task starts from there).
+    private async Task TaskFormClosedAsync()
+    {
+        chosen = null; chosenId = null; formKey = Guid.NewGuid(); notice = null;
+        if (tables is not null) await tables.RefreshAsync();
+    }
+
+    public void Dispose() { lifetime.Cancel(); lifetime.Dispose(); }
+}

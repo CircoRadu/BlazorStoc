@@ -1,0 +1,19 @@
+# Taskurile mele
+Ruta: /taskurile-mele
+Cautare: taskurile mele task utilizator activ finalizat preia preluare stare termen fisiere
+
+Pagina taskurilor primite de la administrator, din meniul numelui tău din bara de sus. Taskurile nefinalizate sunt în fila „Active”, cele finalizate în fila „Finalizate”.
+
+## Elemente
+### Lista de taskuri
+- Active | filă | Orice task care nu este finalizat; un task nou apare pe fond roșu până îl preiei.
+- Finalizate | filă | Taskurile marcate „Finalizat”.
+- Etichetele de stare | butoane | Un clic filtrează după starea „În viitor” sau „În lucru”; „Șterge filtrele” le scoate.
+- Stare | listă | Schimbi starea taskului (În viitor, În lucru, Finalizat); schimbarea preia și taskul.
+- Termen | coloană | Roșu când a trecut, galben când se apropie.
+- Preia taskul | iconita:check | Marchezi taskul ca preluat; fondul roșu dispare.
+- Deschide taskul | iconita:view | Deschide detaliile ([[task-detalii]]): descrierea, starea și fișierele.
+
+## Flux: Cum preiau un task
+1. Găsești taskul pe fond roșu în fila „Active”.
+2. Apasă iconița de bifă („Preia taskul”) sau deschide taskul și apasă „Preia taskul”.

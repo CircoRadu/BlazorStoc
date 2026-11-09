@@ -1,0 +1,19 @@
+# Formularul taskului
+Cautare: formular task adauga editeaza titlu utilizator stare termen limita descriere fisiere
+
+Fereastra în care administratorul adaugă sau modifică un task. Beneficiarul este stabilit de pagina din care ai deschis-o; data creării este data curentă și nu se modifică.
+
+## Elemente
+### Campurile si butoanele
+- Titlu | câmp | Numele scurt al taskului (cel mult 150 de caractere); apare în tabele.
+- Utilizator | listă cu căutare | Cui îi este dat taskul. Mutarea la alt utilizator îl face din nou „nepreluat”.
+- Stare | listă | În viitor, În lucru sau Finalizat.
+- Termen limită | comutator + dată | „Are termen” arată câmpul de dată; fără termen, taskul nu avertizează.
+- Descriere | câmp | Ce are de făcut utilizatorul.
+- Adaugă taskul / Salvează taskul | buton | Salvează taskul; la adăugare, fereastra rămâne deschisă pentru fișiere.
+- Anulează / Închide | buton | Închide fereastra.
+- Fișiere | zonă | Atașezi fișiere (se salvează imediat) și le ștergi; administratorul șterge orice fișier.
+
+## Flux: Cum atașez un fișier
+1. Salvează taskul (la un task nou, fereastra rămâne deschisă).
+2. În zona „Fișiere”, alege sau trage fișierele.

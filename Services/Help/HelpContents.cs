@@ -19,6 +19,7 @@ public static class HelpContents
         ("Mentenanță", ["mentenanta"]),
         ("Analize de risc", ["analize-risc", "analizor-risc"]),
         ("Vehicule", ["vehicule"]),
+        ("Taskuri utilizatori", ["task", "taskuri", "taskurile-mele"]),
         ("Notificări și jurnal", ["notificari", "jurnal"]),
         ("Raportare erori", ["raportare-eroare"]),
         ("Categorii și nomenclator", ["categorii", "nomenclator"]),

@@ -1,0 +1,70 @@
+@namespace BlazorStoc.Components.Shared
+@using BlazorStoc.Modules.Tasks
+@inject IUserTaskRepository Repository
+@inject IAccessControl Access
+@inject ILogger<TaskWarningSettings> Logger
+@implements IDisposable
+@* Setari -> Notificari: how many days before the deadline of a task its user is warned (one global value, default 3). Belongs to the Tasks module; the page of the settings shows it through
+   this wrapper. Shown only while the module runs; changed by who may edit the notification settings (setari-notificari.edit), journaled. *@
+<ModuleGate ModuleId="@TasksModule.ModuleId" Notice="false">
+    @if (loaded)
+    {
+        <section class="product-editor" aria-labelledby="task-warning-title">
+            <div class="catalog-heading"><h3 id="task-warning-title">Avertizarea taskurilor înainte de termen</h3></div>
+            @if (error is not null) { <div class="error-banner" role="alert">@error</div> }
+            @if (notice is not null) { <div class="success-banner" role="status">@notice</div> }
+            <p class="muted">Un utilizator este avertizat (fila „Taskuri” din Notificări și culoarea termenului) cu atâtea zile înainte de termenul limită al unui task care nu e finalizat.</p>
+            <fieldset disabled="@(saving || !canEdit)">
+                <div class="editor-grid">
+                    <label for="task-warning-days">Zile înainte de termen (1–@UserTaskRules.MaxWarningDays)
+                        <input id="task-warning-days" type="number" min="1" max="@UserTaskRules.MaxWarningDays" step="1" @bind="days" /></label>
+                </div>
+                <div class="editor-actions">
+                    <button class="primary" type="button" disabled="@(days == saved)" @onclick="SaveAsync">@(saving ? "Se salvează…" : "Salvează zilele")</button>
+                </div>
+            </fieldset>
+        </section>
+    }
+</ModuleGate>
+
+@code {
+    private readonly CancellationTokenSource lifetime = new();
+    private bool loaded, saving, canEdit;
+    private int days = UserTaskRules.DefaultWarningDays, saved = UserTaskRules.DefaultWarningDays;
+    private string? error, notice;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            canEdit = await Access.HasAsync("setari-notificari.edit", lifetime.Token);
+            days = saved = await Repository.GetWarningDaysAsync(lifetime.Token);
+            loaded = true;
+        }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (ModuleUnavailableException) { loaded = false; }
+        catch (Exception exception)
+        {
+            Logger.LogWarning("Task warning days loading failed ({ErrorType}).", exception.GetType().Name);
+            loaded = false;
+        }
+    }
+
+    private async Task SaveAsync()
+    {
+        if (saving) return;
+        saving = true; error = null; notice = null;
+        try { await Repository.SetWarningDaysAsync(days, lifetime.Token); saved = days; notice = $"Avertizarea este acum cu {days} {(days == 1 ? "zi" : "zile")} înainte de termen."; }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (UserTaskOperationException exception) { error = exception.Message; }
+        catch (AccessDeniedException exception) { error = exception.Message; }
+        catch (Exception exception)
+        {
+            Logger.LogError("Task warning days saving failed ({ErrorType}).", exception.GetType().Name);
+            error = "Setarea nu a putut fi salvată.";
+        }
+        finally { saving = false; }
+    }
+
+    public void Dispose() { lifetime.Cancel(); lifetime.Dispose(); }
+}

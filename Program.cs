@@ -277,6 +277,21 @@ app.MapGet("/media/entity-files/{fileId:int}", async (int fileId, HttpContext co
     }
     return file is null ? Results.NotFound() : Results.File(file.Content, file.ContentType, file.OriginalName, enableRangeProcessing: true);
 }).RequireAuthorization(PermissionPolicy.For("mentenanta.view", "analize-risc.view"));
+// The files of a task: any signed-in user, the module checks that the task is addressed to them or that they hold taskuri.view (503 while the module is out).
+app.MapGet("/media/task-files/{fileId:int}", async (int fileId, HttpContext context, BlazorStoc.Modules.Tasks.IUserTaskFiles files, CancellationToken token) =>
+{
+    try
+    {
+        var file = await files.GetContentAsync(fileId, token);
+        context.Response.Headers["X-Content-Type-Options"] = "nosniff";
+        // Only the types the application knows are shown inline; any other file of a task is always a download.
+        if (file is not null && context.Request.Query["inline"] == "1" && BlazorStoc.Modules.Tasks.UserTaskFileRules.CanShowInline(file.ContentType))
+            return Results.File(file.Content, file.ContentType, enableRangeProcessing: true);
+        return file is null ? Results.NotFound() : Results.File(file.Content, file.ContentType, file.OriginalName, enableRangeProcessing: true);
+    }
+    catch (BlazorStoc.Modules.ModuleUnavailableException) { return Results.StatusCode(StatusCodes.Status503ServiceUnavailable); }
+    catch (AccessDeniedException) { return Results.NotFound(); }
+}).RequireAuthorization();
 app.MapHub<ChangesHub>(ChangesHub.Path);
 app.MapRazorPages().RequireRateLimiting("login");
 app.MapRazorComponents<App>().AddInteractiveServerRenderMode();
