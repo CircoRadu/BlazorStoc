@@ -873,3 +873,7 @@ Cerut de utilizator la 06.10.2026 (verificarea fluxului, apoi deciziile: facturi
 ## Finalizat la 09.11.2026 15:54 - Modulul Propuneri (0.5.61)
 
 - Modul nou Propuneri: popup Propune o modificare (formular cu captura, imagini si marire, propuneri asemanatoare, Propunerile mele, Toate propunerile, fir de raspunsuri), Setari -> Dezvoltare cu file Erori/Propuneri (stari Active/Inchise, versiune implementare, raspuns, export ZIP), fila Propuneri in Notificari, jurnal si chei proprii, migrarea 83.,Fara Sustine si fara buton de creare task (deciziile din 09.11.2026); doar imagini ca atasamente.,Verificari: MariaDB Proposals (22 noi), componente 1765, help; browser pe instanta separata (formular, trimitere, liste, administrare, notificari, bara popup).
+
+## Finalizat la 09.11.2026 17:12 - Bara popup-ului ancorata de popup (BUG-0006)
+
+- Bara cu Raporteaza o eroare / Propune / cerc de inchidere se pozitioneaza fata de popup si se muta odata cu el la derulare (nu mai ramane la marginea de sus a ecranului); in colt cand nu e loc deasupra; iese din ecran odata cu popup-ul. Modificare in wwwroot/bug-report.js, nepachetata (dupa 0.5.61).

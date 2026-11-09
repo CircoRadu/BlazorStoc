@@ -267,6 +267,19 @@
     };
 
     let lastTop = null;
+    let anchor = null;
+    // The bar is anchored to the popup: it follows it when the popup (or the page under it) is scrolled, it is not held at the top of the screen. Above the panel when there is room for it,
+    // in the top corner of the panel when there is none (a popup that starts at the top of the window); out of sight with the panel when that scrolls away.
+    const reposition = () => {
+        if (!anchor || floating.hidden || !anchor.isConnected) return;
+        const box = panelOf(anchor).getBoundingClientRect();
+        const width = floating.offsetWidth || 200;
+        const height = floating.offsetHeight || 32;
+        const top = box.top >= height + 12 ? box.top - height - 8 : box.top + 6;
+        floating.style.top = top + "px";
+        floating.style.left = Math.max(4, Math.min(innerWidth - width - 4, box.right - width - (box.top >= height + 12 ? 0 : 6))) + "px";
+        floating.style.visibility = top + height < 0 || top > innerHeight ? "hidden" : "visible";
+    };
     const place = () => {
         moveHeadingClose();
         const available = !!document.getElementById("bug-dialog");
@@ -296,16 +309,15 @@
         floating.querySelector("[data-bug-popup]").hidden = !available || isReport;
         floating.querySelector("[data-proposal-popup]").hidden = !proposalsAvailable || isReport;
         floating.querySelector("[data-popup-close-icon]").hidden = !closeButtonOf(popup) && !(popup instanceof HTMLDialogElement);
-        const box = panelOf(popup).getBoundingClientRect();
-        const width = floating.offsetWidth || 200;
-        floating.style.top = Math.max(4, box.top - 40) + "px";
-        floating.style.left = Math.max(4, Math.min(innerWidth - width - 4, box.right - width)) + "px";
+        anchor = popup;
+        reposition();
     };
     let scheduled = false;
     const schedule = () => { if (scheduled) return; scheduled = true; const run = () => { if (!scheduled) return; scheduled = false; place(); }; requestAnimationFrame(run); setTimeout(run, 60); };
     new MutationObserver((records) => { if (records.some((record) => record.target !== floating && !(record.target instanceof Element && record.target.closest("[data-popup-bar]")))) schedule(); }).observe(document.documentElement, { subtree: true, childList: true, attributes: true, attributeFilter: ["open", "class", "style", "disabled", "hidden"] });
     window.addEventListener("resize", schedule);
-    document.addEventListener("scroll", schedule, true);
+    // At once, in the same frame as the scroll, so the bar does not lag behind the popup.
+    document.addEventListener("scroll", () => reposition(), true);
     document.addEventListener("DOMContentLoaded", schedule);
 
     // The menu entries and the buttons of the bar: "Raportează o eroare" (data-bug-open) and "Propune" (data-proposal-open). The page is photographed BEFORE the popup shows.

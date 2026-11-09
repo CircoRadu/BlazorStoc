@@ -920,3 +920,5 @@ Parametri obligatori: tip Interval si familii de parametri (26.10.2026): Verific
 Taskuri: prioritate, ordonare, editare de utilizator; popup-uri uniforme (0.5.58-0.5.60) (09.11.2026): Verificare in browser: tema intunecata cu date, popup-urile pe telefon, migrarea 82 pe baza reala (la actualizare); help si capturi pentru ferestrele noi (HELP_DE_REGENERAT).
 
 Modulul Propuneri (0.5.61) (09.11.2026): Notificari pentru rapoartele de erori; help si capturi pentru ferestrele noi; verificare in browser ca utilizator simplu, tema intunecata, telefon.
+
+Bara popup-ului ancorata de popup (BUG-0006) (09.11.2026): Pachet cu corectia (0.5.62), la cerere; verificare in aplicatie pe telefon.
