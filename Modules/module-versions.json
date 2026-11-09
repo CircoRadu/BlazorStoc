@@ -1,8 +1,8 @@
 {
     "modules":  {
                     "ActivityImport":  {
-                                           "version":  "0.13.0",
-                                           "hash":  "6772b8eabe48feddfc3861c61c920bc073e9dfca33a6674509935a5a6132eb98",
+                                           "version":  "0.13.1",
+                                           "hash":  "97d2016971e141d523c7940778be29b1a6e10263429b8fdd26b7aeb08baa3d5b",
                                            "history":  [
                                                            {
                                                                "version":  "0.1.0",
@@ -83,6 +83,11 @@
                                                                "version":  "0.13.0",
                                                                "date":  "07.11.2026",
                                                                "note":  "Fereastra tichetului preluat de operator alege componentele acoperite de intervenția de mentenanta"
+                                                           },
+                                                           {
+                                                               "version":  "0.13.1",
+                                                               "date":  "09.11.2026",
+                                                               "note":  "Titluri popup cu numele obiectului, mesaj de sectiune indisponibila cu nume, add task in popup"
                                                            }
                                                        ]
                                        },
@@ -130,8 +135,8 @@
                                                   ]
                                   },
                     "Invoices":  {
-                                     "version":  "1.1.3",
-                                     "hash":  "f3e11612edd65ce1a5b43388dd804587b759170c83df6640b08e6708db8bd6ec",
+                                     "version":  "1.1.4",
+                                     "hash":  "3bcca700f530978c6ee078484f4e29e73df991fb29e5b99b4747f1fb2cd8e403",
                                      "history":  [
                                                      {
                                                          "version":  "1.0.0",
@@ -157,12 +162,17 @@
                                                          "version":  "1.1.3",
                                                          "date":  "04.11.2026",
                                                          "note":  "CUI furnizor corectat manual in sablon ramane la salvare (nu mai e rescris cu valoarea citita prin OCR)"
+                                                     },
+                                                     {
+                                                         "version":  "1.1.4",
+                                                         "date":  "09.11.2026",
+                                                         "note":  "Titluri popup cu numele obiectului, mesaj de sectiune indisponibila cu nume, add task in popup"
                                                      }
                                                  ]
                                  },
                     "Journal":  {
-                                    "version":  "1.4.18",
-                                    "hash":  "064b140916574b7bbeb8d7ebe622f5926c2df63643db67fd650f49d3ac6545be",
+                                    "version":  "1.4.19",
+                                    "hash":  "c0418eaa3c812b6d1deda9344f841cf4e6be5b788743722451608a978d728d6d",
                                     "history":  [
                                                     {
                                                         "version":  "1.0.0",
@@ -293,12 +303,17 @@
                                                         "version":  "1.4.18",
                                                         "date":  "09.11.2026",
                                                         "note":  "Taskuri: entitatea Taskuri utilizatori in filtrul jurnalului si actiunile exacte ale taskurilor"
+                                                    },
+                                                    {
+                                                        "version":  "1.4.19",
+                                                        "date":  "09.11.2026",
+                                                        "note":  "Actiune Modificare prioritate task"
                                                     }
                                                 ]
                                 },
                     "Maintenance":  {
-                                        "version":  "1.10.0",
-                                        "hash":  "6c12e239635ee6d82c1187df6f2a35054fc0fb601f85aadb23d18620e9130c97",
+                                        "version":  "1.10.2",
+                                        "hash":  "ef310ee257e841b89cb35fe8f21059d7ce9f747841ce3acaa84981209991c20b",
                                         "history":  [
                                                         {
                                                             "version":  "1.0.0",
@@ -409,6 +424,16 @@
                                                             "version":  "1.10.0",
                                                             "date":  "07.11.2026",
                                                             "note":  "Scadente pe punct si componenta, interventii cu componente (mutarea scadentelor numai pentru componentele alese), acte aditionale complete (data de referinta, componente On/Off, verificarea interventiilor, scadente propuse, anulare) legate in fisa beneficiarului"
+                                                        },
+                                                        {
+                                                            "version":  "1.10.1",
+                                                            "date":  "09.11.2026",
+                                                            "note":  "Titluri popup cu numele obiectului, mesaj de sectiune indisponibila cu nume, add task in popup"
+                                                        },
+                                                        {
+                                                            "version":  "1.10.2",
+                                                            "date":  "09.11.2026",
+                                                            "note":  "Butonul de inchidere al detaliilor de pe harta devine iconita de inchidere"
                                                         }
                                                     ]
                                     },
@@ -475,8 +500,8 @@
                                             ]
                             },
                     "Offers":  {
-                                   "version":  "1.1.0",
-                                   "hash":  "f4d68c7b56fbad2b2f80bdc8418748e2cd41a91bfe068a727ce818f9cbc754ea",
+                                   "version":  "1.1.1",
+                                   "hash":  "529f4e92e1d19a357b9b155bdc4b3b77c98e06e916a40968624000a078926865",
                                    "history":  [
                                                    {
                                                        "version":  "1.0.0",
@@ -487,17 +512,27 @@
                                                        "version":  "1.1.0",
                                                        "date":  "25.10.2026",
                                                        "note":  "Preluarea ofertei: proces in pasi cu stepper si bara Pasul precedent/urmator, ca la preluarea facturii"
+                                                   },
+                                                   {
+                                                       "version":  "1.1.1",
+                                                       "date":  "09.11.2026",
+                                                       "note":  "Titluri popup cu numele obiectului, mesaj de sectiune indisponibila cu nume, add task in popup"
                                                    }
                                                ]
                                },
                     "ProjectObservations":  {
-                                                "version":  "1.0.0",
-                                                "hash":  "b8d918a3b5041f97d6b29a011a195309fa06a5d8d1489b51af385370f3d160dd",
+                                                "version":  "1.0.1",
+                                                "hash":  "f36d3c9f63bcc7210b0b15f447603608e19808cedf0e47b0a7c346e953a922cc",
                                                 "history":  [
                                                                 {
                                                                     "version":  "1.0.0",
                                                                     "date":  "24.10.2026",
                                                                     "note":  "Versiune de pornire (inceputul versionarii modulelor)"
+                                                                },
+                                                                {
+                                                                    "version":  "1.0.1",
+                                                                    "date":  "09.11.2026",
+                                                                    "note":  "Titluri popup cu numele obiectului, mesaj de sectiune indisponibila cu nume, add task in popup"
                                                                 }
                                                             ]
                                             },
@@ -513,8 +548,8 @@
                                                        ]
                                        },
                     "RiskAnalyses":  {
-                                         "version":  "1.3.0",
-                                         "hash":  "3277fd6713009b1b1d7ef6211ab92766d9727c782a50ba0360685f89a107d897",
+                                         "version":  "1.3.1",
+                                         "hash":  "5afe57c44233c58b85c4b0fbc1d4b9647fd0d6beac0e53167a29a36436fb06d5",
                                          "history":  [
                                                          {
                                                              "version":  "1.0.0",
@@ -555,6 +590,11 @@
                                                              "version":  "1.3.0",
                                                              "date":  "04.11.2026",
                                                              "note":  "Formularul analizei de risc: fara campul Intocmita de; Data inregistrarii devine Data intocmirii"
+                                                         },
+                                                         {
+                                                             "version":  "1.3.1",
+                                                             "date":  "09.11.2026",
+                                                             "note":  "Titluri popup cu numele obiectului, mesaj de sectiune indisponibila cu nume, add task in popup"
                                                          }
                                                      ]
                                      },
@@ -575,8 +615,8 @@
                                                   ]
                                   },
                     "Vehicles":  {
-                                     "version":  "1.0.2",
-                                     "hash":  "a1d5687e2b3c5d69896ee09c0048efeea41b0701fc6556a0581c52c616ac8aa9",
+                                     "version":  "1.0.3",
+                                     "hash":  "56cfc55aec8943f3172eacb7f0d4347da4d7610fd0d56d4074e746958cc4ad1d",
                                      "history":  [
                                                      {
                                                          "version":  "1.0.0",
@@ -592,6 +632,11 @@
                                                          "version":  "1.0.2",
                                                          "date":  "04.11.2026",
                                                          "note":  "Adaugarea unui vehicul se face in popup"
+                                                     },
+                                                     {
+                                                         "version":  "1.0.3",
+                                                         "date":  "09.11.2026",
+                                                         "note":  "Titluri popup cu numele obiectului, mesaj de sectiune indisponibila cu nume, add task in popup"
                                                      }
                                                  ]
                                  },
@@ -632,19 +677,24 @@
                                                  ]
                                  },
                     "BugReports":  {
-                                       "version":  "1.0.0",
-                                       "hash":  "5dae579515986e50f07fef0aa2cdda504903f5488493759c9c97c6d9cd15eb12",
+                                       "version":  "1.1.0",
+                                       "hash":  "5ec8c4e44fb1a9cd37e58bf7971ec2f4f78043e14b8021403c26b179a6eb47be",
                                        "history":  [
                                                        {
                                                            "version":  "1.0.0",
                                                            "date":  "07.11.2026",
                                                            "note":  "Versiune de pornire (inceputul versionarii modulelor)"
+                                                       },
+                                                       {
+                                                           "version":  "1.1.0",
+                                                           "date":  "09.11.2026",
+                                                           "note":  "Rapoarte erori: taburi Nerezolvate/Rezolvate; buton de raportare in orice popup (ascuns cand modulul e oprit)"
                                                        }
                                                    ]
                                    },
                     "Tasks":  {
-                                  "version":  "1.0.3",
-                                  "hash":  "734c511f2502a6ad7f6481f3b4514669065dfb5d2577f845785a384ed703eb7f",
+                                  "version":  "1.1.0",
+                                  "hash":  "e46f4b5c0fbdb631d337486748fb775edbd6914f64cd2fcc900afd97b317533d",
                                   "history":  [
                                                   {
                                                       "version":  "1.0.0",
@@ -665,6 +715,26 @@
                                                       "version":  "1.0.3",
                                                       "date":  "09.11.2026",
                                                       "note":  "Fisierele unui task pot fi de orice tip (tipurile necunoscute doar se descarca)"
+                                                  },
+                                                  {
+                                                      "version":  "1.0.4",
+                                                      "date":  "09.11.2026",
+                                                      "note":  "Buton vizualizare task in tabelul administratorului, titluri popup cu obiect"
+                                                  },
+                                                  {
+                                                      "version":  "1.0.5",
+                                                      "date":  "09.11.2026",
+                                                      "note":  "Titluri popup cu numele obiectului, mesaj de sectiune indisponibila cu nume, add task in popup"
+                                                  },
+                                                  {
+                                                      "version":  "1.0.6",
+                                                      "date":  "09.11.2026",
+                                                      "note":  "Meniu Administrare: Taskuri utilizator; adaugare task in popup"
+                                                  },
+                                                  {
+                                                      "version":  "1.1.0",
+                                                      "date":  "09.11.2026",
+                                                      "note":  "Prioritate la taskuri, ordonare pe coloane, vizualizare/editare utilizator"
                                                   }
                                               ]
                               }

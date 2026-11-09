@@ -5,8 +5,7 @@
              aria-labelledby="@TitleId" aria-describedby="@DescriptionId">
         @if (step == DeleteStep.Reason)
         {
-            <h2 id="@TitleId">@Title</h2>
-            <p class="delete-object"><strong>@ObjectLabel</strong></p>
+            <h2 id="@TitleId">@Title@(string.IsNullOrWhiteSpace(ObjectLabel) ? "" : " – " + ObjectLabel)</h2>
             @if (!string.IsNullOrWhiteSpace(Description))
             {
                 <p id="@DescriptionId">@Description</p>

@@ -44,6 +44,10 @@ public static partial class MariaExtendedChecks
             var changed = await boss.ChangeStateAsync(report.Id, BugReportRules.StateResolved, "Rezolvat in proba");
             Check(changed.State == BugReportRules.StateResolved && changed.ResolvedUtc is not null && changed.AdminNote == "Rezolvat in proba", "Bug report: the administrator changes the state with a note (Rezolvat records the time)");
 
+            var closedPage = await boss.QueryAsync(new BugReportQuery(User: "proba.rap", Closed: true), 1, 10);
+            var openPage = await boss.QueryAsync(new BugReportQuery(User: "proba.rap", Closed: false), 1, 10);
+            Check(closedPage.Items.Any(item => item.Id == report.Id) && openPage.Items.All(item => item.Id != report.Id), "Bug report: the tabs split resolved/rejected reports from the unresolved ones");
+
             var export = await boss.ExportAsync([report.Id]);
             using (var zip = new ZipArchive(new MemoryStream(export.Content)))
             {

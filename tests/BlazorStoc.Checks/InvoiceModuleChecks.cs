@@ -166,7 +166,7 @@ public static class InvoiceModuleChecks
             "Invoices: the reading and analysis building blocks shared with the Ocr module stay in Services/Invoices");
 
         var settings = File.ReadAllText(Path.Combine(root, "Components", "Pages", "Settings.razor"));
-        check(Regex.IsMatch(settings, @"<ModuleGate ModuleId=""@BlazorStoc\.Modules\.Invoices\.InvoicesModule\.ModuleId"">\s*@SubtabBar\(InvoiceSubtabs[\s\S]*?</ModuleGate>\s*</div>\s*@if \(activeTab == AnafTab"),
+        check(Regex.IsMatch(settings, @"<ModuleGate ModuleId=""@BlazorStoc\.Modules\.Invoices\.InvoicesModule\.ModuleId""( Section=""[^""]*"")?>\s*@SubtabBar\(InvoiceSubtabs[\s\S]*?</ModuleGate>\s*</div>\s*@if \(activeTab == AnafTab"),
             "Invoices: the Setari -> Facturi tab (workbench and list of templates) is inside the gate of the module");
         var layout = File.ReadAllText(Path.Combine(root, "Components", "Layout", "MainLayout.razor"));
         check(Regex.IsMatch(layout, @"@if \(Modules\.IsAvailable\(BlazorStoc\.Modules\.Invoices\.InvoicesModule\.ModuleId\)\) \{\s*<AuthorizeView Policy=""perm:preluare-factura\.view"">"), "Invoices: the menu entry is shown only while the module works");

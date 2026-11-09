@@ -114,6 +114,19 @@ public static partial class MariaExtendedChecks
             Check(await Events(task.Id, AuditActions.EditUserTask) == 1 && await Events(task.Id, AuditActions.EditUserTaskDueDate) == 1 && await Events(task.Id, AuditActions.MoveUserTask) == 1 &&
                   await Events(task.Id, AuditActions.ChangeUserTaskStatus) == 4, "Each kind of change (title, deadline, user, status) is a journal event of its own");
             await Rejects<UserTaskOperationException>(() => tasks.UpdateAsync(current, edit), "A stale edit is refused");
+            // ---- Priority: Scazut by default (also for the tasks that existed before), changed by the administrator with an event of its own ----
+            Check(task.Priority == UserTaskPriority.Low && moved.Priority == UserTaskPriority.Low, "A new task has the priority \"Scăzut\" by default");
+            var prioEdit = UserTaskInput.From(moved); prioEdit.Priority = UserTaskPriority.High;
+            var prioritised = await tasks.UpdateAsync(moved, prioEdit);
+            Check(prioritised.Priority == UserTaskPriority.High && await Events(task.Id, AuditActions.EditUserTaskPriority) == 1 && (await tasks.GetAsync(task.Id))!.Priority == UserTaskPriority.High, "Changing the priority is saved and journaled with its own action");
+            await Rejects<UserTaskOperationException>(() => tasks.UpdateAsync(prioritised, new UserTaskInput { BeneficiaryId = owner.Id, AssignedUserId = userB.Id, Title = "t", Description = "d", Priority = (UserTaskPriority)9 }), "An invalid priority is refused");
+            var tasksByOrder = new[] { prioritised with { DueDate = null }, prioritised with { Id = 1, DueDate = today.AddDays(5), Priority = UserTaskPriority.Low }, prioritised with { Id = 2, DueDate = today.AddDays(1), Priority = UserTaskPriority.Medium } };
+            Check(TaskSort.Apply(tasksByOrder, TaskSortKey.Due, false).Select(item => item.Id).SequenceEqual([2, 1, prioritised.Id]) && TaskSort.Apply(tasksByOrder, TaskSortKey.Due, true).Select(item => item.Id).SequenceEqual([1, 2, prioritised.Id]),
+                "Ordering by the deadline works both ways and keeps the tasks without a deadline last");
+            Check(TaskSort.Apply(tasksByOrder, TaskSortKey.Priority, true).First().Id == prioritised.Id && TaskSort.Apply(tasksByOrder, TaskSortKey.Priority, false).First().Id == 1, "Ordering by priority goes from \"Ridicat\" to \"Scăzut\" and back");
+            Check(TaskSort.Next(TaskSortKey.None, false, TaskSortKey.Created) == (TaskSortKey.Created, false) && TaskSort.Next(TaskSortKey.Created, false, TaskSortKey.Created) == (TaskSortKey.Created, true) &&
+                  TaskSort.Next(TaskSortKey.Created, true, TaskSortKey.Created) == (TaskSortKey.None, false), "A header orders ascending, then descending, then back to the default order");
+            current = prioritised; edit = UserTaskInput.From(current);
             Check(!(await asA.GetMineAsync()).Any(item => item.Id == task.Id) && (await asB.GetMineAsync()).Any(item => item.Id == task.Id), "After the move the task is on the dashboard of the new user only");
             var addedByNewUser = await filesB.AddAsync(task.Id, "b.txt", "text/plain", Text("fisier b"));
             Check((await asB.GetAsync(task.Id))!.IsAccepted && await Events(task.Id, AuditActions.AcceptUserTask) == 2 && addedByNewUser.UploadedBy == userB.Username, "A user who attaches a file to a new task takes it over too");

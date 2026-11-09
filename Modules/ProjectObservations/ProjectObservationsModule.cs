@@ -12,7 +12,7 @@ public sealed class ProjectObservationsModule : IModule
 
     public string Id => ModuleId;
     public string Name => "Observații proiect";
-    public Version Version { get; } = new(1, 0, 0);
+    public Version Version { get; } = new(1, 0, 1);
     // No menu entry: the observations are listed on the project page, in a gate of the module.
     public IReadOnlyList<ModuleNavItem> Nav { get; } = [];
 

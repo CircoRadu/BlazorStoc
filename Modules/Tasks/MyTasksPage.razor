@@ -46,8 +46,9 @@
                     @if (statusFilter.Count > 0) { <button type="button" class="refresh act-close" @onclick="() => statusFilter.Clear()">Șterge filtrele</button> }
                 </div>
             }
-            IReadOnlyList<UserTask> rows = [.. scope.Where(task => statusFilter.Count == 0 || statusFilter.Contains(task.Status))
-                .OrderBy(task => task.IsAccepted ? 1 : 0).ThenBy(task => task.DueDate is null ? DateOnly.MaxValue : task.DueDate!.Value).ThenByDescending(task => task.CreatedUtc)];
+            var defaultOrder = scope.Where(task => statusFilter.Count == 0 || statusFilter.Contains(task.Status))
+                .OrderBy(task => task.IsAccepted ? 1 : 0).ThenBy(task => task.DueDate is null ? DateOnly.MaxValue : task.DueDate!.Value).ThenByDescending(task => task.CreatedUtc);
+            IReadOnlyList<UserTask> rows = TaskSort.Apply(defaultOrder, sortKey, sortDescending);
             @if (rows.Count == 0)
             {
                 <div class="empty-state"><span class="empty-icon">▦</span><h3>@(scope.Count == 0 ? (showDone ? "Nu ai taskuri finalizate" : "Nu ai taskuri active") : "Niciun task pentru filtrul curent")</h3>
@@ -56,18 +57,17 @@
             else
             {
                 <Paged Items="rows" Id="@(showDone ? "my-tasks-done-size" : "my-tasks-active-size")" Context="pageRows">
-                    <div class="table-scroll"><table><thead><tr><th>BENEFICIAR</th><th>TITLU</th><th>CREAT</th><th>TERMEN</th><th>STARE</th><th class="number">FIȘIERE</th><th><span class="sr-only">Acțiuni</span></th></tr></thead><tbody>
+                    <div class="table-scroll"><table><thead><tr><th>BENEFICIAR</th><th>TITLU</th><TaskSortHeader Label="PRIORITATE" Key="TaskSortKey.Priority" Current="sortKey" Descending="sortDescending" Clicked="SortBy" /><TaskSortHeader Label="CREAT" Key="TaskSortKey.Created" Current="sortKey" Descending="sortDescending" Clicked="SortBy" /><TaskSortHeader Label="TERMEN" Key="TaskSortKey.Due" Current="sortKey" Descending="sortDescending" Clicked="SortBy" /><th>STARE</th><th class="number">FIȘIERE</th><th><span class="sr-only">Acțiuni</span></th></tr></thead><tbody>
                     @foreach (var task in pageRows)
                     {
                         <tr @key="task.Id" class="@(task.IsActive && !task.IsAccepted ? "task-row-new" : null)">
                             <td>@if (canSeeBeneficiary) { <a class="category-table-link" href="@($"/beneficiari/{task.BeneficiaryId}")">@task.BeneficiaryName</a> } else { <text>@task.BeneficiaryName</text> }</td>
                             <td><strong>@task.Title</strong>@if (task.IsActive && !task.IsAccepted) { <text> </text><span class="task-new-badge">Nou</span> }<br /><small class="muted" title="@task.Description">@Shorten(task.Description)</small></td>
-                            <td>@task.CreatedUtc.ToLocalTime().ToString("dd.MM.yyyy HH:mm", System.Globalization.CultureInfo.InvariantCulture)</td>
+                            <td><span class="task-prio @UserTaskRules.PriorityClass(task.Priority)">@UserTaskRules.PriorityLabel(task.Priority)</span></td>
+                            <td>@task.CreatedUtc.ToLocalTime().ToString("dd.MM.yyyy HH:mm", System.Globalization.CultureInfo.InvariantCulture)<br /><small class="muted">@task.CreatedBy</small></td>
                             <td class="@DueClass(task)">@UserTaskRules.DueText(task.DueDate)</td>
                             <td>
-                                <select aria-label="@($"Starea taskului {task.Title}")" value="@((int)task.Status)" disabled="@(busyId == task.Id)" @onchange="args => StatusChangedAsync(task, args)">
-                                    @foreach (var status in UserTaskRules.Statuses) { <option value="@((int)status)">@UserTaskRules.StatusLabel(status)</option> }
-                                </select>
+                                <span class="task-label static">@UserTaskRules.StatusLabel(task.Status)</span>
                             </td>
                             <td class="number">@task.FileCount</td>
                             <td class="row-actions">
@@ -139,15 +139,13 @@
     private async Task ReloadAsync() { await LoadAsync(); StateHasChanged(); }
     private async Task CloseDialogAsync() { openId = null; await ReloadAsync(); }
     private void OpenTab(bool done) { showDone = done; statusFilter.Clear(); }
+    private TaskSortKey sortKey;
+    private bool sortDescending;
+    private void SortBy(TaskSortKey clicked) => (sortKey, sortDescending) = TaskSort.Next(sortKey, sortDescending, clicked);
     private void ToggleStatus(UserTaskStatus status) { if (!statusFilter.Add(status)) statusFilter.Remove(status); }
 
     private async Task AcceptAsync(UserTask task) => await RunAsync(task, () => Repository.AcceptAsync(task, lifetime.Token), "Taskul nu a putut fi preluat.");
 
-    private async Task StatusChangedAsync(UserTask task, ChangeEventArgs args)
-    {
-        if (!int.TryParse(args.Value?.ToString(), out var value) || !Enum.IsDefined((UserTaskStatus)value)) return;
-        await RunAsync(task, () => Repository.SetStatusAsync(task, (UserTaskStatus)value, lifetime.Token), "Starea taskului nu a putut fi schimbată.");
-    }
 
     private async Task RunAsync(UserTask task, Func<Task<UserTask>> operation, string fallback)
     {

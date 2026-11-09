@@ -10,7 +10,7 @@ public sealed class TasksModule : IModule
 
     public string Id => ModuleId;
     public string Name => "Taskuri utilizatori";
-    public Version Version { get; } = new(1, 0, 3);
+    public Version Version { get; } = new(1, 1, 0);
     // The administrator entry sits in the Administration menu and the user's page in the account menu (both in a gate of the module); no item of its own here.
     public IReadOnlyList<ModuleNavItem> Nav { get; } = [];
 

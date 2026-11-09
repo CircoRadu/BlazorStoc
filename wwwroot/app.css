@@ -1647,3 +1647,35 @@ tr.task-row-new td:first-child { box-shadow:inset 4px 0 0 var(--c-a3241b); }
 .task-facts { margin:12px 0; }
 .task-description p { white-space:pre-wrap; margin:6px 0 14px; }
 .account-badge { display:inline-block; min-width:18px; padding:2px 6px; border-radius:999px; background:var(--c-a3241b); color:var(--c-ffffff); font-size:11px; font-weight:700; line-height:1.3; text-align:center; margin-left:6px; }
+
+/* Raportare eroare din orice popup: butonul din antetul ferestrei (injectat de bug-report.js) si nota cand modulul e oprit. */
+
+/* Bara popup-ului (bug-report.js): Raporteaza o eroare + iconita de inchidere; pentru <dialog> sta in antet, pentru celelalte e o bara plutitoare deasupra ferestrei. */
+.bug-popup-bar { display:inline-flex; align-items:center; gap:6px; margin-left:auto; flex:none; align-self:flex-start; }
+dialog > .bug-popup-bar { position:absolute; top:8px; right:8px; z-index:2; }
+.bug-popup-bar[hidden], .bug-popup-bar [hidden] { display:none; }
+.bug-popup-float { position:fixed; z-index:2147483000; }
+.bug-popup-button { padding:4px 10px; font-size:.8rem; border:1px solid var(--c-d8e2de, #c9ced6); border-radius:6px; background:var(--c-ffffff, #fff); color:inherit; cursor:pointer; box-shadow:0 2px 8px rgba(0,0,0,.18); }
+.bug-popup-button:hover { background:rgba(127,127,127,.15); }
+/* Taskuri: prioritate (ridicat rosiatic, mediu galben, scazut alb), antet ordonabil, eticheta de stare doar afisata. */
+.task-prio { display:inline-block; padding:3px 10px; border-radius:999px; font-size:11px; font-weight:650; white-space:nowrap; border:1px solid transparent; }
+.prio-high { background:#f8d9d4; color:#8a2417; border-color:#ecb6ad; }
+.prio-medium { background:#fff0b3; color:#6b5200; border-color:#ecd68a; }
+.prio-low { background:#ffffff; color:#4a5d5a; border-color:#d8e2de; }
+:root[data-theme="dark"] .prio-high { background:#5a2620; color:#ffd5cf; border-color:#8a3a31; }
+:root[data-theme="dark"] .prio-medium { background:#59480f; color:#ffe9a6; border-color:#8a7220; }
+:root[data-theme="dark"] .prio-low { background:#1f2b29; color:#c9d6d3; border-color:#3a4a47; }
+select.prio-high, select.prio-medium, select.prio-low { font-weight:600; }
+.task-label.static { cursor:default; pointer-events:none; }
+.sort-header { background:none; border:0; padding:0; font:inherit; letter-spacing:inherit; color:inherit; cursor:pointer; display:inline-flex; align-items:center; gap:5px; text-transform:inherit; }
+.sort-header .sort-arrow { font-size:10px; opacity:.55; }
+.sort-header.active .sort-arrow { opacity:1; color:var(--green); }
+/* Elementul de inchidere sta in bara de deasupra popup-ului, langa "Raporteaza o eroare": cerc cu fond rosu, X alb desenat si centrat. Butonul de inchidere din antet se ascunde (iconita il declanseaza). */
+.popup-close-moved { display:none !important; }
+.popup-close-icon { position:relative; box-sizing:border-box; width:32px; height:32px; min-width:32px; padding:0; margin:0; border-radius:50%; font-size:0; line-height:0; color:transparent; background:#b3261e; border:1px solid #8c1c15; box-shadow:0 2px 8px rgba(0,0,0,.18); cursor:pointer; flex:none; overflow:hidden; display:inline-block; vertical-align:middle; }
+.popup-close-icon:hover { background:#8c1c15; }
+.popup-close-icon::before, .popup-close-icon::after { content:""; position:absolute; left:50%; top:50%; width:14px; height:2px; margin:-1px 0 0 -7px; border-radius:1px; background:#fff; }
+.popup-close-icon::before { transform:rotate(45deg); }
+.popup-close-icon::after { transform:rotate(-45deg); }
+.bug-popup-bar { gap:8px; align-items:center; }
+.bug-popup-button { height:32px; padding:0 12px; display:inline-flex; align-items:center; }

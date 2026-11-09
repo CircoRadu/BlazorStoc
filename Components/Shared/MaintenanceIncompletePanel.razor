@@ -6,7 +6,7 @@
 @implements IDisposable
 
 @* The list of the frozen maintenance contracts (incomplete data) with what each one is missing. It belongs to the Maintenance module; the Notifications page shows it through this wrapper. *@
-<ModuleGate ModuleId="@BlazorStoc.Modules.Maintenance.MaintenanceModule.ModuleId">
+<ModuleGate ModuleId="@BlazorStoc.Modules.Maintenance.MaintenanceModule.ModuleId" Section="Contracte de mentenanță incomplete">
 <section class="catalog" aria-labelledby="incomplete-title">
     <div class="catalog-heading"><h2 id="incomplete-title">Contracte de mentenanță incomplete <span class="count-badge">@items.Count</span></h2>
         <div class="heading-actions"><button class="refresh act-reload" type="button" disabled="@loading" @onclick="LoadAsync">↻ Actualizează</button></div></div>

@@ -55,7 +55,7 @@ else if (session is null || draft is null)
 }
 else
 {
-    @if (IsEditMode) { <UnsavedChangesTracker @ref="tracker" Snapshot="CurrentSnapshot" Discard="CloseEditingAsync" /> }
+    @if (IsEditMode) { <UnsavedChangesTracker @ref="tracker" Subject="@(BlazorStoc.Services.PopupSubject.Of("șablon de factură", templateName))" Snapshot="CurrentSnapshot" Discard="CloseEditingAsync" /> }
     var pageData = CurrentPageData;
     <section class="invoice-head" aria-label="Fișierul analizat">
         <div><strong>@session.FileName</strong> <span class="muted">· @session.Document.Pages.Count @(session.Document.Pages.Count == 1 ? "pagină" : "pagini") · citit @SourceText</span></div>

@@ -57,7 +57,7 @@ public sealed record BugReportImage(string Kind, string FileName, byte[] Content
 
 public sealed record BugReportInput(string Title, string Description, string Severity, string Route, string PageTitle, string TechJson, IReadOnlyList<BugReportImage> Images);
 
-public sealed record BugReportQuery(string? State = null, string? Severity = null, string? User = null, DateOnly? From = null, DateOnly? To = null);
+public sealed record BugReportQuery(string? State = null, string? Severity = null, string? User = null, DateOnly? From = null, DateOnly? To = null, bool? Closed = null);
 
 public sealed record BugReportPage(IReadOnlyList<BugReport> Items, int Total);
 
@@ -201,6 +201,11 @@ public sealed class MariaBugReportService(IConfiguration configuration, IAccessC
         var clauses = new List<string>();
         var parameters = new List<MySqlParameter>();
         if (!string.IsNullOrEmpty(query.State)) { clauses.Add("r.state=@state"); parameters.Add(new("@state", query.State)); }
+        if (query.Closed is { } closed)
+        {
+            clauses.Add(closed ? "r.state IN (@sResolved,@sRejected)" : "r.state NOT IN (@sResolved,@sRejected)");
+            parameters.Add(new("@sResolved", BugReportRules.StateResolved)); parameters.Add(new("@sRejected", BugReportRules.StateRejected));
+        }
         if (!string.IsNullOrEmpty(query.Severity)) { clauses.Add("r.severity=@severity"); parameters.Add(new("@severity", query.Severity)); }
         if (!string.IsNullOrWhiteSpace(query.User)) { clauses.Add("LOCATE(LOWER(@user), LOWER(r.user_name))>0"); parameters.Add(new("@user", query.User.Trim())); }
         if (query.From is { } from) { clauses.Add("r.created_utc>=@from"); parameters.Add(new("@from", from.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture))); }

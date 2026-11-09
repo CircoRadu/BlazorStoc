@@ -4,11 +4,7 @@
 <div class="delete-overlay" @onkeydown="KeyDownAsync">
     <section class="delete-dialog save-confirmation-dialog" role="dialog" aria-modal="true" tabindex="-1" @ref="dialog"
              aria-labelledby="@TitleId" aria-describedby="@DescriptionId">
-        <h2 id="@TitleId">@Title</h2>
-        @if (!string.IsNullOrWhiteSpace(ObjectLabel))
-        {
-            <p class="delete-object"><strong>@ObjectLabel</strong></p>
-        }
+        <h2 id="@TitleId">@Title@(string.IsNullOrWhiteSpace(ObjectLabel) ? "" : " – " + ObjectLabel)</h2>
         <p id="@DescriptionId">@(Message ?? (Changes.Count == 0
             ? "Nu ai modificat nicio valoare a câmpurilor. Salvarea va înregistra doar motivarea."
             : "Următoarele valori vor fi modificate:"))</p>

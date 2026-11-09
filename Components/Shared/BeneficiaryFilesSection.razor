@@ -79,8 +79,7 @@
 {
     <div class="delete-overlay">
         <section class="delete-dialog" role="alertdialog" aria-modal="true" tabindex="-1" aria-labelledby="beneficiary-file-delete-title">
-            <h2 id="beneficiary-file-delete-title">Ștergi fișierul?</h2>
-            <p class="delete-object"><strong>@doomed.OriginalName</strong></p>
+            <h2 id="beneficiary-file-delete-title">Ștergi fișierul? – @doomed.OriginalName</h2>
             <p>Fișierul liber este șters definitiv de la beneficiar.</p>
             <div class="editor-actions">
                 <button type="button" class="danger" disabled="@busy" @onclick="ConfirmDeleteAsync">@(busy ? "Se șterge…" : "Șterge")</button>

@@ -116,8 +116,7 @@
 {
     <div class="delete-overlay" @onkeydown="PopupKey">
         <section class="delete-dialog" role="alertdialog" aria-modal="true" tabindex="-1" aria-labelledby="review-discard-title">
-            <h2 id="review-discard-title">Discard tichet?</h2>
-            <p class="delete-object"><strong>@doomed.TicketNumber @doomed.Title</strong></p>
+            <h2 id="review-discard-title">Discard tichet? – @doomed.TicketNumber @doomed.Title</h2>
             <p>Tichetul nu se mai preia din ActivityApp (poate fi reactivat din lista tichetelor discardate din Setări).@(doomed.InRegister ? " Intervenția deja înregistrată pentru el se șterge." : "")</p>
             @if (error is not null) { <div class="error-banner" role="alert">@error</div> }
             <div class="editor-actions">

@@ -163,8 +163,7 @@ else
 {
     <div class="delete-overlay">
         <section class="delete-dialog" role="dialog" aria-modal="true" aria-labelledby="offer-template-delete-title">
-            <h2 id="offer-template-delete-title">Ștergi șablonul?</h2>
-            <p class="delete-object"><strong>@deleting.Name</strong></p>
+            <h2 id="offer-template-delete-title">Ștergi șablonul? – @deleting.Name</h2>
             <p>Șablonul se șterge definitiv; ofertele deja preluate nu se schimbă. Se înregistrează în jurnal.</p>
             <div class="editor-actions">
                 <button type="button" class="danger" disabled="@busy" @onclick="DeleteAsync">@(busy ? "Se șterge…" : "Șterge șablonul")</button>

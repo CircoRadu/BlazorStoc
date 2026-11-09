@@ -4,8 +4,7 @@
 <div class="delete-overlay" @onkeydown="KeyDownAsync">
     <section class="delete-dialog force-unlock-dialog" role="dialog" aria-modal="true" tabindex="-1" @ref="dialog"
              aria-labelledby="@TitleId" aria-describedby="@DescriptionId">
-        <h2 id="@TitleId">Deblochezi produsul?</h2>
-        <p class="delete-object"><strong>@ObjectLabel</strong></p>
+        <h2 id="@TitleId">Deblochezi produsul? – @ObjectLabel</h2>
         <p id="@DescriptionId">Editarea în curs a utilizatorului <strong>@Owner</strong> nu este oprită, dar produsul devine disponibil pentru alții.
             La salvare se verifică versiunea produsului, deci nicio modificare nu este suprascrisă în tăcere. Deblocarea se înregistrează în jurnalul de activitate.</p>
         <ChangeReasonField Id="@ReasonId" @bind-Value="reason" Error="@reasonError" Disabled="@Busy" />

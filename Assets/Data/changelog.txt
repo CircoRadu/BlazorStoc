@@ -1,3 +1,17 @@
+## 0.5.60 | 09.11.2026
+- Ferestrele (popup-uri): elementul de închidere stă într-o bară deasupra ferestrei, în dreapta, lângă „Raportează o eroare”: cerc cu fond roșu și X alb centrat, cu aceeași acțiune ca butonul de închidere al formularului. Butonul de închidere din antet se ascunde, iar butoanele din antet (Editează, Descarcă) rămân pe loc. Detaliile punctului de pe hartă folosesc și ele același element. Raport: docs/RAPORT_ANTET_POPUP.md.
+
+## 0.5.59 | 09.11.2026
+- Iconița de închidere a ferestrelor este acum un cerc (și când înlocuiește butonul „Închide” din antet, și când apare în bara ferestrei).
+
+## 0.5.58 | 09.11.2026
+- Rapoarte erori (Setări): două file, „Nerezolvate” (Nou, În analiză) și „Rezolvate” (Rezolvat, Respins). Oriunde apare o fereastră (popup) există acum butonul „Raportează o eroare”, iar captura include și fereastra deschisă; când modulul de rapoarte e oprit, butonul dispare.
+- Toate ferestrele au iconiță de închidere (✕) în dreapta sus, cu aceeași acțiune ca butonul de închidere al formularului; un buton „Închide” din antet devine iconița. Titlurile ferestrelor spun operațiunea și obiectul (de exemplu „Ștergi taskul? – Titlu · Beneficiar”, „Părăsire editare task – Titlu · Beneficiar”).
+- Taskuri: butonul „Vezi” (în fereastră) la toate taskurile din tabelul administratorului; adăugarea unui task se face în fereastră, se închide la salvare și avertizează la închidere cu date completate; intrarea din Administrare se numește „Taskuri utilizator”.
+- Taskuri: nivel de prioritate (Ridicat – roșiatic, Mediu – galben, Scăzut – alb), ales în formular și afișat în tabele și în fereastra taskului, cu filtru pe etichete; toate taskurile existente primesc „Scăzut” (schema bazei: migrarea 82). Modificarea prioritații are acțiune proprie în Jurnal („Modificare prioritate task”).
+- Taskuri: coloanele Prioritate, Creat și Termen se pot ordona crescător / descrescător (al treilea clic revine la ordinea implicită). În „Taskurile mele” starea este doar afișată, coloana „Creat” arată și cine a creat taskul, iar fereastra taskului este doar de vizualizare; butonul „Editează” (utilizatorul taskului) permite schimbarea stării și adăugarea / ștergerea fișierelor proprii.
+- Mesajul „secțiune indisponibilă” numește secțiunea și modulul oprit. Versiuni de modul: BugReports 1.1.0 și patch la Taskuri, Mentenanță, Facturi, Oferte, Vehicule, Analize de risc, Observații proiect, Import ActivityApp.
+
 ## 0.5.57 | 09.11.2026
 - Versiune de reunire: conține comutatorul de căutare simplă / extinsă din registrul de beneficiari (0.5.54) și modulul Taskuri utilizatori (0.5.55 și 0.5.56), împreună.
 

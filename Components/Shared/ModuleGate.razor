@@ -13,11 +13,15 @@
 }
 else if (Notice)
 {
-    <div class="error-banner" role="alert">Secțiunea nu este disponibilă momentan (modul indisponibil).</div>
+    <div class="error-banner" role="alert">Secțiunea „@SectionName” nu este disponibilă momentan: modulul „@ModuleName” este indisponibil.</div>
 }
 
 @code {
     [Parameter, EditorRequired] public string ModuleId { get; set; } = "";
     [Parameter] public bool Notice { get; set; } = true;
+    // The section the message names; when it is not given the name of the module is used.
+    [Parameter] public string? Section { get; set; }
+    private string ModuleName => Modules.Modules.FirstOrDefault(module => module.Id == ModuleId)?.Name ?? ModuleId;
+    private string SectionName => string.IsNullOrWhiteSpace(Section) ? ModuleName : Section;
     [Parameter] public RenderFragment? ChildContent { get; set; }
 }

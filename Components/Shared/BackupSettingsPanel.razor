@@ -116,7 +116,7 @@
 @if (Section != TimeSection)
 {
     @* The packages, the backup on request and the restoration belong to the backup module: while it is out the settings above stay usable and this part says so. *@
-    <ModuleGate ModuleId="@BlazorStoc.Modules.Backup.BackupWorkerRules.ModuleId"><BackupPackagesTable @key="tableVersion" /></ModuleGate>
+    <ModuleGate ModuleId="@BlazorStoc.Modules.Backup.BackupWorkerRules.ModuleId" Section="Pachete de backup"><BackupPackagesTable @key="tableVersion" /></ModuleGate>
 }
 
 @if (pendingRemoval is not null)

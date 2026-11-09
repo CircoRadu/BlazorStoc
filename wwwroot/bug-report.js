@@ -13,9 +13,20 @@
     window.addEventListener("error", (event) => remember(`${event.message} (${event.filename || ""}:${event.lineno || 0})`));
     window.addEventListener("unhandledrejection", (event) => remember(`Promise: ${(event.reason && event.reason.message) || event.reason}`));
 
+    // The popups (modal or not) open right now, except the report popup itself: the report must say which window the author was looking at.
+    const popupSelector = "dialog[open],[role=dialog],[role=alertdialog]";
+    const isShown = (item) => { const box = item.getBoundingClientRect(); return box.width > 0 && box.height > 0; };
+    const openPopups = () => Array.from(document.querySelectorAll(popupSelector)).filter((item) => item.id !== "bug-dialog" && !item.closest("#bug-dialog") && !item.hasAttribute("data-no-bug") && isShown(item));
+    const popupName = (dialog) => {
+        const heading = dialog.querySelector("h1,h2,h3,[aria-labelledby]");
+        const labelled = dialog.getAttribute("aria-labelledby") ? document.getElementById(dialog.getAttribute("aria-labelledby")) : null;
+        return ((labelled || heading || {}).textContent || dialog.id || "fereastră").trim().replace(/\s+/g, " ").slice(0, 80);
+    };
+
     const environment = () => ({
         url: location.pathname + location.search,
-        title: document.title,
+        title: document.title + (openPopups().length ? " · fereastra: " + openPopups().map(popupName).join(" > ") : ""),
+        popups: openPopups().map(popupName),
         viewport: `${window.innerWidth}x${window.innerHeight}`,
         screen: `${screen.width}x${screen.height}`,
         theme: document.documentElement.getAttribute("data-theme") || "light",
@@ -78,11 +89,14 @@
             const jobs = [];
             const swaps = [];
             const wraps = [];
+            let hasPopup = false;
             // Every element carries its computed style, so the picture does not depend on re-running the selectors, the viewport units or the fixed positions of the page.
             clone.setAttribute("style", computedText(body));
             for (let i = 0; i < sources.length; i++) {
                 const source = sources[i], target = targets[i];
                 if (!(source instanceof SVGElement) || source instanceof SVGSVGElement) target.setAttribute("style", computedText(source));
+                // An open popup lives in the top layer, which the picture does not have: it is lifted above everything and a dimming layer is put under it.
+                if (source instanceof HTMLDialogElement && source.open && source.id !== "bug-dialog") { target.style.zIndex = "2147483000"; hasPopup = true; }
                 if (source instanceof HTMLInputElement) {
                     target.setAttribute("value", source.value);
                     if (source.checked) target.setAttribute("checked", "checked"); else target.removeAttribute("checked");
@@ -105,7 +119,12 @@
                 while (target.firstChild) wrapper.appendChild(target.firstChild);
                 target.appendChild(wrapper);
             }
-            clone.querySelectorAll("script,noscript,dialog,iframe,#blazor-error-ui").forEach((node) => node.remove());
+            clone.querySelectorAll("script,noscript,dialog:not([open]),#bug-dialog,iframe,#blazor-error-ui").forEach((node) => node.remove());
+            if (hasPopup) {
+                const dim = document.createElement("div");
+                dim.setAttribute("style", "position:fixed;left:0;top:0;right:0;bottom:0;background:rgba(0,0,0,.45);z-index:2147482999");
+                clone.appendChild(dim);
+            }
             const style = document.createElement("style");
             style.textContent = collectCss();
             const root = document.createElement("div");
@@ -149,6 +168,119 @@
             return blob && blob.size < file.size ? blob : file;
         } catch { return file; }
     };
+
+    // Every popup (a native <dialog> or a div/section with role=dialog) gets a small bar: "Raportează o eroare" and a close icon. A <dialog> lives in the top layer, so its bar sits inside
+    // it; the other popups share ONE floating bar (outside the Blazor tree) placed above the topmost popup. Module out (no #bug-dialog): no report button at all.
+    const makeBar = () => {
+        const bar = document.createElement("div");
+        bar.className = "bug-popup-bar";
+        bar.setAttribute("data-popup-bar", "");
+        const report = document.createElement("button");
+        report.type = "button";
+        report.className = "bug-popup-button";
+        report.setAttribute("data-bug-open", "");
+        report.setAttribute("data-bug-popup", "");
+        report.setAttribute("aria-haspopup", "dialog");
+        report.title = "Raportează o eroare în această fereastră";
+        report.textContent = "⚑ Raportează o eroare";
+        const close = document.createElement("button");
+        close.type = "button";
+        close.className = "popup-close-icon";
+        close.setAttribute("data-popup-close-icon", "");
+        close.setAttribute("aria-label", "Închide fereastra");
+        close.title = "Închide fereastra";
+        close.textContent = "✕";
+        bar.append(report, close);
+        return bar;
+    };
+    const floating = makeBar();
+    floating.id = "bug-popup-float";
+    floating.classList.add("bug-popup-float");
+    floating.hidden = true;
+
+    // The panel of a popup: a backdrop that fills the window is skipped for its first child.
+    const panelOf = (popup) => {
+        let node = popup;
+        for (let guard = 0; guard < 4; guard++) {
+            const box = node.getBoundingClientRect();
+            if (box.width < innerWidth * 0.9 || box.height < innerHeight * 0.9) break;
+            const child = Array.from(node.children).find((item) => isShown(item) && item.getBoundingClientRect().width < box.width - 4);
+            if (!child) break;
+            node = child;
+        }
+        return node;
+    };
+
+    // The button the form already has for closing: the close icon triggers exactly that action (so an unsaved-changes question, a discard and so on behave the same).
+    // Priority: marked with data-popup-close, the .act-close buttons, then the safe words ("Închide", "Anulează", "Nu, păstrează", "Înapoi", "Renunță").
+    const closeWords = [/^închide/i, /^anulează/i, /^nu[, ]/i, /^înapoi/i, /^renunță/i];
+    const closeButtonOf = (popup) => {
+        const buttons = Array.from(popup.querySelectorAll("button")).filter((item) => !item.closest("[data-popup-bar]") && !item.disabled && (isShown(item) || item.classList.contains("popup-close-moved")));
+        const text = (item) => (item.textContent || "").trim().replace(/^[^\p{L}]+/u, "");
+        return buttons.find((item) => item.hasAttribute("data-popup-close"))
+            || buttons.find((item) => item.classList.contains("act-close") && !item.classList.contains("row-icon"))
+            || closeWords.map((word) => buttons.find((item) => word.test(text(item)))).find(Boolean)
+            || null;
+    };
+    const closePopup = (popup) => {
+        const button = closeButtonOf(popup);
+        if (button) { button.click(); return; }
+        if (popup instanceof HTMLDialogElement && popup.open) popup.close();
+    };
+
+    const topmost = () => { const list = openPopups(); return list.length ? list[list.length - 1] : null; };
+    document.addEventListener("click", (event) => {
+        const icon = event.target instanceof Element ? event.target.closest("[data-popup-close-icon]") : null;
+        if (!icon) return;
+        event.preventDefault();
+        event.stopPropagation();
+        const own = icon.closest("dialog");
+        const popup = own ? (own.open ? own : null) : topmost();
+        if (popup) closePopup(popup);
+    }, true);
+
+    // The close button of a popup lives in the bar above the popup (next to "Raportează o eroare"): a close button that sits in the heading is hidden, and the icon of the bar triggers it.
+    // One placed elsewhere in the popup (the foot of a form) stays, and the icon is added in the bar as well.
+    const headingCloseOf = (popup) => {
+        const button = closeButtonOf(popup);
+        return button && button.closest(".catalog-heading,.dialog-head,.heading-actions,.map-panel-heading") && !button.closest("[data-popup-bar]") ? button : null;
+    };
+    const moveHeadingClose = () => {
+        const wanted = new Set(openPopups().map(headingCloseOf).filter(Boolean));
+        for (const button of document.querySelectorAll(".popup-close-moved")) if (!wanted.has(button)) button.classList.remove("popup-close-moved");
+        for (const button of wanted) if (!button.classList.contains("popup-close-moved")) button.classList.add("popup-close-moved");
+    };
+
+    const place = () => {
+        moveHeadingClose();
+        const available = !!document.getElementById("bug-dialog");
+        if (!floating.isConnected) document.body.appendChild(floating);
+        const bugDialog = document.getElementById("bug-dialog");
+        // Native dialogs carry a bar inside.
+        for (const dialog of document.querySelectorAll("dialog[open]")) {
+            let bar = dialog.querySelector(":scope [data-popup-bar]");
+            if (!bar) { bar = makeBar(); (dialog.querySelector(".dialog-head") || dialog).appendChild(bar); }
+            // The report popup keeps only the close icon (it is the report itself).
+            bar.querySelector("[data-bug-popup]").hidden = !available || dialog.id === "bug-dialog" || dialog.hasAttribute("data-no-bug");
+            bar.querySelector("[data-popup-close-icon]").hidden = !closeButtonOf(dialog) && !(dialog instanceof HTMLDialogElement);
+        }
+        const popups = !bugDialog?.open ? openPopups().filter((item) => !(item instanceof HTMLDialogElement)) : [];
+        if (popups.length === 0) { floating.hidden = true; return; }
+        const popup = popups[popups.length - 1];
+        const box = panelOf(popup).getBoundingClientRect();
+        floating.hidden = false;
+        floating.querySelector("[data-bug-popup]").hidden = !available;
+        floating.querySelector("[data-popup-close-icon]").hidden = !closeButtonOf(popup);
+        const width = floating.offsetWidth || 200;
+        floating.style.top = Math.max(4, box.top - 36) + "px";
+        floating.style.left = Math.max(4, Math.min(innerWidth - width - 4, box.right - width)) + "px";
+    };
+    let scheduled = false;
+    const schedule = () => { if (scheduled) return; scheduled = true; const run = () => { if (!scheduled) return; scheduled = false; place(); }; requestAnimationFrame(run); setTimeout(run, 60); };
+    new MutationObserver((records) => { if (records.some((record) => record.target !== floating && !(record.target instanceof Element && record.target.closest("[data-popup-bar]")))) schedule(); }).observe(document.documentElement, { subtree: true, childList: true, attributes: true, attributeFilter: ["open", "class", "style", "disabled", "hidden"] });
+    window.addEventListener("resize", schedule);
+    document.addEventListener("scroll", schedule, true);
+    document.addEventListener("DOMContentLoaded", schedule);
 
     document.addEventListener("click", async (event) => {
         const target = event.target instanceof Element ? event.target.closest("[data-bug-open]") : null;

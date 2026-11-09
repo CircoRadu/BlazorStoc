@@ -25,7 +25,7 @@
 @if (creatingCategory || editingCategory is not null)
 {
     <div class="delete-overlay"><section class="delete-dialog group-editor-dialog" role="dialog" aria-modal="true" aria-labelledby="category-editor-title">
-        <UnsavedChangesTracker @ref="groupTracker" Adding="@(creatingCategory || creatingSubcategory)" Snapshot="CurrentSnapshot" Discard="DiscardEditAsync" />
+        <UnsavedChangesTracker @ref="groupTracker" Subject="@(BlazorStoc.Services.PopupSubject.Of("categorie", editingCategory))" Adding="@(creatingCategory || creatingSubcategory)" Snapshot="CurrentSnapshot" Discard="DiscardEditAsync" />
         <div class="catalog-heading dialog-head"><h2 id="category-editor-title">@(creatingCategory ? "Adaugă categorie" : $"Editează categoria „{editingCategory}”")</h2><HelpButton Topic="categorii" About="categoria și subcategoria" /></div>
         <div class="editor-grid">
             <label class="full-width" for="category-name">Denumire categorie *<input id="category-name" maxlength="100" @bind="categoryName" disabled="@saving" /></label>
@@ -337,7 +337,7 @@ else
 
     // The form of a subcategory (new or edited) opens as a popup over the page.
     private RenderFragment SubcategoryEditor => @<div class="delete-overlay"><section class="delete-dialog group-editor-dialog" role="dialog" aria-modal="true" aria-labelledby="subcategory-editor-title">
-        <UnsavedChangesTracker @ref="groupTracker" Adding="@(creatingCategory || creatingSubcategory)" Snapshot="CurrentSnapshot" Discard="DiscardEditAsync" />
+        <UnsavedChangesTracker @ref="groupTracker" Subject="@(BlazorStoc.Services.PopupSubject.Of("subcategorie", editingSubcategory?.Subcategory ?? creatingChildOf?.Subcategory))" Adding="@(creatingCategory || creatingSubcategory)" Snapshot="CurrentSnapshot" Discard="DiscardEditAsync" />
         <div class="catalog-heading dialog-head"><h2 id="subcategory-editor-title">@(creatingChildOf is not null ? $"Adaugă subcategorie copil în „{creatingChildOf.Subcategory}”" : creatingSubcategory ? $"Adaugă subcategorie în „{targetCategory}”" : $"Editează subcategoria „{editingSubcategory!.Subcategory}”")</h2><HelpButton Topic="categorii" About="categoria și subcategoria" /></div>
         <div class="editor-grid">
             @if (creatingChildOf is not null && ProductCount(creatingChildOf) > 0) { <p class="full-width muted" role="note">Subcategoria „@creatingChildOf.Subcategory” are @ProductCount(creatingChildOf) produse. Produsele se asociază numai subcategoriilor de la ultimul nivel, deci la adăugare se mută în noua subcategorie și își păstrează parametrii și etichetele.</p> }

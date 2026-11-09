@@ -70,7 +70,8 @@ public sealed class UnsavedChanges
         lock (gate)
         {
             var affected = only is not null ? [only] : trackers.Where(tracker => tracker.IsModified).ToArray();
-            pending = new PendingLeave(continuation, only, affected.Length > 0 && affected.All(tracker => tracker.Adding));
+            pending = new PendingLeave(continuation, only, affected.Length > 0 && affected.All(tracker => tracker.Adding),
+                string.Join(", ", affected.Select(tracker => tracker.Subject).Where(text => !string.IsNullOrWhiteSpace(text)).Distinct()));
         }
         Changed?.Invoke();
     }
@@ -105,7 +106,8 @@ public sealed class UnsavedChanges
 }
 
 // Adding: every form that would be discarded creates a new object (the dialog wording differs from editing).
-public sealed record PendingLeave(Func<Task> Continue, EditTracker? Only, bool Adding);
+// Subject: what the forms that would be discarded work on (for example "task – Popescu SRL"); it completes the title of the question.
+public sealed record PendingLeave(Func<Task> Continue, EditTracker? Only, bool Adding, string Subject = "");
 
 // One open editor: a snapshot of its values taken when it opened (kept as a hash, so typed values such as passwords are
 // not kept twice), a way to read its current values and a way to close it without saving.
@@ -124,6 +126,9 @@ public sealed class EditTracker : IDisposable
     }
 
     public bool Adding { get; }
+
+    // What the form works on, shown in the title of the "editing not finished" question.
+    public string Subject { get; set; } = "";
 
     // Modified = the current values differ from the values the editor opened with (or from the last save).
     public bool IsModified

@@ -13,7 +13,7 @@ public sealed class MariaUserTaskRepository(IConfiguration configuration, IAcces
     private const string Select = """
         SELECT t.id, t.beneficiary_id, b.name, t.assigned_user_id, u.username, u.display_name, u.is_active, t.title, t.description, t.status, t.due_date,
                t.created_utc, t.created_by, t.accepted_utc, t.accepted_by, t.finished_utc, t.version,
-               (SELECT COUNT(*) FROM entity_files f WHERE f.owner_kind='task' AND f.owner_id=t.id)
+               (SELECT COUNT(*) FROM entity_files f WHERE f.owner_kind='task' AND f.owner_id=t.id), t.priority
         FROM beneficiary_tasks t
         JOIN beneficiaries b ON b.id=t.beneficiary_id
         JOIN web_users u ON u.id=t.assigned_user_id
@@ -67,10 +67,10 @@ public sealed class MariaUserTaskRepository(IConfiguration configuration, IAcces
             await CheckUserAsync(connection, transaction, value.AssignedUserId, cancellationToken).ConfigureAwait(false);
             var now = MariaTimeText.Now();
             await using var command = Command(connection, transaction, """
-                INSERT INTO beneficiary_tasks (beneficiary_id, assigned_user_id, title, description, status, due_date, created_utc, created_by, finished_utc, version)
-                VALUES (@beneficiary, @user, @title, @description, @status, @due, @created, @author, @finished, 0)
+                INSERT INTO beneficiary_tasks (beneficiary_id, assigned_user_id, title, description, status, due_date, priority, created_utc, created_by, finished_utc, version)
+                VALUES (@beneficiary, @user, @title, @description, @status, @due, @priority, @created, @author, @finished, 0)
                 """, ("@beneficiary", value.BeneficiaryId), ("@user", value.AssignedUserId), ("@title", value.Title), ("@description", value.Description),
-                ("@status", (int)value.Status), ("@due", SqlDate(value.DueDate)), ("@created", MariaTimeText.Format(now)), ("@author", author),
+                ("@status", (int)value.Status), ("@due", SqlDate(value.DueDate)), ("@priority", (int)value.Priority), ("@created", MariaTimeText.Format(now)), ("@author", author),
                 ("@finished", value.Status == UserTaskStatus.Done ? MariaTimeText.Format(now) : null));
             await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
             return checked((int)command.LastInsertedId);
@@ -96,12 +96,12 @@ public sealed class MariaUserTaskRepository(IConfiguration configuration, IAcces
             var wasDone = original.Status == UserTaskStatus.Done;
             var isDone = value.Status == UserTaskStatus.Done;
             await using var command = Command(connection, transaction, """
-                UPDATE beneficiary_tasks SET assigned_user_id=@user, title=@title, description=@description, status=@status, due_date=@due,
+                UPDATE beneficiary_tasks SET assigned_user_id=@user, title=@title, description=@description, status=@status, due_date=@due, priority=@priority,
                     accepted_utc=IF(@moved, NULL, accepted_utc), accepted_by=IF(@moved, NULL, accepted_by),
                     finished_utc=@finished, version=version+1
                 WHERE id=@id AND version=@version
                 """, ("@user", value.AssignedUserId), ("@title", value.Title), ("@description", value.Description), ("@status", (int)value.Status),
-                ("@due", SqlDate(value.DueDate)), ("@moved", moved ? 1 : 0), ("@id", original.Id), ("@version", original.Version),
+                ("@due", SqlDate(value.DueDate)), ("@priority", (int)value.Priority), ("@moved", moved ? 1 : 0), ("@id", original.Id), ("@version", original.Version),
                 ("@finished", isDone ? (wasDone && original.FinishedUtc is { } kept ? MariaTimeText.Format(kept) : MariaTimeText.Format(MariaTimeText.Now())) : null));
             if (await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false) != 1) throw new UserTaskOperationException(UserTaskRules.ConcurrentMessage);
             return true;
@@ -254,6 +254,7 @@ public sealed class MariaUserTaskRepository(IConfiguration configuration, IAcces
         }
         await Record(AuditActions.EditUserTask, new("Titlu", before.Title, after.Title), new("Descriere", before.Description, after.Description)).ConfigureAwait(false);
         await Record(AuditActions.EditUserTaskDueDate, new AuditChange("Termen", UserTaskRules.DueText(before.DueDate), UserTaskRules.DueText(after.DueDate))).ConfigureAwait(false);
+        await Record(AuditActions.EditUserTaskPriority, new AuditChange("Prioritate", UserTaskRules.PriorityLabel(before.Priority), UserTaskRules.PriorityLabel(after.Priority))).ConfigureAwait(false);
         await Record(AuditActions.MoveUserTask, new AuditChange("Utilizator", before.AssignedUserName, after.AssignedUserName)).ConfigureAwait(false);
         await Record(AuditActions.ChangeUserTaskStatus, new AuditChange("Stare", UserTaskRules.StatusLabel(before.Status), UserTaskRules.StatusLabel(after.Status))).ConfigureAwait(false);
     }
@@ -283,7 +284,7 @@ public sealed class MariaUserTaskRepository(IConfiguration configuration, IAcces
             (UserTaskStatus)Convert.ToInt32(reader.GetValue(9)), reader.IsDBNull(10) ? null : DateOnly.FromDateTime(reader.GetDateTime(10)),
             MariaTimeText.Parse(reader.GetString(11)), reader.GetString(12),
             MariaTimeText.ParseOrNull(reader.IsDBNull(13) ? null : reader.GetString(13)), reader.IsDBNull(14) ? null : reader.GetString(14),
-            MariaTimeText.ParseOrNull(reader.IsDBNull(15) ? null : reader.GetString(15)), Convert.ToInt64(reader.GetValue(16)), Convert.ToInt32(reader.GetValue(17)));
+            MariaTimeText.ParseOrNull(reader.IsDBNull(15) ? null : reader.GetString(15)), Convert.ToInt64(reader.GetValue(16)), Convert.ToInt32(reader.GetValue(17)), (UserTaskPriority)Convert.ToInt32(reader.GetValue(18)));
     }
 
     private static async Task<long> LockVersionAsync(MySqlConnection connection, MySqlTransaction transaction, int id, CancellationToken token)

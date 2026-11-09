@@ -1,0 +1,16 @@
+@* The header of a column a table of tasks can be ordered by: a click orders ascending, a second click descending, a third click goes back to the default order. The arrow shows the state. *@
+<th aria-sort="@(Active ? (Descending ? "descending" : "ascending") : "none")" class="@Class">
+    <button type="button" class="sort-header @(Active ? "active" : "")" title="@Tooltip" @onclick="() => Clicked.InvokeAsync(Key)">@Label<span class="sort-arrow" aria-hidden="true">@(Active ? (Descending ? "▼" : "▲") : "↕")</span></button>
+</th>
+
+@code {
+    [Parameter, EditorRequired] public string Label { get; set; } = "";
+    [Parameter, EditorRequired] public TaskSortKey Key { get; set; }
+    [Parameter] public TaskSortKey Current { get; set; }
+    [Parameter] public bool Descending { get; set; }
+    [Parameter] public string? Class { get; set; }
+    [Parameter] public EventCallback<TaskSortKey> Clicked { get; set; }
+
+    private bool Active => Current == Key;
+    private string Tooltip => !Active ? $"Ordonează după {Label.ToLowerInvariant()} crescător" : !Descending ? $"Ordonează după {Label.ToLowerInvariant()} descrescător" : "Revino la ordinea implicită";
+}

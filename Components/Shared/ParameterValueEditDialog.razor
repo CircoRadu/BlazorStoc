@@ -6,8 +6,7 @@
 @* Administrators only. Step 1: the new value and what it does to the products that use the old one (nothing is written); step 2: the reason and the confirmation. *@
 <div class="delete-overlay">
     <section class="delete-dialog parameter-value-dialog" role="dialog" aria-modal="true" aria-labelledby="@TitleId">
-        <h2 id="@TitleId">Modifici valoarea parametrului?</h2>
-        <p class="delete-object"><strong>@Parameter.Name: @Parameter.Display(Value.Value)</strong></p>
+        <h2 id="@TitleId">Modifici valoarea parametrului? – @Parameter.Name: @Parameter.Display(Value.Value)</h2>
         @if (!confirming)
         {
             <p>@(Value.ProductCount == 0

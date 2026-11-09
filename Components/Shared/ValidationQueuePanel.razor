@@ -3,7 +3,7 @@
 
 @* The lists of the events that wait for a decision from ActivityApp (tickets proposed as maintenance with the discarded ones, beneficiaries to verify, the problems found by the import). They belong to
    the ActivityApp import module; the pages of other modules (Maintenance, Notifications) show them through this wrapper, because modules do not refer to each other. *@
-<ModuleGate ModuleId="@BlazorStoc.Modules.ActivityImport.ActivityImportModule.ModuleId">
+<ModuleGate ModuleId="@BlazorStoc.Modules.ActivityImport.ActivityImportModule.ModuleId" Section="Coada de validare tichete">
     @if (Beneficiaries) { <BeneficiaryChecksSection ShowEmpty="true" Changed="Changed" /> }
     else if (Issues) { <ActivityIssuesSection Changed="Changed" /> }
     else

@@ -124,13 +124,13 @@ else if (beneficiary is not null)
 
     <NetConsumptionSection BeneficiaryId="Id" StartOpen="false" />
 
-    <ModuleGate ModuleId="@BlazorStoc.Modules.Maintenance.MaintenanceModule.ModuleId"><ServiceContractsSection BeneficiaryId="Id" BeneficiaryName="@beneficiary.Name" WorkPoints="workPoints" Contracts="contracts" CanManage="canMaintenance" ThresholdDays="thresholdDays" Changed="ReloadContractsAsync" />
+    <ModuleGate ModuleId="@BlazorStoc.Modules.Maintenance.MaintenanceModule.ModuleId" Section="Contracte de mentenanță"><ServiceContractsSection BeneficiaryId="Id" BeneficiaryName="@beneficiary.Name" WorkPoints="workPoints" Contracts="contracts" CanManage="canMaintenance" ThresholdDays="thresholdDays" Changed="ReloadContractsAsync" />
 
     <ServiceInterventionsSection BeneficiaryId="Id" BeneficiaryName="@beneficiary.Name" WorkPoints="workPoints" Contracts="contracts" CanManage="canMaintenance" OpenForWorkPointId="AddInterventionPoint ?? 0" Changed="ReloadContractsAsync" /></ModuleGate>
 
     <ModuleGate ModuleId="@BlazorStoc.Modules.Elcomtur.ElcomturModule.ModuleId" Notice="false"><ElcomturBalanceSection BeneficiaryId="Id" StartOpen="BalanceRequested" /></ModuleGate>
 
-    <ModuleGate ModuleId="@RiskAnalysesModule.ModuleId"><RiskAnalysesSection BeneficiaryId="Id" StartOpen="false" Views="riskAnalyses" WorkPoints="workPoints" CanManage="canRisk" ThresholdDays="riskThresholdDays" Changed="ReloadRiskAnalysesAsync" /></ModuleGate>
+    <ModuleGate ModuleId="@RiskAnalysesModule.ModuleId" Section="Analize de risc"><RiskAnalysesSection BeneficiaryId="Id" StartOpen="false" Views="riskAnalyses" WorkPoints="workPoints" CanManage="canRisk" ThresholdDays="riskThresholdDays" Changed="ReloadRiskAnalysesAsync" /></ModuleGate>
 
     <ModuleGate ModuleId="@BlazorStoc.Modules.Tasks.TasksModule.ModuleId" Notice="false"><AuthorizeView Policy="perm:taskuri.view"><Authorized><BlazorStoc.Modules.Tasks.UserTasksSection BeneficiaryId="Id" BeneficiaryName="@beneficiary.Name" /></Authorized></AuthorizeView></ModuleGate>
 

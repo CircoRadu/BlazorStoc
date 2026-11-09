@@ -57,8 +57,7 @@
     {
         <div class="delete-overlay">
             <section class="delete-dialog" role="dialog" aria-modal="true" aria-labelledby="component-archive-title">
-                <h2 id="component-archive-title">Scoți componenta?</h2>
-                <p class="delete-object"><strong>@archiving.SystemTypeName</strong></p>
+                <h2 id="component-archive-title">Scoți componenta? – @archiving.SystemTypeName</h2>
                 <p>Componenta se arhivează (nu se șterge): oferta și liniile ei se păstrează și o poți reactiva oricând. Se înregistrează în jurnal.</p>
                 @if (archiveError is not null) { <div class="error-banner" role="alert">@archiveError</div> }
                 @if (pendingExits.Count > 0)

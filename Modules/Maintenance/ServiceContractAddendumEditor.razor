@@ -9,7 +9,7 @@
 @implements IDisposable
 @* Act adițional la un contract de mentenanță: fereastra unui act nou (ce modifică: valabilitate, ciclicitate, puncte acoperite, alte clauze) sau corectarea câmpurilor descriptive ale unui act
    existent. Efectul se aplică la salvare, o singură dată; scadențele afectate sunt propuse și pot fi modificate. Nu se atașează fișiere. *@
-<UnsavedChangesTracker @ref="tracker" Adding="true" Snapshot="CurrentSnapshot" Discard="DiscardAsync" />
+<UnsavedChangesTracker @ref="tracker" Subject="@(BlazorStoc.Services.PopupSubject.Of("act adițional", Details.Contract.Label))" Adding="true" Snapshot="CurrentSnapshot" Discard="DiscardAsync" />
 <section class="product-editor" aria-labelledby="addendum-editor-title">
     <div class="catalog-heading"><h2 id="addendum-editor-title">@(Original is null ? $"Adaugă act adițional la contractul {Details.Contract.Label}" : $"Corectează actul adițional {Original.Label}")</h2><span class="heading-actions"><HelpButton Topic="mentenanta-act-aditional" About="Act adițional" /></span></div>
     @if (error is not null) { <div class="error-banner" role="alert">@error</div> }

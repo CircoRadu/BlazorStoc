@@ -9,13 +9,13 @@
     <div class="delete-dialog template-popup" role="dialog" aria-modal="true" tabindex="-1" aria-labelledby="task-details-title">
         @if (task is null)
         {
-            <div class="catalog-heading"><h2 id="task-details-title">Task</h2><span class="heading-actions"><button type="button" class="refresh act-close" @onclick="() => Closed.InvokeAsync()">Închide</button></span></div>
+            <div class="catalog-heading"><h2 id="task-details-title">Vizualizare task</h2><span class="heading-actions"><button type="button" class="refresh act-close" @onclick="() => Closed.InvokeAsync()">Închide</button></span></div>
             @if (loadError is not null) { <div class="error-banner" role="alert">@loadError</div> }
             else { <div class="empty-state" role="status"><div class="spinner"></div><h3>Se încarcă taskul</h3></div> }
         }
         else
         {
-            <div class="catalog-heading"><h2 id="task-details-title">@task.Title</h2><span class="heading-actions"><HelpButton Topic="task-detalii" About="Detaliile taskului" /><button type="button" class="refresh act-close" @onclick="() => Closed.InvokeAsync()">Închide</button></span></div>
+            <div class="catalog-heading"><h2 id="task-details-title">@(editing ? "Editare task" : "Vizualizare task") – @task.Title · @task.BeneficiaryName</h2><span class="heading-actions"><HelpButton Topic="task-detalii" About="Detaliile taskului" />@if (isAssignee && !editing) { <button type="button" class="refresh act-edit" disabled="@busy" @onclick="() => editing = true">Editează</button> }<button type="button" class="refresh act-close" @onclick="() => Closed.InvokeAsync()">Închide</button></span></div>
             @if (error is not null) { <div class="error-banner" role="alert">@error</div> }
             @if (!task.IsAccepted && isAssignee)
             {
@@ -24,18 +24,30 @@
             }
             <dl class="database-facts task-facts">
                 <div><dt>Beneficiar</dt><dd>@task.BeneficiaryName</dd></div>
+                <div><dt>Prioritate</dt><dd><span class="task-prio @UserTaskRules.PriorityClass(task.Priority)">@UserTaskRules.PriorityLabel(task.Priority)</span></dd></div>
                 <div><dt>Utilizator</dt><dd>@task.AssignedUserName</dd></div>
                 <div><dt>Creat</dt><dd>@task.CreatedUtc.ToLocalTime().ToString("dd.MM.yyyy HH:mm", System.Globalization.CultureInfo.InvariantCulture) · @task.CreatedBy</dd></div>
                 <div><dt>Termen limită</dt><dd class="@DueClass">@UserTaskRules.DueText(task.DueDate)</dd></div>
                 <div><dt>Preluat</dt><dd>@(task.IsAccepted ? $"{task.AcceptedUtc!.Value.ToLocalTime():dd.MM.yyyy HH:mm} · {task.AcceptedBy}" : "nu")</dd></div>
                 @if (task.FinishedUtc is { } finished) { <div><dt>Finalizat</dt><dd>@finished.ToLocalTime().ToString("dd.MM.yyyy HH:mm", System.Globalization.CultureInfo.InvariantCulture)</dd></div> }
             </dl>
-            <label for="task-details-status">Stare
-                <select id="task-details-status" value="@((int)task.Status)" disabled="@(busy || !canChangeStatus)" title="@(canChangeStatus ? "Schimbă starea taskului" : "Starea o poate schimba doar utilizatorul căruia îi este dat taskul")" @onchange="StatusChangedAsync">
-                    @foreach (var status in UserTaskRules.Statuses) { <option value="@((int)status)">@UserTaskRules.StatusLabel(status)</option> }
-                </select></label>
-            <div class="task-description"><strong>Descriere</strong><p>@task.Description</p></div>
-            <TaskFilesPanel TaskId="task.Id" Changed="ReloadAsync" />
+            @if (editing)
+            {
+                <p class="form-note">Poți schimba starea taskului și adăuga fișiere proprii (le poți și șterge). Celelalte date le modifică administratorul. Se salvează imediat.</p>
+                <label for="task-details-status">Stare
+                    <select id="task-details-status" value="@((int)task.Status)" disabled="@(busy || !canChangeStatus)" @onchange="StatusChangedAsync">
+                        @foreach (var status in UserTaskRules.Statuses) { <option value="@((int)status)">@UserTaskRules.StatusLabel(status)</option> }
+                    </select></label>
+                <div class="task-description"><strong>Descriere</strong><p>@task.Description</p></div>
+                <TaskFilesPanel TaskId="task.Id" Changed="ReloadAsync" />
+                <div class="editor-actions"><button type="button" class="refresh act-nav" @onclick="() => editing = false">Înapoi la vizualizare</button></div>
+            }
+            else
+            {
+                <div class="task-facts-extra"><strong>Stare</strong> <span class="task-label static">@UserTaskRules.StatusLabel(task.Status)</span></div>
+                <div class="task-description"><strong>Descriere</strong><p>@task.Description</p></div>
+                <TaskFilesPanel TaskId="task.Id" ReadOnly="true" />
+            }
         }
     </div>
 </div>
@@ -47,7 +59,7 @@
     [Parameter] public EventCallback Closed { get; set; }
 
     private UserTask? task;
-    private bool isAssignee, canChangeStatus, busy;
+    private bool isAssignee, canChangeStatus, busy, editing;
     private string? error, loadError;
     private readonly CancellationTokenSource lifetime = new();
 

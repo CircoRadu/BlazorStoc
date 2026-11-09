@@ -11,7 +11,7 @@
 <NavigationLock OnBeforeInternalNavigation="BeforeNavigationAsync" ConfirmExternalNavigation="@confirmExternal" />
 @if (Guard.Pending is not null)
 {
-    <UnsavedChangesDialog Adding="@(Guard.Pending?.Adding == true)" BackToEditing="BackToEditingAsync" Leave="LeaveAsync" />
+    <UnsavedChangesDialog Adding="@(Guard.Pending?.Adding == true)" Subject="@(Guard.Pending?.Subject ?? "")" BackToEditing="BackToEditingAsync" Leave="LeaveAsync" />
 }
 
 @code {

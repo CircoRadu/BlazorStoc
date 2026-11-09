@@ -15,17 +15,55 @@ public enum UserTaskStatus
     Done = 3
 }
 
+public enum UserTaskPriority
+{
+    /// <summary>"Scăzut" (white): the default, also for every task that existed before the priority was added.</summary>
+    Low = 1,
+    /// <summary>"Mediu" (yellow).</summary>
+    Medium = 2,
+    /// <summary>"Ridicat" (reddish).</summary>
+    High = 3
+}
+
 public sealed class UserTaskOperationException(string message) : Exception(message);
 
 /// <summary>A task with the names of its beneficiary and user. FileCount is the number of attached files.</summary>
 public sealed record UserTask(int Id, int BeneficiaryId, string BeneficiaryName, int AssignedUserId, string AssignedUserName, bool AssignedUserActive,
     string Title, string Description, UserTaskStatus Status, DateOnly? DueDate, DateTime CreatedUtc, string CreatedBy,
-    DateTime? AcceptedUtc, string? AcceptedBy, DateTime? FinishedUtc, long Version, int FileCount)
+    DateTime? AcceptedUtc, string? AcceptedBy, DateTime? FinishedUtc, long Version, int FileCount, UserTaskPriority Priority = UserTaskPriority.Low)
 {
     /// <summary>Every task that is not finished is active.</summary>
     public bool IsActive => Status != UserTaskStatus.Done;
     /// <summary>False while the user did not take the task over: a new or moved task (shown on a red background).</summary>
     public bool IsAccepted => AcceptedUtc is not null;
+}
+
+/// <summary>The columns the tables of tasks can be ordered by (None = the default order of the table).</summary>
+public enum TaskSortKey { None, Created, Due, Priority }
+
+public static class TaskSort
+{
+    /// <summary>The tasks ordered by the column; a task without a deadline always goes last when ordering by the deadline. None keeps the order given.</summary>
+    public static IReadOnlyList<UserTask> Apply(IEnumerable<UserTask> tasks, TaskSortKey key, bool descending)
+    {
+        switch (key)
+        {
+            case TaskSortKey.Created:
+                return [.. descending ? tasks.OrderByDescending(task => task.CreatedUtc) : tasks.OrderBy(task => task.CreatedUtc)];
+            case TaskSortKey.Priority:
+                return [.. (descending ? tasks.OrderByDescending(task => (int)task.Priority) : tasks.OrderBy(task => (int)task.Priority)).ThenByDescending(task => task.CreatedUtc)];
+            case TaskSortKey.Due:
+                var dated = tasks.Where(task => task.DueDate is not null);
+                var undated = tasks.Where(task => task.DueDate is null);
+                return [.. (descending ? dated.OrderByDescending(task => task.DueDate) : dated.OrderBy(task => task.DueDate)), .. undated];
+            default:
+                return [.. tasks];
+        }
+    }
+
+    /// <summary>The next state of a header: a new column starts ascending, a second click descending, a third click goes back to the default order.</summary>
+    public static (TaskSortKey Key, bool Descending) Next(TaskSortKey current, bool descending, TaskSortKey clicked) =>
+        current != clicked ? (clicked, false) : !descending ? (clicked, true) : (TaskSortKey.None, false);
 }
 
 /// <summary>A user a task can be given to.</summary>
@@ -42,11 +80,12 @@ public sealed class UserTaskInput
     public string Description { get; set; } = "";
     public UserTaskStatus Status { get; set; } = UserTaskStatus.Future;
     public DateOnly? DueDate { get; set; }
+    public UserTaskPriority Priority { get; set; } = UserTaskPriority.Low;
 
     public static UserTaskInput From(UserTask task) => new()
     {
         BeneficiaryId = task.BeneficiaryId, AssignedUserId = task.AssignedUserId, Title = task.Title, Description = task.Description,
-        Status = task.Status, DueDate = task.DueDate
+        Status = task.Status, DueDate = task.DueDate, Priority = task.Priority
     };
 
     /// <summary>The input cleaned (text trimmed); throws <see cref="UserTaskOperationException"/> for the first problem.</summary>
@@ -55,7 +94,7 @@ public sealed class UserTaskInput
         if (UserTaskRules.ValidationError(this) is { } error) throw new UserTaskOperationException(error);
         return new()
         {
-            BeneficiaryId = BeneficiaryId, AssignedUserId = AssignedUserId, Title = Title.Trim(), Description = Description.Trim(), Status = Status, DueDate = DueDate
+            BeneficiaryId = BeneficiaryId, AssignedUserId = AssignedUserId, Title = Title.Trim(), Description = Description.Trim(), Status = Status, DueDate = DueDate, Priority = Priority
         };
     }
 }
@@ -77,6 +116,19 @@ public static class UserTaskRules
         _ => ""
     };
 
+    public static string PriorityLabel(UserTaskPriority priority) => priority switch
+    {
+        UserTaskPriority.Low => "Scăzut",
+        UserTaskPriority.Medium => "Mediu",
+        UserTaskPriority.High => "Ridicat",
+        _ => ""
+    };
+
+    /// <summary>The css class of a priority (the colors: high reddish, medium yellow, low white).</summary>
+    public static string PriorityClass(UserTaskPriority priority) => priority switch { UserTaskPriority.High => "prio-high", UserTaskPriority.Medium => "prio-medium", _ => "prio-low" };
+
+    public static readonly IReadOnlyList<UserTaskPriority> Priorities = [UserTaskPriority.High, UserTaskPriority.Medium, UserTaskPriority.Low];
+
     public static readonly IReadOnlyList<UserTaskStatus> Statuses = [UserTaskStatus.Future, UserTaskStatus.InProgress, UserTaskStatus.Done];
 
     public static string? ValidationError(UserTaskInput input)
@@ -90,6 +142,7 @@ public static class UserTaskRules
         if (description.Length == 0) return "Descrierea este obligatorie.";
         if (description.Length > DescriptionMaxLength) return $"Descrierea poate avea cel mult {DescriptionMaxLength} de caractere.";
         if (!Enum.IsDefined(input.Status)) return "Starea taskului nu este validă.";
+        if (!Enum.IsDefined(input.Priority)) return "Prioritatea taskului nu este validă.";
         return null;
     }
 
@@ -123,7 +176,7 @@ public static class UserTaskRules
 
     /// <summary>The fields of a task for the journal (creation and deletion).</summary>
     public static string Identification(UserTask task) => AuditDetails.Identification(
-        ("Beneficiar", task.BeneficiaryName), ("Utilizator", task.AssignedUserName), ("Titlu", task.Title), ("Stare", StatusLabel(task.Status)),
+        ("Beneficiar", task.BeneficiaryName), ("Utilizator", task.AssignedUserName), ("Titlu", task.Title), ("Prioritate", PriorityLabel(task.Priority)), ("Stare", StatusLabel(task.Status)),
         ("Termen", DueText(task.DueDate)), ("Descriere", task.Description));
 }
 

@@ -26,11 +26,16 @@
             </ChildContent>
         </CollapsibleSection>
 
+        <div class="settings-tabs" role="tablist" aria-label="Rapoarte erori">
+            <button type="button" role="tab" id="tab-bugs-open" class="settings-tab @(showClosed ? "" : "active")" aria-selected="@(showClosed ? "false" : "true")" aria-controls="panel-bugs" @onclick="() => OpenTabAsync(false)">Nerezolvate</button>
+            <button type="button" role="tab" id="tab-bugs-closed" class="settings-tab @(showClosed ? "active" : "")" aria-selected="@(showClosed ? "true" : "false")" aria-controls="panel-bugs" @onclick="() => OpenTabAsync(true)">Rezolvate</button>
+        </div>
+        <div id="panel-bugs" role="tabpanel" aria-labelledby="@(showClosed ? "tab-bugs-closed" : "tab-bugs-open")">
         <div class="audit-filters bug-filters">
             <label>Stare
                 <select id="bug-filter-state" @bind="state" @bind:after="FilterChangedAsync">
                     <option value="">Toate</option>
-                    @foreach (var item in BugReportRules.States) { <option value="@item">@item</option> }
+                    @foreach (var item in BugReportRules.States.Where(s => (s is BugReportRules.StateResolved or BugReportRules.StateRejected) == showClosed)) { <option value="@item">@item</option> }
                 </select></label>
             <label>Gravitate
                 <select id="bug-filter-severity" @bind="severity" @bind:after="FilterChangedAsync">
@@ -72,6 +77,7 @@
             <AuditPager Id="bug-admin-size" Label="Rapoarte pe pagină" PageSizes="sizes" PageSize="pageSize" Page="page" Total="total" PageChanged="PageChangedAsync" PageSizeChanged="SizeChangedAsync" />
         }
 
+        </div>
         @if (deleting is not null)
         {
             <div class="error-banner" role="alert" id="bug-delete-confirm">Ștergi definitiv raportul <strong>@deleting.Number</strong> („@deleting.Title”) și imaginile lui? Nu se poate anula.
@@ -132,7 +138,7 @@
     private string state = "", severity = "", user = "", newState = BugReportRules.StateNew, note = "";
     private DateTime? from, to;
     private int page = 1, pageSize = 25, total;
-    private bool loading = true, busy, canEdit, canExport;
+    private bool loading = true, busy, canEdit, canExport, showClosed;
     private string? error, notice;
     private IJSObjectReference? downloads;
 
@@ -147,7 +153,14 @@
         await LoadAsync();
     }
 
-    private BugReportQuery Query => new(state.Length == 0 ? null : state, severity.Length == 0 ? null : severity, user, from is { } f ? DateOnly.FromDateTime(f) : null, to is { } t ? DateOnly.FromDateTime(t) : null);
+    private BugReportQuery Query => new(state.Length == 0 ? null : state, severity.Length == 0 ? null : severity, user, from is { } f ? DateOnly.FromDateTime(f) : null, to is { } t ? DateOnly.FromDateTime(t) : null, showClosed);
+
+    private async Task OpenTabAsync(bool closed)
+    {
+        if (showClosed == closed) return;
+        showClosed = closed; state = ""; page = 1; opened = null; deleting = null; pictures = [];
+        await LoadAsync();
+    }
 
     private async Task LoadAsync()
     {

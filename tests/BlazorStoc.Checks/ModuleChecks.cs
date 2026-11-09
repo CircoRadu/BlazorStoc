@@ -320,7 +320,9 @@ public static class ModuleChecks
         check(healthy.FindAll("#inside").Count == 1 && healthy.FindAll(".error-banner").Count == 0, "Gate: the content of an available module is shown");
         for (var i = 0; i < ModuleRegistry.FailureThreshold; i++) registry.ReportFailure("g", new InvalidOperationException());
         var gone = context.Render<ModuleGate>(p => p.Add(g => g.ModuleId, "g").AddChildContent(content));
-        check(gone.FindAll("#inside").Count == 0 && gone.Markup.Contains("modul indisponibil"), "Gate: a module that is out shows a notice instead of its content");
+        check(gone.FindAll("#inside").Count == 0 && gone.Markup.Contains("este indisponibil") && gone.Markup.Contains("„Fake g”"), "Gate: a module that is out shows a notice instead of its content");
+        var named = context.Render<ModuleGate>(p => p.Add(g => g.ModuleId, "g").Add(g => g.Section, "Analize de risc").AddChildContent(content));
+        check(named.Markup.Contains("Secțiunea „Analize de risc” nu este disponibilă"), "Gate: the notice of a module that is out names the section");
         var quiet = context.Render<ModuleGate>(p => p.Add(g => g.ModuleId, "g").Add(g => g.Notice, false).AddChildContent(content));
         check(quiet.FindAll("#inside").Count == 0 && quiet.FindAll(".error-banner").Count == 0, "Gate: without Notice a module that is out leaves nothing behind (menus, tiles)");
         clock.Advance(ModuleRegistry.Cooldown + TimeSpan.FromSeconds(1));

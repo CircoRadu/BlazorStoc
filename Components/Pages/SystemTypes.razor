@@ -92,13 +92,13 @@ else if (tab == ComponentsTab)
 else if (tab == AnalyzerTab)
 {
 <div role="tabpanel" id="panel-@AnalyzerTab" aria-labelledby="tab-@AnalyzerTab">
-    <ModuleGate ModuleId="@BlazorStoc.Modules.RiskAnalyses.RiskAnalysesModule.ModuleId" Notice="true"><RiskAnalyzersPanel /></ModuleGate>
+    <ModuleGate ModuleId="@BlazorStoc.Modules.RiskAnalyses.RiskAnalysesModule.ModuleId" Notice="true" Section="Analizoare de risc"><RiskAnalyzersPanel /></ModuleGate>
 </div>
 }
 else
 {
 <div role="tabpanel" id="panel-@KeywordsTab" aria-labelledby="tab-@KeywordsTab">
-    <ModuleGate ModuleId="@BlazorStoc.Modules.ActivityImport.ActivityImportModule.ModuleId"><ActivityKeywordsPanel /></ModuleGate>
+    <ModuleGate ModuleId="@BlazorStoc.Modules.ActivityImport.ActivityImportModule.ModuleId" Section="Cuvinte cheie ActivityApp"><ActivityKeywordsPanel /></ModuleGate>
 </div>
 }
 

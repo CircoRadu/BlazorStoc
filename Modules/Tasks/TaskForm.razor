@@ -4,9 +4,9 @@
 @* The form of a task (add / edit), shared by the popup on the page of the beneficiary and by the "Adaugă task utilizator" page. The beneficiary is fixed (given by the caller). After a
    task is added the form stays open on it (edit mode), so files can be attached at once; Closed is raised by the button. *@
 
-<UnsavedChangesTracker @ref="tracker" Adding="@(current is null)" Snapshot="CurrentSnapshot" Discard="DiscardAsync" />
+<UnsavedChangesTracker @ref="tracker" Subject="@(BlazorStoc.Services.PopupSubject.Of("task", (current?.Title is { Length: > 0 } t ? t + " · " : "") + BeneficiaryName))" Adding="@(current is null)" Snapshot="CurrentSnapshot" Discard="DiscardAsync" />
 <section class="product-editor" aria-labelledby="task-editor-title">
-    <div class="catalog-heading"><h2 id="task-editor-title">@(current is null ? "Adaugă task" : $"Editează taskul #{current.Id}")</h2><span class="heading-actions"><HelpButton Topic="task-formular" About="Formularul taskului" /></span></div>
+    <div class="catalog-heading"><h2 id="task-editor-title">@(current is null ? $"Adaugă task – {BeneficiaryName}" : $"Editează taskul {current.Title} – {BeneficiaryName}")</h2><span class="heading-actions"><HelpButton Topic="task-formular" About="Formularul taskului" /></span></div>
     <p class="form-note">Beneficiar: <strong>@BeneficiaryName</strong> · Data creării: <strong>@CreatedText</strong></p>
     @if (notice is not null) { <div class="success-banner" role="status">@notice</div> }
     @if (error is not null) { <div class="error-banner" role="alert">@error</div> }
@@ -20,6 +20,10 @@
                 <label for="task-status">Stare *
                     <select id="task-status" value="@((int)input.Status)" @onchange="StatusChanged">
                         @foreach (var status in UserTaskRules.Statuses) { <option value="@((int)status)">@UserTaskRules.StatusLabel(status)</option> }
+                    </select></label>
+                <label for="task-priority">Prioritate *
+                    <select id="task-priority" class="@UserTaskRules.PriorityClass(input.Priority)" value="@((int)input.Priority)" @onchange="PriorityChanged">
+                        @foreach (var priority in UserTaskRules.Priorities) { <option value="@((int)priority)">@UserTaskRules.PriorityLabel(priority)</option> }
                     </select></label>
                 <div class="task-due-field">
                     <ToggleSwitch Value="hasDue" ValueChanged="DueToggled" AriaLabel="Taskul are termen limită" OnText="Are termen" OffText="Fără termen">Termen limită</ToggleSwitch>
@@ -78,6 +82,7 @@
     }
 
     private void UserChanged(int? id) => input.AssignedUserId = id ?? 0;
+    private void PriorityChanged(ChangeEventArgs args) { if (int.TryParse(args.Value?.ToString(), out var value) && Enum.IsDefined((UserTaskPriority)value)) input.Priority = (UserTaskPriority)value; }
     private void StatusChanged(ChangeEventArgs args) { if (int.TryParse(args.Value?.ToString(), out var value) && Enum.IsDefined((UserTaskStatus)value)) input.Status = (UserTaskStatus)value; }
 
     private void DueToggled(bool value)

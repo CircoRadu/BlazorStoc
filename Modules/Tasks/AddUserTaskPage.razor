@@ -11,10 +11,10 @@
 @implements IDisposable
 <PageBoundary>
 
-<PageTitle>Taskuri utilizatori · BlazorStoc</PageTitle>
+<PageTitle>Taskuri utilizator · BlazorStoc</PageTitle>
 <UnsavedChangesHost />
 <div class="page-heading">
-    <div><p class="eyebrow">ADMINISTRARE</p><h1>Adaugă task utilizator</h1><p class="muted">Alege beneficiarul și dă un task unui utilizator. Taskurile tuturor utilizatorilor sunt în tabelele de mai jos.</p></div>
+    <div><p class="eyebrow">ADMINISTRARE</p><h1>Taskuri utilizator</h1><p class="muted">Alege beneficiarul și dă un task unui utilizator. Taskurile tuturor utilizatorilor sunt în tabelele de mai jos.</p></div>
 </div>
 @if (error is not null) { <div class="error-banner" role="alert">@error</div> }
 @if (notice is not null) { <div class="success-banner" role="status">@notice</div> }
@@ -43,11 +43,14 @@
                 <p class="form-note">Beneficiar: <strong>@chosen.Name</strong> <button type="button" class="link-button" @onclick="ChangeBeneficiaryAsync">Schimbă beneficiarul</button></p>
             }
         </div>
-        @if (chosen is not null)
-        {
-            <TaskForm @key="formKey" BeneficiaryId="chosen.Id" BeneficiaryName="@chosen.Name" Saved="TaskSavedAsync" Closed="TaskFormClosedAsync" />
-        }
     </section>
+}
+@* The new task is written in a popup: Save closes it, and closing it after something was typed asks first (the tracker of the form). *@
+@if (chosen is not null)
+{
+    <div class="delete-overlay"><div class="delete-dialog template-popup" role="dialog" aria-modal="true" tabindex="-1" aria-labelledby="task-editor-title">
+        <TaskForm @key="formKey" BeneficiaryId="chosen.Id" BeneficiaryName="@chosen.Name" Saved="TaskSavedAsync" Closed="TaskFormClosedAsync" />
+    </div></div>
 }
 
 <section class="catalog">
@@ -114,10 +117,11 @@
     private async Task TaskSavedAsync(UserTask saved)
     {
         notice = $"Taskul „{saved.Title}” pentru {saved.AssignedUserName} a fost salvat.";
+        chosen = null; chosenId = null; formKey = Guid.NewGuid();
         if (tables is not null) await tables.RefreshAsync();
     }
 
-    // "Anulează" / "Închide": the form goes away and the page is back at the choice of the beneficiary (a new task starts from there).
+    // "Anulează" / "Închide" (after the question about the typed values, when there are any): the popup closes and the page is back at the choice of the beneficiary.
     private async Task TaskFormClosedAsync()
     {
         chosen = null; chosenId = null; formKey = Guid.NewGuid(); notice = null;

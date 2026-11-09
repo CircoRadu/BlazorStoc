@@ -178,7 +178,7 @@ public static class MaintenanceModuleChecks
             .Where(name => name is not null && Regex.IsMatch(name, "^(Maria)?(ServiceContract|ServiceIntervention|MaintenanceMap|MaintenanceNotification|MapConfiguration|MapOptions)")).ToList();
         check(strays.Count == 0, "Architecture: the sources of the maintenance are not left in Services (" + string.Join("; ", strays) + ")");
         var beneficiary = File.ReadAllText(Path.Combine(root, "Components", "Pages", "BeneficiaryDetail.razor"));
-        check(Regex.IsMatch(beneficiary, @"<ModuleGate ModuleId=""@BlazorStoc\.Modules\.Maintenance\.MaintenanceModule\.ModuleId""><ServiceContractsSection[^\n]*\n\s*\n\s*<ServiceInterventionsSection[^\n]*</ModuleGate>")
+        check(Regex.IsMatch(beneficiary, @"<ModuleGate ModuleId=""@BlazorStoc\.Modules\.Maintenance\.MaintenanceModule\.ModuleId""( Section=""[^""]*"")?><ServiceContractsSection[^\n]*\n\s*\n\s*<ServiceInterventionsSection[^\n]*</ModuleGate>")
                 && beneficiary.Contains("TryRunAsync(BlazorStoc.Modules.Maintenance.MaintenanceModule.ModuleId"),
             "Maintenance: the beneficiary file shows the contract and intervention sections only inside the module gate and reads the contracts through TryRunAsync");
         var projectsHeading = Regex.Match(beneficiary, @"<summary class=""catalog-heading""><h2>Proiecte.*?</summary>", RegexOptions.Singleline).Value;

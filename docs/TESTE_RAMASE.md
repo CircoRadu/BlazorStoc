@@ -916,3 +916,5 @@ Cautare coordonate dupa adresa si harta cu pin in punctul de lucru (26.10.2026):
 Fundal satelit optional pe harta cu comutator Harta/Satelit (26.10.2026): Verificare cu cheia ArcGIS a utilizatorului pe instanta reala (dale satelit, restrictia de domeniu a cheii): cheia o introduce utilizatorul
 
 Parametri obligatori: tip Interval si familii de parametri (26.10.2026): Verificare in aplicatie pe baza de dezvoltare cu migrarea 52 (se aplica la pornirea aplicatiei cu contul de migrare) si pasii din Teste utilizator/01
+
+Taskuri: prioritate, ordonare, editare de utilizator; popup-uri uniforme (0.5.58-0.5.60) (09.11.2026): Verificare in browser: tema intunecata cu date, popup-urile pe telefon, migrarea 82 pe baza reala (la actualizare); help si capturi pentru ferestrele noi (HELP_DE_REGENERAT).

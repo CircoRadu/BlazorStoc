@@ -6,7 +6,7 @@
 <div class="delete-overlay unsaved-overlay" @onkeydown="KeyDownAsync">
     <section class="delete-dialog unsaved-changes-dialog" role="alertdialog" aria-modal="true" tabindex="-1" @ref="dialog"
              aria-labelledby="@TitleId" aria-describedby="@DescriptionId">
-        <h2 id="@TitleId">@(Adding ? "Adăugarea nu a fost finalizată" : "Editarea nu a fost finalizată")</h2>
+        <h2 id="@TitleId">@(Adding ? "Părăsire adăugare" : "Părăsire editare")@(string.IsNullOrWhiteSpace(Subject) ? "" : " " + Subject)</h2>
         <p id="@DescriptionId">@(Adding
             ? "Ai completat valori care nu au fost salvate. Dacă părăsești adăugarea acum, datele introduse se pierd."
             : "Ai modificat valori care nu au fost salvate. Dacă părăsești editarea acum, modificările se pierd.")</p>
@@ -19,6 +19,8 @@
 
 @code {
     [Parameter] public bool Adding { get; set; }
+    // What is being edited ("task – Popescu SRL"), appended to the title.
+    [Parameter] public string Subject { get; set; } = "";
     [Parameter, EditorRequired] public EventCallback BackToEditing { get; set; }
     [Parameter, EditorRequired] public EventCallback Leave { get; set; }
 

@@ -128,7 +128,7 @@ public static class NotificationModuleChecks
         var strays = new[] { "MariaExpiryNotificationRepository.cs", "DefaultNotificationTemplates.cs" }.Where(name => File.Exists(Path.Combine(root, "Services", name))).ToList();
         check(strays.Count == 0, "Architecture: the sources of the module are not left in Services (" + string.Join("; ", strays) + ")");
         var settings = File.ReadAllText(Path.Combine(root, "Components", "Pages", "Settings.razor"));
-        check(Regex.IsMatch(settings, @"<ModuleGate ModuleId=""@BlazorStoc\.Modules\.Notifications\.NotificationsModule\.ModuleId"">\s*@SubtabBar\(NotificationSubtabs[\s\S]*?</ModuleGate>\s*</div>"),
+        check(Regex.IsMatch(settings, @"<ModuleGate ModuleId=""@BlazorStoc\.Modules\.Notifications\.NotificationsModule\.ModuleId""( Section=""[^""]*"")?>\s*@SubtabBar\(NotificationSubtabs[\s\S]*?</ModuleGate>\s*</div>"),
             "Notifications: the templates and settings tabs of Setari are inside the gate of the module");
         var layout = File.ReadAllText(Path.Combine(root, "Components", "Layout", "MainLayout.razor"));
         check(Regex.IsMatch(layout, @"@if \(Modules\.IsAvailable\(BlazorStoc\.Modules\.Notifications\.NotificationsModule\.ModuleId\)\)\s*\{\s*<AuthorizeView Policy=""perm:notificari\.view"">"), "Notifications: the menu entry is shown only while the module works");

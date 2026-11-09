@@ -14,11 +14,14 @@
     else
     {
         @if (error is not null) { <div class="error-banner" role="alert">@error</div> }
+        @if (!ReadOnly)
+        {
         <div class="image-inputs">
             <FileDropZone OnChange="SelectedAsync" Multiple="true" Text="Alege fișiere" Disabled="@(uploading || busy)" />
             <small>Orice tip de fișier, cel mult 20 MB fiecare, cel mult @EntityFileRules.MaximumPerOwner de fișiere (imaginile, PDF-urile și textele se pot vedea în fereastră, restul se descarcă). Se salvează imediat, fără să apeși butonul de salvare al formularului.</small>
             @if (uploading) { <span role="status">Se încarcă…</span> }
         </div>
+        }
         @if (files.Count == 0)
         {
             <p class="muted">Nu există fișiere atașate.</p>
@@ -36,8 +39,9 @@
                             <td>@file.UploadedBy · @StockMovementRules.DisplayDate(DateOnly.FromDateTime(file.UploadedUtc.ToLocalTime()))</td>
                             <td>
                                 <button type="button" class="row-icon view" aria-label="Vizualizează fișierul @file.OriginalName" title="Vizualizează fișierul @file.OriginalName" @onclick="() => previewing = file"></button>
+                                @if (!ReadOnly) {
                                 <button type="button" class="row-icon delete" disabled="@(uploading || busy || !mayDelete)" aria-label="Șterge fișierul @file.OriginalName"
-                                        title="@(mayDelete ? $"Șterge fișierul {file.OriginalName}" : "Fișierul a fost adăugat de altcineva; îl poate șterge doar cine l-a adăugat sau administratorul.")" @onclick="() => confirmingDelete = file"></button>
+                                        title="@(mayDelete ? $"Șterge fișierul {file.OriginalName}" : "Fișierul a fost adăugat de altcineva; îl poate șterge doar cine l-a adăugat sau administratorul.")" @onclick="() => confirmingDelete = file"></button> }
                             </td>
                         </tr>
                     }
@@ -51,8 +55,7 @@
 {
     <div class="delete-overlay" @onkeydown="ConfirmKey">
         <section class="delete-dialog" role="alertdialog" aria-modal="true" tabindex="-1" aria-labelledby="task-file-delete-title">
-            <h2 id="task-file-delete-title">Ștergi fișierul?</h2>
-            <p class="delete-object"><strong>@doomed.OriginalName</strong></p>
+            <h2 id="task-file-delete-title">Ștergi fișierul? – @doomed.OriginalName</h2>
             <p>Fișierul este șters definitiv din task.</p>
             <div class="editor-actions">
                 <button type="button" class="danger" disabled="@busy" @onclick="ConfirmDeleteAsync">@(busy ? "Se șterge…" : "Șterge")</button>
@@ -69,6 +72,8 @@
 
 @code {
     [Parameter] public int TaskId { get; set; }
+    // Read-only: only the list of the files (view and download), for the details window; the editing window leaves it off.
+    [Parameter] public bool ReadOnly { get; set; }
     // Raised after a file was added or deleted (the task counts its files and may have been taken over by adding one).
     [Parameter] public EventCallback Changed { get; set; }
     private IReadOnlyList<EntityFile> files = Array.Empty<EntityFile>();

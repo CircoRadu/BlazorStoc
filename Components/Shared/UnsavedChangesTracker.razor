@@ -10,6 +10,8 @@
     [Parameter, EditorRequired] public Func<Task> Discard { get; set; } = () => Task.CompletedTask;
     // True for a form that creates a new object: the warning then speaks about "adăugare", not "editare".
     [Parameter] public bool Adding { get; set; }
+    // What the form works on ("task – Popescu SRL"): it completes the title of the leave question.
+    [Parameter] public string? Subject { get; set; }
 
     private EditTracker? tracker;
 
@@ -21,7 +23,9 @@
     // Runs the action now when nothing changed, otherwise after the user confirmed leaving without saving.
     public Task RunAfterConfirmAsync(Func<Task> action) => tracker is null ? action() : tracker.RunAfterConfirmAsync(action);
 
-    protected override void OnInitialized() => tracker = Guard.Track(() => Snapshot(), () => Discard(), Adding);
+    protected override void OnInitialized() { tracker = Guard.Track(() => Snapshot(), () => Discard(), Adding); tracker.Subject = Subject ?? ""; }
+
+    protected override void OnParametersSet() { if (tracker is not null) tracker.Subject = Subject ?? ""; }
 
     protected override void OnAfterRender(bool firstRender) => tracker?.NotifyRendered();
 

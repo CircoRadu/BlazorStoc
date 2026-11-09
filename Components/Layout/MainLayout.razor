@@ -88,7 +88,7 @@
                         <AuthorizeView Policy="perm:facturi.view"><Authorized><NavLink href="/facturi" Match="NavLinkMatch.Prefix">Facturi</NavLink></Authorized></AuthorizeView>
                     }
                     @if (Modules.IsAvailable(BlazorStoc.Modules.Vehicles.VehiclesModule.ModuleId)) { <AuthorizeView Policy="perm:vehicule.view"><Authorized><NavLink href="/vehicule" Match="NavLinkMatch.Prefix">Vehicule</NavLink></Authorized></AuthorizeView> }
-                    @if (Modules.IsAvailable(BlazorStoc.Modules.Tasks.TasksModule.ModuleId)) { <AuthorizeView Policy="perm:taskuri.view"><Authorized><NavLink href="/taskuri/adauga" Match="NavLinkMatch.Prefix">Adaugă task utilizator</NavLink></Authorized></AuthorizeView> }
+                    @if (Modules.IsAvailable(BlazorStoc.Modules.Tasks.TasksModule.ModuleId)) { <AuthorizeView Policy="perm:taskuri.view"><Authorized><NavLink href="/taskuri/adauga" Match="NavLinkMatch.Prefix">Taskuri utilizator</NavLink></Authorized></AuthorizeView> }
                     @if (Modules.IsAvailable(BlazorStoc.Modules.Elcomtur.ElcomturModule.ModuleId)) { <AuthorizeView Policy="perm:elcomtur.import"><Authorized><NavLink href="/preluare-elcomtur" Match="NavLinkMatch.Prefix">Preluare Elcomtur</NavLink></Authorized></AuthorizeView> }
                     <AuthorizeView Policy="perm:nomenclator.view"><Authorized><NavLink href="/nomenclator" Match="NavLinkMatch.Prefix">Nomenclator</NavLink></Authorized></AuthorizeView>
                 </ChildContent>

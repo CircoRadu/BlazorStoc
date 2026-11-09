@@ -125,6 +125,6 @@ public static class AnafModuleChecks
         check(File.Exists(Path.Combine(root, "Services", "AnafApply.cs")) && File.Exists(Path.Combine(root, "Components", "Shared", "AnafDifferencesDialog.razor")),
             "ANAF: the rules and the dialog that apply an answer to a beneficiary or supplier form stay with the editors");
         var settings = File.ReadAllText(Path.Combine(root, "Components", "Pages", "Settings.razor"));
-        check(settings.Contains("<ModuleGate ModuleId=\"@BlazorStoc.Modules.Anaf.AnafModule.ModuleId\"><AnafConfigurator /></ModuleGate>"), "ANAF: the settings tab is inside the gate of the module");
+        check(settings.Contains("<ModuleGate ModuleId=\"@BlazorStoc.Modules.Anaf.AnafModule.ModuleId\" Section=\"Configurare ANAF\"><AnafConfigurator /></ModuleGate>"), "ANAF: the settings tab is inside the gate of the module");
     }
 }

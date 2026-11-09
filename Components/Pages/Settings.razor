@@ -35,7 +35,7 @@
     }
     @* The invoices panel stays mounted (hidden) when another tab is shown, so a template being edited keeps its changes. *@
         <div role="tabpanel" id="panel-@InvoicesTab" aria-labelledby="tab-@InvoicesTab" class="settings-body" hidden="@(activeTab != InvoicesTab)">
-            <ModuleGate ModuleId="@BlazorStoc.Modules.Invoices.InvoicesModule.ModuleId">
+            <ModuleGate ModuleId="@BlazorStoc.Modules.Invoices.InvoicesModule.ModuleId" Section="Șabloane de facturi">
             @SubtabBar(InvoiceSubtabs, "Secțiuni facturi")
             @* The analysis stays mounted (hidden) when the saved templates are shown, so switching sub-tabs does not lose the file being worked on. *@
             <div role="tabpanel" id="subpanel-@InvoiceAnalysisSubtab" aria-labelledby="subtab-@InvoiceAnalysisSubtab" hidden="@(invoiceSubtab != InvoiceAnalysisSubtab)">
@@ -60,25 +60,25 @@
     @if (activeTab == AnafTab && allowedTabs.Contains(AnafTab))
     {
         <div role="tabpanel" id="panel-@AnafTab" aria-labelledby="tab-@AnafTab" class="settings-body">
-            <ModuleGate ModuleId="@BlazorStoc.Modules.Anaf.AnafModule.ModuleId"><AnafConfigurator /></ModuleGate>
+            <ModuleGate ModuleId="@BlazorStoc.Modules.Anaf.AnafModule.ModuleId" Section="Configurare ANAF"><AnafConfigurator /></ModuleGate>
         </div>
     }
     else if (activeTab == ActivityImportTab && allowedTabs.Contains(ActivityImportTab))
     {
         <div role="tabpanel" id="panel-@ActivityImportTab" aria-labelledby="tab-@ActivityImportTab" class="settings-body">
-            <ModuleGate ModuleId="@BlazorStoc.Modules.ActivityImport.ActivityImportModule.ModuleId"><ActivityImportPanel /></ModuleGate>
+            <ModuleGate ModuleId="@BlazorStoc.Modules.ActivityImport.ActivityImportModule.ModuleId" Section="Import ActivityApp"><ActivityImportPanel /></ModuleGate>
         </div>
     }
     else if (activeTab == ElcomturTab && allowedTabs.Contains(ElcomturTab))
     {
         <div role="tabpanel" id="panel-@ElcomturTab" aria-labelledby="tab-@ElcomturTab" class="settings-body">
-            <ModuleGate ModuleId="@BlazorStoc.Modules.Elcomtur.ElcomturModule.ModuleId"><ElcomturAutoPanel /></ModuleGate>
+            <ModuleGate ModuleId="@BlazorStoc.Modules.Elcomtur.ElcomturModule.ModuleId" Section="Import Elcomtur"><ElcomturAutoPanel /></ModuleGate>
         </div>
     }
     else if (activeTab == NotificationsTab && allowedTabs.Contains(NotificationsTab))
     {
         <div role="tabpanel" id="panel-@NotificationsTab" aria-labelledby="tab-@NotificationsTab" class="settings-body">
-            <ModuleGate ModuleId="@BlazorStoc.Modules.Notifications.NotificationsModule.ModuleId">
+            <ModuleGate ModuleId="@BlazorStoc.Modules.Notifications.NotificationsModule.ModuleId" Section="Setări notificări">
             @SubtabBar(NotificationSubtabs, "Secțiuni notificări")
             @if (notificationSubtab == TemplatesSubtab)
             {
@@ -97,15 +97,15 @@
             @SubtabBar(BackupSubtabs, "Secțiuni backup")
             @if (backupSubtab == NasTab)
             {
-                <div role="tabpanel" id="subpanel-@NasTab" aria-labelledby="subtab-@NasTab"><ModuleGate ModuleId="@BlazorStoc.Modules.Backup.BackupWorkerRules.ModuleId"><BackupNasSettings /></ModuleGate></div>
+                <div role="tabpanel" id="subpanel-@NasTab" aria-labelledby="subtab-@NasTab"><ModuleGate ModuleId="@BlazorStoc.Modules.Backup.BackupWorkerRules.ModuleId" Section="Backup pe NAS"><BackupNasSettings /></ModuleGate></div>
             }
             else if (backupSubtab == BackupTimeSubtab)
             {
-                <div role="tabpanel" id="subpanel-@BackupTimeSubtab" aria-labelledby="subtab-@BackupTimeSubtab"><ModuleGate ModuleId="@BlazorStoc.Modules.Backup.BackupWorkerRules.ModuleId"><BackupSettingsPanel Section="@BackupSettingsPanel.TimeSection" /></ModuleGate></div>
+                <div role="tabpanel" id="subpanel-@BackupTimeSubtab" aria-labelledby="subtab-@BackupTimeSubtab"><ModuleGate ModuleId="@BlazorStoc.Modules.Backup.BackupWorkerRules.ModuleId" Section="Programare backup"><BackupSettingsPanel Section="@BackupSettingsPanel.TimeSection" /></ModuleGate></div>
             }
             else
             {
-                <div role="tabpanel" id="subpanel-@BackupMainSubtab" aria-labelledby="subtab-@BackupMainSubtab"><ModuleGate ModuleId="@BlazorStoc.Modules.Backup.BackupWorkerRules.ModuleId"><BackupSettingsPanel Section="@BackupSettingsPanel.BackupSection" /></ModuleGate></div>
+                <div role="tabpanel" id="subpanel-@BackupMainSubtab" aria-labelledby="subtab-@BackupMainSubtab"><ModuleGate ModuleId="@BlazorStoc.Modules.Backup.BackupWorkerRules.ModuleId" Section="Backup și restaurare"><BackupSettingsPanel Section="@BackupSettingsPanel.BackupSection" /></ModuleGate></div>
             }
         </div>
     }
@@ -133,11 +133,11 @@
             @SubtabBar(MapSubtabs, "Secțiuni hartă")
             @if (mapSubtab == MapEngineSubtab)
             {
-                <div role="tabpanel" id="subpanel-@MapEngineSubtab" aria-labelledby="subtab-@MapEngineSubtab"><ModuleGate ModuleId="@BlazorStoc.Modules.Maintenance.MaintenanceModule.ModuleId"><MapEngineEditor /></ModuleGate></div>
+                <div role="tabpanel" id="subpanel-@MapEngineSubtab" aria-labelledby="subtab-@MapEngineSubtab"><ModuleGate ModuleId="@BlazorStoc.Modules.Maintenance.MaintenanceModule.ModuleId" Section="Furnizor de hartă"><MapEngineEditor /></ModuleGate></div>
             }
             else
             {
-                <div role="tabpanel" id="subpanel-@MapOverlaySubtab" aria-labelledby="subtab-@MapOverlaySubtab"><ModuleGate ModuleId="@BlazorStoc.Modules.Maintenance.MaintenanceModule.ModuleId"><MapPinTypesEditor FocusPinTypeId="PinParameter" /></ModuleGate></div>
+                <div role="tabpanel" id="subpanel-@MapOverlaySubtab" aria-labelledby="subtab-@MapOverlaySubtab"><ModuleGate ModuleId="@BlazorStoc.Modules.Maintenance.MaintenanceModule.ModuleId" Section="Insigne hartă"><MapPinTypesEditor FocusPinTypeId="PinParameter" /></ModuleGate></div>
             }
         </div>
     }
@@ -150,13 +150,13 @@
     else if (activeTab == JournalTab && allowedTabs.Contains(JournalTab))
     {
         <div role="tabpanel" id="panel-@JournalTab" aria-labelledby="tab-@JournalTab" class="settings-body">
-            <ModuleGate ModuleId="@BlazorStoc.Modules.Journal.JournalModule.ModuleId"><JournalSettingsPanel /></ModuleGate>
+            <ModuleGate ModuleId="@BlazorStoc.Modules.Journal.JournalModule.ModuleId" Section="Jurnal activitate"><JournalSettingsPanel /></ModuleGate>
         </div>
     }
     else if (activeTab == BugTab && allowedTabs.Contains(BugTab))
     {
         <div role="tabpanel" id="panel-@BugTab" aria-labelledby="tab-@BugTab" class="settings-body">
-            <ModuleGate ModuleId="@BlazorStoc.Modules.BugReports.BugReportsModule.ModuleId"><BugReportsPanel /></ModuleGate>
+            <ModuleGate ModuleId="@BlazorStoc.Modules.BugReports.BugReportsModule.ModuleId" Section="Rapoarte erori"><BugReportsPanel /></ModuleGate>
         </div>
     }
     else if (activeTab == ModulesTab && allowedTabs.Contains(ModulesTab))

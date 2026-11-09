@@ -1,6 +1,6 @@
 # Starea curenta a proiectului
 
-Actualizat: 27.10.2026, Europe/Bucharest (Claude, agent unic, mod `claude_only`). Istoricul vechi: `docs/arhiva/` (vezi `docs/arhiva/INDEX.md`). Cand ceva de aici se invecheste, se inlocuieste, nu se aduna.
+Actualizat: 09.11.2026, Europe/Bucharest (Claude, agent unic, mod `claude_only`). Istoricul vechi: `docs/arhiva/` (vezi `docs/arhiva/INDEX.md`). Cand ceva de aici se invecheste, se inlocuieste, nu se aduna.
 
 ## Aplicatia
 
@@ -8,6 +8,13 @@ Actualizat: 27.10.2026, Europe/Bucharest (Claude, agent unic, mod `claude_only`)
 - Module: produse/stoc, categorii, beneficiari/proiecte, vehicule, mentenanta (contracte, interventii, harta), notificari, jurnal, furnizori si facturi, preluare factura PDF/OCR cu sabloane, preluare inventar.
 - Motorul de facturi este geometric (`Services/Invoices`); utilizatorii obisnuiti creeaza/modifica sabloane, stergerea ramane administratorului.
 - Harta codului: `docs/HARTA_COD.md`. Reguli permanente: `CLAUDE.md`.
+
+## Ultimul lucru facut (09.11.2026): versiunile 0.5.58 - 0.5.60 (taskuri: prioritate, ordonare, editare de utilizator; popup-uri uniforme)
+- Taskuri (modulul `Modules/Tasks`, 1.1.x): `UserTaskPriority` (Scazut/Mediu/Ridicat, culori prio-low/medium/high), coloana `beneficiary_tasks.priority` (migrarea 82, implicit 1 = toate taskurile vechi devin Scazut), actiune de jurnal `Modificare prioritate task`; `TaskSort` + `TaskSortHeader` (Prioritate, Creat, Termen: crescator / descrescator / implicit); Taskurile mele: stare doar afisata, Creat cu autorul; `TaskDetailsDialog` = vizualizare, butonul Editeaza (utilizatorul taskului) = stare + fisiere proprii; adaugarea unui task in popup (se inchide la salvare, avertizare la inchidere); meniul Administrare se numeste "Taskuri utilizator".
+- Popup-uri (toate): `wwwroot/bug-report.js` pune deasupra oricarui popup o bara cu "Raporteaza o eroare" si cercul rosu de inchidere (declanseaza butonul de inchidere al formularului; butonul din antet se ascunde); `Services/PopupSubject.cs` + `UnsavedChangesTracker.Subject` pentru titluri "Operatiune - Obiect" (dialogul de parasire spune ce se editeaza); `DeleteConfirmationDialog` / `SaveConfirmationDialog` / altele pun obiectul in titlu. Raport: `docs/RAPORT_ANTET_POPUP.md`.
+- `ModuleGate` are parametrul `Section` si numeste modulul oprit in mesaj; rapoartele de erori au filele Nerezolvate / Rezolvate (`BugReportQuery.Closed`).
+- Verificat: suita completa 2218 trecute (pachetul 0.5.60), MariaDB Task 53, componente 1765; browser: doar bara popup-ului si autentificarea pe instanta de test 5097. Neverificat in browser: tema intunecata cu date, popup-urile pe telefon, migrarea 82 pe baza reala (se aplica la actualizare).
+- Git: branch `claude/cautare-beneficiari` reunit cu taskurile si dus pe `main` (fast-forward).
 
 ## Ultimul lucru facut (07.11.2026): mentenanta, etapele 2-4 (branch claude/acte-aditionale-componente-mentenanta, necomis, netestat)
 - Etapa 2 (migrarea 77): `service_contract_unit_dues` (scadenta pe punct x unitate; `service_contract_points.next_due` = cea mai apropiata), `SyncDuesAsync` la creare / editare / activare / act aditional / anulare, `service_intervention_unit_dues` (instantaneu pe unitate pentru corectare / stergere); lista de scadente, fisa beneficiarului (`ServiceUnitDues.razor`) si notificarile (una pe punct x componenta, id + 1.000.000, placeholder `<componenta>`).
