@@ -1,15 +1,14 @@
 -- version: 79
--- description: Acte aditionale: data de referinta si componentele contractului inainte / dupa act
--- note: The kinds "referinta" and "componente" of an addendum keep the reference date of the contract and the set of units (families / components, with their On/Off elements, cycle and reference date) before and after the act as JSON, so the act can be cancelled and the history stays readable.
--- column: service_contract_addenda.reference_before
--- column: service_contract_addenda.reference_after
--- column: service_contract_addenda.units_before
--- column: service_contract_addenda.units_after
+-- description: Componentele acoperite de o interventie de mentenanta
+-- note: service_intervention_components keeps which components (nomenclator Componente mentenanta) a maintenance intervention covered; only the units that cover those components have their due dates moved. An intervention recorded without components (older ones, an automatic take) moved every unit of the point.
+-- column: service_intervention_components.intervention_id
+-- column: service_intervention_components.component_id
 -- statement
-ALTER TABLE `service_contract_addenda` ADD COLUMN IF NOT EXISTS `reference_before` DATE NULL
--- statement
-ALTER TABLE `service_contract_addenda` ADD COLUMN IF NOT EXISTS `reference_after` DATE NULL
--- statement
-ALTER TABLE `service_contract_addenda` ADD COLUMN IF NOT EXISTS `units_before` TEXT NULL
--- statement
-ALTER TABLE `service_contract_addenda` ADD COLUMN IF NOT EXISTS `units_after` TEXT NULL
+CREATE TABLE IF NOT EXISTS `service_intervention_components` (
+  `intervention_id` BIGINT NOT NULL,
+  `component_id` BIGINT NOT NULL,
+  PRIMARY KEY (`intervention_id`, `component_id`),
+  KEY `ix_service_intervention_components_component` (`component_id`),
+  CONSTRAINT `fk_service_intervention_components_intervention` FOREIGN KEY (`intervention_id`) REFERENCES `service_interventions` (`id`) ON DELETE CASCADE ON UPDATE NO ACTION,
+  CONSTRAINT `fk_service_intervention_components_component` FOREIGN KEY (`component_id`) REFERENCES `maintenance_components` (`id`) ON DELETE RESTRICT ON UPDATE NO ACTION
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_nopad_bin

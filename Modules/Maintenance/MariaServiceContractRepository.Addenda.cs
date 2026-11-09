@@ -5,7 +5,7 @@ using static BlazorStoc.Services.MariaDb;
 
 namespace BlazorStoc.Services;
 
-// The addenda of the maintenance contracts (service_contract_addenda, migration 74). Like every write of the contracts, an operation locks the beneficiary first, then the contract
+// The addenda of the maintenance contracts (service_contract_addenda, migration 75). Like every write of the contracts, an operation locks the beneficiary first, then the contract
 // and its coverage rows; the effect of an addendum on the contract (validity, cycle, coverage) and the row of the addendum are written in ONE transaction, the journal entries after it.
 public sealed partial class MariaServiceContractRepository
 {
