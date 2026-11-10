@@ -122,6 +122,8 @@ public static class Permissions
     public static readonly IReadOnlySet<string> AdminOnlyModules = new HashSet<string>(StringComparer.Ordinal) { "setari-anaf", "setari-backup", "setari-module", "setari-actualizare", "setari-bug-raport", "setari-propuneri", "setari-import-activityapp", "setari-import-elcomtur", "setari-jurnal" };
 
     public static bool IsAdminOnly(string key) => AdminOnlyModules.Contains(key[..Math.Max(key.IndexOf('.'), 0)]);
+    /// <summary>The keys of the reports of errors and of the proposals of Setari -> Dezvoltare: honoured only for the accounts marked as developers (Utilizatori).</summary>
+    public static bool IsDeveloperOnly(string key) => key.StartsWith("setari-bug-raport.", StringComparison.Ordinal) || key.StartsWith("setari-propuneri.", StringComparison.Ordinal);
 
     // Every key a type other than the administrator may hold.
     public static IReadOnlyList<string> GrantableKeys { get; } = [.. AllKeys.Where(key => !IsAdminOnly(key))];

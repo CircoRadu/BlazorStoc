@@ -1,6 +1,7 @@
 @namespace BlazorStoc.Components.Shared
 @using BlazorStoc.Modules
 @using BlazorStoc.Modules.BugReports
+@using Microsoft.AspNetCore.Components.Forms
 @inject IBugReportService Reports
 @inject IAccessControl Access
 @inject IChangeFeed ChangeFeed
@@ -50,6 +51,7 @@
         <div class="editor-actions">
             <button type="button" class="refresh act-reload" id="bug-refresh" disabled="@busy" @onclick="LoadAsync">Actualizează</button>
             @if (canExport) { <button type="button" class="refresh act-export" id="bug-export-filter" disabled="@(busy || total == 0)" @onclick="ExportFilteredAsync">Exportă lista filtrată (ZIP)</button> }
+            @if (canEdit && showClosed) { <button type="button" class="danger" id="bug-delete-all" disabled="@(busy || total == 0)" title="Șterge definitiv toate rapoartele rezolvate sau respinse" @onclick="AskDeleteAllAsync">Șterge toate cele rezolvate</button> }
         </div>
 
         @if (loading) { <div class="empty-state" role="status"><div class="spinner"></div><h3>Se încarcă</h3></div> }
@@ -87,6 +89,7 @@
                 <span class="editor-actions"><button type="button" class="danger" id="bug-delete-yes" disabled="@busy" @onclick="DeleteAsync">Da, șterge</button>
                     <button type="button" class="refresh act-nav" id="bug-delete-no" @onclick="() => deleting = null">Nu, păstrează</button></span></div>
         }
+@if (deletingAll)        {            <div class="error-banner" role="alert" id="bug-delete-all-confirm">Ștergi definitiv <strong>@(deleteAllCount == 1 ? "singurul raport rezolvat sau respins" : $"toate cele {deleteAllCount} rapoarte rezolvate sau respinse")</strong>, cu imaginile lor? Se șterg de pe server, nu se arhivează, și nu se pot recupera.                <span class="editor-actions"><button type="button" class="danger" id="bug-delete-all-yes" disabled="@busy" @onclick="DeleteAllAsync">Da, șterge toate</button>                    <button type="button" class="refresh act-nav" id="bug-delete-all-no" @onclick="() => deletingAll = false">Nu, păstrează</button></span></div>        }
 
         @if (zoomed is not null)
         {
@@ -122,6 +125,28 @@
                     @if (editing)
                     {
                         <h4>Modificarea raportului</h4>
+                        <div class="editor-grid bug-form">
+                            <label class="wide">Titlu
+                                <input id="bug-detail-title-input" maxlength="@BugReportRules.MaxTitle" @bind="editTitle" @bind:event="oninput" disabled="@busy" /></label>
+                            <label class="wide">Descriere
+                                <textarea id="bug-detail-description" rows="6" maxlength="@BugReportRules.MaxDescription" @bind="editDescription" @bind:event="oninput" disabled="@busy"></textarea></label>
+                        </div>
+                        <h4>Imagini adăugate acum <span class="count-badge">@added.Count</span></h4>
+                        <div class="bug-images" id="bug-detail-added">
+                            @foreach (var image in added)
+                            {
+                                var item = image;
+                                <figure class="bug-image">
+                                    <img src="@item.DataUrl" alt="@item.Name" />
+                                    <figcaption>@item.Name</figcaption>
+                                    <button type="button" class="row-icon delete" aria-label="Scoate imaginea @item.Name" title="Scoate imaginea @item.Name" disabled="@busy" @onclick="() => added.Remove(item)"></button>
+                                </figure>
+                            }
+                        </div>
+                        <div class="bug-add-images">
+                            <label class="refresh act-confirm bug-file-button">Adaugă imagini…<InputFile OnChange="OnAddFilesAsync" multiple accept="image/png,image/jpeg,image/gif,image/webp" disabled="@busy" /></label>
+                            <span class="muted">cel mult @BugReportRules.MaxImages imagini în total (acum @pictures.Count), fiecare de cel mult @(BugReportRules.MaxImageBytes / 1024 / 1024) MB</span>
+                        </div>
                     <div class="editor-grid bug-form">
                         <label>Stare
                             <select id="bug-detail-state" @bind="newState" disabled="@(!canEdit || busy)">
@@ -215,11 +240,51 @@
     private async Task PageChangedAsync(int value) { page = value; await LoadAsync(); }
     private async Task SizeChangedAsync(int value) { pageSize = value; page = 1; await LoadAsync(); }
 
+    // Editing the content (BUG-0014): the title and the description can be corrected and more pictures added (the ones already there stay); saved with the state.
+    private string editTitle = "", editDescription = "";
+    private readonly List<NewImage> added = [];
+    private sealed record NewImage(string Name, byte[] Bytes, string ContentType)
+    {
+        public string DataUrl => $"data:{ContentType};base64,{Convert.ToBase64String(Bytes)}";
+    }
+
+    private void StartEditing(BugReport report) { editing = true; newState = report.State; note = report.AdminNote; editTitle = report.Title; editDescription = report.Description; added.Clear(); }
+    private bool ContentChanged => opened is not null && (editTitle.Trim() != opened.Title || editDescription.Trim() != opened.Description || added.Count > 0);
+
+    private async Task OnAddFilesAsync(InputFileChangeEventArgs args)
+    {
+        error = null;
+        foreach (var file in args.GetMultipleFiles(BugReportRules.MaxImages))
+        {
+            if (pictures.Count + added.Count >= BugReportRules.MaxImages) { error = $"Un raport poate avea cel mult {BugReportRules.MaxImages} imagini."; break; }
+            if (file.Size > BugReportRules.MaxImageBytes) { error = $"Imaginea „{file.Name}” depășește {BugReportRules.MaxImageBytes / 1024 / 1024} MB."; continue; }
+            try
+            {
+                await using var stream = file.OpenReadStream(BugReportRules.MaxImageBytes);
+                using var buffer = new MemoryStream();
+                await stream.CopyToAsync(buffer, lifetime.Token);
+                var bytes = buffer.ToArray();
+                if (BugReportRules.DetectImageType(bytes) is not { } type) { error = $"Fișierul „{file.Name}” nu este o imagine (PNG, JPEG, GIF sau WebP)."; continue; }
+                added.Add(new NewImage(file.Name, bytes, type));
+            }
+            catch (Exception exception) when (exception is IOException or InvalidOperationException) { error = $"Fișierul „{file.Name}” nu a putut fi citit."; }
+        }
+    }
+
+    private async Task LoadPicturesAsync(BugReport report)
+    {
+        pictures = [];
+        foreach (var file in await Reports.GetFilesAsync(report.Id, lifetime.Token))
+            if (await Reports.GetFileContentAsync(file.Id, lifetime.Token) is { } content)
+                pictures.Add(new Picture(file.Kind == BugReportRules.KindScreenshot ? "Captura paginii" : file.FileName, $"data:{content.ContentType};base64,{Convert.ToBase64String(content.Content)}"));
+    }
+
     private bool editing, confirmDiscard;
     private async Task OpenAsync(BugReport report, bool edit = false)
     {
         error = notice = null; deleting = null; editing = edit && canEdit; confirmDiscard = false;
         opened = report; newState = report.State; note = report.AdminNote; pictures = [];
+        if (editing) StartEditing(report);
         try
         {
             foreach (var file in await Reports.GetFilesAsync(report.Id, lifetime.Token))
@@ -230,13 +295,13 @@
         catch (Exception exception) when (exception is AccessDeniedException or ModuleUnavailableException) { error = exception.Message; }
     }
 
-    private void CloseDetail() { opened = null; pictures = []; zoomed = null; editing = false; confirmDiscard = false; }
-    private bool Dirty => editing && opened is not null && (newState != opened.State || note != opened.AdminNote);
+    private void CloseDetail() { opened = null; pictures = []; zoomed = null; editing = false; confirmDiscard = false; added.Clear(); }
+    private bool Dirty => editing && opened is not null && (newState != opened.State || note != opened.AdminNote || ContentChanged);
     private void RequestClose() { if (Dirty) confirmDiscard = true; else CloseDetail(); }
-    private void BeginEdit() { if (!canEdit || opened is null) return; editing = true; newState = opened.State; note = opened.AdminNote; }
-    private void CancelEdit() { if (Dirty && !confirmDiscard) { confirmDiscard = true; return; } editing = false; confirmDiscard = false; if (opened is not null) { newState = opened.State; note = opened.AdminNote; } }
+    private void BeginEdit() { if (!canEdit || opened is null) return; StartEditing(opened); }
+    private void CancelEdit() { if (Dirty && !confirmDiscard) { confirmDiscard = true; return; } editing = false; confirmDiscard = false; added.Clear(); if (opened is not null) { newState = opened.State; note = opened.AdminNote; } }
     private Task ExportRowAsync(BugReport report) => RunAsync(() => ExportAsync([report.Id]), "Exportul nu a putut fi făcut.");
-    private void AskDelete(BugReport report) { deleting = report; error = notice = null; }
+    private void AskDelete(BugReport report) { deleting = report; deletingAll = false; error = notice = null; }
 
     private async Task RunAsync(Func<Task> work, string failure)
     {
@@ -255,11 +320,38 @@
 
     private Task SaveStateAsync() => RunAsync(async () =>
     {
-        var saved = await Reports.ChangeStateAsync(opened!.Id, newState, note, lifetime.Token);
+        var current = opened!;
+        var contentSaved = false;
+        if (ContentChanged)
+        {
+            current = await Reports.UpdateContentAsync(current.Id, editTitle, editDescription, [.. added.Select(item => new BugReportImage(BugReportRules.KindFile, item.Name, item.Bytes))], lifetime.Token);
+            added.Clear();
+            await LoadPicturesAsync(current);
+            contentSaved = true;
+        }
+        var saved = await Reports.ChangeStateAsync(current.Id, newState, note, lifetime.Token);
         opened = saved; note = saved.AdminNote; editing = false; confirmDiscard = false;
-        notice = $"Raportul {saved.Number} este acum „{saved.State}”.";
+        notice = contentSaved ? $"Raportul {saved.Number} a fost modificat și este acum „{saved.State}”." : $"Raportul {saved.Number} este acum „{saved.State}”.";
         await LoadAsync();
     }, "Starea nu a putut fi salvată.");
+
+    private bool deletingAll;
+    private int deleteAllCount;
+    private Task AskDeleteAllAsync() => RunAsync(async () =>
+    {
+        deleteAllCount = (await Reports.QueryAsync(new BugReportQuery(Closed: true), 1, 1, lifetime.Token)).Total;
+        deletingAll = deleteAllCount > 0; deleting = null; notice = null;
+        if (deleteAllCount == 0) notice = "Nu există rapoarte rezolvate de șters.";
+    }, "Numărul rapoartelor nu a putut fi citit.");
+
+    private Task DeleteAllAsync() => RunAsync(async () =>
+    {
+        var deleted = await Reports.DeleteClosedAsync(lifetime.Token);
+        deletingAll = false; if (opened is not null && opened.State is BugReportRules.StateResolved or BugReportRules.StateRejected) CloseDetail();
+        notice = deleted == 1 ? "A fost șters definitiv un raport rezolvat sau respins." : $"Au fost șterse definitiv {deleted} rapoarte rezolvate sau respinse.";
+        page = 1;
+        await LoadAsync();
+    }, "Rapoartele nu au putut fi șterse.");
 
     private Task DeleteAsync() => RunAsync(async () =>
     {

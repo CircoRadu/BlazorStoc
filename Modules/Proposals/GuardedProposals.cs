@@ -16,7 +16,9 @@ internal sealed class GuardedProposalService(IProposalService inner, ModuleRegis
     public Task<IReadOnlyList<ProposalFile>> GetFilesAsync(int proposalId, CancellationToken cancellationToken = default) => modules.RunAsync(Id, () => inner.GetFilesAsync(proposalId, cancellationToken));
     public Task<ProposalFileContent?> GetFileContentAsync(int fileId, CancellationToken cancellationToken = default) => modules.RunAsync(Id, () => inner.GetFileContentAsync(fileId, cancellationToken));
     public Task<Proposal> ChangeStateAsync(int proposalId, string state, string implementedVersion, string note, CancellationToken cancellationToken = default) => modules.RunAsync(Id, () => inner.ChangeStateAsync(proposalId, state, implementedVersion, note, cancellationToken));
+    public Task<Proposal> UpdateContentAsync(int proposalId, string title, string description, string benefit, IReadOnlyList<ReportImage> addedImages, CancellationToken cancellationToken = default) => modules.RunAsync(Id, () => inner.UpdateContentAsync(proposalId, title, description, benefit, addedImages, cancellationToken));
     public Task DeleteAsync(int proposalId, CancellationToken cancellationToken = default) => modules.RunAsync(Id, () => inner.DeleteAsync(proposalId, cancellationToken));
+    public Task<int> DeleteClosedAsync(CancellationToken cancellationToken = default) => modules.RunAsync(Id, () => inner.DeleteClosedAsync(cancellationToken));
     public Task<ProposalExportResult> ExportAsync(IReadOnlyList<int> proposalIds, CancellationToken cancellationToken = default) => modules.RunAsync(Id, () => inner.ExportAsync(proposalIds, cancellationToken));
     public Task MarkSeenAsync(int proposalId, CancellationToken cancellationToken = default) => modules.RunAsync(Id, () => inner.MarkSeenAsync(proposalId, cancellationToken));
     public Task<int> CountOpenAsync(CancellationToken cancellationToken = default) => modules.RunAsync(Id, () => inner.CountOpenAsync(cancellationToken));
@@ -37,7 +39,9 @@ internal sealed class UnavailableProposalService : IProposalService
     public Task<IReadOnlyList<ProposalFile>> GetFilesAsync(int proposalId, CancellationToken cancellationToken = default) => Out<IReadOnlyList<ProposalFile>>();
     public Task<ProposalFileContent?> GetFileContentAsync(int fileId, CancellationToken cancellationToken = default) => Out<ProposalFileContent?>();
     public Task<Proposal> ChangeStateAsync(int proposalId, string state, string implementedVersion, string note, CancellationToken cancellationToken = default) => Out<Proposal>();
+    public Task<Proposal> UpdateContentAsync(int proposalId, string title, string description, string benefit, IReadOnlyList<ReportImage> addedImages, CancellationToken cancellationToken = default) => Out<Proposal>();
     public Task DeleteAsync(int proposalId, CancellationToken cancellationToken = default) => Task.FromException(new ModuleUnavailableException(ProposalsModule.ModuleId));
+    public Task<int> DeleteClosedAsync(CancellationToken cancellationToken = default) => Out<int>();
     public Task<ProposalExportResult> ExportAsync(IReadOnlyList<int> proposalIds, CancellationToken cancellationToken = default) => Out<ProposalExportResult>();
     public Task MarkSeenAsync(int proposalId, CancellationToken cancellationToken = default) => Task.CompletedTask;
     public Task<IReadOnlyList<ProposalAlert>> GetAlertsAsync(CancellationToken cancellationToken = default) => Task.FromResult<IReadOnlyList<ProposalAlert>>([]);

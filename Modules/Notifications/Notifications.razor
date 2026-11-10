@@ -47,10 +47,11 @@
     <ElcomturBalancesTab Active="@(validationTab == "balances")" Selected="OpenBalances" />
     <MaintenanceIncompleteTab Active="@(validationTab == "incomplete")" Selected="OpenIncomplete" />
     <UserTaskAlertsTab Active="@(validationTab == "tasks")" Selected="OpenTasks" />
+    <BugAlertsTab Active="@(validationTab == "bugs")" Selected="OpenBugs" />
     <ProposalAlertsTab Active="@(validationTab == "proposals")" Selected="OpenProposals" />
 </div>
 
-<div id="panel-notifications" role="tabpanel" aria-labelledby="@(validationTab == "tickets" ? "tab-tickets" : validationTab == "beneficiaries" ? "tab-beneficiaries" : validationTab == "issues" ? "tab-issues" : validationTab == "balances" ? "tab-balances" : validationTab == "incomplete" ? "tab-contracts-incomplete" : validationTab == "tasks" ? "tab-user-tasks" : validationTab == "proposals" ? "tab-proposals" : showResolved ? "tab-resolved" : "tab-active")">
+<div id="panel-notifications" role="tabpanel" aria-labelledby="@(validationTab == "tickets" ? "tab-tickets" : validationTab == "beneficiaries" ? "tab-beneficiaries" : validationTab == "issues" ? "tab-issues" : validationTab == "balances" ? "tab-balances" : validationTab == "incomplete" ? "tab-contracts-incomplete" : validationTab == "tasks" ? "tab-user-tasks" : validationTab == "bugs" ? "tab-bugs" : validationTab == "proposals" ? "tab-proposals" : showResolved ? "tab-resolved" : "tab-active")">
 @if (validationTab == "tickets")
 {
     <ValidationQueuePanel ShowDiscarded="true" Changed="RefreshQueuesAsync" />
@@ -62,6 +63,10 @@ else if (validationTab == "balances")
 else if (validationTab == "tasks")
 {
     <UserTaskAlertsPanel />
+}
+else if (validationTab == "bugs")
+{
+    <BugAlertsPanel />
 }
 else if (validationTab == "proposals")
 {
@@ -202,6 +207,7 @@ else if (loaded)
     private void OpenIncomplete() => OpenTab("incomplete", false);
     private void OpenTasks() => OpenTab("tasks", false);
     private void OpenProposals() => OpenTab("proposals", false);
+    private void OpenBugs() => OpenTab("bugs", false);
     // The id of the Elcomtur module (a module does not refer to another: the tab is shown only while that module runs; its content comes through ElcomturBalancesPanel).
     private const string ElcomturModuleId = "elcomtur";
 
@@ -234,6 +240,7 @@ else if (loaded)
         else if (TabQuery == "balante" && Modules.IsAvailable(ElcomturModuleId)) validationTab = "balances";
         else if (TabQuery == "taskuri") validationTab = "tasks";
         else if (TabQuery == "propuneri") validationTab = "proposals";
+        else if (TabQuery == "bugs") validationTab = "bugs";
         else if (TabQuery == "contracte-incomplete" && Modules.IsAvailable("mentenanta")) validationTab = "incomplete";
         await LoadAsync(true);
         RefreshPeriodicallyAsync().FireAndForget(Logger, "periodic refresh");

@@ -929,3 +929,5 @@ Taskuri: taburi pe utilizator, ordine proprie, stadiu si jurnal al taskului (10.
 - Motiv: baza de test nu are un ActivityApp real de unde sa se citeasca tichetul exemplu; fluxul (alegere, mutare, camp nou, sumar) este verificat cu teste de componenta, iar suspendarea importului cu MariaDB. Pasii sunt in Teste utilizator/18 (modificarile 10.11.2026).
 
 Setari: Spatiu pe disc, popup propuneri/erori, marcarea zonelor, mutare/redimensionare ferestre (0.5.67) (10.11.2026): Preview-ul 5087 si pachetul 0.5.66 nu contin aceste modificari; help .help/capturi in docs/HELP_DE_REGENERAT.md
+
+Dezvoltator (cont), stergere in bloc, popup propunere fara taburi, editare continut, capturi mari (0.5.68) (10.11.2026): Marcarea unui cont obisnuit (nu administrator) ca dezvoltator verificata doar prin test MariaDB; help .help/capturi in docs/HELP_DE_REGENERAT.md

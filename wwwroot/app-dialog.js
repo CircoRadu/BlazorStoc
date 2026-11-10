@@ -89,7 +89,7 @@
             event.preventDefault();
             track(event, (dx, dy) => {
                 const width = clamp(rect.width + dx, MIN_WIDTH, maxWidth), height = clamp(rect.height + dy, MIN_HEIGHT, maxHeight);
-                panel.style.width = `${width}px`; panel.style.height = `${height}px`;
+                frame.style.width = `${width}px`; panel.style.height = `${height}px`;
                 // The layout (centred frame) moves the panel when its size changes; measure where it went and bring the top-left corner back, so the corner follows the pointer.
                 const now = panel.getBoundingClientRect(), shifted = offsetOf(frame);
                 place(frame, shifted.x + (rect.left - now.left), shifted.y + (rect.top - now.top));
@@ -113,7 +113,7 @@
         const frame = event.target.closest("[data-app-dialog-frame]");
         const panel = frame && frame.querySelector(".app-dialog-panel");
         if (!frame || !panel) return;
-        if (event.target.closest("[data-app-dialog-resize]")) { panel.style.width = ""; panel.style.height = ""; place(frame, 0, 0); return; }
+        if (event.target.closest("[data-app-dialog-resize]")) { frame.style.width = ""; panel.style.width = ""; panel.style.height = ""; place(frame, 0, 0); return; }
         const head = event.target.closest(".app-dialog-head, .dialog-head");
         if (head && panel.contains(head) && !event.target.closest(interactive)) place(frame, 0, 0);
     });

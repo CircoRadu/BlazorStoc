@@ -1,3 +1,4 @@
+@using Microsoft.AspNetCore.Components.Forms
 @inject IProposalService Proposals
 @inject IAccessControl Access
 @inject IChangeFeed ChangeFeed
@@ -53,6 +54,7 @@
             <div class="editor-actions">
                 <button type="button" class="refresh act-reload" id="proposal-refresh" disabled="@busy" @onclick="LoadAsync">Actualizează</button>
                 @if (canExport) { <button type="button" class="refresh act-export" id="proposal-export-filter" disabled="@(busy || total == 0)" @onclick="ExportFilteredAsync">Exportă lista filtrată (ZIP)</button> }
+                @if (canEdit && showClosed) { <button type="button" class="danger" id="proposal-delete-all" disabled="@(busy || total == 0)" title="Șterge definitiv toate propunerile închise" @onclick="AskDeleteAllAsync">Șterge toate cele rezolvate</button> }
             </div>
 
             @if (loading) { <div class="empty-state" role="status"><div class="spinner"></div><h3>Se încarcă</h3></div> }
@@ -90,6 +92,7 @@
                 <span class="editor-actions"><button type="button" class="danger" id="proposal-delete-yes" disabled="@busy" @onclick="DeleteAsync">Da, șterge</button>
                     <button type="button" class="refresh act-nav" id="proposal-delete-no" @onclick="() => deleting = null">Nu, păstrează</button></span></div>
         }
+@if (deletingAll)        {            <div class="error-banner" role="alert" id="proposal-delete-all-confirm">Ștergi definitiv <strong>@(deleteAllCount == 1 ? "singura propunere închisă" : $"toate cele {deleteAllCount} propuneri închise")</strong> (implementate, amânate sau respinse), cu răspunsurile și imaginile lor? Se șterg de pe server, nu se arhivează, și nu se pot recupera.                <span class="editor-actions"><button type="button" class="danger" id="proposal-delete-all-yes" disabled="@busy" @onclick="DeleteAllAsync">Da, șterge toate</button>                    <button type="button" class="refresh act-nav" id="proposal-delete-all-no" @onclick="() => deletingAll = false">Nu, păstrează</button></span></div>        }
 
         @if (zoomed is not null)
         {
@@ -129,6 +132,30 @@
                     @if (editing)
                     {
                         <h4>Modificarea propunerii</h4>
+                        <div class="editor-grid bug-form">
+                            <label class="wide">Titlu
+                                <input id="proposal-detail-title-input" maxlength="@ProposalRules.MaxTitle" @bind="editTitle" @bind:event="oninput" disabled="@busy" /></label>
+                            <label class="wide">Descriere
+                                <textarea id="proposal-detail-description" rows="6" maxlength="@ProposalRules.MaxDescription" @bind="editDescription" @bind:event="oninput" disabled="@busy"></textarea></label>
+                            <label class="wide">De ce (motivarea)
+                                <textarea id="proposal-detail-benefit" rows="3" maxlength="@ProposalRules.MaxBenefit" @bind="editBenefit" @bind:event="oninput" disabled="@busy"></textarea></label>
+                        </div>
+                        <h4>Imagini adăugate acum <span class="count-badge">@added.Count</span></h4>
+                        <div class="bug-images" id="proposal-detail-added">
+                            @foreach (var image in added)
+                            {
+                                var item = image;
+                                <figure class="bug-image">
+                                    <img src="@item.DataUrl" alt="@item.Name" />
+                                    <figcaption>@item.Name</figcaption>
+                                    <button type="button" class="row-icon delete" aria-label="Scoate imaginea @item.Name" title="Scoate imaginea @item.Name" disabled="@busy" @onclick="() => added.Remove(item)"></button>
+                                </figure>
+                            }
+                        </div>
+                        <div class="bug-add-images">
+                            <label class="refresh act-confirm bug-file-button">Adaugă imagini…<InputFile OnChange="OnAddFilesAsync" multiple accept="image/png,image/jpeg,image/gif,image/webp" disabled="@busy" /></label>
+                            <span class="muted">cel mult @ReportImageRules.MaxImages imagini în total (acum @pictures.Count), fiecare de cel mult @(ReportImageRules.MaxImageBytes / 1024 / 1024) MB</span>
+                        </div>
                     <div class="editor-grid bug-form">
                         <label>Stare
                             <select id="proposal-detail-state" @bind="newState" disabled="@(!canEdit || busy)">
@@ -229,11 +256,52 @@
     private async Task PageChangedAsync(int value) { page = value; await LoadAsync(); }
     private async Task SizeChangedAsync(int value) { pageSize = value; page = 1; await LoadAsync(); }
 
+    // Editing the content (BUG-0014): the title and the description can be corrected and more pictures added (the ones already there stay); saved with the state.
+    private string editTitle = "", editDescription = "", editBenefit = "";
+    private readonly List<NewImage> added = [];
+    private sealed record NewImage(string Name, byte[] Bytes, string ContentType)
+    {
+        public string DataUrl => $"data:{ContentType};base64,{Convert.ToBase64String(Bytes)}";
+    }
+
+    private void StartEditing(Proposal report) { editing = true; newState = report.State; implementedVersion = report.ImplementedVersion; note = ""; editTitle = report.Title; editDescription = report.Description; editBenefit = report.Benefit; added.Clear(); }
+    private bool ContentChanged => opened is not null && (editTitle.Trim() != opened.Title || editDescription.Trim() != opened.Description || editBenefit.Trim() != opened.Benefit || added.Count > 0);
+
+    private async Task OnAddFilesAsync(InputFileChangeEventArgs args)
+    {
+        error = null;
+        foreach (var file in args.GetMultipleFiles(ReportImageRules.MaxImages))
+        {
+            if (pictures.Count + added.Count >= ReportImageRules.MaxImages) { error = $"O propunere poate avea cel mult {ReportImageRules.MaxImages} imagini."; break; }
+            if (file.Size > ReportImageRules.MaxImageBytes) { error = $"Imaginea „{file.Name}” depășește {ReportImageRules.MaxImageBytes / 1024 / 1024} MB."; continue; }
+            try
+            {
+                await using var stream = file.OpenReadStream(ReportImageRules.MaxImageBytes);
+                using var buffer = new MemoryStream();
+                await stream.CopyToAsync(buffer, lifetime.Token);
+                var bytes = buffer.ToArray();
+                if (ReportImageRules.DetectImageType(bytes) is not { } type) { error = $"Fișierul „{file.Name}” nu este o imagine (PNG, JPEG, GIF sau WebP)."; continue; }
+                added.Add(new NewImage(file.Name, bytes, type));
+            }
+            catch (Exception exception) when (exception is IOException or InvalidOperationException) { error = $"Fișierul „{file.Name}” nu a putut fi citit."; }
+        }
+    }
+
+
+    private async Task LoadPicturesAsync(Proposal proposal)
+    {
+        pictures = [];
+        foreach (var file in await Proposals.GetFilesAsync(proposal.Id, lifetime.Token))
+            if (await Proposals.GetFileContentAsync(file.Id, lifetime.Token) is { } content)
+                pictures.Add(new Picture(file.Kind == ReportImageRulesKindScreenshot ? "Captura paginii" : file.FileName, $"data:{content.ContentType};base64,{Convert.ToBase64String(content.Content)}"));
+    }
+
     private bool editing, confirmDiscard;
     private async Task OpenAsync(Proposal proposal, bool edit = false)
     {
         error = notice = null; deleting = null; zoomed = null; editing = edit && canEdit; confirmDiscard = false;
         opened = proposal; newState = proposal.State; implementedVersion = proposal.ImplementedVersion; note = ""; pictures = []; notes = [];
+        if (editing) StartEditing(proposal);
         try
         {
             notes = await Proposals.GetNotesAsync(proposal.Id, lifetime.Token);
@@ -247,13 +315,13 @@
 
     private const string ReportImageRulesKindScreenshot = BlazorStoc.Services.ReportImageRules.KindScreenshot;
 
-    private void CloseDetail() { opened = null; pictures = []; notes = []; zoomed = null; editing = false; confirmDiscard = false; }
-    private bool Dirty => editing && opened is not null && (note.Trim().Length > 0 || newState != opened.State || implementedVersion != opened.ImplementedVersion);
+    private void CloseDetail() { opened = null; pictures = []; notes = []; zoomed = null; editing = false; confirmDiscard = false; added.Clear(); }
+    private bool Dirty => editing && opened is not null && (note.Trim().Length > 0 || newState != opened.State || implementedVersion != opened.ImplementedVersion || ContentChanged);
     private void RequestClose() { if (Dirty) confirmDiscard = true; else CloseDetail(); }
-    private void BeginEdit() { if (!canEdit || opened is null) return; editing = true; newState = opened.State; implementedVersion = opened.ImplementedVersion; note = ""; }
-    private void CancelEdit() { if (Dirty && !confirmDiscard) { confirmDiscard = true; return; } editing = false; confirmDiscard = false; if (opened is not null) { newState = opened.State; implementedVersion = opened.ImplementedVersion; } note = ""; }
+    private void BeginEdit() { if (!canEdit || opened is null) return; StartEditing(opened); }
+    private void CancelEdit() { if (Dirty && !confirmDiscard) { confirmDiscard = true; return; } editing = false; confirmDiscard = false; added.Clear(); if (opened is not null) { newState = opened.State; implementedVersion = opened.ImplementedVersion; } note = ""; }
     private Task ExportRowAsync(Proposal proposal) => RunAsync(() => ExportAsync([proposal.Id]), "Exportul nu a putut fi făcut.");
-    private void AskDelete(Proposal proposal) { deleting = proposal; error = notice = null; }
+    private void AskDelete(Proposal proposal) { deleting = proposal; deletingAll = false; error = notice = null; }
 
     private async Task RunAsync(Func<Task> work, string failure)
     {
@@ -272,12 +340,39 @@
 
     private Task SaveStateAsync() => RunAsync(async () =>
     {
-        var saved = await Proposals.ChangeStateAsync(opened!.Id, newState, implementedVersion, note, lifetime.Token);
+        var current = opened!;
+        var contentSaved = false;
+        if (ContentChanged)
+        {
+            current = await Proposals.UpdateContentAsync(current.Id, editTitle, editDescription, editBenefit, [.. added.Select(item => new ReportImage(ReportImageRules.KindFile, item.Name, item.Bytes))], lifetime.Token);
+            added.Clear();
+            await LoadPicturesAsync(current);
+            contentSaved = true;
+        }
+        var saved = await Proposals.ChangeStateAsync(current.Id, newState, implementedVersion, note, lifetime.Token);
         opened = saved; note = ""; editing = false; confirmDiscard = false;
         notes = await Proposals.GetNotesAsync(saved.Id, lifetime.Token);
-        notice = $"Propunerea {saved.Number} este acum „{saved.State}”.";
+        notice = contentSaved ? $"Propunerea {saved.Number} a fost modificată și este acum „{saved.State}”." : $"Propunerea {saved.Number} este acum „{saved.State}”.";
         await LoadAsync();
     }, "Starea nu a putut fi salvată.");
+
+    private bool deletingAll;
+    private int deleteAllCount;
+    private Task AskDeleteAllAsync() => RunAsync(async () =>
+    {
+        deleteAllCount = (await Proposals.QueryAsync(new ProposalQuery(Closed: true), 1, 1, lifetime.Token)).Total;
+        deletingAll = deleteAllCount > 0; deleting = null; notice = null;
+        if (deleteAllCount == 0) notice = "Nu există propuneri închise de șters.";
+    }, "Numărul propunerilor nu a putut fi citit.");
+
+    private Task DeleteAllAsync() => RunAsync(async () =>
+    {
+        var deleted = await Proposals.DeleteClosedAsync(lifetime.Token);
+        deletingAll = false; if (opened is not null && ProposalRules.ClosedStates.Contains(opened.State)) CloseDetail();
+        notice = deleted == 1 ? "A fost ștearsă definitiv o propunere închisă." : $"Au fost șterse definitiv {deleted} propuneri închise.";
+        page = 1;
+        await LoadAsync();
+    }, "Propunerile nu au putut fi șterse.");
 
     private Task DeleteAsync() => RunAsync(async () =>
     {

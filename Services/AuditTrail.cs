@@ -274,12 +274,16 @@ public static class AuditActions
     public const string DeleteServiceContractAddendum = "Ștergere act adițional contract";
     public const string CreateBugReport = "Raportare eroare creată";
     public const string ChangeBugReportState = "Raportare eroare: stare schimbată";
+    public const string EditBugReportContent = "Raportare eroare: conținut modificat";
     public const string DeleteBugReport = "Raportare eroare ștearsă";
+    public const string DeleteAllClosedBugReports = "Raportare eroare: toate cele rezolvate șterse";
     public const string ExportBugReport = "Raportare eroare exportată";
     public const string CreateProposal = "Propunere creată";
     public const string ChangeProposalState = "Propunere: stare schimbată";
+    public const string EditProposalContent = "Propunere: conținut modificat";
     public const string AddProposalNote = "Propunere: răspuns adăugat";
     public const string DeleteProposal = "Propunere ștearsă";
+    public const string DeleteAllClosedProposals = "Propunere: toate cele închise șterse";
     public const string ExportProposal = "Propunere exportată";
     public const string TestActivityImport = "Testare conexiune ActivityApp";
     public const string SetActivityImportTypes = "Modificare tipuri tichete preluate ActivityApp";
@@ -363,6 +367,8 @@ public static class AuditActions
     public const string GrantPermission = "Acordare permisiune";
     public const string RevokePermission = "Revocare permisiune";
     public const string DeleteUserType = "Ștergere tip utilizator";
+    public const string GrantDeveloper = "Utilizator: drept de dezvoltator acordat";
+    public const string RevokeDeveloper = "Utilizator: drept de dezvoltator revocat";
     public const string ChangeUserType = "Schimbare tip utilizator";
     // The first administrator account, made by the installer (BlazorStoc.dll --create-administrator), recorded as made by the system.
     public const string CreateInstallerAdministrator = "Creare cont administrator la instalare";

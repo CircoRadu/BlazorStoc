@@ -96,7 +96,7 @@ else
              aria-labelledby="@LabelId" aria-label="@(LabelId is null ? Label : null)" aria-describedby="@DescribedBy" @attributes="PanelAttributes">
             @if (HasTitle)
             {
-                <div class="dialog-head app-dialog-head"><h2 id="@TitleIdOrDefault">@if (TitleContent is not null) { @TitleContent } else { @Title }</h2>@if (!string.IsNullOrWhiteSpace(HelpTopic)) { <HelpButton Topic="@HelpTopic" About="@HelpAbout" /> }</div>
+                <div class="dialog-head app-dialog-head" title="Trage de bara de titlu pentru a muta fereastra"><h2 id="@TitleIdOrDefault">@if (TitleContent is not null) { @TitleContent } else { @Title }</h2>@if (!string.IsNullOrWhiteSpace(HelpTopic)) { <HelpButton Topic="@HelpTopic" About="@HelpAbout" /> }</div>
             }
             <div class="app-dialog-body">@ChildContent</div>
             @if (Footer is not null) { <div class="app-dialog-foot">@Footer</div> }

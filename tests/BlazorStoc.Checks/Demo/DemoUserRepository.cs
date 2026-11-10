@@ -86,7 +86,7 @@ public sealed class DemoUserRepository(IAccessControl? accessControl = null, Dem
             EnsureUniqueUsername(value.Username, original.Id);
             EnsureSelfRemainsAdministrator(original, value, currentUsername);
             EnsureLastAdministratorRemains(original, value.Role, value.IsActive);
-            updated = new WebUser(original.Id, value.Username, value.DisplayName, value.Role, value.IsActive, checked(original.Version + 1));
+            updated = new WebUser(original.Id, value.Username, value.DisplayName, value.Role, value.IsActive, checked(original.Version + 1), IsDeveloper: original.IsDeveloper);
             store.Accounts[index] = new(updated, passwordHash ?? store.Accounts[index].PasswordHash);
         }
         await AuditRecorder.RecordEditAsync(auditTrail, accessControl, AuditEntities.User, updated.Id.ToString(),
@@ -94,6 +94,7 @@ public sealed class DemoUserRepository(IAccessControl? accessControl = null, Dem
         return updated;
     }
 
+public async Task<WebUser> SetDeveloperAsync(WebUser original, bool isDeveloper, CancellationToken cancellationToken = default)    {        await EnsureAdministratorAsync(cancellationToken);        WebUser updated;        lock (store.Gate)        {            var index = store.Accounts.FindIndex(account => account.User.Id == original.Id);            WebUserRules.CheckCurrent(index < 0 ? null : store.Accounts[index].User, original);            updated = original with { Version = checked(original.Version + 1), IsDeveloper = isDeveloper };            store.Accounts[index] = new(updated, store.Accounts[index].PasswordHash);        }        return updated;    }
     public async Task DeleteAsync(WebUser original, string reason, CancellationToken cancellationToken = default)
     {
         await EnsureAdministratorAsync(cancellationToken);

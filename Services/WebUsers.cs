@@ -3,7 +3,7 @@ using System.ComponentModel.DataAnnotations;
 namespace BlazorStoc.Services;
 
 // Role stays "Administrator" or "Utilizator" (Administrator exactly when the type is the system type of that name); the rights come from the type.
-public sealed record WebUser(int Id, string Username, string DisplayName, string Role, bool IsActive, long Version, long? TypeId = null, string TypeName = "", [property: System.Text.Json.Serialization.JsonIgnore] bool MustChangePassword = false);
+public sealed record WebUser(int Id, string Username, string DisplayName, string Role, bool IsActive, long Version, long? TypeId = null, string TypeName = "", [property: System.Text.Json.Serialization.JsonIgnore] bool MustChangePassword = false, bool IsDeveloper = false);
 public sealed record AuthenticatedWebUser(int Id, string Username, string DisplayName, string Role, bool MustChangePassword = false);
 
 /// <summary>The rules of every password of a web account (the one an administrator sets and the one a user chooses): minimum 8 characters with a lower case letter, an upper case letter, a digit and a special character.</summary>
@@ -118,6 +118,8 @@ public interface IUserRepository
     Task<IReadOnlyList<WebUser>> GetUsersAsync(CancellationToken cancellationToken = default);
     Task<WebUser> CreateAsync(WebUserInput input, CancellationToken cancellationToken = default);
     Task<WebUser> UpdateAsync(WebUser original, WebUserInput input, CancellationToken cancellationToken = default);
+    /// <summary>Marks or unmarks an account as developer (the tile Dezvoltare of Setari and the tabs Bugs and Propuneri of Notificari are seen only by developers); journaled as its own action.</summary>
+    Task<WebUser> SetDeveloperAsync(WebUser original, bool isDeveloper, CancellationToken cancellationToken = default);
     Task DeleteAsync(WebUser original, string reason, CancellationToken cancellationToken = default);
 }
 

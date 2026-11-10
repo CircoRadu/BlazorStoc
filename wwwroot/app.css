@@ -1600,8 +1600,8 @@ tr[data-depth="0"] > td { border-top: 4px solid var(--c-d6e4df); }
 .bug-facts dt { font-weight:700; color:var(--muted); }
 .bug-facts dd { margin:0; overflow-wrap:anywhere; }
 .bug-description { white-space:pre-wrap; overflow-wrap:anywhere; margin:6px 0 14px; }
-.bug-detail { margin-top:20px; }
-.bug-filters { margin-bottom:12px; }
+.bug-detail:not(.app-dialog-panel) { margin-top:20px; }
+.bug-filters { margin-bottom:12px; padding:18px 16px 0; }
 
 /* Codurile de recuperare ale unui autentificator: fereastra suficient de larga, codurile se rup la margine in loc sa iasa din pagina */
 .delete-dialog.recovery-dialog { width:min(640px, 94vw); max-width:94vw; box-sizing:border-box; }
@@ -1758,16 +1758,11 @@ dialog.app-dialog-native::backdrop { background:#142d2870; }
 .disk-bar-app { background:var(--green); }
 .disk-bar-used { background:var(--muted); opacity:.55; }
 /* Setari -> Baza de date: collapsed sections are one stack of framed rows without gaps (BUG-0009/0010/0011). */
-.db-collapse { margin:0 0 -1px; border:1px solid var(--line); border-radius:0; background:var(--c-ffffff); }
-.db-collapse:first-of-type { border-radius:8px 8px 0 0; }
-.db-collapse:last-of-type { border-radius:0 0 8px 8px; margin-bottom:0; }
-.db-collapse:only-of-type { border-radius:8px; }
+.db-collapse { margin:12px 0 0; border:1px solid var(--line); border-radius:8px; background:var(--c-ffffff); }
 .db-collapse > summary { padding:12px 16px; }
 .db-collapse > :not(summary) { margin-left:16px; margin-right:16px; }
 .db-collapse[open] > :last-child { margin-bottom:16px; }
-.db-stack > .catalog { margin:0 0 -1px !important; border-radius:0; }
-.db-stack > .catalog:first-child { border-radius:10px 10px 0 0; }
-.db-stack > .catalog:last-child { border-radius:0 0 10px 10px; margin-bottom:0 !important; }
+.db-stack > .catalog { margin:12px 0 0 !important; }
 .db-stack > .catalog > details.catalog-collapse { margin:0 !important; }
 .db-stack > .catalog > details.catalog-collapse > summary.catalog-heading { flex-wrap:wrap; justify-content:flex-start; align-items:center; padding:12px 16px; gap:2px 12px; }
 .db-stack > .catalog > details.catalog-collapse > summary.catalog-heading > h2 { margin:0; }
@@ -1780,8 +1775,7 @@ dialog.app-dialog-native::backdrop { background:#142d2870; }
 .app-dialog-resize:hover { opacity:1; }
 html.app-dialog-adjusting, html.app-dialog-adjusting * { user-select:none !important; cursor:grabbing; }
 @media (max-width:719px) { .app-dialog-resize { display:none; } .app-dialog-head, .app-dialog-panel > .dialog-head { cursor:auto; touch-action:auto; } }
-.settings-body details.db-collapse { margin:0 0 -1px; font-size:inherit; }
-.settings-body details.db-collapse:last-of-type { margin-bottom:0; }
+.settings-body details.db-collapse { margin:12px 0 0; font-size:inherit; }
 .disk-usage .disk-total { margin:10px 0 14px; font-size:15px; }
 /* Marking zones on a picture (PROP-0009, Components/Shared/ImageAnnotator.razor + wwwroot/image-annotate.js): a window that floats over the popup. */
 .image-annotator { position:fixed; right:24px; top:64px; z-index:5; display:flex; flex-direction:column; width:min(720px, calc(100vw - 48px)); height:min(580px, calc(100vh - 96px)); box-sizing:border-box;
@@ -1804,3 +1798,14 @@ html.app-dialog-adjusting, html.app-dialog-adjusting * { user-select:none !impor
 /* Row icon "export" (PROP-0012): a tray with an arrow going down, violet like the export buttons. */
 .row-icon.export { color:#6b4fa0; --row-icon-shape:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4'/%3E%3Cpath d='M7 10l5 5 5-5'/%3E%3Cpath d='M12 15V3'/%3E%3C/svg%3E"); }
 .row-icon.export:hover:not(:disabled) { background:#f1ecf8; border-color:#cdbfe6; }
+/* BUG-0014: the frame has the width of the window (by size), the panel fills it, so the bar of buttons always sits on the right edge of the panel, also after a resize. */
+.app-dialog-frame:has(> .app-dialog-panel.app-dialog-s) { width:min(440px, 100%); }
+.app-dialog-frame:has(> .app-dialog-panel.app-dialog-m) { width:min(640px, 100%); }
+.app-dialog-frame:has(> .app-dialog-panel.app-dialog-l) { width:min(960px, 100%); }
+.app-dialog-frame:has(> .app-dialog-panel.app-dialog-xl) { width:min(1280px, 100%); }
+.app-dialog-frame > .app-dialog-panel.app-dialog-s, .app-dialog-frame > .app-dialog-panel.app-dialog-m, .app-dialog-frame > .app-dialog-panel.app-dialog-l, .app-dialog-frame > .app-dialog-panel.app-dialog-xl { width:100%; }
+/* BUG-0014: the head of a window is a visible title bar (the grip of the move): tinted, framed, with a grip of dots. */
+.app-dialog-panel > .app-dialog-head { align-items:center; justify-content:flex-start; gap:12px; padding:8px 12px; margin-bottom:14px; background:var(--c-f5f7f6); border:1px solid var(--line); border-radius:8px; }
+.app-dialog-panel > .app-dialog-head::before { content:""; flex:none; width:10px; height:18px; opacity:.75; background:radial-gradient(circle, var(--muted) 1.4px, transparent 1.7px) 0 0 / 5px 6px; }
+.app-dialog-panel > .app-dialog-head > h2 { margin:0; flex:1 1 auto; min-width:0; }
+.app-dialog-panel > .app-dialog-head:hover { background:var(--c-eaf4f0); }

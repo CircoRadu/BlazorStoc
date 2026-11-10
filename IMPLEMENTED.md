@@ -923,3 +923,7 @@ Cerut de utilizator la 06.10.2026 (verificarea fluxului, apoi deciziile: facturi
 ## Finalizat la 10.11.2026 14:44 - Setari: Spatiu pe disc, popup propuneri/erori, marcarea zonelor, mutare/redimensionare ferestre (0.5.67)
 
 - Fila Spatiu in Baza de date (DiskUsageService), sectiuni restranse Stare/Conexiune/ANAF, tabele propuneri/erori cu actualizare automata (LiveRefresh), popup mutabil si redimensionabil (app-dialog.js), marcarea zonelor numerotate pe imagini (ImageAnnotator), detaliul propunerilor/erorilor in popup cu vizualizare/editare si iconite edit/export pe randuri (PROP-0003, 0004, 0005, 0007, 0009, 0012, BUG-0009, 0010, 0011, 0013),Verificari: build Release, teste modules/appdialog/help/moduleversions, browser pe instanta de test (baza de test) cu date de test sterse
+
+## Finalizat la 10.11.2026 15:44 - Dezvoltator (cont), stergere in bloc, popup propunere fara taburi, editare continut, capturi mari (0.5.68)
+
+- Migrarea 86 (web_users.is_developer), comutator Dezvoltator pe randul si pagina contului, sub-tab Dezvoltatori, Setari -> Dezvoltare si filele Bugs/Propuneri din Notificari doar pentru dezvoltatori, fila Bugs noua, Sterge toate cele rezolvate (rapoarte si propuneri, definitiv, jurnalizat), popup propunere fara taburi, editare titlu/descriere/motivare + imagini adaugate, capturi pana la 3200 px, spatieri Setari (PROP-0013, 0014, 0015, BUG-0014),Verificari: build Release, suita completa, MariaDB (rapoarte, propuneri, tipuri de utilizatori), browser pe instanta de test cu date de test sterse

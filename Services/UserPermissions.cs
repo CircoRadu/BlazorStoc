@@ -61,7 +61,8 @@ public sealed class MariaUserPermissions(IConfiguration configuration, TimeProvi
     // The keys reserved to the administrator (ANAF, backup, modules) are honoured only for the Administrator role (rows saved before those modules became
     // administrator-only may still hold them).
     private static IReadOnlySet<string> ForRole(ClaimsPrincipal user, IReadOnlySet<string> keys) =>
-        user.IsInRole(AccessRoles.Administrator) || !keys.Any(Permissions.IsAdminOnly) ? keys : keys.Where(key => !Permissions.IsAdminOnly(key)).ToHashSet(StringComparer.Ordinal);
+        user.IsInRole(AccessRoles.Administrator) || !keys.Any(key => Permissions.IsAdminOnly(key) && !Permissions.IsDeveloperOnly(key)) ? keys
+            : keys.Where(key => !Permissions.IsAdminOnly(key) || Permissions.IsDeveloperOnly(key)).ToHashSet(StringComparer.Ordinal);   // the keys of a developer survive: the flag is the right, not the role
 
     private static IReadOnlySet<string> FromRole(ClaimsPrincipal user) => user.IsInRole(AccessRoles.Administrator) ? Everything
         : user.IsInRole(AccessRoles.LimitedUser) ? new HashSet<string>(Permissions.DefaultUserKeys, StringComparer.Ordinal) : None;
@@ -70,20 +71,24 @@ public sealed class MariaUserPermissions(IConfiguration configuration, TimeProvi
     {
         await using var connection = await MariaDb.OpenAsync(configuration, cancellationToken).ConfigureAwait(false);
         await using var command = MariaDb.Command(connection, null, """
-            SELECT t.id, t.name, t.is_system FROM web_users u INNER JOIN user_types t ON t.id = u.user_type_id WHERE u.id=@id
+            SELECT t.id, t.name, t.is_system, u.is_developer FROM web_users u INNER JOIN user_types t ON t.id = u.user_type_id WHERE u.id=@id
             """, ("@id", userId));
-        long typeId; bool administrator;
+        long typeId; bool administrator, developer;
         await using (var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false))
         {
             if (!await reader.ReadAsync(cancellationToken).ConfigureAwait(false)) return null;
             typeId = reader.GetInt64(0);
             administrator = reader.GetBoolean(2) && string.Equals(reader.GetString(1), AccessRoles.Administrator, StringComparison.Ordinal);
+            developer = reader.GetBoolean(3);
         }
-        if (administrator) return Everything;
+        // The tile Dezvoltare of Setari and the tabs Bugs and Propuneri of Notificari (the keys of the reports and proposals) belong to the accounts marked as developers, administrators too.
+        if (administrator) return developer ? Everything : Everything.Where(key => !Permissions.IsDeveloperOnly(key)).ToHashSet(StringComparer.Ordinal);
         await using var keys = MariaDb.Command(connection, null, "SELECT permission_key FROM user_type_permissions WHERE user_type_id=@id", ("@id", typeId));
         var set = new HashSet<string>(StringComparer.Ordinal);
         await using var keyReader = await keys.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
-        while (await keyReader.ReadAsync(cancellationToken).ConfigureAwait(false)) set.Add(keyReader.GetString(0));
+        while (await keyReader.ReadAsync(cancellationToken).ConfigureAwait(false)) { var key = keyReader.GetString(0); if (developer || !Permissions.IsDeveloperOnly(key)) set.Add(key); }
+        // A developer sees the reports and the proposals whatever the type of the account (a user of a limited type too).
+        if (developer) foreach (var key in Everything.Where(Permissions.IsDeveloperOnly)) set.Add(key);
         return set;
     }
 }

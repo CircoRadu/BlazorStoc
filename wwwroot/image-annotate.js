@@ -3,7 +3,7 @@
 // in the order they were drawn, can only be deleted (the button outside the top-right corner) and the numbers follow by themselves. After every change the picture is drawn again from
 // the ORIGINAL with the zones on it (JPEG) and handed to the component; the original and the zones live here, per picture, until the form is left. Pointer events only, no observers.
 window.imageAnnotate = (() => {
-    const MAX_ZONES = 10, MIN_SIZE = 12, OUT_WIDTH = 2000;
+    const MAX_ZONES = 10, MIN_SIZE = 12, OUT_WIDTH = 3200;
     const states = new Map();      // picture id -> { source: data URL of the original, zones: [{ x, y, w, h }] as fractions of the picture }
     const editors = new Map();     // root element -> { id, ref, maxBytes, image, layer, stage, cleanup }
 

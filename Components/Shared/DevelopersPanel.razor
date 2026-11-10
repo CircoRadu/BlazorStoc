@@ -1,0 +1,91 @@
+@namespace BlazorStoc.Components.Shared
+@inject IUserRepository Repository
+@inject IAccessControl Access
+@inject IChangeFeed ChangeFeed
+@inject ILogger<DevelopersPanel> Logger
+@implements IDisposable
+@* Setari -> Utilizatori -> Dezvoltatori (PROP-0013): the accounts marked as developers. Only they see the tile Dezvoltare of Setari (reports of errors and proposals) and the tabs Bugs and
+   Propuneri of Notificari; any user still sends reports and proposals from the popups. The mark is given with the switch on the row of the account (Utilizatori) or on the page of the account;
+   here an administrator also takes it back with one icon. *@
+<section class="catalog" aria-labelledby="developers-title">
+    <div class="catalog-heading"><h2 id="developers-title">Dezvoltatori înregistrați <span class="count-badge">@developers.Count</span></h2><small>Conturile care văd Dezvoltare (Setări) și filele Bugs și Propuneri din Notificări.</small></div>
+    <div class="catalog-body">
+        @if (error is not null) { <div class="error-banner" role="alert" id="developers-error">@error</div> }
+        @if (notice is not null) { <div class="success-banner" role="status" id="developers-notice">@notice</div> }
+        @if (loading) { <div class="empty-state" role="status"><div class="spinner"></div><h3>Se încarcă</h3></div> }
+        else if (developers.Count == 0) { <p class="muted" id="developers-empty">Niciun cont nu este marcat ca dezvoltator. Marchează-le cu comutatorul „Dezvoltator” din lista de conturi sau de pe pagina contului.</p> }
+        else
+        {
+            <div class="table-scroll">
+                <table id="developers-table">
+                    <thead><tr><th>Utilizator</th><th>Nume afișat</th><th>Tip utilizator</th><th>Stare</th><th>Operații</th></tr></thead>
+                    <tbody>
+                        @foreach (var developer in developers)
+                        {
+                            var item = developer;
+                            <tr @key="item.Id">
+                                <td><a class="category-table-link" href="@UserNavigation.UserUrl(item.Id)"><strong>@item.Username</strong></a></td>
+                                <td>@item.DisplayName</td>
+                                <td>@(item.TypeName.Length > 0 ? item.TypeName : item.Role)</td>
+                                <td><span class="stock-badge @(item.IsActive ? "positive" : "zero")">@(item.IsActive ? "Activ" : "Inactiv")</span></td>
+                                <td class="row-actions">
+                                    @if (canEdit) { <button type="button" class="row-icon close" aria-label="Revocă dreptul de dezvoltator al lui @item.Username" title="Revocă dreptul de dezvoltator al lui @item.Username" disabled="@busy" @onclick="() => RevokeAsync(item)"></button> }
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </div>
+</section>
+
+@code {
+    private readonly CancellationTokenSource lifetime = new();
+    private IReadOnlyList<WebUser> developers = [];
+    private bool loading = true, busy, canEdit;
+    private string? error, notice;
+    private IDisposable? subscription;
+
+    protected override async Task OnInitializedAsync()
+    {
+        canEdit = await Access.HasAsync("utilizatori.edit", lifetime.Token);
+        subscription = ChangeFeed.Subscribe(change => change.EntityType == AuditEntities.User ? InvokeAsync(async () => { await LoadAsync(); StateHasChanged(); }) : Task.CompletedTask);
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        try
+        {
+            developers = [.. (await Repository.GetUsersAsync(lifetime.Token)).Where(user => user.IsDeveloper)];
+            error = null;
+        }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (Exception exception) when (exception is UserOperationException or AccessDeniedException) { error = exception.Message; developers = []; }
+        catch (Exception exception)
+        {
+            Logger.LogError("The developers could not be read ({ErrorType}).", exception.GetType().Name);
+            error = "Dezvoltatorii nu au putut fi citiți.";
+        }
+        loading = false;
+    }
+
+    private async Task RevokeAsync(WebUser developer)
+    {
+        if (busy) return;
+        busy = true; error = notice = null;
+        try
+        {
+            await Repository.SetDeveloperAsync(developer, false, lifetime.Token);
+            notice = $"Dreptul de dezvoltator al lui {developer.Username} a fost revocat.";
+            await LoadAsync();
+        }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (Exception exception) when (exception is UserOperationException or AccessDeniedException) { error = exception.Message; await LoadAsync(); }
+        catch (Exception exception) { Logger.LogError("Developer revoke failed ({ErrorType}).", exception.GetType().Name); error = "Revocarea nu a putut fi salvată."; }
+        finally { busy = false; }
+    }
+
+    public void Dispose() { subscription?.Dispose(); lifetime.Cancel(); lifetime.Dispose(); }
+}

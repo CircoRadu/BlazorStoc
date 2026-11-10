@@ -59,14 +59,29 @@ public static partial class MariaExtendedChecks
                     "Bug report: the ZIP holds raport.json, raport.txt and both pictures");
             }
 
+            var edited = await boss.UpdateContentAsync(report.Id, "Titlu corectat", "Descriere corectata", [new BugReportImage(BugReportRules.KindFile, "extra.png", png)]);
+            Check(edited.Title == "Titlu corectat" && edited.Description == "Descriere corectata" && (await author.GetFilesAsync(report.Id)).Count == 3, "Bug report: the administrator corrects the title and the description and adds a picture (the pictures already there stay)");
+            Check(await Rejects<AccessDeniedException>(() => author.UpdateContentAsync(report.Id, "x", "y", []), "An ordinary user cannot edit the content of a report") is not null, "Bug report: editing the content is for the administrator");
             var events = (await audit.GetEventsAsync()).Where(item => item.TimestampUtc >= started && item.EntityType == AuditEntities.BugReport).Select(item => item.Action).ToList();
-            Check(events.Contains(AuditActions.CreateBugReport) && events.Contains(AuditActions.ChangeBugReportState) && events.Contains(AuditActions.ExportBugReport), "Bug report: creation, state change and export are journaled with their own actions");
+            Check(events.Contains(AuditActions.CreateBugReport) && events.Contains(AuditActions.ChangeBugReportState) && events.Contains(AuditActions.EditBugReportContent) && events.Contains(AuditActions.ExportBugReport), "Bug report: creation, state change and export are journaled with their own actions");
 
             await boss.DeleteAsync(report.Id);
             await using var left = new MySqlCommand("SELECT (SELECT COUNT(*) FROM bug_reports WHERE id=@id) + (SELECT COUNT(*) FROM bug_report_files WHERE report_id=@id)", probe);
             left.Parameters.AddWithValue("@id", report.Id);
             Check(Convert.ToInt32(await left.ExecuteScalarAsync()) == 0, "Bug report: deleting a report removes its pictures too");
             Check((await audit.GetEventsAsync()).Any(item => item.TimestampUtc >= started && item.Action == AuditActions.DeleteBugReport), "Bug report: the deletion is journaled with its own action");
+            var second = await author.CreateAsync(new BugReportInput("Proba stergere totala", "Descriere", BugReportRules.SeverityImportant, "/produse", "Produse", "{}", [new BugReportImage(BugReportRules.KindFile, "x.png", png)]));
+            var third = await author.CreateAsync(new BugReportInput("Proba ramane deschis", "Descriere", BugReportRules.SeverityImportant, "/produse", "Produse", "{}", []));
+            await boss.ChangeStateAsync(second.Id, BugReportRules.StateRejected, "");
+            var deniedAll = await Rejects<AccessDeniedException>(() => author.DeleteClosedAsync(), "An ordinary user cannot delete all the resolved reports");
+            var removed = await boss.DeleteClosedAsync();
+            Check(deniedAll is not null && removed >= 1, "Bug report: the administrator deletes every resolved or rejected report at once, the unresolved ones stay");
+            await using var leftAll = new MySqlCommand("SELECT (SELECT COUNT(*) FROM bug_reports WHERE id=@id) + (SELECT COUNT(*) FROM bug_report_files WHERE report_id=@id)", probe);
+            leftAll.Parameters.AddWithValue("@id", second.Id);
+            await using var stays = new MySqlCommand("SELECT COUNT(*) FROM bug_reports WHERE id=@id", probe);
+            stays.Parameters.AddWithValue("@id", third.Id);
+            Check(Convert.ToInt32(await stays.ExecuteScalarAsync()) == 1, "Bug report: the bulk deletion leaves the unresolved reports");
+            Check(Convert.ToInt32(await leftAll.ExecuteScalarAsync()) == 0 && (await audit.GetEventsAsync()).Any(item => item.TimestampUtc >= started && item.Action == AuditActions.DeleteAllClosedBugReports), "Bug report: the bulk deletion removes the pictures too and is journaled with its own action");
         }
         finally { await using var cleanup = new MySqlCommand("DELETE FROM bug_reports WHERE user_name IN ('proba.raport','proba.altul')", probe); await cleanup.ExecuteNonQueryAsync(); }
     }

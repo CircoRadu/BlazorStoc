@@ -63,6 +63,9 @@ public sealed record BugReportPage(IReadOnlyList<BugReport> Items, int Total);
 
 public sealed record BugReportExportResult(string FileName, byte[] Content, int Reports);
 
+/// <summary>A report that needs the attention of a developer (the tab Bugs of Notificari) with the reason.</summary>
+public sealed record BugReportAlert(BugReport Report, string Reason);
+
 /// <summary>An answer of the module for the user (a missing title, a picture that is not one), not a failure of the module.</summary>
 public sealed class BugReportException(string message) : Exception(message), IExpectedAnswer;
 
@@ -81,7 +84,13 @@ public interface IBugReportService
     Task<IReadOnlyList<BugReportFile>> GetFilesAsync(int reportId, CancellationToken cancellationToken = default);
     Task<BugReportFileContent?> GetFileContentAsync(int fileId, CancellationToken cancellationToken = default);
     Task<BugReport> ChangeStateAsync(int reportId, string state, string note, CancellationToken cancellationToken = default);
+    /// <summary>Administrator (setari-bug-raport.edit): corrects the title and the description of a report and adds more pictures to it (the pictures already there stay). Journaled as its own action.</summary>
+    Task<BugReport> UpdateContentAsync(int reportId, string title, string description, IReadOnlyList<BugReportImage> addedImages, CancellationToken cancellationToken = default);
     Task DeleteAsync(int reportId, CancellationToken cancellationToken = default);
+    /// <summary>Administrator (setari-bug-raport.edit): deletes every report that is resolved or rejected (the table of the resolved ones), with their pictures; returns how many. One journal line.</summary>
+    Task<int> DeleteClosedAsync(CancellationToken cancellationToken = default);
+    /// <summary>The reports that wait for a developer (new ones; the tab Bugs of Notificari); empty for an account that is not a developer.</summary>
+    Task<IReadOnlyList<BugReportAlert>> GetAlertsAsync(CancellationToken cancellationToken = default);
     /// <summary>Administrator (setari-bug-raport.export): the reports as a ZIP (a folder for each, an index.csv when there are several).</summary>
     Task<BugReportExportResult> ExportAsync(IReadOnlyList<int> reportIds, CancellationToken cancellationToken = default);
 }
@@ -216,6 +225,7 @@ public sealed class MariaBugReportService(IConfiguration configuration, IAccessC
         return (clauses.Count == 0 ? "" : "WHERE " + string.Join(" AND ", clauses), parameters);
     }
 
+public async Task<IReadOnlyList<BugReportAlert>> GetAlertsAsync(CancellationToken cancellationToken = default)    {        if (!await access.HasAsync("setari-bug-raport.view", cancellationToken).ConfigureAwait(false)) return [];        var page = await QueryAsync(new BugReportQuery(State: BugReportRules.StateNew), 1, 100, cancellationToken).ConfigureAwait(false);        return [.. page.Items.Select(report => new BugReportAlert(report, "Raport nou"))];    }
     public async Task<BugReportPage> QueryAsync(BugReportQuery query, int page, int pageSize, CancellationToken cancellationToken = default)
     {
         await access.EnsureAsync("setari-bug-raport.view", cancellationToken).ConfigureAwait(false);
@@ -334,6 +344,89 @@ public sealed class MariaBugReportService(IConfiguration configuration, IAccessC
         return (await GetAsync(reportId, cancellationToken).ConfigureAwait(false))!;
     }
 
+    public async Task<BugReport> UpdateContentAsync(int reportId, string title, string description, IReadOnlyList<BugReportImage> addedImages, CancellationToken cancellationToken = default)
+    {
+        await access.EnsureAsync("setari-bug-raport.edit", cancellationToken).ConfigureAwait(false);
+        title = (title ?? "").Trim();
+        description = (description ?? "").Trim();
+        if (title.Length == 0) throw new BugReportException("Scrie un titlu scurt al problemei.");
+        if (title.Length > BugReportRules.MaxTitle) throw new BugReportException($"Titlul poate avea cel mult {BugReportRules.MaxTitle} de caractere.");
+        if (description.Length == 0) throw new BugReportException("Descrierea nu poate fi goală.");
+        if (description.Length > BugReportRules.MaxDescription) throw new BugReportException($"Descrierea poate avea cel mult {BugReportRules.MaxDescription:N0} de caractere.");
+        var before = await GetAsync(reportId, cancellationToken).ConfigureAwait(false) ?? throw new BugReportException("Raportul nu mai există.");
+        addedImages ??= [];
+        if (before.FileCount + addedImages.Count > BugReportRules.MaxImages) throw new BugReportException($"Un raport poate avea cel mult {BugReportRules.MaxImages} imagini (acum are {before.FileCount}).");
+        var images = new List<(BugReportImage Image, string Type)>();
+        foreach (var image in addedImages)
+        {
+            if (image.Content.Length == 0 || image.Content.Length > BugReportRules.MaxImageBytes)
+                throw new BugReportException($"Imaginea „{image.FileName}” trebuie să aibă cel mult {BugReportRules.MaxImageBytes / 1024 / 1024} MB.");
+            var type = BugReportRules.DetectImageType(image.Content) ?? throw new BugReportException($"Fișierul „{image.FileName}” nu este o imagine (PNG, JPEG, GIF sau WebP).");
+            images.Add((image, type));
+        }
+        var user = await access.GetUsernameAsync(cancellationToken).ConfigureAwait(false) ?? "";
+        var now = DateTime.UtcNow;
+        await using (var connection = await MariaDb.OpenAsync(configuration, cancellationToken).ConfigureAwait(false))
+        await using (var transaction = await connection.BeginTransactionAsync(cancellationToken).ConfigureAwait(false))
+        {
+            await using (var update = new MySqlCommand("UPDATE bug_reports SET title=@title, description=@description, updated_by=@by, updated_utc=@now WHERE id=@id", connection, transaction))
+            {
+                update.Parameters.AddWithValue("@title", title);
+                update.Parameters.AddWithValue("@description", description);
+                update.Parameters.AddWithValue("@by", user);
+                update.Parameters.AddWithValue("@now", MariaTimeText.Format(now));
+                update.Parameters.AddWithValue("@id", reportId);
+                await update.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
+            }
+            var index = before.FileCount;
+            foreach (var (image, type) in images)
+            {
+                index++;
+                await using var file = new MySqlCommand("""
+                    INSERT INTO bug_report_files (report_id, kind, file_name, content_type, size_bytes, content, created_utc) VALUES (@report,@kind,@name,@type,@size,@content,@now)
+                    """, connection, transaction);
+                file.Parameters.AddWithValue("@report", reportId);
+                file.Parameters.AddWithValue("@kind", image.Kind is BugReportRules.KindScreenshot or BugReportRules.KindFile ? image.Kind : BugReportRules.KindPasted);
+                file.Parameters.AddWithValue("@name", BugReportRules.SafeName(image.FileName, $"imagine-{index}{BugReportRules.Extension(type)}"));
+                file.Parameters.AddWithValue("@type", type);
+                file.Parameters.AddWithValue("@size", image.Content.Length);
+                file.Parameters.AddWithValue("@content", image.Content);
+                file.Parameters.AddWithValue("@now", MariaTimeText.Format(now));
+                await file.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
+            }
+            await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
+        }
+        if (before.Title != title || before.Description != description || images.Count > 0)
+        {
+            var changes = new List<AuditChange>();
+            if (before.Title != title) changes.Add(new AuditChange("Titlu", before.Title, title));
+            if (before.Description != description) changes.Add(new AuditChange("Descriere", Trim(before.Description, 200), Trim(description, 200)));
+            if (images.Count > 0) changes.Add(new AuditChange("Imagini adăugate", "0", images.Count.ToString(CultureInfo.InvariantCulture)));
+            await AuditRecorder.RecordActionAsync(audit, access, AuditEntities.BugReport, AuditActions.EditBugReportContent, reportId.ToString(CultureInfo.InvariantCulture), before.Number,
+                AuditDetails.Changes([.. changes]), "", cancellationToken).ConfigureAwait(false);
+        }
+        Publish(AuditActions.EditBugReportContent, reportId);
+        return (await GetAsync(reportId, cancellationToken).ConfigureAwait(false))!;
+    }
+
+    public async Task<int> DeleteClosedAsync(CancellationToken cancellationToken = default)
+    {
+        await access.EnsureAsync("setari-bug-raport.edit", cancellationToken).ConfigureAwait(false);
+        int deleted;
+        await using (var connection = await MariaDb.OpenAsync(configuration, cancellationToken).ConfigureAwait(false))
+        await using (var command = new MySqlCommand("DELETE FROM bug_reports WHERE state IN (@resolved,@rejected)", connection))
+        {
+            command.Parameters.AddWithValue("@resolved", BugReportRules.StateResolved);
+            command.Parameters.AddWithValue("@rejected", BugReportRules.StateRejected);
+            deleted = await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
+        }
+        if (deleted > 0)
+            await AuditRecorder.RecordActionAsync(audit, access, AuditEntities.BugReport, AuditActions.DeleteAllClosedBugReports, "*", "rapoarte rezolvate sau respinse",
+                $"Rapoarte șterse: {deleted}", "", cancellationToken).ConfigureAwait(false);
+        Publish(AuditActions.DeleteAllClosedBugReports, 0);
+        return deleted;
+    }
+
     public async Task DeleteAsync(int reportId, CancellationToken cancellationToken = default)
     {
         await access.EnsureAsync("setari-bug-raport.edit", cancellationToken).ConfigureAwait(false);
@@ -434,7 +527,10 @@ internal sealed class GuardedBugReportService(IBugReportService inner, ModuleReg
     public Task<IReadOnlyList<BugReportFile>> GetFilesAsync(int reportId, CancellationToken cancellationToken = default) => modules.RunAsync(Id, () => inner.GetFilesAsync(reportId, cancellationToken));
     public Task<BugReportFileContent?> GetFileContentAsync(int fileId, CancellationToken cancellationToken = default) => modules.RunAsync(Id, () => inner.GetFileContentAsync(fileId, cancellationToken));
     public Task<BugReport> ChangeStateAsync(int reportId, string state, string note, CancellationToken cancellationToken = default) => modules.RunAsync(Id, () => inner.ChangeStateAsync(reportId, state, note, cancellationToken));
+    public Task<BugReport> UpdateContentAsync(int reportId, string title, string description, IReadOnlyList<BugReportImage> addedImages, CancellationToken cancellationToken = default) => modules.RunAsync(Id, () => inner.UpdateContentAsync(reportId, title, description, addedImages, cancellationToken));
     public Task DeleteAsync(int reportId, CancellationToken cancellationToken = default) => modules.RunAsync(Id, () => inner.DeleteAsync(reportId, cancellationToken));
+    public Task<int> DeleteClosedAsync(CancellationToken cancellationToken = default) => modules.RunAsync(Id, () => inner.DeleteClosedAsync(cancellationToken));
+    public Task<IReadOnlyList<BugReportAlert>> GetAlertsAsync(CancellationToken cancellationToken = default) => modules.RunAsync(Id, () => inner.GetAlertsAsync(cancellationToken));
     public Task<BugReportExportResult> ExportAsync(IReadOnlyList<int> reportIds, CancellationToken cancellationToken = default) => modules.RunAsync(Id, () => inner.ExportAsync(reportIds, cancellationToken));
 }
 
@@ -449,6 +545,9 @@ internal sealed class UnavailableBugReportService : IBugReportService
     public Task<IReadOnlyList<BugReportFile>> GetFilesAsync(int reportId, CancellationToken cancellationToken = default) => Out<IReadOnlyList<BugReportFile>>();
     public Task<BugReportFileContent?> GetFileContentAsync(int fileId, CancellationToken cancellationToken = default) => Out<BugReportFileContent?>();
     public Task<BugReport> ChangeStateAsync(int reportId, string state, string note, CancellationToken cancellationToken = default) => Out<BugReport>();
+    public Task<BugReport> UpdateContentAsync(int reportId, string title, string description, IReadOnlyList<BugReportImage> addedImages, CancellationToken cancellationToken = default) => Out<BugReport>();
     public Task DeleteAsync(int reportId, CancellationToken cancellationToken = default) => Task.FromException(new ModuleUnavailableException(BugReportsModule.ModuleId));
+    public Task<int> DeleteClosedAsync(CancellationToken cancellationToken = default) => Out<int>();
+    public Task<IReadOnlyList<BugReportAlert>> GetAlertsAsync(CancellationToken cancellationToken = default) => Task.FromResult<IReadOnlyList<BugReportAlert>>([]);
     public Task<BugReportExportResult> ExportAsync(IReadOnlyList<int> reportIds, CancellationToken cancellationToken = default) => Out<BugReportExportResult>();
 }

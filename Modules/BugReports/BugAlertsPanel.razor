@@ -1,0 +1,58 @@
+@namespace BlazorStoc.Components.Shared
+@using BlazorStoc.Modules.BugReports
+@inject IBugReportService Reports
+@inject NavigationManager Navigation
+@inject ILogger<BugAlertsPanel> Logger
+@* The content of the tab "Bugs" of the Notifications page (PROP-0013): the new reports of errors, for the developers; a report opens in Setari -> Dezvoltare -> Erori, where it is read, edited and answered. *@
+@if (error is not null) { <div class="error-banner" role="alert">@error</div> }
+<section class="catalog">
+    <div class="catalog-heading"><h2>Rapoarte de eroare care cer atenție <span class="count-badge">@alerts.Count</span></h2><small>Rapoartele noi, trimise de utilizatori, care așteaptă un dezvoltator.</small></div>
+    <div class="catalog-body">
+    @if (loading) { <div class="empty-state" role="status"><div class="spinner"></div><h3>Se încarcă rapoartele</h3></div> }
+    else if (alerts.Count == 0)
+    {
+        <div class="empty-state"><span class="empty-icon">✓</span><h3>Niciun raport nu cere atenție</h3><p>Aici apar rapoartele de eroare noi, trimise din „Raportează o eroare”.</p></div>
+    }
+    else
+    {
+        <Paged Items="alerts" Id="bug-alerts-size" Context="pageRows" DefaultSize="10">
+            <div class="table-scroll"><table id="bug-alerts-table"><thead><tr><th>NUMĂR</th><th>TITLU</th><th>GRAVITATE</th><th>MOTIV</th><th>AUTOR</th><th>TRIMIS</th><th><span class="sr-only">Acțiuni</span></th></tr></thead><tbody>
+            @foreach (var alert in pageRows)
+            {
+                var report = alert.Report;
+                <tr @key="report.Id">
+                    <td>@report.Number</td>
+                    <td><strong>@report.Title</strong></td>
+                    <td>@report.Severity</td>
+                    <td><span class="task-new-badge">@alert.Reason</span></td>
+                    <td>@report.UserName</td>
+                    <td>@BugReportRules.Display(report.CreatedUtc)</td>
+                    <td class="row-actions"><button class="row-icon view" aria-label="@($"Deschide raportul {report.Number}")" title="@($"Deschide raportul {report.Number}")" @onclick="OpenAsync"></button></td>
+                </tr>
+            }
+            </tbody></table></div>
+        </Paged>
+    }
+    </div>
+</section>
+
+@code {
+    private IReadOnlyList<BugReportAlert> alerts = [];
+    private bool loading = true;
+    private string? error;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try { alerts = await Reports.GetAlertsAsync(); }
+        catch (Exception exception) when (exception is AccessDeniedException or ModuleUnavailableException) { error = exception.Message; alerts = []; }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            Logger.LogWarning("The bug alerts could not be read ({ErrorType}).", exception.GetType().Name);
+            error = "Rapoartele nu au putut fi încărcate. Reîncearcă după o clipă.";
+            alerts = [];
+        }
+        loading = false;
+    }
+
+    private void OpenAsync() => Navigation.NavigateTo("/setari?tab=dezvoltare&subtab=erori");
+}

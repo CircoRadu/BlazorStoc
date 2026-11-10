@@ -187,7 +187,11 @@
     {
         <div role="tabpanel" id="panel-@UsersTab" aria-labelledby="tab-@UsersTab" class="settings-body">
             @SubtabBar(UserSubtabs, "Secțiuni utilizatori")
-            @if (userSubtab == UserTypesSubtab)
+            @if (userSubtab == DevelopersSubtab && canUsers)
+            {
+                <div role="tabpanel" id="subpanel-@DevelopersSubtab" aria-labelledby="subtab-@DevelopersSubtab"><DevelopersPanel /></div>
+            }
+            else if (userSubtab == UserTypesSubtab)
             {
                 <div role="tabpanel" id="subpanel-@UserTypesSubtab" aria-labelledby="subtab-@UserTypesSubtab"><UserTypesPanel /></div>
             }
@@ -233,10 +237,11 @@
     private const string LegacyUserTypesTab = "tipuri-utilizatori";
     private const string UserAccountsSubtab = "conturi";
     private const string UserTypesSubtab = "tipuri";
+    private const string DevelopersSubtab = "dezvoltatori";
     private bool canUsers, canUserTypes;
-    private static readonly (string Id, string Title)[] UserSubtabsBoth = [(UserAccountsSubtab, "Utilizatori"), (UserTypesSubtab, "Tipuri de utilizatori")];
-    private static readonly (string Id, string Title)[] UserSubtabsAccounts = [UserSubtabsBoth[0]];
-    private static readonly (string Id, string Title)[] UserSubtabsTypes = [UserSubtabsBoth[1]];
+    private static readonly (string Id, string Title)[] UserSubtabsBoth = [(UserAccountsSubtab, "Utilizatori"), (DevelopersSubtab, "Dezvoltatori"), (UserTypesSubtab, "Tipuri de utilizatori")];
+    private static readonly (string Id, string Title)[] UserSubtabsAccounts = [UserSubtabsBoth[0], UserSubtabsBoth[1]];
+    private static readonly (string Id, string Title)[] UserSubtabsTypes = [UserSubtabsBoth[2]];
     // Only the sub-tabs the signed-in user has the right to (static arrays: the sub-tab bar tells them apart by reference).
     private (string Id, string Title)[] UserSubtabs => canUsers && canUserTypes ? UserSubtabsBoth : canUsers ? UserSubtabsAccounts : UserSubtabsTypes;
     private string userSubtab = UserAccountsSubtab;

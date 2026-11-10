@@ -5,7 +5,8 @@
 (() => {
     const state = { ref: null, proposalRef: null, errors: [] };
     const reportPopups = "#bug-dialog,#proposal-dialog";
-    const maxWidth = 1600;
+    const maxWidth = 2560;            // a pasted or chosen picture larger than 800 KB is reduced to this width
+    const captureWidth = 3200;        // the capture of the page (BUG-0014: high resolution, so an enlarged picture stays readable)
 
     const remember = (message) => {
         state.errors.push(`${new Date().toISOString()} ${String(message).slice(0, 300)}`);
@@ -141,7 +142,7 @@
             const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}"><foreignObject x="0" y="0" width="100%" height="100%">${markup}</foreignObject></svg>`;
             const image = new Image();
             await new Promise((resolve, reject) => { image.onload = resolve; image.onerror = reject; image.src = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(svg); });
-            const scale = Math.min(1, maxWidth / width);
+            const scale = Math.min(Math.max(2, window.devicePixelRatio || 1), captureWidth / width);
             const canvas = document.createElement("canvas");
             canvas.width = Math.round(width * scale);
             canvas.height = Math.round(height * scale);
@@ -149,7 +150,9 @@
             context.fillStyle = getComputedStyle(body).backgroundColor || "#fff";
             context.fillRect(0, 0, canvas.width, canvas.height);
             context.drawImage(image, 0, 0, canvas.width, canvas.height);
-            return await new Promise((resolve) => canvas.toBlob(resolve, "image/jpeg", 0.85));
+            const first = await new Promise((resolve) => canvas.toBlob(resolve, "image/jpeg", 0.92));
+            // The limit of a picture is 5 MB: a very busy page is saved lighter instead of being refused.
+            return first && first.size > 4.5 * 1024 * 1024 ? await new Promise((resolve) => canvas.toBlob(resolve, "image/jpeg", 0.7)) : first;
         } catch (error) {
             remember(`Captura paginii nu a reusit: ${error && error.message ? error.message : error}`);
             return null;

@@ -1,3 +1,12 @@
+## 0.5.68 | 10.11.2026
+- Conturile de utilizator pot fi marcate „Dezvoltator” (comutator pe rândul contului și pe pagina contului, sub-tab nou „Dezvoltatori” cu revocare); dala „Dezvoltare” din Setări și filele „Bugs” și „Propuneri” din Notificări se văd numai dezvoltatorilor; după actualizare nimeni nu este dezvoltator, conturile se marchează din Utilizatori
+- Notificări: fila nouă „Bugs” cu rapoartele de eroare noi, după modelul filei „Propuneri”
+- Setări → Dezvoltare → Erori / Propuneri: „Șterge toate cele rezolvate” în tabelul celor rezolvate (ștergere definitivă de pe server, fără arhivare, cu confirmare și jurnal)
+- Editarea unui raport sau a unei propuneri permite corectarea titlului și a descrierii (la propuneri și a motivării) și adăugarea de imagini
+- Fereastra „Propune o modificare” nu mai are tab-uri, ci doar formularul de propunere nouă
+- Capturile paginii din rapoarte și propuneri sunt la rezoluție mare (până la 3200 px lățime)
+- Ferestre: bara de titlu este vizibilă (mutarea), butoanele din bară stau pe marginea ferestrei și după redimensionare; filtrele listelor au spațiu sub tab-uri; secțiunile bazei de date au 12 px între ele
+
 ## 0.5.67 | 10.11.2026
 - Ferestrele (popup-urile) se mută trăgând de antet și se redimensionează din colțul dreapta-jos; dublu-clic pe antet le centrează, pe mâner readuce dimensiunea implicită
 - Raportare eroare și Propunere: un clic pe o imagine o deschide într-o fereastră de marcare plutitoare, în care tragi zone dreptunghiulare numerotate (cel mult 10, se pot doar șterge, numerele se refac singure); imaginea trimisă are zonele desenate pe ea
