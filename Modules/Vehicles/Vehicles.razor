@@ -23,7 +23,8 @@
 @if (notice is not null) { <div class="success-banner" role="status">@notice</div> }
 @if (editing && editingVehicle is null)
 {
-    <div class="delete-overlay"><div class="delete-dialog template-popup" role="dialog" aria-modal="true" tabindex="-1" aria-labelledby="vehicle-editor-title"><VehicleEditor @key="editorKey" Original="editingVehicle" Saved="VehicleSavedAsync" Closed="CloseEditorAsync" /></div></div>
+    <AppDialog PanelClass="template-popup" LabelledBy="vehicle-editor-title"><VehicleEditor @key="editorKey" Original="editingVehicle" Saved="VehicleSavedAsync" Closed="CloseEditorAsync" />
+    </AppDialog>
 }
 else if (editing) { <VehicleEditor @key="editorKey" Original="editingVehicle" Saved="VehicleSavedAsync" Closed="CloseEditorAsync" /> }
 

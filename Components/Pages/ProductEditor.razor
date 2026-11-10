@@ -11,7 +11,7 @@
 
 <UnsavedChangesTracker @ref="tracker" Subject="@(BlazorStoc.Services.PopupSubject.Of("produs", Original?.Name))" Adding="@(Original is null)" Snapshot="CurrentSnapshot" Discard="DiscardAsync" />
 <section class="product-editor" aria-labelledby="editor-title">
-    <div class="catalog-heading"><h2 id="editor-title">@(Original is null ? (Staging ? "Pregătește produs nou" : "Adaugă produs") : $"Editează produsul {Original.Name}")</h2><span class="heading-actions"><HelpButton Topic="produse-editor" About="Formularul de produs" /><button type="button" class="danger" disabled="@saving" @onclick="Close">Închide</button></span></div>
+    <div class="catalog-heading"><h2 id="editor-title">@(Original is null ? (Staging ? "Pregătește produs nou" : "Adaugă produs") : $"Editează produsul {Original.Name}")</h2><span class="heading-actions"><HelpButton Topic="produse-editor" About="Formularul de produs" /><button type="button" class="danger" disabled="@saving" @onclick="Close" data-head-close>Închide</button></span></div>
     @if (error is not null) { <div class="error-banner" role="alert">@error</div> }
     <EditForm Model="input" OnValidSubmit="SaveAsync" FormName="product-editor">
         <DataAnnotationsValidator />
@@ -103,12 +103,10 @@
 </section>
 @if (categoriesOpen)
 {
-    <div class="invoice-modal-backdrop front">
-        <div class="invoice-modal wide" role="dialog" aria-modal="true" aria-label="Categorii și subcategorii">
+    <AppDialog PanelClass="invoice-modal wide" BackdropClass="front" Label="Categorii și subcategorii">
             <div class="catalog-heading"><h3>Categorii și subcategorii</h3><button type="button" class="primary" @onclick="CloseCategoriesAsync">Gata, înapoi la produs</button></div>
             <iframe class="categories-frame" src="/categorii/fereastra" title="Categorii și subcategorii"></iframe>
-        </div>
-    </div>
+    </AppDialog>
 }
 @if (pendingChanges is not null && Original is not null)
 {

@@ -4,9 +4,7 @@
 @inject ILogger<VehicleExpiryDialog> Logger
 @implements IDisposable
 
-<div class="delete-overlay" @onkeydown="KeyDownAsync">
-    <section class="delete-dialog" role="dialog" aria-modal="true" tabindex="-1" aria-labelledby="vehicle-expiry-title">
-        <div class="dialog-head"><h2 id="vehicle-expiry-title">Modifică @Field.Label.ToLowerInvariant() – @Vehicle.PlateNumber</h2><HelpButton Topic="vehicule-expirare" About="Modificarea unei date de expirare" /></div>
+<AppDialog OnClose="() => Cancelled.InvokeAsync()" TitleId="vehicle-expiry-title" HelpTopic="vehicule-expirare" HelpAbout="Modificarea unei date de expirare" OnKeyDown="KeyDownAsync"><TitleContent>Modifică @Field.Label.ToLowerInvariant() – @Vehicle.PlateNumber</TitleContent><ChildContent>
         <p class="delete-object"><strong>@Vehicle.PlateNumber · @Vehicle.Description</strong></p>
         @if (error is not null) { <div class="error-banner" role="alert">@error</div> }
         <label for="vehicle-expiry-date">@Field.Label *<PickOnlyDate Id="vehicle-expiry-date" @bind-Value="date" Min="@MinDate" Disabled="saving" /></label>
@@ -14,8 +12,8 @@
             <button type="button" class="primary" disabled="@(saving || date is null)" @onclick="SaveAsync">@(saving ? "Se salvează…" : "Salvează")</button>
             <button type="button" class="danger" disabled="@saving" @onclick="() => Cancelled.InvokeAsync()">Anulează</button>
         </div>
-    </section>
-</div>
+</ChildContent>
+</AppDialog>
 
 @code {
     [Parameter, EditorRequired] public Vehicle Vehicle { get; set; } = default!;

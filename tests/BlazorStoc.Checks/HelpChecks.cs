@@ -327,9 +327,9 @@ public static class HelpChecks
         var catalog = HelpCatalog.Default;
         var used = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var wrong = new List<string>();
-        foreach (var file in new[] { "Components", "Modules", "Pages" }.Select(folder => Path.Combine(root, folder)).Where(Directory.Exists).SelectMany(folder => Directory.EnumerateFiles(folder, "*.razor", SearchOption.AllDirectories)))
+        foreach (var file in new[] { "Components", "Modules", "Pages" }.Select(folder => Path.Combine(root, folder)).Where(Directory.Exists).SelectMany(folder => Directory.EnumerateFiles(folder, "*.razor", SearchOption.AllDirectories)).Where(file => !file.EndsWith("AppDialog.razor", StringComparison.Ordinal)))
         {
-            foreach (Match match in Regex.Matches(File.ReadAllText(file), @"<HelpButton\s[^>]*Topic=""([^""]+)"""))
+            foreach (Match match in Regex.Matches(File.ReadAllText(file), @"(?:<HelpButton\s[^>]*Topic|<AppDialog\s[^>]*HelpTopic)=""([^""]+)"""))
             {
                 used.Add(match.Groups[1].Value);
                 if (catalog.Get(match.Groups[1].Value) is null) wrong.Add($"{Path.GetFileName(file)} -> {match.Groups[1].Value}");
@@ -339,11 +339,11 @@ public static class HelpChecks
         // Every file that draws a window over the page (class delete-dialog, delete-overlay or invoice-modal) has a help button, unless it is a file that only asks
         // for a confirmation or that only wraps a form which has its own help button (listed here, with the reason).
         var dialogsWithoutHelp = new List<string>();
-        foreach (var file in new[] { "Components", "Modules", "Pages" }.Select(folder => Path.Combine(root, folder)).Where(Directory.Exists).SelectMany(folder => Directory.EnumerateFiles(folder, "*.razor", SearchOption.AllDirectories)))
+        foreach (var file in new[] { "Components", "Modules", "Pages" }.Select(folder => Path.Combine(root, folder)).Where(Directory.Exists).SelectMany(folder => Directory.EnumerateFiles(folder, "*.razor", SearchOption.AllDirectories)).Where(file => !file.EndsWith("AppDialog.razor", StringComparison.Ordinal)))
         {
             var text = File.ReadAllText(file);
-            if (!Regex.IsMatch(text, @"class=""(delete-dialog|invoice-modal|delete-overlay)")) continue;
-            if (!text.Contains("<HelpButton", StringComparison.Ordinal) && !DialogFilesWithoutHelp.Contains(Path.GetFileName(file))) dialogsWithoutHelp.Add(Path.GetFileName(file));
+            if (!Regex.IsMatch(text, @"(class=""(delete-dialog|invoice-modal|delete-overlay)|<AppDialog\b)")) continue;
+            if (!text.Contains("<HelpButton", StringComparison.Ordinal) && !text.Contains("HelpTopic=", StringComparison.Ordinal) && !DialogFilesWithoutHelp.Contains(Path.GetFileName(file))) dialogsWithoutHelp.Add(Path.GetFileName(file));
         }
         check(dialogsWithoutHelp.Count == 0, "Help: every file with a window over the page has a help button (or is a confirmation / a wrapper of a form that has one)" + (dialogsWithoutHelp.Count > 0 ? ": " + string.Join(", ", dialogsWithoutHelp) : ""));
         var linked = catalog.Topics.Values.SelectMany(topic => topic.Summary.Select(block => block.Text)

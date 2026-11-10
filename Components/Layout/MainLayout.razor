@@ -115,7 +115,7 @@
         }
         <main class="workspace"><UpdateBanner @rendermode="@(new InteractiveServerRenderMode(prerender: false))" /><ModuleAlertBanner @rendermode="@(new InteractiveServerRenderMode(prerender: false))" /><SessionTracker @rendermode="@(new InteractiveServerRenderMode(prerender: false))" />@Body</main></div>
 </div>
-<dialog id="logout-dialog" class="delete-dialog logout-dialog" aria-labelledby="logout-title" aria-describedby="logout-description">
+<AppDialog Native="true" Id="logout-dialog" PanelClass="logout-dialog" LabelledBy="logout-title" DescribedBy="logout-description" ShowModuleActions="false">
     <form method="post" action="/Account/Logout">
         <AntiforgeryToken />
         <h2 id="logout-title">Închizi sesiunea?</h2>
@@ -125,7 +125,7 @@
             <button type="button" class="primary" data-logout-cancel autofocus>Anulează deconectarea</button>
         </div>
     </form>
-</dialog>
+</AppDialog>
 @if (Modules.IsAvailable(BlazorStoc.Modules.BugReports.BugReportsModule.ModuleId)) { <BugReportDialog @rendermode="@(new InteractiveServerRenderMode(prerender: false))" /> }
 @if (Modules.IsAvailable(BlazorStoc.Modules.Proposals.ProposalsModule.ModuleId)) { <BlazorStoc.Modules.Proposals.ProposalDialog @rendermode="@(new InteractiveServerRenderMode(prerender: false))" /> }
 <div id="blazor-error-ui" role="alert">Conexiunea cu aplicația a fost întreruptă. Dacă aplicația se repornește singură, durează câteva secunde. <a href="" class="reload">Reîncarcă pagina</a><a class="dismiss" title="Închide" aria-label="Închide">×</a></div>

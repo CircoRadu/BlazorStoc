@@ -61,22 +61,18 @@ else if (beneficiary is not null)
 
     @if (addingProject)
     {
-        <div class="delete-overlay">
-            <div class="delete-dialog template-popup" role="dialog" aria-modal="true" tabindex="-1" aria-labelledby="project-editor-title">
+        <AppDialog PanelClass="template-popup" LabelledBy="project-editor-title">
                 <ProjectEditor @key="editorKey" Original="null" FixedBeneficiaryId="Id" FixedBeneficiaryName="@beneficiary.Name"
                                Saved="ProjectSavedAsync" Closed="CloseAddProjectAsync" />
-            </div>
-        </div>
+        </AppDialog>
     }
 
     @if (addingWorkPoint || editingWorkPoint is not null)
     {
-        <div class="delete-overlay">
-            <div class="delete-dialog template-popup" role="dialog" aria-modal="true" tabindex="-1" aria-labelledby="work-point-editor-title">
+        <AppDialog PanelClass="template-popup" LabelledBy="work-point-editor-title">
                 <WorkPointEditor @key="workPointEditorKey" BeneficiaryId="Id" Original="editingWorkPoint"
                                  Saved="WorkPointSavedAsync" Closed="CloseWorkPointEditorAsync" PhotosChanged="ReloadPhotoCountsAsync" />
-            </div>
-        </div>
+        </AppDialog>
     }
 
     <section class="catalog">

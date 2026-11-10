@@ -2,6 +2,19 @@
 
 ## Modificari de testat
 
+### 10.11.2026 - Ferestre unitare (bara deasupra panoului)
+
+**Ce s-a adaugat:** componenta AppDialog: orice fereastra are bara de sus rezervata (Raporteaza o eroare, Propune, inchidere) deasupra panoului, niciodata peste antet.
+**Ce face acum:** pe ecran lat arata ca inainte (bara deasupra, butonul rosu rotund de inchidere); pe ecran ingust butoanele barei sunt iconite rotunde; butoanele modulelor apar doar cat modulul functioneaza, si in ferestrele deschise.
+
+| Nr | Pasi | Asteptat | Rezultat |
+|---|---|---|---|
+| 1 | Deschide o fereastra inalta (ex. Beneficiari -> Adauga beneficiar, sau un sablon de factura) | Bara cu "Raporteaza o eroare", "Propune" si butonul rosu sta deasupra panoului, nu peste titlu | |
+| 2 | Apasa butonul rosu rotund dupa ce ai scris ceva in formular | Apare intrebarea despre modificari nesalvate, ca la "Inchide"; Escape o inchide pe ea, nu formularul | |
+| 3 | Micsoreaza fereastra browserului sub 720 px latime | Butoanele barei devin iconite rotunde (steag, creion, X rosu), simbol centrat | |
+| 4 | Setari -> Module: opreste modulul Propuneri cu o fereastra deschisa in alt tab | Butonul "Propune" dispare din bara ferestrei deschise; la pornire revine | |
+| 5 | Apasa "Raporteaza o eroare" din bara unei ferestre | Se deschide raportul cu captura ferestrei; inchis, fereastra de dedesubt ramane | |
+
 ### 10.11.2026 - Insigne pe taburile Setari -> Dezvoltare
 
 **Ce s-a adaugat:** insigna cu numarul de obiecte nerezolvate pe tile-ul Dezvoltare si pe sub-taburile Erori si Propuneri.

@@ -19,7 +19,8 @@
 @if (notice is not null) { <div class="success-banner" role="status">@notice</div> }
 @if (editing && editingBeneficiary is null)
 {
-    <div class="delete-overlay"><div class="delete-dialog template-popup" role="dialog" aria-modal="true" tabindex="-1" aria-labelledby="beneficiary-editor-title"><BeneficiaryEditor @key="editorKey" Original="editingBeneficiary" Saved="BeneficiarySavedAsync" Closed="CloseEditorAsync" /></div></div>
+    <AppDialog PanelClass="template-popup" LabelledBy="beneficiary-editor-title"><BeneficiaryEditor @key="editorKey" Original="editingBeneficiary" Saved="BeneficiarySavedAsync" Closed="CloseEditorAsync" />
+    </AppDialog>
 }
 else if (editing) { <BeneficiaryEditor @key="editorKey" Original="editingBeneficiary" Saved="BeneficiarySavedAsync" Closed="CloseEditorAsync" /> }
 

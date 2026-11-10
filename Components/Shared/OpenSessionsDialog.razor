@@ -1,9 +1,7 @@
 @using BlazorStoc.Services
 @* Setari -> Baza de date -> Stare -> "Vezi sesiunile deschise": the open sessions with their details. Nothing is changed here; the list is given by the page and refreshed
    on request. *@
-<div class="delete-overlay" @onkeydown="KeyDownAsync">
-    <section class="delete-dialog save-confirmation-dialog open-sessions-dialog" role="dialog" aria-modal="true" aria-labelledby="open-sessions-title">
-        <div class="dialog-head"><h2 id="open-sessions-title">Sesiuni deschise <span class="count-badge">@Sessions.Count</span></h2><HelpButton Topic="setari-baza-sesiuni" About="Sesiunile deschise" /></div>
+<AppDialog TitleId="open-sessions-title" HelpTopic="setari-baza-sesiuni" HelpAbout="Sesiunile deschise" PanelClass="save-confirmation-dialog open-sessions-dialog" OnKeyDown="KeyDownAsync" OnClose="CloseConfirmedAsync"><TitleContent>Sesiuni deschise <span class="count-badge">@Sessions.Count</span></TitleContent><ChildContent>
         <p class="muted"><small>Sesiunile interactive ale aplicației în acest moment. Adresa și browserul apar după ce pagina sesiunii le raportează; o sesiune fără utilizator nu s-a autentificat.</small></p>
         @if (Sessions.Count == 0)
         {
@@ -53,7 +51,7 @@
         @if (Message is not null) { <div class="@(MessageIsError ? "error-banner" : "success-banner")" role="@(MessageIsError ? "alert" : "status")">@Message</div> }
         @if (confirming is { } target)
         {
-            <div class="confirm-bar" role="alertdialog" aria-label="Confirmare închidere sesiune">
+            <div class="confirm-bar" role="group" aria-label="Confirmare închidere sesiune">
                 <p>Închizi sesiunea lui <strong>@Name(target)</strong>@(target.IpAddress is null ? "" : $" ({target.IpAddress})")? Utilizatorul este deconectat din browserul respectiv și trebuie să se autentifice din nou; ce nu a salvat se pierde.</p>
                 <div class="editor-actions">
                     <button type="button" class="danger" @onclick="CloseConfirmedAsync">Închide sesiunea</button>
@@ -65,8 +63,8 @@
             <button type="button" class="refresh act-reload" @onclick="() => Refresh.InvokeAsync()">Actualizează</button>
             <button type="button" class="refresh act-close" @onclick="() => Closed.InvokeAsync()">Închide</button>
         </div>
-    </section>
-</div>
+</ChildContent>
+</AppDialog>
 
 @code {
     [Parameter, EditorRequired] public IReadOnlyList<OpenSession> Sessions { get; set; } = [];

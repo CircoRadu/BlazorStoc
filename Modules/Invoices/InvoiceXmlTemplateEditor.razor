@@ -137,11 +137,9 @@
 
         @if (addingSupplier)
         {
-            <div class="invoice-modal-backdrop">
-                <div class="invoice-modal wide" role="dialog" aria-modal="true" aria-label="Adaugă furnizor">
+            <AppDialog PanelClass="invoice-modal wide" Label="Adaugă furnizor">
                     <SupplierEditor @key="addSupplierKey" InitialCui="@sampleCui" InitialName="@sampleSupplierName" Saved="SupplierAddedAsync" Closed="CloseAddSupplier" />
-                </div>
-            </div>
+            </AppDialog>
         }
 
 </section>

@@ -3,9 +3,7 @@
 
 @* Confirmation of returning products to the warehouse or moving them into another vehicle: the quantity (for one
    product) and the target vehicle (for a move) are chosen here; the page performs the operation. *@
-<div class="delete-overlay" @onkeydown="KeyAsync">
-    <section class="delete-dialog movement-dialog" role="dialog" aria-modal="true" aria-labelledby="transfer-title">
-        <div class="dialog-head"><h2 id="transfer-title">@Title</h2><HelpButton Topic="vehicule-transfer" About="Mutarea sau restituirea produselor" /></div>
+<AppDialog OnClose="() => Cancelled.InvokeAsync()" TitleId="transfer-title" HelpTopic="vehicule-transfer" HelpAbout="Mutarea sau restituirea produselor" PanelClass="movement-dialog" OnKeyDown="KeyAsync"><TitleContent>@Title</TitleContent><ChildContent>
         @if (!string.IsNullOrWhiteSpace(Summary)) { <p class="muted">@Summary</p> }
         <EditForm Model="this" OnSubmit="SubmitAsync" FormName="vehicle-transfer">
             <fieldset disabled="@Busy">
@@ -34,8 +32,8 @@
                 </div>
             </fieldset>
         </EditForm>
-    </section>
-</div>
+</ChildContent>
+</AppDialog>
 
 @code {
     [Parameter, EditorRequired] public string Title { get; set; } = "";

@@ -61,8 +61,7 @@
 
 @if (regularizing is not null)
 {
-    <div class="delete-overlay">
-        <section class="delete-dialog" role="dialog" aria-modal="true" aria-label="Regularizare stoc">
+    <AppDialog Label="Regularizare stoc">
             <div class="dialog-head"><h2>Regularizare stoc – @regularizing.ProductName</h2><HelpButton Topic="produse-de-regularizat" About="Regularizarea stocului" /></div>
             <NegativeStockPanel Resolution="resolution" Stock="regularizing.Stock" Disabled="busy" Changed="() => dialogError = null" />
             @if (dialogError is not null) { <div class="error-banner" role="alert">@dialogError</div> }
@@ -70,8 +69,7 @@
                 <button type="button" class="primary" disabled="@(busy || !resolution.IsResolved)" @onclick="RegularizeAsync">@(busy ? "Se salvează…" : "Regularizează stocul acum")</button>
                 <button type="button" class="danger" disabled="@busy" @onclick="Close">Renunț</button>
             </div>
-        </section>
-    </div>
+    </AppDialog>
 }
 
 @code {

@@ -55,8 +55,7 @@
 
     @if (archiving is not null)
     {
-        <div class="delete-overlay">
-            <section class="delete-dialog" role="dialog" aria-modal="true" aria-labelledby="component-archive-title">
+        <AppDialog LabelledBy="component-archive-title">
                 <h2 id="component-archive-title">Scoți componenta? – @archiving.SystemTypeName</h2>
                 <p>Componenta se arhivează (nu se șterge): oferta și liniile ei se păstrează și o poți reactiva oricând. Se înregistrează în jurnal.</p>
                 @if (archiveError is not null) { <div class="error-banner" role="alert">@archiveError</div> }
@@ -94,8 +93,7 @@
                     <button type="button" class="danger" disabled="@busy" @onclick="ArchiveAsync">@(busy ? "Se salvează…" : pendingExits.Count > 0 ? "Lămurește și scoate componenta" : "Scoate componenta")</button>
                     <button type="button" class="refresh act-close" disabled="@busy" @onclick="() => archiving = null">Renunț</button>
                 </div>
-            </section>
-        </div>
+        </AppDialog>
     }
 }
 

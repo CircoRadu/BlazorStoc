@@ -5,8 +5,7 @@
 @* The details of a task: read-only text, the files, the status (for the user the task is addressed to and for who may edit tasks) and the "Preia" action (the user only).
    Used by the dashboard of the user and for the finished tasks of the administrator tables. *@
 
-<div class="delete-overlay" @onkeydown="KeyAsync">
-    <div class="delete-dialog template-popup" role="dialog" aria-modal="true" tabindex="-1" aria-labelledby="task-details-title">
+<AppDialog OnClose="() => Closed.InvokeAsync()" PanelClass="template-popup" OnKeyDown="KeyAsync" LabelledBy="task-details-title">
         @if (task is null)
         {
             <div class="catalog-heading"><h2 id="task-details-title">Vizualizare task</h2><span class="heading-actions"><button type="button" class="refresh act-close" @onclick="() => Closed.InvokeAsync()">Închide</button></span></div>
@@ -74,8 +73,7 @@
                 }
             </section>
         }
-    </div>
-</div>
+</AppDialog>
 
 @code {
     [Parameter, EditorRequired] public int TaskId { get; set; }

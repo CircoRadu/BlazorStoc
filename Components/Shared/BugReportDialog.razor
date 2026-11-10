@@ -8,8 +8,7 @@
 @implements IAsyncDisposable
 @* Raportare eroare: the popup opened by the menu entry above "Ajutor" (wwwroot/bug-report.js). The script photographs the page BEFORE the popup shows and hands the picture to Opened;
    Ctrl+V pictures arrive through AddPasted; a file can also be chosen. The flow is described at the top in sections that stay closed until opened. *@
-<dialog id="bug-dialog" class="delete-dialog bug-dialog" aria-labelledby="bug-title">
-    <div class="dialog-head"><h2 id="bug-title">Raportează o eroare</h2><HelpButton Topic="raportare-eroare" About="Raportare eroare" /></div>
+<AppDialog Native="true" Id="bug-dialog" PanelClass="bug-dialog" Title="Raportează o eroare" TitleId="bug-title" HelpTopic="raportare-eroare" HelpAbout="Raportare eroare" ShowModuleActions="false" OnClose="CloseAsync">
     <div class="bug-tabs" role="tablist" aria-label="Raportare erori">
         <button type="button" role="tab" id="bug-tab-new" class="settings-tab @(tab == "new" ? "active" : "")" aria-selected="@(tab == "new")" @onclick="@(() => SelectTab("new"))">Raport nou</button>
         <button type="button" role="tab" id="bug-tab-mine" class="settings-tab @(tab == "mine" ? "active" : "")" aria-selected="@(tab == "mine")" @onclick="@(() => SelectTab("mine"))">Rapoartele mele @if (mine is not null) { <span class="count-badge">@mine.Count</span> }</button>
@@ -170,8 +169,7 @@
     {
         <ImageLightbox Src="@zoomed.ZoomUrl" Title="@zoomed.Label" Closed="() => zoomed = null" />
     }
-</dialog>
-
+</AppDialog>
 @code {
     private sealed class PendingImage(string kind, string name, byte[] bytes, string contentType)
     {

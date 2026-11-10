@@ -42,12 +42,10 @@
 @* The template of the supplier is made on the file already read, in a window over the pickup; once saved it is applied to the file. *@
 @if (creatingTemplate && session is not null)
 {
-    <div class="delete-overlay template-popup-overlay">
-        <section class="delete-dialog template-popup" role="dialog" aria-modal="true" aria-label="Creare șablon de factură">
+    <AppDialog PanelClass="template-popup" BackdropClass="template-popup-overlay" Label="Creare șablon de factură" OnClose="CloseTemplateCreation">
             <div class="heading-actions"><HelpButton Topic="setari-facturi-generare" About="Crearea șablonului de factură" /><button type="button" class="refresh act-close" @onclick="CloseTemplateCreation">✕ Închide fără să creezi șablonul</button></div>
             <InvoiceTemplateWorkbench ExistingSession="session" SavedRecord="OnTemplateCreatedAsync" Closed="CloseTemplateCreation" />
-        </section>
-    </div>
+    </AppDialog>
 }
 
 @if (step == 1)
@@ -397,14 +395,12 @@ else if (step == 2)
     </section>
     @if (newProductFor is { } adding)
     {
-        <div class="invoice-modal-backdrop">
-            <div class="invoice-modal wide" role="dialog" aria-modal="true" aria-label="Adaugă produs">
+        <AppDialog PanelClass="invoice-modal wide" Label="Adaugă produs">
                 <ProductEditor @key="newProductKey" Staging="true" InitialName="@NewProductInitialName(adding)" InitialDescription="@(adding.Staged?.Input.Description ?? NewProductDescription(adding))"
                                InitialCategory="@(adding.Staged?.Input.Category ?? VariantSample(adding)?.Category ?? "")" InitialSubcategory="@(adding.Staged?.Input.Subcategory ?? VariantSample(adding)?.Subcategory ?? "")"
                                InitialChoices="@(adding.Staged?.Input.Parameters ?? [])" InitialImage="adding.Staged?.Image"
                                Groups="groups" Staged="NewProductStagedAsync" Closed="CloseNewProduct" />
-            </div>
-        </div>
+        </AppDialog>
     }
 }
 else
@@ -460,12 +456,10 @@ else
 
 @if (addingSupplier)
 {
-    <div class="invoice-modal-backdrop">
-        <div class="invoice-modal wide" role="dialog" aria-modal="true" aria-label="Adaugă furnizor">
+    <AppDialog PanelClass="invoice-modal wide" Label="Adaugă furnizor">
             <SupplierEditor @key="addSupplierKey" InitialCui="@(addFromInvoice ? supplierCuiText : "")" InitialName="@(addFromInvoice ? invoiceSupplierName : "")"
                             Saved="SupplierAddedAsync" Closed="CloseAddSupplier" />
-        </div>
-    </div>
+    </AppDialog>
 }
 
 <div class="wizard-nav">

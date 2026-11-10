@@ -6,8 +6,7 @@
 @inject ILogger<SubcategoryParametersPanel> Logger
 @implements IDisposable
 
-<div class="delete-overlay">
-<section class="delete-dialog subcategory-parameters-dialog subcategory-parameters" role="dialog" aria-modal="true" aria-labelledby="@TitleId">
+<AppDialog PanelClass="subcategory-parameters-dialog subcategory-parameters" LabelledBy="@TitleId" OnClose="CancelEditParameter">
     <div class="catalog-heading"><h2 id="@TitleId">Parametri și etichete · @NodeName<span class="count-badge">@(parameters.Count + families.Count + tags.Count)</span></h2><span class="heading-actions"><HelpButton Topic="categorii-parametri" About="Parametrii și etichetele subcategoriei" /><button type="button" class="danger" @onclick="() => Closed.InvokeAsync()">Închide</button></span></div>
     @if (ForCategory) { <p class="form-note category-inheritance-note">Parametrii, familiile și etichetele categoriei se moștenesc de toate subcategoriile ei, pe toate nivelurile: produsele lor au nevoie de valorile lor, iar codul începe cu ele.</p> }
     <p class="form-note">Parametrii sunt obligatorii: un produs din această subcategorie nu poate fi salvat sau mișcat în stoc fără model și fără o valoare pentru fiecare parametru, iar codul lui devine „model - valoare - valoare”. Etichetele sunt opționale (On/Off pe produs) și devin filtre în catalog.</p>
@@ -295,8 +294,7 @@
             </div>
         </details>
     }
-</section>
-</div>
+</AppDialog>
 
 @if (pendingChanges is not null && editingParameter is not null)
 {

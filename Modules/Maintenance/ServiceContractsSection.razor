@@ -9,21 +9,17 @@
 
 @if (adding || editing is not null)
 {
-    <div class="delete-overlay">
-        <div class="delete-dialog template-popup" role="dialog" aria-modal="true" tabindex="-1" aria-labelledby="contract-editor-title">
+    <AppDialog PanelClass="template-popup" LabelledBy="contract-editor-title">
             <ServiceContractEditor @key="editorKey" BeneficiaryId="BeneficiaryId" WorkPoints="WorkPoints" Contracts="Contracts" Original="editing"
                                    Saved="SavedAsync" Closed="CloseEditorAsync" />
-        </div>
-    </div>
+    </AppDialog>
 }
 
 @if (addendumFor is not null)
 {
-    <div class="delete-overlay">
-        <div class="delete-dialog template-popup" role="dialog" aria-modal="true" tabindex="-1" aria-labelledby="addendum-editor-title">
+    <AppDialog PanelClass="template-popup" LabelledBy="addendum-editor-title">
             <ServiceContractAddendumEditor @key="addendumKey" Details="addendumFor" WorkPoints="WorkPoints" Contracts="Contracts" Saved="AddendumSavedAsync" Closed="CloseAddendumAsync" />
-        </div>
-    </div>
+    </AppDialog>
 }
 
 @if (addendumAction is not null)

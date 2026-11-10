@@ -87,7 +87,7 @@ public static class ProductGroupsChecks
         cards[1].QuerySelectorAll("button.row-icon.add").First().Click();
         page.WaitForAssertion(() => page.Find("#subcategory-name"), TimeSpan.FromSeconds(5));
         check(page.FindAll("#subcategory-name").Count == 1, "Categories page: one form for the new subcategory");
-        var form = page.Find(".delete-overlay > section.group-editor-dialog");
+        var form = page.Find(".delete-overlay .app-dialog-panel.group-editor-dialog");
         check(form.QuerySelector("#subcategory-name") is not null && form.QuerySelectorAll("*").Any(item => item.TextContent.Contains($"Adaugă subcategorie în „{title}”")),
             "Categories page: the form of a new subcategory opens as a popup for its category");
         check(page.FindAll(".category-management-card").All(item => item.QuerySelector("#subcategory-name") is null),
@@ -95,7 +95,7 @@ public static class ProductGroupsChecks
 
         // Saved from there, the subcategory is created in that category.
         page.Find("#subcategory-name").Change("Subcategorie noua test");
-        page.Find("section.group-editor-dialog .editor-actions button.primary").Click();
+        page.Find(".group-editor-dialog .editor-actions button.primary").Click();
         page.WaitForAssertion(() => { if (page.FindAll("#subcategory-name").Count != 0) throw new Exception("pending"); }, TimeSpan.FromSeconds(5));
         var groups = await repository.GetGroupsAsync();
         check(groups.Any(group => group.Category == title && group.Subcategory == "Subcategorie noua test"), "Categories page: the subcategory typed in the form is created in its category");

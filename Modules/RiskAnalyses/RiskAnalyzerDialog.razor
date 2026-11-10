@@ -4,8 +4,7 @@
 @inject ILogger<RiskAnalyzerDialog> Logger
 @implements IDisposable
 
-<div class="delete-overlay">
-    <div class="delete-dialog template-popup" role="dialog" aria-modal="true" tabindex="-1" aria-labelledby="risk-analyzer-dialog-title">
+<AppDialog PanelClass="template-popup" LabelledBy="risk-analyzer-dialog-title" OnClose="CloseAsync">
         <section class="product-editor">
             <div class="catalog-heading dialog-head"><h2 id="risk-analyzer-dialog-title">@(Original is null ? "Adaugă analizor de risc" : $"Editează analizorul {Original.Name}")</h2><HelpButton Topic="analizor-risc-editor" About="Formularul analizorului de risc" /></div>
             @if (error is not null) { <div class="error-banner" role="alert">@error</div> }
@@ -19,8 +18,7 @@
                 </fieldset>
             </EditForm>
         </section>
-    </div>
-</div>
+</AppDialog>
 
 @code {
     [Parameter] public RiskAnalyzer? Original { get; set; }

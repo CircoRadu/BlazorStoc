@@ -130,9 +130,7 @@ else if (loaded)
 
 @if (selected is not null)
 {
-    <div class="delete-overlay" @onkeydown="DialogKeyDown">
-        <section class="delete-dialog notification-dialog" role="dialog" aria-modal="true" tabindex="-1" aria-labelledby="notification-title">
-            <div class="dialog-head"><h2 id="notification-title">@selected.Subject</h2><HelpButton Topic="notificari-detaliu" About="Detaliile notificării" /></div>
+    <AppDialog TitleId="notification-title" HelpTopic="notificari-detaliu" HelpAbout="Detaliile notificării" PanelClass="notification-dialog" OnKeyDown="DialogKeyDown" OnClose="Close"><TitleContent>@selected.Subject</TitleContent><ChildContent>
             <p class="delete-object"><strong>@selected.Category · @selected.EventName · @selected.ObjectLabel</strong></p>
             <p class="notification-body">@selected.Body</p>
             @if (selected.IsOverdue) { <p class="notification-overdue-note">Termenul a fost depășit cu @(-selected.DaysLeft) @(-selected.DaysLeft == 1 ? "zi" : "zile").</p> }
@@ -168,22 +166,20 @@ else if (loaded)
                     <button type="button" class="danger" disabled="@busy" @onclick="Close">Închide</button>
                 </div>
             }
-        </section>
-    </div>
+</ChildContent>
+</AppDialog>
 }
 
 @if (selectedResolved is not null)
 {
-    <div class="delete-overlay" @onkeydown="DialogKeyDown">
-        <section class="delete-dialog notification-dialog" role="dialog" aria-modal="true" tabindex="-1" aria-labelledby="resolved-title">
-            <div class="dialog-head"><h2 id="resolved-title">@selectedResolved.Subject</h2><HelpButton Topic="notificari-rezolvata" About="Notificarea rezolvată" /></div>
+    <AppDialog TitleId="resolved-title" HelpTopic="notificari-rezolvata" HelpAbout="Notificarea rezolvată" PanelClass="notification-dialog" OnKeyDown="DialogKeyDown" OnClose="Close"><TitleContent>@selectedResolved.Subject</TitleContent><ChildContent>
             <p class="delete-object"><strong>@selectedResolved.SourceText · @selectedResolved.ObjectLabel</strong></p>
             <p class="notification-body">@selectedResolved.Body</p>
             <p class="muted small">Scadență @StockMovementRules.DisplayDate(selectedResolved.Notification.ExpiryDate) · rezolvată la @ResolvedAt(selectedResolved.Notification) de @(selectedResolved.Notification.ResolvedAutomatically ? "sistem (automat)" : selectedResolved.Notification.ResolvedBy)</p>
             <p class="notification-reason-box"><strong>Motiv:</strong> @selectedResolved.Notification.ResolvedReason</p>
             <div class="editor-actions"><button type="button" class="danger" @onclick="Close">Închide</button></div>
-        </section>
-    </div>
+</ChildContent>
+</AppDialog>
 }
 
 </PageBoundary>

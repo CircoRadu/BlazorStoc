@@ -7,8 +7,7 @@
 @* Propune o modificare: the popup opened by the menu entry under "Raportează o eroare" or by the button "Propune" of the bar above any popup (wwwroot/bug-report.js). The script photographs
    the page BEFORE the popup shows and hands the picture to Opened; Ctrl+V pictures arrive through AddPasted. Three tabs: the form, "Propunerile mele" and "Toate propunerile" (every proposal,
    text only, with the answers). A proposal opens in the same popup: its data, the answers and, for the author and the administrator, the pictures and the box of a new answer. *@
-<dialog id="proposal-dialog" class="delete-dialog bug-dialog proposal-dialog" aria-labelledby="proposal-title">
-    <div class="dialog-head"><h2 id="proposal-title">@(viewing is null ? "Propune o modificare" : $"{viewing.Number} – {viewing.Title}")</h2><HelpButton Topic="propunere-modificare" About="Propunerile de modificări" /></div>
+<AppDialog Native="true" Id="proposal-dialog" PanelClass="bug-dialog proposal-dialog" Title="@(viewing is null ? "Propune o modificare" : $"{viewing.Number} – {viewing.Title}")" TitleId="proposal-title" HelpTopic="propunere-modificare" HelpAbout="Propunerile de modificări" ShowModuleActions="false" OnClose="CloseAsync">
     @if (viewing is null)
     {
         <div class="bug-tabs" role="tablist" aria-label="Propuneri">
@@ -204,7 +203,7 @@
     {
         <ImageLightbox Src="@zoomedUrl.Url" Title="@zoomedUrl.Name" Closed="() => zoomedUrl = null" />
     }
-</dialog>
+</AppDialog>
 
 @code {
     private sealed record Picture(string Name, string Url);

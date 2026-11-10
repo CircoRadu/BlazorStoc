@@ -1,8 +1,6 @@
 @using BlazorStoc.Services
 
-<div class="delete-overlay">
-    <section class="delete-dialog restore-confirmation-dialog" role="dialog" aria-modal="true"
-             aria-labelledby="@TitleId" aria-describedby="@DescriptionId">
+<AppDialog PanelClass="restore-confirmation-dialog" LabelledBy="@TitleId" DescribedBy="@DescriptionId">
         <h2 id="@TitleId">Restaurezi baza de date? – @PackageLabel</h2>
         <p id="@DescriptionId" class="sr-only">@PackageLabel</p>
         <p class="error-banner" role="alert">
@@ -30,8 +28,7 @@
             </button>
             <button type="button" class="danger" disabled="@Busy" @onclick="CancelAsync">Anuleaza</button>
         </div>
-    </section>
-</div>
+</AppDialog>
 
 @code {
     [Parameter, EditorRequired] public string PackageLabel { get; set; } = string.Empty;

@@ -1,6 +1,5 @@
 @using BlazorStoc.Services
-<div class="delete-overlay" @onkeydown="KeyAsync">
-    <div class="delete-dialog template-popup file-preview" role="dialog" aria-modal="true" tabindex="-1" aria-labelledby="file-preview-title">
+<AppDialog OnClose="() => Closed.InvokeAsync()" PanelClass="template-popup file-preview" OnKeyDown="KeyAsync" LabelledBy="file-preview-title">
         <div class="catalog-heading"><h2 id="file-preview-title">@File.OriginalName</h2><span class="heading-actions"><a class="refresh act-export" href="@($"{BaseUrl}/{File.Id}")" download="@File.OriginalName">Descarcă</a><button type="button" class="danger" @onclick="() => Closed.InvokeAsync()">Închide</button></span></div>
         @if (File.ContentType.StartsWith("image/", StringComparison.Ordinal))
         {
@@ -14,8 +13,7 @@
         {
             <p class="muted">Acest tip de fișier (Word, Excel) nu se poate afișa în fereastră; folosește „Descarcă”.</p>
         }
-    </div>
-</div>
+</AppDialog>
 
 @code {
     [Parameter, EditorRequired] public EntityFile File { get; set; } = default!;

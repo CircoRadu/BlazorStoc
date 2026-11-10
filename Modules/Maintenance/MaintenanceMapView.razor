@@ -87,8 +87,7 @@ else
 
 @if (Selected is { } row)
 {
-    <div class="delete-overlay" @onclick="ClearSelectionAsync" @onkeydown="MapDialogKeyAsync">
-        <section class="delete-dialog map-dialog" role="dialog" aria-modal="true" aria-labelledby="map-dialog-title" @onclick:stopPropagation="true">
+    <AppDialog PanelClass="map-dialog" OnBackdropClick="ClearSelectionAsync" OnKeyDown="MapDialogKeyAsync" LabelledBy="map-dialog-title" OnClose="ClearSelectionAsync">
                 @{
                     var today = Today;
                     var due = row.Point.Point.NextDue;
@@ -122,8 +121,7 @@ else
                         }
                     </ul>
                 }
-        </section>
-    </div>
+    </AppDialog>
 }
 
 <section class="catalog map-unplaced">

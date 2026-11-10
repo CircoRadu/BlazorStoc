@@ -59,8 +59,7 @@
 
 @if (adding)
 {
-    <div class="delete-overlay">
-        <div class="delete-dialog template-popup" role="dialog" aria-modal="true" tabindex="-1" aria-labelledby="beneficiary-file-add-title">
+    <AppDialog PanelClass="template-popup" LabelledBy="beneficiary-file-add-title" OnClose="CloseAdd">
             <section class="product-editor">
                 <div class="catalog-heading dialog-head"><h2 id="beneficiary-file-add-title">Adaugă fișiere beneficiar</h2><HelpButton Topic="beneficiari-fisiere" About="Fișierele beneficiarului" /></div>
                 @if (popupError is not null) { <div class="error-banner" role="alert">@popupError</div> }
@@ -71,22 +70,19 @@
                 </div>
                 <div class="editor-actions"><button type="button" class="danger" disabled="@uploading" @onclick="CloseAdd">Închide</button></div>
             </section>
-        </div>
-    </div>
+    </AppDialog>
 }
 
 @if (confirmingDelete is { } doomed)
 {
-    <div class="delete-overlay">
-        <section class="delete-dialog" role="alertdialog" aria-modal="true" tabindex="-1" aria-labelledby="beneficiary-file-delete-title">
+    <AppDialog Alert="true" LabelledBy="beneficiary-file-delete-title">
             <h2 id="beneficiary-file-delete-title">Ștergi fișierul? – @doomed.OriginalName</h2>
             <p>Fișierul liber este șters definitiv de la beneficiar.</p>
             <div class="editor-actions">
                 <button type="button" class="danger" disabled="@busy" @onclick="ConfirmDeleteAsync">@(busy ? "Se șterge…" : "Șterge")</button>
                 <button type="button" class="refresh act-close" disabled="@busy" @onclick="() => confirmingDelete = null">Anulează</button>
             </div>
-        </section>
-    </div>
+    </AppDialog>
 }
 
 @if (previewing is { } shown)

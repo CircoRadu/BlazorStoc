@@ -1,0 +1,106 @@
+@namespace BlazorStoc.Components.Shared
+@using BlazorStoc.Modules
+@using BlazorStoc.Services
+
+@inject IServiceProvider Provider
+@implements IDisposable
+@* The one structure of every window over a page: backdrop > frame > [bar | panel]. The bar has its own place ABOVE the panel (the frame reserves it, so it never covers the head):
+   the buttons registered by the working modules (DialogBarActions: "Raportează o eroare", "Propune") and the round red close button, which calls OnClose (the same flow as the
+   "Închide" of the window). The panel is the head (title + help), the body that scrolls by itself and the optional foot. The content of the window stays its own.
+   Escape closes the top window (wwwroot/app-dialog.js, no observers). Native = a <dialog> opened with showModal by a script (the windows of the reports, the logout question); this is
+   the only place that writes a <dialog> or role="dialog" by hand (a test forbids it elsewhere). *@
+@if (Native)
+{
+    <dialog id="@Id" class="app-dialog-native @BackdropClass" data-app-dialog data-native="true" aria-labelledby="@LabelId">
+        @Frame
+    </dialog>
+}
+else
+{
+    <div class="app-dialog-backdrop delete-overlay @BackdropClass" data-app-dialog data-own-keys="@(OnKeyDown.HasDelegate ? "" : null)" @onkeydown="OnKeyDown" @onclick="OnBackdropClick" @onmousedown="OnBackdropMouseDown">
+        @Frame
+    </div>
+}
+
+@code {
+    /// <summary>Plain-text title of the head; for a title with markup use <see cref="TitleContent"/>; a window whose head is written inside the content leaves both empty.</summary>
+    [Parameter] public string? Title { get; set; }
+    [Parameter] public RenderFragment? TitleContent { get; set; }
+    /// <summary>Id of the title (tests and aria-labelledby use it); generated when empty.</summary>
+    [Parameter] public string? TitleId { get; set; }
+    /// <summary>For a window whose head is inside the content: the id of its title (aria-labelledby).</summary>
+    [Parameter] public string? LabelledBy { get; set; }
+    /// <summary>aria-label of a window with no visible title.</summary>
+    [Parameter] public string? Label { get; set; }
+    [Parameter] public string? DescribedBy { get; set; }
+    [Parameter] public string? HelpTopic { get; set; }
+    [Parameter] public string? HelpAbout { get; set; }
+    [Parameter] public AppDialogSize Size { get; set; } = AppDialogSize.Auto;
+    /// <summary>Pressed by the round close button (the flow of the "Închide" of the window). Absent: the button presses the closing button the window already has (wwwroot/app-dialog.js).</summary>
+    [Parameter] public EventCallback OnClose { get; set; }
+    /// <summary>false = the round close button is not drawn (a window that makes the user choose).</summary>
+    [Parameter] public bool ShowClose { get; set; } = true;
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+    [Parameter] public RenderFragment? Footer { get; set; }
+    /// <summary>Extra classes of the panel (the look of the window: template-popup, movement-dialog ...).</summary>
+    [Parameter] public string? PanelClass { get; set; }
+    /// <summary>Extra classes of the backdrop (front, unsaved-overlay: the layer over other windows).</summary>
+    [Parameter] public string? BackdropClass { get; set; }
+    [Parameter] public bool Alert { get; set; }
+    /// <summary>Keys of the window (when it answers more than Escape): it handles Escape itself then.</summary>
+    [Parameter] public EventCallback<KeyboardEventArgs> OnKeyDown { get; set; }
+    [Parameter] public EventCallback<MouseEventArgs> OnBackdropClick { get; set; }
+    [Parameter] public EventCallback<MouseEventArgs> OnBackdropMouseDown { get; set; }
+    /// <summary>false for the windows of the reports themselves and for confirmations: only the close button is in the bar.</summary>
+    [Parameter] public bool ShowModuleActions { get; set; } = true;
+    [Parameter] public bool Native { get; set; }
+    /// <summary>Id of the native &lt;dialog&gt;.</summary>
+    [Parameter] public string? Id { get; set; }
+    /// <summary>The panel of the window (for the ones that move the focus to it: keep a reference to the component with @ref).</summary>
+    public ElementReference Panel => panel;
+    [Parameter(CaptureUnmatchedValues = true)] public Dictionary<string, object>? PanelAttributes { get; set; }
+
+    private readonly string generated = Guid.NewGuid().ToString("N")[..8];
+    private ElementReference panel;
+    private string TitleIdOrDefault => string.IsNullOrWhiteSpace(TitleId) ? $"app-dialog-title-{generated}" : TitleId;
+    private bool HasTitle => !string.IsNullOrWhiteSpace(Title) || TitleContent is not null;
+    private string? LabelId => HasTitle ? TitleIdOrDefault : LabelledBy;
+    // Without a registry of modules (a host that has none) the buttons are simply not drawn.
+    private ModuleRegistry? Modules => Provider.GetService<ModuleRegistry>();
+    private IReadOnlyList<DialogBarAction> Actions => ShowModuleActions && Modules is { } registry ? DialogBarActions.Ordered(Provider.GetServices<DialogBarAction>(), registry.IsAvailable) : [];
+    private string SizeClass => Size switch { AppDialogSize.S => "app-dialog-s", AppDialogSize.M => "app-dialog-m", AppDialogSize.L => "app-dialog-l", AppDialogSize.XL => "app-dialog-xl", _ => "" };
+
+    protected override void OnInitialized() { if (Modules is { } registry) registry.Changed += OnModulesChanged; }
+    // A module stopped or started in Setari -> Module: the buttons appear / disappear in the windows that are open right now.
+    private void OnModulesChanged() { _ = InvokeAsync(() => { try { StateHasChanged(); } catch (ObjectDisposedException) { } }); }
+    public void Dispose() { if (Modules is { } registry) registry.Changed -= OnModulesChanged; }
+
+    private RenderFragment Frame => @<div class="app-dialog-frame" data-app-dialog-frame @onclick:stopPropagation="OnBackdropClick.HasDelegate" @onmousedown:stopPropagation="OnBackdropMouseDown.HasDelegate">
+        <div class="app-dialog-bar" data-app-dialog-bar>
+            @foreach (var action in Actions)
+            {
+                var current = action;
+                <button type="button" class="app-dialog-action" data-dialog-action="@current.Id" title="@current.Title" aria-label="@current.Title" @attributes="current.Attributes"
+                        @onclick="() => RunAsync(current)"><span class="app-dialog-action-icon" aria-hidden="true">@current.Icon</span><span class="app-dialog-action-label">@current.Label</span></button>
+            }
+            @if (ShowClose)
+            {
+                <button type="button" class="popup-close-icon" data-app-dialog-close data-app-dialog-proxy="@(OnClose.HasDelegate ? null : "")" aria-label="Închide fereastra" title="Închide fereastra" @onclick="OnClose"></button>
+            }
+        </div>
+        <div class="delete-dialog app-dialog-panel @SizeClass @PanelClass" role="@(Alert ? "alertdialog" : "dialog")" aria-modal="true" tabindex="-1" @ref="panel"
+             aria-labelledby="@LabelId" aria-label="@(LabelId is null ? Label : null)" aria-describedby="@DescribedBy" @attributes="PanelAttributes">
+            @if (HasTitle)
+            {
+                <div class="dialog-head app-dialog-head"><h2 id="@TitleIdOrDefault">@if (TitleContent is not null) { @TitleContent } else { @Title }</h2>@if (!string.IsNullOrWhiteSpace(HelpTopic)) { <HelpButton Topic="@HelpTopic" About="@HelpAbout" /> }</div>
+            }
+            <div class="app-dialog-body">@ChildContent</div>
+            @if (Footer is not null) { <div class="app-dialog-foot">@Footer</div> }
+        </div>
+    </div>;
+
+    private async Task RunAsync(DialogBarAction action)
+    {
+        if (action.OnClick is not null) await action.OnClick(Provider);
+    }
+}

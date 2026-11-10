@@ -27,7 +27,8 @@
 <LiveChangeNotice Visible="live?.HasPendingChange == true" Reload="ReloadLiveAsync" />
 @if (lockMessage is not null) { <div class="info-banner" role="status">@lockMessage</div> }
 @if (lockLost && editing) { <div class="info-banner" role="status">Blocarea editării a fost pierdută (a expirat sau a fost eliberată de un administrator). Poți continua, dar la salvare se verifică versiunea produsului.</div> }
-@if (editing) { <div class="invoice-modal-backdrop product-editor-backdrop" role="dialog" aria-modal="true" aria-label="@(editingProduct is null ? "Produs nou" : $"Editează produsul {editingProduct.Name}")"><div class="invoice-modal product-editor-modal"><ProductEditor @key="editorKey" Original="editingProduct" InitialCategory="@category" InitialSubcategory="@subcategory" Groups="groups" Saved="ProductSavedAsync" Closed="CloseEditorAsync" /></div></div> }
+@if (editing) { <AppDialog PanelClass="invoice-modal product-editor-modal" BackdropClass="product-editor-backdrop" Label="@(editingProduct is null ? "Produs nou" : "Editare produs")"><ProductEditor @key="editorKey" Original="editingProduct" InitialCategory="@category" InitialSubcategory="@subcategory" Groups="groups" Saved="ProductSavedAsync" Closed="CloseEditorAsync" />
+</AppDialog> }
 <div class="settings-tabs" role="tablist" aria-label="Secțiuni produse">
     <button type="button" role="tab" class="settings-tab @(!regularizeTab ? "active" : "")" aria-selected="@(!regularizeTab)" @onclick="() => regularizeTab = false">Catalog</button>
     <button type="button" role="tab" class="settings-tab @(regularizeTab ? "active" : "")" aria-selected="@regularizeTab" @onclick="() => regularizeTab = true">De regularizat@(toRegularize > 0 ? $" ({toRegularize})" : "")</button>
@@ -55,19 +56,16 @@ else { @ActiveTagsBar()<div class="table-scroll"><table><thead><tr><th>COD PRODU
 
 @if (imagePreview is not null)
 {
-    <div class="image-lightbox" role="dialog" aria-modal="true" aria-label="Imagine mărită pentru @imagePreview.Name" @onclick="CloseImagePreviewAsync">
-        <button type="button" class="image-lightbox-close" aria-label="Închide imaginea" @onclick="CloseImagePreviewAsync" title="Închide imaginea">×</button>
-        <figure @onclick:stopPropagation="true"><img src="@ProductImageUrl(imagePreview)" alt="Imagine mărită pentru @imagePreview.Name" /><figcaption>@imagePreview.Name</figcaption></figure>
-    </div>
+    <AppDialog BackdropClass="image-lightbox front" PanelClass="image-figure" Label="@($"Imagine mărită pentru {imagePreview.Name}")" ShowModuleActions="false" OnClose="CloseImagePreviewAsync" OnBackdropClick="CloseImagePreviewAsync">
+        <figure><img src="@ProductImageUrl(imagePreview)" alt="Imagine mărită pentru @imagePreview.Name" /><figcaption>@imagePreview.Name</figcaption></figure>
+    </AppDialog>
 }
 
 @if (quickExit is not null)
 {
-    <div class="invoice-modal-backdrop" role="dialog" aria-modal="true" aria-label="Ieșire rapidă @quickExit.Name">
-        <div class="invoice-modal quick-exit-modal">
+    <AppDialog PanelClass="invoice-modal quick-exit-modal" Label="@($"Ieșire rapidă {quickExit.Name}")">
             <ExitOperation @key="quickExit.Id" Embedded="true" InitialProductId="quickExit.Id" OnClosed="CloseQuickExitAsync" />
-        </div>
-    </div>
+    </AppDialog>
 }
 
 @if (deleting is not null)

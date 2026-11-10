@@ -17,7 +17,7 @@
 @if (editing is not null)
 {
     <section class="product-editor" aria-labelledby="invoice-editor-title">
-        <div class="catalog-heading"><h2 id="invoice-editor-title">Editează factura @editing.Number</h2><span class="heading-actions"><HelpButton Topic="facturi-editare" About="Editarea facturii" /><button type="button" class="danger" disabled="@saving" @onclick="CloseEditor">Închide</button></span></div>
+        <div class="catalog-heading"><h2 id="invoice-editor-title">Editează factura @editing.Number</h2><span class="heading-actions"><HelpButton Topic="facturi-editare" About="Editarea facturii" /><button type="button" class="danger" disabled="@saving" @onclick="CloseEditor" data-head-close>Închide</button></span></div>
         @if (editorError is not null) { <div class="error-banner" role="alert">@editorError</div> }
         <fieldset disabled="@saving">
             <div class="editor-grid">
@@ -88,9 +88,7 @@ else
 
 @if (openInvoice is { } shown)
 {
-    <div class="delete-overlay">
-        <section class="delete-dialog" role="dialog" aria-modal="true" aria-labelledby="invoice-entries-title">
-            <div class="dialog-head"><h2 id="invoice-entries-title">Factura @shown.Number</h2><HelpButton Topic="facturi-detaliu" About="Factura deschisă" /></div>
+    <AppDialog TitleId="invoice-entries-title" HelpTopic="facturi-detaliu" HelpAbout="Factura deschisă" OnClose="CloseEntries"><TitleContent>Factura @shown.Number</TitleContent><ChildContent>
             <p class="delete-object"><strong>@shown.SupplierName</strong> · emisă la @StockMovementRules.DisplayDate(shown.Date)</p>
             @if (entriesLoading) { <div role="status"><div class="spinner"></div></div> }
             else if (entriesError is not null) { <div class="validation-message" role="alert">@entriesError</div> }
@@ -105,8 +103,8 @@ else
                 @if (CanAddManually) { <button type="button" class="refresh act-confirm" @onclick="() => manualFor = shown">Adaugă produs manual</button> }
                 <button type="button" class="primary" @onclick="CloseEntries">Închide</button>
             </div>
-        </section>
-    </div>
+</ChildContent>
+</AppDialog>
 }
 
 @if (manualFor is not null)

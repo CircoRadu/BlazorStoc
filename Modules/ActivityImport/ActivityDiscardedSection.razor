@@ -39,16 +39,14 @@
 
 @if (viewed is { } shown && viewedSource is { } source)
 {
-    <div class="delete-overlay" @onkeydown="PopupKey">
-        <div class="delete-dialog template-popup review-popup" role="dialog" aria-modal="true" tabindex="-1" aria-labelledby="discarded-view-title">
-            <div class="catalog-heading"><h2 id="discarded-view-title">Tichet @shown.TicketNumber @shown.Title</h2><span class="heading-actions"><button type="button" class="danger" @onclick="ClosePopup">Închide</button></span></div>
+    <AppDialog PanelClass="template-popup review-popup" OnKeyDown="PopupKey" LabelledBy="discarded-view-title" OnClose="ClosePopup">
+            <div class="catalog-heading"><h2 id="discarded-view-title">Tichet @shown.TicketNumber @shown.Title</h2><span class="heading-actions"><button type="button" class="danger" @onclick="ClosePopup" data-head-close>Închide</button></span></div>
             <dl class="review-facts">
                 <dt>Discardat de</dt><dd>@shown.DiscardedBy</dd>
                 <dt>La data</dt><dd>@shown.DiscardedUtc.ToLocalTime().ToString("dd.MM.yyyy HH:mm")</dd>
                 <TicketInfoRows ShowEmpty Problem="@source.Problem" Resolution="@source.Resolution" Report="@source.Report" Executor="@source.Executor" Extras="@source.Extras" />
             </dl>
-        </div>
-    </div>
+    </AppDialog>
 }
 
 @code {

@@ -21,7 +21,8 @@
 
 @if (addingBeneficiary)
 {
-    <div class="delete-overlay"><div class="delete-dialog template-popup" role="dialog" aria-modal="true" tabindex="-1" aria-labelledby="beneficiary-editor-title"><BeneficiaryEditor Saved="BeneficiaryAddedAsync" Closed="CloseBeneficiaryAsync" /></div></div>
+    <AppDialog PanelClass="template-popup" LabelledBy="beneficiary-editor-title"><BeneficiaryEditor Saved="BeneficiaryAddedAsync" Closed="CloseBeneficiaryAsync" />
+    </AppDialog>
 }
 
 @if (canAdd)
@@ -48,9 +49,9 @@
 @* The new task is written in a popup: Save closes it, and closing it after something was typed asks first (the tracker of the form). *@
 @if (chosen is not null)
 {
-    <div class="delete-overlay"><div class="delete-dialog template-popup" role="dialog" aria-modal="true" tabindex="-1" aria-labelledby="task-editor-title">
+    <AppDialog PanelClass="template-popup" LabelledBy="task-editor-title">
         <TaskForm @key="formKey" BeneficiaryId="chosen.Id" BeneficiaryName="@chosen.Name" Saved="TaskSavedAsync" Closed="TaskFormClosedAsync" />
-    </div></div>
+    </AppDialog>
 }
 
 <section class="catalog">

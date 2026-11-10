@@ -24,7 +24,7 @@
 
 @if (creatingCategory || editingCategory is not null)
 {
-    <div class="delete-overlay"><section class="delete-dialog group-editor-dialog" role="dialog" aria-modal="true" aria-labelledby="category-editor-title">
+    <AppDialog PanelClass="group-editor-dialog" LabelledBy="category-editor-title" OnClose="RequestCancelEditAsync">
         <UnsavedChangesTracker @ref="groupTracker" Subject="@(BlazorStoc.Services.PopupSubject.Of("categorie", editingCategory))" Adding="@(creatingCategory || creatingSubcategory)" Snapshot="CurrentSnapshot" Discard="DiscardEditAsync" />
         <div class="catalog-heading dialog-head"><h2 id="category-editor-title">@(creatingCategory ? "Adaugă categorie" : $"Editează categoria „{editingCategory}”")</h2><HelpButton Topic="categorii" About="categoria și subcategoria" /></div>
         <div class="editor-grid">
@@ -32,7 +32,7 @@
             @if (!creatingCategory) { <ChangeReasonField Id="category-reason" @bind-Value="customReason" AutoText="@AutoSummary" @bind-UseAuto="reasonAuto" Disabled="@saving" /> }
         </div>
         <div class="editor-actions"><button class="primary" disabled="@saving" @onclick="RequestSaveCategoryAsync">@(creatingCategory ? "Adaugă categoria" : "Salvează categoria")</button><button class="danger" disabled="@saving" @onclick="RequestCancelEditAsync">Anulează</button></div>
-    </section></div>
+    </AppDialog>
 }
 else if (editingSubcategory is not null || creatingSubcategory)
 {
@@ -336,7 +336,7 @@ else
     }
 
     // The form of a subcategory (new or edited) opens as a popup over the page.
-    private RenderFragment SubcategoryEditor => @<div class="delete-overlay"><section class="delete-dialog group-editor-dialog" role="dialog" aria-modal="true" aria-labelledby="subcategory-editor-title">
+    private RenderFragment SubcategoryEditor => @<AppDialog PanelClass="group-editor-dialog" LabelledBy="subcategory-editor-title" OnClose="RequestCancelEditAsync">
         <UnsavedChangesTracker @ref="groupTracker" Subject="@(BlazorStoc.Services.PopupSubject.Of("subcategorie", editingSubcategory?.Subcategory ?? creatingChildOf?.Subcategory))" Adding="@(creatingCategory || creatingSubcategory)" Snapshot="CurrentSnapshot" Discard="DiscardEditAsync" />
         <div class="catalog-heading dialog-head"><h2 id="subcategory-editor-title">@(creatingChildOf is not null ? $"Adaugă subcategorie copil în „{creatingChildOf.Subcategory}”" : creatingSubcategory ? $"Adaugă subcategorie în „{targetCategory}”" : $"Editează subcategoria „{editingSubcategory!.Subcategory}”")</h2><HelpButton Topic="categorii" About="categoria și subcategoria" /></div>
         <div class="editor-grid">
@@ -346,7 +346,7 @@ else
             @if (!creatingSubcategory) { <ChangeReasonField Id="subcategory-reason" @bind-Value="customReason" AutoText="@AutoSummary" @bind-UseAuto="reasonAuto" Disabled="@saving" /> }
         </div>
         <div class="editor-actions"><button class="primary" disabled="@saving" @onclick="RequestSaveSubcategoryAsync">@(creatingChildOf is not null && ProductCount(creatingChildOf) > 0 ? "Adaugă și mută produsele" : creatingSubcategory ? "Adaugă subcategoria" : "Salvează subcategoria")</button><button class="danger" disabled="@saving" @onclick="RequestCancelEditAsync">Anulează</button></div>
-    </section></div>;
+</AppDialog>;
 
     protected override async Task OnInitializedAsync()
     {

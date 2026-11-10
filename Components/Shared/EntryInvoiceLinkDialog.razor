@@ -4,9 +4,7 @@
 @inject ISupplierRepository SupplierRepository
 @* Administrator only: ties free entries to an invoice (several at once) or frees one entry from its invoice. The stock does not change;
    each entry is its own event in the journal and the reason is required. *@
-<div class="delete-overlay">
-    <section class="delete-dialog movement-dialog" role="dialog" aria-modal="true" aria-labelledby="link-title">
-        <div class="dialog-head"><h2 id="link-title">@(Detach ? "Detașează intrarea de la factură" : Entries.Count == 1 ? "Atașează intrarea la factură" : $"Atașează {Entries.Count} intrări la factură")</h2><HelpButton Topic="facturi-legare-intrari" About="Legarea intrărilor de factură" /></div>
+<AppDialog TitleId="link-title" HelpTopic="facturi-legare-intrari" HelpAbout="Legarea intrărilor de factură" PanelClass="movement-dialog" OnClose="Cancelled"><TitleContent>@(Detach ? "Detașează intrarea de la factură" : Entries.Count == 1 ? "Atașează intrarea la factură" : $"Atașează {Entries.Count} intrări la factură")</TitleContent><ChildContent>
         <ul class="link-entries">
             @foreach (var entry in Entries)
             {
@@ -39,8 +37,8 @@
                 <button type="button" class="danger" @onclick="Cancelled">Anulează</button>
             </div>
         </fieldset>
-    </section>
-</div>
+</ChildContent>
+</AppDialog>
 
 @code {
     [Parameter, EditorRequired] public IReadOnlyList<StockMovement> Entries { get; set; } = [];

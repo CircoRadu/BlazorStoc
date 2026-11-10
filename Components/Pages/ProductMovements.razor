@@ -351,18 +351,15 @@ else
 
 @if (imagePreview && product is not null)
 {
-    <div class="image-lightbox" role="dialog" aria-modal="true" aria-label="Imagine mărită pentru @product.Name" @onclick="() => imagePreview = false" @onkeydown="ImageKeyAsync">
-        <button type="button" class="image-lightbox-close" aria-label="Închide imaginea" @onclick="() => imagePreview = false" title="Închide imaginea">×</button>
-        <figure @onclick:stopPropagation="true"><img src="@ImageUrl" alt="Imagine mărită pentru @product.Name" /><figcaption>@product.Name</figcaption></figure>
-    </div>
+    <AppDialog BackdropClass="image-lightbox front" PanelClass="image-figure" Label="@($"Imagine mărită pentru {product.Name}")" ShowModuleActions="false" OnClose="() => imagePreview = false" OnBackdropClick="() => imagePreview = false" OnKeyDown="ImageKeyAsync">
+        <figure><img src="@ImageUrl" alt="Imagine mărită pentru @product.Name" /><figcaption>@product.Name</figcaption></figure>
+    </AppDialog>
 }
 
 @if (editing is not null)
 {
-    <div class="delete-overlay" @onkeydown="EditKeyAsync">
-        <UnsavedChangesTracker @key="editing.Id" @ref="editTracker" Subject="@(BlazorStoc.Services.PopupSubject.Of("mișcare de stoc", product.Name))" Snapshot="EditSnapshot" Discard="DiscardEditAsync" />
-        <section class="delete-dialog movement-dialog" role="dialog" aria-modal="true" aria-labelledby="movement-edit-title">
-            <div class="dialog-head"><h2 id="movement-edit-title">Editează @StockMovementRules.KindLabel(editing.Kind).ToLowerInvariant()a din @StockMovementRules.DisplayDate(editing.Date)</h2><HelpButton Topic="produse-miscare-editare" About="Editarea unei mișcări" /></div>
+    <UnsavedChangesTracker @key="editing.Id" @ref="editTracker" Subject="@(BlazorStoc.Services.PopupSubject.Of("mișcare de stoc", product.Name))" Snapshot="EditSnapshot" Discard="DiscardEditAsync" />
+    <AppDialog TitleId="movement-edit-title" HelpTopic="produse-miscare-editare" HelpAbout="Editarea unei mișcări" PanelClass="movement-dialog" OnKeyDown="EditKeyAsync" OnClose="RequestCloseEditAsync"><TitleContent>Editează @StockMovementRules.KindLabel(editing.Kind).ToLowerInvariant()a din @StockMovementRules.DisplayDate(editing.Date)</TitleContent><ChildContent>
             <EditForm Model="editForm" OnSubmit="SaveEditAsync" FormName="stock-movement-edit">
                 <fieldset disabled="@editSaving">
                     <div class="editor-grid">
@@ -416,8 +413,8 @@ else
                     <div class="editor-actions"><button class="primary" type="submit">@(editSaving ? "Se salvează…" : "Salvează modificarea")</button><button type="button" class="danger" @onclick="RequestCloseEditAsync">Anulează</button></div>
                 </fieldset>
             </EditForm>
-        </section>
-    </div>
+</ChildContent>
+</AppDialog>
 }
 
 @if (linking is not null)
@@ -449,8 +446,7 @@ else
 
 @if (voiding is not null)
 {
-    <div class="delete-overlay">
-        <section class="delete-dialog" role="dialog" aria-modal="true" aria-labelledby="void-title">
+    <AppDialog LabelledBy="void-title" OnClose="CancelVoid">
             <h2 id="void-title">Stornezi operația? – Operația #@voiding.OperationId · @StockMovementRules.DisplayDate(voiding.Date)</h2>
             <p>Toate ieșirile operației se anulează (stocul și cantitățile din mașini se refac), dar rămân în pagină marcate „stornat”. Se înregistrează în jurnal.</p>
             @if (voidError is not null) { <div class="error-banner" role="alert">@voidError</div> }
@@ -460,15 +456,12 @@ else
                 <button type="button" class="danger" disabled="@voidBusy" @onclick="VoidAsync">@(voidBusy ? "Se stornează…" : "Stornează operația")</button>
                 <button type="button" class="refresh act-close" disabled="@voidBusy" @onclick="CancelVoid">Renunț</button>
             </div>
-        </section>
-    </div>
+    </AppDialog>
 }
 
 @if (historyFor is not null)
 {
-    <div class="delete-overlay" @onkeydown="HistoryKeyAsync">
-        <section class="delete-dialog movement-dialog" role="dialog" aria-modal="true" aria-labelledby="movement-history-title">
-            <div class="dialog-head"><h2 id="movement-history-title">Istoricul modificărilor · @StockMovementRules.KindLabel(historyFor.Kind) din @StockMovementRules.DisplayDate(historyFor.Date)</h2><HelpButton Topic="produse-istoric-modificari" About="Istoricul modificărilor" /></div>
+    <AppDialog TitleId="movement-history-title" HelpTopic="produse-istoric-modificari" HelpAbout="Istoricul modificărilor" PanelClass="movement-dialog" OnKeyDown="HistoryKeyAsync" OnClose="CloseHistory"><TitleContent>Istoricul modificărilor · @StockMovementRules.KindLabel(historyFor.Kind) din @StockMovementRules.DisplayDate(historyFor.Date)</TitleContent><ChildContent><ChildContent>
             @if (historyError is not null) { <div class="error-banner" role="alert">@historyError</div> }
             else if (history.Count == 0) { <p class="muted">Nu există modificări înregistrate.</p> }
             else
@@ -483,8 +476,9 @@ else
                 </ol>
             }
             <div class="editor-actions"><button type="button" class="primary" autofocus @onclick="CloseHistory">Închide</button></div>
-        </section>
-    </div>
+</ChildContent>
+</ChildContent>
+</AppDialog>
 }
 
 </PageBoundary>

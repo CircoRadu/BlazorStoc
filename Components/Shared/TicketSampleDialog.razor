@@ -2,8 +2,7 @@
 @* Setari -> Preluare ActivityApp, secțiunea 6: un tichet real din ActivityApp cu toate coloanele lui și valorile, ca să se vadă ce conține fiecare coloană. Deasupra: ce primește fiecare informație
    (și cum ar arăta observațiile) cu setările de pe ecran, chiar nesalvate. Fiecare coloană cu text se poate alege direct pentru o informație sau ca nou câmp suplimentar. Nimic din tichet nu se
    păstrează: se citește la cerere și se arată. *@
-<div class="delete-overlay" @onkeydown="Key">
-    <div class="delete-dialog template-popup review-popup ticket-sample" role="dialog" aria-modal="true" tabindex="-1" aria-labelledby="ticket-sample-title">
+<AppDialog OnClose="() => Close.InvokeAsync()" PanelClass="template-popup review-popup ticket-sample" OnKeyDown="Key" LabelledBy="ticket-sample-title">
         <div class="catalog-heading"><h2 id="ticket-sample-title">Tichet exemplu @Sample.Number @Sample.Title</h2><span class="heading-actions"><HelpButton Topic="setari-tichet-exemplu" About="Tichetul exemplu" /><button type="button" class="danger" @onclick="() => Close.InvokeAsync()">Închide</button></span></div>
         @if (Error is not null) { <div class="error-banner" role="alert">@Error</div> }
         <div class="editor-actions">
@@ -78,13 +77,11 @@
             <h3>Observațiile intervenției, așa cum ajung în aplicația de stoc</h3>
             <pre class="review-text" id="ticket-sample-notes">@preview.Notes</pre>
         }
-    </div>
-</div>
+</AppDialog>
 
 @if (adding is { } add)
 {
-    <div class="delete-overlay" @onkeydown="AddKey">
-        <div class="delete-dialog template-popup" role="dialog" aria-modal="true" tabindex="-1" aria-labelledby="ticket-sample-extra-title" id="ticket-sample-extra">
+    <AppDialog PanelClass="template-popup" OnKeyDown="AddKey" LabelledBy="ticket-sample-extra-title" OnClose="CancelAdd">
             <div class="catalog-heading"><h2 id="ticket-sample-extra-title">Câmp suplimentar nou</h2></div>
             <div class="catalog-body">
                 <p class="muted"><small>Coloana <strong>@ActivityFieldMap.ColumnName(add.Table, add.Column)</strong> se preia ca un câmp separat, sub numele ales. Numele nu trebuie să fie unic.</small></p>
@@ -103,8 +100,7 @@
                     <button type="button" class="refresh act-close" @onclick="CancelAdd">Renunță</button>
                 </div>
             </div>
-        </div>
-    </div>
+    </AppDialog>
 }
 
 @code {

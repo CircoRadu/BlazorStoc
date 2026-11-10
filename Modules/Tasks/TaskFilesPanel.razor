@@ -53,16 +53,14 @@
 
 @if (confirmingDelete is { } doomed)
 {
-    <div class="delete-overlay" @onkeydown="ConfirmKey">
-        <section class="delete-dialog" role="alertdialog" aria-modal="true" tabindex="-1" aria-labelledby="task-file-delete-title">
+    <AppDialog OnClose="() => confirmingDelete = null" OnKeyDown="ConfirmKey" Alert="true" LabelledBy="task-file-delete-title">
             <h2 id="task-file-delete-title">Ștergi fișierul? – @doomed.OriginalName</h2>
             <p>Fișierul este șters definitiv din task.</p>
             <div class="editor-actions">
                 <button type="button" class="danger" disabled="@busy" @onclick="ConfirmDeleteAsync">@(busy ? "Se șterge…" : "Șterge")</button>
                 <button type="button" class="refresh act-close" disabled="@busy" @onclick="() => confirmingDelete = null">Anulează</button>
             </div>
-        </section>
-    </div>
+    </AppDialog>
 }
 
 @if (previewing is { } shown)

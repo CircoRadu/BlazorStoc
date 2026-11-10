@@ -1,3 +1,10 @@
+## 0.5.65 | 10.11.2026
+- Toate ferestrele (popup-urile) aplicației folosesc aceeași structură: fundal, cadru cu bara de sus rezervată și panou cu antet, corp care derulează singur și, la nevoie, subsol. Bara cu „Raportează o eroare”, „Propune” și butonul roșu rotund de închidere stă întotdeauna deasupra panoului, niciodată peste antet, indiferent cât de înalt este panoul.
+- Pe ecrane înguste butoanele barei devin iconițe rotunde cu simbolul centrat (ca butonul roșu de închidere), cu text alternativ pentru cititoarele de ecran; pe ecran lat fereastra arată ca înainte.
+- Butoanele din bară vin de la module: „Raportează o eroare” (Raportare erori) și „Propune” (Propuneri) apar doar cât modulul funcționează; la oprirea sau pornirea unui modul în Setări → Module butonul apare sau dispare și în ferestrele deja deschise.
+- Butonul de închidere face același lucru ca „Închide” din fereastră (inclusiv întrebarea despre modificări nesalvate); Escape închide fereastra de deasupra. La ferestrele așezate una peste alta fiecare are bara ei, iar cea de sus este cea activă.
+- Scriptul vechi care plasa bara (observator pe toată pagina) a fost scos: bara este acum parte din structura ferestrei, fără urmărirea paginii.
+
 ## 0.5.64 | 10.11.2026
 - Setări → Preluare ActivityApp → Tichet exemplu: alegerea corespondenței se face cu opțiuni „Tichet – nume” și „Eveniment – nume”; alegi o coloană pentru o informație deja asignată și corespondența se mută (informația obligatorie care avea coloana o preia pe cea rămasă liberă, cea opțională se oprește), cu mesaj despre ce s-a schimbat.
 - „Câmp suplimentar nou” deschide o fereastră pentru nume și destinație; numele nu trebuie să fie unic, numărul câmpurilor suplimentare nu mai este limitat, iar un câmp existent se poate muta pe altă coloană din aceeași listă. Lista câmpurilor suplimentare are paginare.

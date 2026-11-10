@@ -137,9 +137,7 @@ else if (review is not null)
 
 @if (showSendPopup)
 {
-    <div class="delete-overlay" @onkeydown="PopupKeyDownAsync">
-        <section class="delete-dialog" role="dialog" aria-modal="true" tabindex="-1" @ref="popupDialog" aria-labelledby="pickup-popup-title">
-            <div class="dialog-head"><h2 id="pickup-popup-title">Confirmă modificările de stoc</h2><HelpButton Topic="inventar-preluare" About="Confirmarea modificărilor de stoc" /></div>
+    <AppDialog Title="Confirmă modificările de stoc" TitleId="pickup-popup-title" HelpTopic="inventar-preluare" HelpAbout="Confirmarea modificărilor de stoc" OnKeyDown="PopupKeyDownAsync" OnClose="CloseSendPopup">
             <p>Următoarele modificări vor fi operate în stoc:</p>
             <div class="table-scroll">
                 <table class="save-summary">
@@ -170,22 +168,19 @@ else if (review is not null)
                 <button type="button" class="primary" disabled="@sending" @onclick="ConfirmSendAsync">@(sending ? "Se trimite…" : "Confirmă")</button>
                 <button type="button" class="danger" disabled="@sending" @onclick="CloseSendPopup">Anulează</button>
             </div>
-        </section>
-    </div>
+    </AppDialog>
 }
 
 @if (pendingFile is not null)
 {
-    <div class="delete-overlay" @onkeydown="ReplaceKeyDownAsync">
-        <section class="delete-dialog" role="dialog" aria-modal="true" tabindex="-1" @ref="replaceDialog" aria-labelledby="pickup-replace-title">
+    <AppDialog OnKeyDown="ReplaceKeyDownAsync" LabelledBy="pickup-replace-title" OnClose="CancelReplace">
             <h2 id="pickup-replace-title">Înlocuiești lista curentă?</h2>
             <p>Ai produse bifate care nu au fost trimise. Încărcarea noului fișier șterge selecția curentă fără să modifice stocul.</p>
             <div class="editor-actions">
                 <button type="button" class="primary" @onclick="ConfirmReplaceAsync">Continuă</button>
                 <button type="button" class="danger" @onclick="CancelReplace">Anulează</button>
             </div>
-        </section>
-    </div>
+    </AppDialog>
 }
 
 </PageBoundary>
@@ -197,7 +192,6 @@ else if (review is not null)
     private readonly HashSet<int> selectedProductIds = [];
     private readonly Dictionary<int, int?> editedValues = [];
     private bool showSendPopup;
-    private ElementReference popupDialog, replaceDialog;
     private IBrowserFile? pendingFile;
     private byte[]? lastPdfBytes;
     private string? lastPdfName;

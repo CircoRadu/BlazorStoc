@@ -7,11 +7,9 @@
 
 @if (adding || editing is not null)
 {
-    <div class="delete-overlay">
-        <div class="delete-dialog template-popup" role="dialog" aria-modal="true" tabindex="-1" aria-labelledby="risk-analysis-editor-title">
+    <AppDialog PanelClass="template-popup" LabelledBy="risk-analysis-editor-title">
             <RiskAnalysisEditor @key="editorKey" BeneficiaryId="BeneficiaryId" Original="editing" PresetWorkPointId="presetWorkPointId" Saved="SavedAsync" Closed="CloseEditorAsync" />
-        </div>
-    </div>
+    </AppDialog>
 }
 
 @if (renewing is not null)

@@ -2,8 +2,7 @@
    page itself has no field for the password. The fields of the operation come as the content; the window shows the refusal of the service (a wrong password, a short
    one) inside, keeps what was typed and closes only when the operation succeeded (the parent does that). With a help topic it has the help button; without one it is
    only a confirmation. *@
-<div class="delete-overlay" @onkeydown="KeyDownAsync">
-    <section class="delete-dialog save-confirmation-dialog admin-operation-dialog" role="dialog" aria-modal="true" aria-labelledby="admin-operation-title">
+<AppDialog OnClose="() => Cancelled.InvokeAsync()" PanelClass="save-confirmation-dialog admin-operation-dialog" OnKeyDown="KeyDownAsync" LabelledBy="admin-operation-title">
         <div class="dialog-head"><h2 id="admin-operation-title">@Title</h2>@Help</div>
         @if (Intro is not null) { <p class="muted"><small>@Intro</small></p> }
         @ChildContent
@@ -16,8 +15,7 @@
             <button type="button" class="refresh act-close" disabled="@Busy" @onclick="() => Cancelled.InvokeAsync()">Renunță</button>
             @if (Busy) { <span class="muted" role="status" data-operation-driver>@BusyText</span> }
         </div>
-    </section>
-</div>
+</AppDialog>
 
 @code {
     [Parameter, EditorRequired] public string Title { get; set; } = "";

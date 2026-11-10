@@ -1648,12 +1648,9 @@ tr.task-row-new td:first-child { box-shadow:inset 4px 0 0 var(--c-a3241b); }
 .task-description p { white-space:pre-wrap; margin:6px 0 14px; }
 .account-badge { display:inline-block; min-width:18px; padding:2px 6px; border-radius:999px; background:var(--c-a3241b); color:var(--c-ffffff); font-size:11px; font-weight:700; line-height:1.3; text-align:center; margin-left:6px; }
 
-/* Raportare eroare din orice popup: butonul din antetul ferestrei (injectat de bug-report.js) si nota cand modulul e oprit. */
 
-/* Bara popup-ului (bug-report.js): Raporteaza o eroare + iconita de inchidere; pentru <dialog> sta in antet, pentru celelalte e o bara plutitoare deasupra ferestrei. */
-.bug-popup-bar { display:inline-flex; align-items:center; gap:6px; margin-left:auto; flex:none; align-self:flex-start; }
-.bug-popup-button { padding:4px 10px; font-size:.8rem; border:1px solid var(--c-d8e2de, #c9ced6); border-radius:6px; background:var(--c-ffffff, #fff); color:inherit; cursor:pointer; box-shadow:0 2px 8px rgba(0,0,0,.18); }
-.bug-popup-button:hover { background:rgba(127,127,127,.15); }
+.app-dialog-action { padding:4px 10px; font-size:.8rem; border:1px solid var(--c-d8e2de, #c9ced6); border-radius:6px; background:var(--c-ffffff, #fff); color:inherit; cursor:pointer; box-shadow:0 2px 8px rgba(0,0,0,.18); }
+.app-dialog-action:hover { background:rgba(127,127,127,.15); }
 /* Taskuri: prioritate (ridicat rosiatic, mediu galben, scazut alb), antet ordonabil, eticheta de stare doar afisata. */
 .task-prio { display:inline-block; padding:3px 10px; border-radius:999px; font-size:11px; font-weight:650; white-space:nowrap; border:1px solid transparent; }
 .prio-high { background:#f8d9d4; color:#8a2417; border-color:#ecb6ad; }
@@ -1667,19 +1664,13 @@ select.prio-high, select.prio-medium, select.prio-low { font-weight:600; }
 .sort-header { background:none; border:0; padding:0; font:inherit; letter-spacing:inherit; color:inherit; cursor:pointer; display:inline-flex; align-items:center; gap:5px; text-transform:inherit; }
 .sort-header .sort-arrow { font-size:10px; opacity:.55; }
 .sort-header.active .sort-arrow { opacity:1; color:var(--green); }
-/* Elementul de inchidere sta in bara de deasupra popup-ului, langa "Raporteaza o eroare": cerc cu fond rosu, X alb desenat si centrat. Butonul de inchidere din antet se ascunde (iconita il declanseaza). */
-.popup-close-moved { display:none !important; }
+/* Butonul rotund de inchidere din bara ferestrei (AppDialog): cerc cu fond rosu, X alb desenat si centrat. */
 .popup-close-icon { position:relative; box-sizing:border-box; width:32px; height:32px; min-width:32px; padding:0; margin:0; border-radius:50%; font-size:0; line-height:0; color:transparent; background:#b3261e; border:1px solid #8c1c15; box-shadow:0 2px 8px rgba(0,0,0,.18); cursor:pointer; flex:none; overflow:hidden; display:inline-block; vertical-align:middle; }
 .popup-close-icon:hover { background:#8c1c15; }
 .popup-close-icon::before, .popup-close-icon::after { content:""; position:absolute; left:50%; top:50%; width:14px; height:2px; margin:-1px 0 0 -7px; border-radius:1px; background:#fff; }
 .popup-close-icon::before { transform:rotate(45deg); }
 .popup-close-icon::after { transform:rotate(-45deg); }
-.bug-popup-bar { gap:8px; align-items:center; }
-.bug-popup-button { height:32px; padding:0 12px; display:inline-flex; align-items:center; }
 
-.bug-popup-float { position:fixed; inset:auto; margin:0; padding:0; border:0; background:transparent; overflow:visible; width:auto; height:auto; z-index:2147483000; display:inline-flex; }
-.bug-popup-float[hidden], .bug-popup-bar [hidden] { display:none !important; }
-.bug-popup-float[popover]:not(:popover-open) { display:none; }
 /* Un popup randat in interiorul unei celule de tabel (ex. Asociaza autentificator din coloana Operatii) mostenea white-space:nowrap si text-align:right de la td.row-actions: textul nu se rupea si iesea din fereastra. Popup-urile reseteaza ambele. */
 .delete-overlay, .invoice-modal-backdrop, .detail-overlay, dialog { white-space:normal; text-align:left; }
 /* Imaginile unui raport de eroare: miniatura se mareste cu un clic (cerc cu + in centru), intr-un overlay peste pagina sau peste fereastra. */
@@ -1715,3 +1706,39 @@ tr.task-done-separator > td { padding:8px 16px; font-size:12px; font-weight:700;
 .task-history li { display:grid; grid-template-columns:150px 1fr; gap:12px; padding:8px 0; border-top:1px solid var(--line); }
 .task-history li time { color:var(--c-5c706d); font-size:13px; }
 .task-note textarea { width:100%; min-height:110px; }
+
+/* ===== AppDialog (Components/Shared/AppDialog.razor): backdrop > frame > [bar | panel]. The bar has its own reserved place above the panel, so it never covers the head. ===== */
+.app-dialog-backdrop { position:fixed; inset:0; z-index:1000; display:flex; align-items:center; justify-content:center; padding:8px; box-sizing:border-box; background:#142d2870; overflow:clip; }
+.app-dialog-backdrop.front { z-index:2000; }
+.app-dialog-backdrop.unsaved-overlay { z-index:3000; }
+.app-dialog-frame { display:flex; flex-direction:column; align-items:stretch; max-width:100%; max-height:100%; min-height:0; min-width:0; }
+.app-dialog-bar { flex:none; height:56px; box-sizing:border-box; display:flex; align-items:center; justify-content:flex-end; gap:8px; padding-bottom:8px; }
+.app-dialog-bar [hidden] { display:none !important; }
+.app-dialog-panel { flex:0 1 auto; min-height:0; max-width:100%; max-height:none !important; box-sizing:border-box; display:flex; flex-direction:column; overflow:hidden !important; }
+.app-dialog-head { flex:none; }
+.app-dialog-body { flex:1 1 auto; min-height:0; overflow:auto; }
+.app-dialog-foot { flex:none; padding-top:14px; }
+.app-dialog-panel.app-dialog-s { width:min(440px, 100%); }
+.app-dialog-panel.app-dialog-m { width:min(640px, 100%); }
+.app-dialog-panel.app-dialog-l { width:min(960px, 100%); }
+.app-dialog-panel.app-dialog-xl { width:min(1280px, 100%); }
+/* The close button of the head is replaced by the round one of the bar (when the window has one). */
+.app-dialog-frame:has([data-app-dialog-close]) .app-dialog-panel :is(.catalog-heading,.dialog-head,.heading-actions,.map-panel-heading,.help-header,.help-header-actions) button.act-close:not(.row-icon), .app-dialog-frame:has([data-app-dialog-close]) .app-dialog-panel [data-head-close] { display:none; }
+.delete-dialog.file-preview .app-dialog-body { display:flex; flex-direction:column; }
+dialog.app-dialog-native { border:0; padding:8px; margin:0; background:transparent; max-width:none; max-height:none; width:100%; height:100%; box-sizing:border-box; overflow:clip; color:inherit; }
+dialog.app-dialog-native[open] { display:flex; align-items:center; justify-content:center; }
+dialog.app-dialog-native::backdrop { background:#142d2870; }
+.app-dialog-action { display:inline-flex; align-items:center; gap:6px; height:32px; padding:0 12px; }
+.app-dialog-action-icon { line-height:1; }
+/* Narrow screens: the buttons of the bar become round icons (like the red close button), the label stays for screen readers (aria-label / title). */
+@media (max-width: 720px) {
+  .app-dialog-backdrop { padding:4px; }
+  .app-dialog-action { box-sizing:border-box; width:32px; height:32px; min-width:32px; padding:0; border-radius:50%; justify-content:center; gap:0; flex:none; }
+  .app-dialog-action-icon { font-size:15px; display:block; text-align:center; }
+  .app-dialog-action-label { position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap; }
+}
+.app-dialog-backdrop.image-lightbox { background:rgba(8,18,16,.78); }
+.app-dialog-panel.image-lightbox-panel { width:auto; padding:10px; gap:8px; }
+.app-dialog-panel.image-figure { width:auto; background:transparent; box-shadow:none; padding:0; }
+.app-dialog-panel.image-figure .app-dialog-body { display:flex; justify-content:center; }
+.app-dialog-frame:has([data-app-dialog-close]) .image-lightbox-head button.act-close { display:none; }

@@ -1,8 +1,8 @@
 {
     "modules":  {
                     "ActivityImport":  {
-                                           "version":  "0.15.0",
-                                           "hash":  "0775b94d956d2b8c2aacec9eef4ad0dd6e278f2bb2b5cc3aa95748bf004b414d",
+                                           "version":  "0.15.1",
+                                           "hash":  "eca3e5bb5bb02ba92e928ac31413f11e9edf04fbfac954a80915f19b8cf647ee",
                                            "history":  [
                                                            {
                                                                "version":  "0.1.0",
@@ -103,6 +103,11 @@
                                                                "version":  "0.15.0",
                                                                "date":  "10.11.2026",
                                                                "note":  "Corespondenta tichet: alegere Tichet/Eveniment cu mutare la realocare, camp suplimentar nou cu fereastra proprie, fara limita si cu nume repetabile, sumar cu coloana sursa; importul se suspenda cand structura tichetelor se schimba pana la confirmarea corespondentei"
+                                                           },
+                                                           {
+                                                               "version":  "0.15.1",
+                                                               "date":  "10.11.2026",
+                                                               "note":  "Ferestrele folosesc componenta globala AppDialog (bara cu butoane deasupra panoului)"
                                                            }
                                                        ]
                                        },
@@ -134,8 +139,8 @@
                                                ]
                                },
                     "Inventory":  {
-                                      "version":  "1.1.0",
-                                      "hash":  "dec7ba0da02295736e8ac41a789068dbbf520d303d0b807bbe61840db83ff245",
+                                      "version":  "1.1.1",
+                                      "hash":  "85302e6545efcd05f66a049ed40c10e6affe6727f2a91bfeb0c6eb82abd05936",
                                       "history":  [
                                                       {
                                                           "version":  "1.0.0",
@@ -146,12 +151,17 @@
                                                           "version":  "1.1.0",
                                                           "date":  "28.10.2026",
                                                           "note":  "Inventarul urmeaza arborele de subcategorii: randuri indentate, un nod cu copii selecteaza frunzele de sub el, raportul are frunzele cu cale"
+                                                      },
+                                                      {
+                                                          "version":  "1.1.1",
+                                                          "date":  "10.11.2026",
+                                                          "note":  "Ferestrele folosesc componenta globala AppDialog (bara cu butoane deasupra panoului)"
                                                       }
                                                   ]
                                   },
                     "Invoices":  {
-                                     "version":  "1.1.4",
-                                     "hash":  "3bcca700f530978c6ee078484f4e29e73df991fb29e5b99b4747f1fb2cd8e403",
+                                     "version":  "1.1.5",
+                                     "hash":  "2331a645cbc28a5f98850fcdcf0f1a2ba337c4fb91fbbcc7678fb5fd3a7a68f0",
                                      "history":  [
                                                      {
                                                          "version":  "1.0.0",
@@ -182,6 +192,11 @@
                                                          "version":  "1.1.4",
                                                          "date":  "09.11.2026",
                                                          "note":  "Titluri popup cu numele obiectului, mesaj de sectiune indisponibila cu nume, add task in popup"
+                                                     },
+                                                     {
+                                                         "version":  "1.1.5",
+                                                         "date":  "10.11.2026",
+                                                         "note":  "Ferestrele folosesc componenta globala AppDialog (bara cu butoane deasupra panoului)"
                                                      }
                                                  ]
                                  },
@@ -342,8 +357,8 @@
                                                 ]
                                 },
                     "Maintenance":  {
-                                        "version":  "1.11.1",
-                                        "hash":  "1ad7ea8bfc756f80ad2c03dc2e7bbf5600f04b549ccc168ceb2b37caf38a341a",
+                                        "version":  "1.11.2",
+                                        "hash":  "45eedb254cd0ea39b50d9d1332dbb1431bb4d3a8025bd683b205f64e5d3208fd",
                                         "history":  [
                                                         {
                                                             "version":  "1.0.0",
@@ -474,12 +489,17 @@
                                                             "version":  "1.11.1",
                                                             "date":  "10.11.2026",
                                                             "note":  "Workerul de rezultate foloseste ITicketOutcomeProcessor, fara referinta la modulul de preluare"
+                                                        },
+                                                        {
+                                                            "version":  "1.11.2",
+                                                            "date":  "10.11.2026",
+                                                            "note":  "Ferestrele folosesc componenta globala AppDialog (bara cu butoane deasupra panoului)"
                                                         }
                                                     ]
                                     },
                     "Notifications":  {
-                                          "version":  "1.5.1",
-                                          "hash":  "e5431c5d0b9613ae4c2706ac5235ffc2a6bbdbf71f49e7e9e9c2032f778599d5",
+                                          "version":  "1.5.2",
+                                          "hash":  "1fe224dfa5d8cb4fdd2607c8bf9e5458789d94a9d0de01681720ef0c9a2cc6d1",
                                           "history":  [
                                                           {
                                                               "version":  "1.0.0",
@@ -530,6 +550,11 @@
                                                               "version":  "1.5.1",
                                                               "date":  "09.11.2026",
                                                               "note":  "Propuneri: bara popup-ului cu Propune, Setari -\u003e Dezvoltare, fila Propuneri in Notificari"
+                                                          },
+                                                          {
+                                                              "version":  "1.5.2",
+                                                              "date":  "10.11.2026",
+                                                              "note":  "Ferestrele folosesc componenta globala AppDialog (bara cu butoane deasupra panoului)"
                                                           }
                                                       ]
                                       },
@@ -545,8 +570,8 @@
                                             ]
                             },
                     "Offers":  {
-                                   "version":  "1.1.1",
-                                   "hash":  "529f4e92e1d19a357b9b155bdc4b3b77c98e06e916a40968624000a078926865",
+                                   "version":  "1.1.2",
+                                   "hash":  "b76c3365d47c663f9aa9c84c84b7d87f825a8f26ba77fd8a42a20ab6a97fa6bc",
                                    "history":  [
                                                    {
                                                        "version":  "1.0.0",
@@ -562,6 +587,11 @@
                                                        "version":  "1.1.1",
                                                        "date":  "09.11.2026",
                                                        "note":  "Titluri popup cu numele obiectului, mesaj de sectiune indisponibila cu nume, add task in popup"
+                                                   },
+                                                   {
+                                                       "version":  "1.1.2",
+                                                       "date":  "10.11.2026",
+                                                       "note":  "Ferestrele folosesc componenta globala AppDialog (bara cu butoane deasupra panoului)"
                                                    }
                                                ]
                                },
@@ -593,8 +623,8 @@
                                                        ]
                                        },
                     "RiskAnalyses":  {
-                                         "version":  "1.3.1",
-                                         "hash":  "5afe57c44233c58b85c4b0fbc1d4b9647fd0d6beac0e53167a29a36436fb06d5",
+                                         "version":  "1.3.2",
+                                         "hash":  "13a75321f4e6e31248cc4dbdc6495668b0578fb3a964c257c7adb80cc076c817",
                                          "history":  [
                                                          {
                                                              "version":  "1.0.0",
@@ -640,12 +670,17 @@
                                                              "version":  "1.3.1",
                                                              "date":  "09.11.2026",
                                                              "note":  "Titluri popup cu numele obiectului, mesaj de sectiune indisponibila cu nume, add task in popup"
+                                                         },
+                                                         {
+                                                             "version":  "1.3.2",
+                                                             "date":  "10.11.2026",
+                                                             "note":  "Ferestrele folosesc componenta globala AppDialog (bara cu butoane deasupra panoului)"
                                                          }
                                                      ]
                                      },
                     "Suppliers":  {
-                                      "version":  "1.0.1",
-                                      "hash":  "7238f057e17c2ca25b62b43c64e78bd2e40955da092c99a80702fc8add350c88",
+                                      "version":  "1.0.2",
+                                      "hash":  "ef71dc54f5737c052f92fd901a9423bf2485fbb05dbf3e778a5d7f9e29094648",
                                       "history":  [
                                                       {
                                                           "version":  "1.0.0",
@@ -656,12 +691,17 @@
                                                           "version":  "1.0.1",
                                                           "date":  "04.11.2026",
                                                           "note":  "Adaugarea unui furnizor se face in popup"
+                                                      },
+                                                      {
+                                                          "version":  "1.0.2",
+                                                          "date":  "10.11.2026",
+                                                          "note":  "Ferestrele folosesc componenta globala AppDialog (bara cu butoane deasupra panoului)"
                                                       }
                                                   ]
                                   },
                     "Vehicles":  {
-                                     "version":  "1.0.3",
-                                     "hash":  "56cfc55aec8943f3172eacb7f0d4347da4d7610fd0d56d4074e746958cc4ad1d",
+                                     "version":  "1.0.4",
+                                     "hash":  "cdaa1c4d8380797f97c4a8ac77d60fe41937e606df3c17611be4f489f21dc4f7",
                                      "history":  [
                                                      {
                                                          "version":  "1.0.0",
@@ -682,6 +722,11 @@
                                                          "version":  "1.0.3",
                                                          "date":  "09.11.2026",
                                                          "note":  "Titluri popup cu numele obiectului, mesaj de sectiune indisponibila cu nume, add task in popup"
+                                                     },
+                                                     {
+                                                         "version":  "1.0.4",
+                                                         "date":  "10.11.2026",
+                                                         "note":  "Ferestrele folosesc componenta globala AppDialog (bara cu butoane deasupra panoului)"
                                                      }
                                                  ]
                                  },
@@ -722,8 +767,8 @@
                                                  ]
                                  },
                     "BugReports":  {
-                                       "version":  "1.1.3",
-                                       "hash":  "f256a2c7570b0aec726c5fa0bb54771b40536a3b8a16b2e74e12ec74df901a58",
+                                       "version":  "1.1.4",
+                                       "hash":  "499e2387e27402a1818473cdee5a44831b356ce6254e01783d8447aae17f0a62",
                                        "history":  [
                                                        {
                                                            "version":  "1.0.0",
@@ -749,12 +794,17 @@
                                                            "version":  "1.1.3",
                                                            "date":  "10.11.2026",
                                                            "note":  "Insigna cu numarul de rapoarte nerezolvate pe tab (CountOpenAsync) si evenimente de schimbare publicate in feed"
+                                                       },
+                                                       {
+                                                           "version":  "1.1.4",
+                                                           "date":  "10.11.2026",
+                                                           "note":  "Ferestrele folosesc componenta globala AppDialog (bara cu butoane deasupra panoului)"
                                                        }
                                                    ]
                                    },
                     "Tasks":  {
-                                  "version":  "1.2.1",
-                                  "hash":  "0fa7095a646cc2c31095a702199556a7929fb6b23569012e676bd3221a9cb57b",
+                                  "version":  "1.2.2",
+                                  "hash":  "3dd9bb7165ab22ce7dd002a381d70a7d37eeda7e61ad515aae3f037840138b20",
                                   "history":  [
                                                   {
                                                       "version":  "1.0.0",
@@ -805,12 +855,17 @@
                                                       "version":  "1.2.1",
                                                       "date":  "10.11.2026",
                                                       "note":  "Verificari: componenta de taburi si dialogul de detalii acoperite de teste"
+                                                  },
+                                                  {
+                                                      "version":  "1.2.2",
+                                                      "date":  "10.11.2026",
+                                                      "note":  "Ferestrele folosesc componenta globala AppDialog (bara cu butoane deasupra panoului)"
                                                   }
                                               ]
                               },
                     "Proposals":  {
-                                      "version":  "1.0.1",
-                                      "hash":  "00ef7a26d9ef17dcde9e2ce99778a22586bbc3fc84043c2b8f612678113d3a82",
+                                      "version":  "1.0.2",
+                                      "hash":  "b30d9b638e726bf11ed0cfffc238ec734b2c4e1ae89cd4be9526cc1308437337",
                                       "history":  [
                                                       {
                                                           "version":  "1.0.0",
@@ -821,6 +876,11 @@
                                                           "version":  "1.0.1",
                                                           "date":  "10.11.2026",
                                                           "note":  "Insigna cu numarul de propuneri active pe tab (CountOpenAsync) si evenimente de schimbare publicate in feed"
+                                                      },
+                                                      {
+                                                          "version":  "1.0.2",
+                                                          "date":  "10.11.2026",
+                                                          "note":  "Ferestrele folosesc componenta globala AppDialog (bara cu butoane deasupra panoului)"
                                                       }
                                                   ]
                                   }

@@ -209,11 +209,13 @@ else if (step == 5)
 
 @if (addingBeneficiary)
 {
-    <div class="delete-overlay"><div class="delete-dialog"><BeneficiaryEditor InitialName="@beneficiaryText" Saved="BeneficiaryAddedAsync" Closed="() => { addingBeneficiary = false; return Task.CompletedTask; }" /></div></div>
+    <AppDialog ><BeneficiaryEditor InitialName="@beneficiaryText" Saved="BeneficiaryAddedAsync" Closed="() => { addingBeneficiary = false; return Task.CompletedTask; }" />
+    </AppDialog>
 }
 @if (newProductFor is not null)
 {
-    <div class="delete-overlay"><div class="delete-dialog"><ProductEditor InitialName="@NewProductName" InitialDescription="@NewProductDescription" Groups="groups" Saved="ProductAddedAsync" Closed="() => { newProductFor = null; return Task.CompletedTask; }" /></div></div>
+    <AppDialog ><ProductEditor InitialName="@NewProductName" InitialDescription="@NewProductDescription" Groups="groups" Saved="ProductAddedAsync" Closed="() => { newProductFor = null; return Task.CompletedTask; }" />
+    </AppDialog>
 }
 
 </PageBoundary>

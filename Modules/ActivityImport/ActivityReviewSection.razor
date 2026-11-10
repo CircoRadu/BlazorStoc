@@ -49,9 +49,8 @@
 
 @if (popup == Popup.View && detail is { } view)
 {
-    <div class="delete-overlay" @onkeydown="PopupKey">
-        <div class="delete-dialog template-popup review-popup" role="dialog" aria-modal="true" tabindex="-1" aria-labelledby="review-view-title">
-            <div class="catalog-heading"><h2 id="review-view-title">Tichet @view.Item.TicketNumber @view.Item.Title</h2><span class="heading-actions"><button type="button" class="danger" @onclick="ClosePopup">Închide</button></span></div>
+    <AppDialog PanelClass="template-popup review-popup" OnKeyDown="PopupKey" LabelledBy="review-view-title" OnClose="ClosePopup">
+            <div class="catalog-heading"><h2 id="review-view-title">Tichet @view.Item.TicketNumber @view.Item.Title</h2><span class="heading-actions"><button type="button" class="danger" @onclick="ClosePopup" data-head-close>Închide</button></span></div>
             @if (error is not null) { <div class="error-banner" role="alert">@error</div> }
             <dl class="review-facts">
                 <dt>Beneficiar</dt><dd>@view.Item.Beneficiary</dd>
@@ -65,15 +64,13 @@
                 <button type="button" class="refresh act-edit" disabled="@busy" @onclick="() => OpenEditAsync(view.Item)">Modifică și preia</button>
                 <button type="button" class="danger" disabled="@busy" @onclick="() => OpenDiscard(view.Item)">Discard</button>
             </div>
-        </div>
-    </div>
+    </AppDialog>
 }
 
 @if (popup == Popup.Edit && detail is { } edit)
 {
-    <div class="delete-overlay" @onkeydown="PopupKey">
-        <div class="delete-dialog template-popup review-popup" role="dialog" aria-modal="true" tabindex="-1" aria-labelledby="review-edit-title">
-            <div class="catalog-heading"><h2 id="review-edit-title">Modifică și preia tichetul @edit.Item.TicketNumber</h2><span class="heading-actions"><button type="button" class="danger" disabled="@busy" @onclick="ClosePopup">Închide</button></span></div>
+    <AppDialog PanelClass="template-popup review-popup" OnKeyDown="PopupKey" LabelledBy="review-edit-title" OnClose="ClosePopup">
+            <div class="catalog-heading"><h2 id="review-edit-title">Modifică și preia tichetul @edit.Item.TicketNumber</h2><span class="heading-actions"><button type="button" class="danger" disabled="@busy" @onclick="ClosePopup" data-head-close>Închide</button></span></div>
             @if (error is not null) { <div class="error-banner" role="alert">@error</div> }
             <p class="muted"><small>@edit.Item.Title · @edit.Item.Beneficiary. Se înregistrează intervenția cu ce alegi aici; tichetul din ActivityApp nu se schimbă.</small></p>
             <fieldset disabled="@busy">
@@ -110,14 +107,12 @@
                 <button type="button" class="primary" disabled="@(busy || performedOn is null)" @onclick="SaveEditAsync">@(busy ? "Se salvează…" : "Preia")</button>
                 <button type="button" class="danger" disabled="@busy" @onclick="ClosePopup">Anulează</button>
             </div>
-        </div>
-    </div>
+    </AppDialog>
 }
 
 @if (popup == Popup.Discard && target is { } doomed)
 {
-    <div class="delete-overlay" @onkeydown="PopupKey">
-        <section class="delete-dialog" role="alertdialog" aria-modal="true" tabindex="-1" aria-labelledby="review-discard-title">
+    <AppDialog OnKeyDown="PopupKey" Alert="true" LabelledBy="review-discard-title" OnClose="ClosePopup">
             <h2 id="review-discard-title">Discard tichet? – @doomed.TicketNumber @doomed.Title</h2>
             <p>Tichetul nu se mai preia din ActivityApp (poate fi reactivat din lista tichetelor discardate din Setări).@(doomed.InRegister ? " Intervenția deja înregistrată pentru el se șterge." : "")</p>
             @if (error is not null) { <div class="error-banner" role="alert">@error</div> }
@@ -125,8 +120,7 @@
                 <button type="button" class="danger" disabled="@busy" @onclick="DiscardAsync">@(busy ? "Se salvează…" : "Discard")</button>
                 <button type="button" class="refresh act-close" disabled="@busy" @onclick="ClosePopup">Anulează</button>
             </div>
-        </section>
-    </div>
+    </AppDialog>
 }
 
 @code {
