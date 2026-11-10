@@ -309,7 +309,9 @@ public static class ActivityImportPanelChecks
             "Activity import panel: \"Tichet anterior\" loads the ticket before the one shown");
         cut.Find("#ticket-sample-newer").Click();
         check(cut.Find("#ticket-sample-info").TextContent.Contains("Tichet 30", StringComparison.Ordinal) && settingsService.SampleCalls.Count == 2, "Activity import panel: \"Tichet mai nou\" comes back to the ticket shown before without reading it again");
+        cut.Find("button[aria-label='Alege pentru ce folosești coloana Detalii']").Click();
         cut.Find("select[aria-label='Folosește coloana Detalii pentru']").Change("problem");
+        cut.Find("button[aria-label='Alege pentru ce folosești coloana Observatii']").Click();
         cut.Find("select[aria-label='Folosește coloana Observatii pentru']").Change("extra");
         check(cut.Find("#ticket-sample-preview").TextContent.Contains("Detalii 30", StringComparison.Ordinal) && cut.Find("#ticket-sample-preview").TextContent.Contains("Obs 30", StringComparison.Ordinal) && cut.FindAll("#ai-extras tbody tr").Count == 1,
             "Activity import panel: a column chosen in the window becomes the column of the piece (or an extra field) and the preview follows at once");

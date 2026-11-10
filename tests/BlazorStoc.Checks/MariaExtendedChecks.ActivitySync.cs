@@ -39,7 +39,7 @@ public static partial class MariaExtendedChecks
             await settings.SaveSettingsAsync(new ActivityImportInput(enabled, "SERVER-" + suffix, 1433, "TIPActivity", "citire", null, new DateOnly(2026, 1, 1), 0, 24, 200, false, sync2, 60));
         try
         {
-            foreach (var table in new[] { "activity_import_map", "activity_import_issues", "activity_import_runs", "activity_import_types", "activity_import_settings", "activity_import_partner_checks", "activity_import_tickets", "activity_import_suggestions", "activity_import_keywords" }) await Exec(probe, "DELETE FROM " + table);
+            foreach (var table in new[] { "activity_import_map", "activity_import_issues", "activity_import_runs", "activity_import_types", "activity_import_settings", "activity_import_partner_checks", "activity_ticket_outcomes", "activity_import_tickets", "activity_import_suggestions", "activity_import_keywords" }) await Exec(probe, "DELETE FROM " + table);
             fake.Partners = [new(7301, $"Ext Sync {suffix} SRL", "RO" + cui, "Str. Florilor 5", "Timisoara", "Timis", "0722111222", "")];
             fake.Points = [new(7401, 7301, "Str. Florilor 5", "Timisoara", "Timis", "", "Sediu", "", true, null)];
             fake.Types = [new(4, "Service", "S", true, false, 1, 0, 0)];
@@ -194,7 +194,7 @@ public static partial class MariaExtendedChecks
         }
         finally
         {
-            foreach (var table in new[] { "activity_import_map", "activity_import_issues", "activity_import_runs", "activity_import_types", "activity_import_settings", "activity_import_partner_checks", "activity_import_tickets", "activity_import_suggestions", "activity_import_keywords" }) await Exec(probe, "DELETE FROM " + table);
+            foreach (var table in new[] { "activity_import_map", "activity_import_issues", "activity_import_runs", "activity_import_types", "activity_import_settings", "activity_import_partner_checks", "activity_ticket_outcomes", "activity_import_tickets", "activity_import_suggestions", "activity_import_keywords" }) await Exec(probe, "DELETE FROM " + table);
         }
     }
 }

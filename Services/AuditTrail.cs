@@ -242,6 +242,8 @@ public static class AuditActions
     public const string MoveUserTask = "Mutare task la alt utilizator";
     public const string DeleteUserTask = "Ștergere task";
     public const string ChangeUserTaskStatus = "Schimbare status task";
+    public const string EditUserTaskNote = "Modificare stadiu task";
+    public const string ReorderUserTasks = "Reordonare taskuri utilizator";
     public const string AcceptUserTask = "Preluare task";
     public const string AddUserTaskFile = "Adăugare fișier task";
     public const string DeleteUserTaskFile = "Ștergere fișier task";
@@ -432,7 +434,7 @@ public static class AuditActions
             or RecordFreeEntry or AttachEntryToInvoice or DetachEntryFromInvoice or DuplicateEntryOnInvoice or RegularizeNegativeStock or ExitOverStock
             or ExitToBeneficiary or ExitToVehicle or GenericSale or StockCorrection or DuplicateExit or VoidExitOperation or ReturnFromBeneficiary
             or ImportOffer or ReviseOffer or LinkOfferLine or AddBeneficiaryAlias
-            or CreateUserTask or EditUserTask or EditUserTaskDueDate or EditUserTaskPriority or MoveUserTask or ChangeUserTaskStatus or AcceptUserTask or AddUserTaskFile or DeleteUserTaskFile
+            or CreateUserTask or EditUserTask or EditUserTaskDueDate or EditUserTaskPriority or MoveUserTask or ChangeUserTaskStatus or EditUserTaskNote or ReorderUserTasks or AcceptUserTask or AddUserTaskFile or DeleteUserTaskFile
             or CreateOfferTemplate or EditOfferTemplate or ActivateOfferTemplate or DeactivateOfferTemplate
             or AddProjectComponent or ChangeProjectComponentState or ArchiveProjectComponent or ReactivateProjectComponent or SetVehicleTarget or RemoveVehicleTarget or SetMinStock or RemoveMinStock or SetProjectDeadline or RemoveProjectDeadline or ReserveStock or ReduceReservation or ReleaseReservation or ReservationConsumed or ReservationReducedByExit or ReservationReleasedByComponent or ComponentExitReturned or ComponentExitLeft or ComponentExitMoved or ComponentExitConsumed
             or AddMaintenanceFamily or RenameMaintenanceFamily or ActivateMaintenanceFamily or DeactivateMaintenanceFamily or MoveMaintenanceFamily or AddMaintenanceComponent or RenameMaintenanceComponent or ActivateMaintenanceComponent or DeactivateMaintenanceComponent or MoveMaintenanceComponent or ChangeMaintenanceComponentFamily or AddMaintenanceComponentAlias or RemoveMaintenanceComponentAlias

@@ -2,6 +2,27 @@
 
 ## Modificari de testat
 
+### 10.11.2026 - Taburi pe utilizator, ordine proprie, stadiu si jurnal propriu al taskului (Tasks 1.2.1, migrarea 85)
+
+**Ce s-a adaugat:** pagina Taskuri utilizator are tab "Nepreluate" (global) si cate un tab pe fiecare utilizator care are taskuri; in tab, taskurile active sunt numerotate in ordinea stabilita de administrator (maner de tragere), cele finalizate urmeaza dedesubt, cu comutator care le ascunde; taskurile finalizate pot fi editate; camp nou "Stadiu / note de lucru"; sectiunea pliabila "Jurnalul taskului" in fereastra de detalii.
+**Ce face acum:** administratorul aranjeaza ordinea in care fiecare utilizator isi trateaza taskurile; utilizatorul vede aceeasi ordine in Taskurile mele; stadiul unui task (de exemplu "trimis la politie la 12.11.2026") se scrie si dupa finalizare, de utilizator sau administrator; fiecare actiune pe task (creat, preluat, finalizat, stadiu, mutat, reordonat) se vede in jurnalul taskului.
+
+| Nr | Pasi | Asteptat | Rezultat |
+|---|---|---|---|
+| 1 | Administrare -> Taskuri utilizator, cu taskuri date la 2 utilizatori | Taburi: Nepreluate si cate unul pe utilizator; fiecare tab are insigna cu numarul taskurilor active; un utilizator fara taskuri nu are tab | |
+| 2 | Tab Nepreluate | Doar taskurile active pe care utilizatorul nu le-a preluat; numele utilizatorului deschide tab-ul lui | |
+| 3 | Tab de utilizator: trage manerul unui task peste altul | Taskul se muta, numerele raman 1, 2, 3...; Jurnal: "Reordonare taskuri utilizator" cu pozitia veche si noua | |
+| 4 | Focus pe maner, sageata sus / jos | Taskul urca / coboara o pozitie | |
+| 5 | Scrie ceva in cautare sau apasa un antet de sortare | Manerele dispar si apare nota "Sterge filtrele..."; la stergerea filtrelor revin | |
+| 6 | Marcheaza un task Finalizat (din detalii) | Iese din numerotare, apare sub separatorul Finalizate; ceilalti se renumeroteaza | |
+| 7 | Comutatorul "Ascunde taskurile finalizate" | Finalizatele dispar / reapar | |
+| 8 | Editeaza un task finalizat (creion) si schimba titlul | Se salveaza; ramane finalizat, cu aceeasi data a finalizarii | |
+| 9 | Ca utilizator: deschide un task finalizat -> Editeaza -> scrie in Stadiu "Trimis la politie la 12.11.2026" -> Salveaza stadiul | Stadiul apare in tabelul administratorului sub titlu; Jurnal: "Modificare stadiu task" | |
+| 10 | Deschide taskul -> Jurnalul taskului | Lista cu data si cine a creat, preluat, finalizat, scris stadiul, mutat, reordonat; ordine cronologica | |
+| 11 | Mutarea unui task la alt utilizator / redeschiderea unuia finalizat | Intra ultimul in lista noului utilizator; lista veche se renumeroteaza | |
+| 12 | Taskurile mele (utilizator) | Coloana NR. cu ordinea stabilita de administrator | |
+| 13 | Dupa actualizare, taskurile existente | Fiecare utilizator are taskurile active numerotate dupa termen si data crearii | |
+
 ### 09.11.2026 - Taskuri date de administrator unui utilizator, pe un beneficiar
 
 **Ce s-a adaugat:** modulul Taskuri. Administratorul (sau cine are cheile `taskuri.*`) da taskuri unui utilizator: titlu, descriere, utilizator, stare (In viitor / In lucru / Finalizat), termen limita optional, fisiere. Pagina Administrare -> "Taskuri utilizator" (cautare beneficiar + "+ Adauga beneficiar" prin fereastra existenta), tabele Active / Finalizate cu etichete de filtrare, sectiunea "Taskuri" pe fisa beneficiarului, pagina "Taskurile mele" (meniul numelui din bara de sus), fila "Taskuri" din Notificari, avertizare globala de 3 zile inainte de termen.

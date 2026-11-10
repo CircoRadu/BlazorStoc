@@ -1700,3 +1700,18 @@ select.prio-high, select.prio-medium, select.prio-low { font-weight:600; }
 .proposal-filter { display:flex; flex-wrap:wrap; gap:14px; align-items:center; margin:8px 0 12px; }
 .proposal-filter .search-box { flex:1 1 260px; }
 .proposal-facts { margin-bottom:8px; }
+
+/* Taskuri utilizator: the order of the active tasks of one user (task-order.js) and the journal of a task */
+tr[data-task-index] .row-icon.drag { position:relative; display:inline-block; vertical-align:middle; }
+tr[data-task-index].dragging { opacity:.5; }
+tr[data-task-index].drop-before > td { box-shadow:inset 0 3px 0 var(--green); }
+tr[data-task-index].drop-after > td { box-shadow:inset 0 -3px 0 var(--green); }
+.task-number { font-weight:700; color:var(--c-5c706d); text-align:center; width:44px; }
+tr.task-done-row > td { color:var(--c-5c706d); }
+tr.task-done-separator > td { padding:8px 16px; font-size:12px; font-weight:700; letter-spacing:.04em; text-transform:uppercase; background:var(--paper); }
+.task-history { margin-top:16px; }
+.task-history > summary { cursor:pointer; font-weight:700; padding:8px 0; }
+.task-history ol { list-style:none; margin:8px 0 0; padding:0; }
+.task-history li { display:grid; grid-template-columns:150px 1fr; gap:12px; padding:8px 0; border-top:1px solid var(--line); }
+.task-history li time { color:var(--c-5c706d); font-size:13px; }
+.task-note textarea { width:100%; min-height:110px; }

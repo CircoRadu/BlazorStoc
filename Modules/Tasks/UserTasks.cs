@@ -25,12 +25,15 @@ public enum UserTaskPriority
     High = 3
 }
 
+/// <summary>One line of the journal of a task.</summary>
+public sealed record UserTaskHistoryEntry(DateTime TimestampUtc, string Actor, string Action, string Details);
+
 public sealed class UserTaskOperationException(string message) : Exception(message);
 
 /// <summary>A task with the names of its beneficiary and user. FileCount is the number of attached files.</summary>
 public sealed record UserTask(int Id, int BeneficiaryId, string BeneficiaryName, int AssignedUserId, string AssignedUserName, bool AssignedUserActive,
     string Title, string Description, UserTaskStatus Status, DateOnly? DueDate, DateTime CreatedUtc, string CreatedBy,
-    DateTime? AcceptedUtc, string? AcceptedBy, DateTime? FinishedUtc, long Version, int FileCount, UserTaskPriority Priority = UserTaskPriority.Low)
+    DateTime? AcceptedUtc, string? AcceptedBy, DateTime? FinishedUtc, long Version, int FileCount, UserTaskPriority Priority = UserTaskPriority.Low, string ProgressNote = "", int SortOrder = 0)
 {
     /// <summary>Every task that is not finished is active.</summary>
     public bool IsActive => Status != UserTaskStatus.Done;
@@ -104,9 +107,33 @@ public sealed record UserTaskAlert(UserTask Task, bool NotAccepted, bool Overdue
 
 public static class UserTaskRules
 {
-    public const int TitleMaxLength = 150, DescriptionMaxLength = 4000, DefaultWarningDays = 3, MaxWarningDays = 60;
+    public const int TitleMaxLength = 150, DescriptionMaxLength = 4000, NoteMaxLength = 4000, DefaultWarningDays = 3, MaxWarningDays = 60;
     public const string ConcurrentMessage = "Taskul s-a schimbat între timp. Actualizează lista.";
     public const string SettingWarningDays = "warning_days";
+
+    /// <summary>One line of the journal of a task as a sentence: what happened and who did it (the date is shown beside it).</summary>
+    public static string HistoryText(UserTaskHistoryEntry entry)
+    {
+        var who = entry.Actor.Trim().Length == 0 ? "necunoscut" : entry.Actor;
+        var details = entry.Details;
+        switch (entry.Action)
+        {
+            case AuditActions.CreateUserTask: return $"Creat de {who}";
+            case AuditActions.AcceptUserTask: return $"Preluat de {who}";
+            case AuditActions.ChangeUserTaskStatus:
+                return details.EndsWith("→ " + StatusLabel(UserTaskStatus.Done), StringComparison.Ordinal) ? $"Finalizat de {who}"
+                    : details.StartsWith("Stare: " + StatusLabel(UserTaskStatus.Done), StringComparison.Ordinal) ? $"Redeschis de {who} ({details})" : $"Stare schimbată de {who} ({details})";
+            case AuditActions.EditUserTask: return $"Titlu sau descriere modificate de {who}: {details}";
+            case AuditActions.EditUserTaskNote: return $"Stadiu modificat de {who}: {details}";
+            case AuditActions.EditUserTaskDueDate: return $"Termen modificat de {who}: {details}";
+            case AuditActions.EditUserTaskPriority: return $"Prioritate modificată de {who}: {details}";
+            case AuditActions.MoveUserTask: return $"Mutat la alt utilizator de {who}: {details}";
+            case AuditActions.ReorderUserTasks: return $"Ordine schimbată de {who}: {details}";
+            case AuditActions.AddUserTaskFile: return $"Fișier adăugat de {who}: {details}";
+            case AuditActions.DeleteUserTaskFile: return $"Fișier șters de {who}: {details}";
+            default: return $"{entry.Action} — {who}" + (details.Length > 0 ? $": {details}" : "");
+        }
+    }
 
     public static string StatusLabel(UserTaskStatus status) => status switch
     {
@@ -224,6 +251,12 @@ public interface IUserTaskRepository
     /// <summary>Days before a deadline from which the user is warned (global setting, default 3); any signed-in user may read it.</summary>
     Task<int> GetWarningDaysAsync(CancellationToken cancellationToken = default);
     Task SetWarningDaysAsync(int days, CancellationToken cancellationToken = default);
+    /// <summary>The stage / working notes of the task: the user of the task or whoever holds taskuri.edit writes them, also after the task is finished. The user changing them takes the task over too.</summary>
+    Task<UserTask> SetNoteAsync(UserTask original, string note, CancellationToken cancellationToken = default);
+    /// <summary>Moves an active task to a position (1 = first) of the list of its user (taskuri.edit); the others move along.</summary>
+    Task MoveInListAsync(UserTask task, int newPosition, CancellationToken cancellationToken = default);
+    /// <summary>The journal of one task (who created, took over, changed or finished it and when), oldest first; the user of the task and whoever holds taskuri.view read it.</summary>
+    Task<IReadOnlyList<UserTaskHistoryEntry>> GetHistoryAsync(int taskId, CancellationToken cancellationToken = default);
 }
 
 public interface IUserTaskFiles

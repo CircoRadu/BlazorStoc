@@ -12,7 +12,7 @@ public sealed class ActivityImportModule : IModule
 
     public string Id => ModuleId;
     public string Name => "Preluare tichete ActivityApp";
-    public Version Version { get; } = new(0, 13, 1);
+    public Version Version { get; } = new(0, 14, 1);
     public IReadOnlyList<ModuleNavItem> Nav { get; } = [];
 
     public void Register(IServiceCollection services, IConfiguration configuration)
@@ -35,6 +35,7 @@ public sealed class ActivityImportModule : IModule
         services.AddScoped<IBeneficiaryCheckService>(provider => new GuardedBeneficiaryCheckService(ActivatorUtilities.CreateInstance<MariaBeneficiaryCheckService>(provider), provider.GetRequiredService<ModuleRegistry>()));
         services.AddScoped<IValidationQueues, MariaValidationQueues>();
         services.AddHostedService<ActivitySyncWorker>();
+        services.AddScoped<ITicketOutcomeProcessor, TicketOutcomeProcessor>();
     }
 
     public void RegisterNotificationSources(IServiceCollection services)
@@ -55,6 +56,8 @@ public sealed class ActivityImportModule : IModule
         services.AddScoped<IBeneficiaryCheckService, UnavailableBeneficiaryCheckService>();
         services.AddScoped<IValidationQueues, UnavailableValidationQueues>();
         services.AddScoped<IActivityTicketVisibility, AllTicketFieldsVisible>();
+        // The decided tickets are recorded by the maintenance module even while the import is out: the processor is plain database code.
+        services.AddScoped<ITicketOutcomeProcessor, TicketOutcomeProcessor>();
         services.AddScoped<IActivityTicketRefreshService, UnavailableActivityTicketRefreshService>();
     }
 }

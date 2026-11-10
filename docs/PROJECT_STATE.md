@@ -387,3 +387,8 @@ Actualizare 04.11.2026 (branch Elcomtur): versiunea 0.5.38, schema 62. Modul nou
 - Cod: `Modules/Tasks/` (modul 1.0.0), migrarea 81, actiuni de jurnal exacte (Adaugare/Modificare/Mutare/Stergere task, Modificare termen, Schimbare status, Preluare, fisiere), `IAccessControl.GetUserIdAsync`, `/media/task-files/{id}`.
 - Verificat: MariaDB sectiunea "User tasks" 45 trecute; componente 1764; grupurile moduleversions, package, structure; browser pe instanta de verificare cu baza de test (conturile `claude.verify` / `claude.verify.user`): adaugare cu beneficiar nou prin fereastra existenta, fisiere, filtre, preluare, stare, redeschidere, mutare, stergere cu motiv, jurnal, fila din Notificari, insigna din meniu, latime telefon fara depasire.
 - Neverificat: tema dark cu date, tabelele cu randuri pe telefon, upgrade pe baza reala (migrarea 81 se aplica la pornire). Stash-ul `cautare-beneficiari 0.5.54` este separat.
+
+## Ultimul lucru facut (10.11.2026): versiunea 0.5.62 (branch claude/cautare-beneficiari)
+- Preluarea tichetelor separata de Mentenanta (migrarea 84, ActivityImport 0.14.1 / Maintenance 1.11.1): deciziile se pastreaza in activity_ticket_outcomes, workerul Mentenantei inregistreaza interventiile cand ruleaza (ITicketOutcomeProcessor); Tichet exemplu usor (buton Alege).
+- Taskuri (migrarea 85, Tasks 1.2.1): taburi pe utilizator, ordine proprie cu drag, stadiu/note, finalizate editabile, jurnalul taskului. Neverificat in browser real: tragerea cu mouse-ul (docs/TESTE_RAMASE.md).
+- Verificat: suita completa (vezi IMPLEMENTED.md), MariaDB User tasks si Activity import, grupuri usertasks/help/moduleversions/package/modules.

@@ -1,8 +1,8 @@
 {
     "modules":  {
                     "ActivityImport":  {
-                                           "version":  "0.13.1",
-                                           "hash":  "97d2016971e141d523c7940778be29b1a6e10263429b8fdd26b7aeb08baa3d5b",
+                                           "version":  "0.14.1",
+                                           "hash":  "040cd5376822548f4fb7492f060824e6e6cb92ae1758738e4660bf27adef620c",
                                            "history":  [
                                                            {
                                                                "version":  "0.1.0",
@@ -88,6 +88,16 @@
                                                                "version":  "0.13.1",
                                                                "date":  "09.11.2026",
                                                                "note":  "Titluri popup cu numele obiectului, mesaj de sectiune indisponibila cu nume, add task in popup"
+                                                           },
+                                                           {
+                                                               "version":  "0.14.0",
+                                                               "date":  "10.11.2026",
+                                                               "note":  "Preluarea nu mai depinde de Mentenanta: decizia pe un tichet se pastreaza ca rezultat (activity_ticket_outcomes) si intervențiile se inregistreaza cand modulul Mentenanta ruleaza"
+                                                           },
+                                                           {
+                                                               "version":  "0.14.1",
+                                                               "date":  "10.11.2026",
+                                                               "note":  "Procesorul rezultatelor de tichete (ITicketOutcomeProcessor) lucreaza si cand modulul de preluare e oprit"
                                                            }
                                                        ]
                                        },
@@ -171,8 +181,8 @@
                                                  ]
                                  },
                     "Journal":  {
-                                    "version":  "1.4.20",
-                                    "hash":  "ccdc2300ca7dccc86f551e746f28a12f1c070ebcf625cd15c1769ef64529d43b",
+                                    "version":  "1.4.21",
+                                    "hash":  "bee74efcb7a59f6a04ddeb063a02e71231cc35caf9ef6321141fb270894e7fe8",
                                     "history":  [
                                                     {
                                                         "version":  "1.0.0",
@@ -313,12 +323,17 @@
                                                         "version":  "1.4.20",
                                                         "date":  "09.11.2026",
                                                         "note":  "Propuneri: bara popup-ului cu Propune, Setari -\u003e Dezvoltare, fila Propuneri in Notificari"
+                                                    },
+                                                    {
+                                                        "version":  "1.4.21",
+                                                        "date":  "10.11.2026",
+                                                        "note":  "Filtrul de actiuni cuprinde actiunile noi ale taskurilor (stadiu, reordonare)"
                                                     }
                                                 ]
                                 },
                     "Maintenance":  {
-                                        "version":  "1.10.2",
-                                        "hash":  "ef310ee257e841b89cb35fe8f21059d7ce9f747841ce3acaa84981209991c20b",
+                                        "version":  "1.11.1",
+                                        "hash":  "1ad7ea8bfc756f80ad2c03dc2e7bbf5600f04b549ccc168ceb2b37caf38a341a",
                                         "history":  [
                                                         {
                                                             "version":  "1.0.0",
@@ -439,6 +454,16 @@
                                                             "version":  "1.10.2",
                                                             "date":  "09.11.2026",
                                                             "note":  "Butonul de inchidere al detaliilor de pe harta devine iconita de inchidere"
+                                                        },
+                                                        {
+                                                            "version":  "1.11.0",
+                                                            "date":  "10.11.2026",
+                                                            "note":  "Worker care inregistreaza intervențiile tichetelor decise cat timp modulul era oprit; scadentele urmeaza ultimele tichete preluate"
+                                                        },
+                                                        {
+                                                            "version":  "1.11.1",
+                                                            "date":  "10.11.2026",
+                                                            "note":  "Workerul de rezultate foloseste ITicketOutcomeProcessor, fara referinta la modulul de preluare"
                                                         }
                                                     ]
                                     },
@@ -713,8 +738,8 @@
                                                    ]
                                    },
                     "Tasks":  {
-                                  "version":  "1.1.0",
-                                  "hash":  "e46f4b5c0fbdb631d337486748fb775edbd6914f64cd2fcc900afd97b317533d",
+                                  "version":  "1.2.1",
+                                  "hash":  "0fa7095a646cc2c31095a702199556a7929fb6b23569012e676bd3221a9cb57b",
                                   "history":  [
                                                   {
                                                       "version":  "1.0.0",
@@ -755,6 +780,16 @@
                                                       "version":  "1.1.0",
                                                       "date":  "09.11.2026",
                                                       "note":  "Prioritate la taskuri, ordonare pe coloane, vizualizare/editare utilizator"
+                                                  },
+                                                  {
+                                                      "version":  "1.2.0",
+                                                      "date":  "10.11.2026",
+                                                      "note":  "Taburi pe utilizator, ordine proprie (drag), stadiu / note de lucru, editare taskuri finalizate, jurnal propriu al taskului"
+                                                  },
+                                                  {
+                                                      "version":  "1.2.1",
+                                                      "date":  "10.11.2026",
+                                                      "note":  "Verificari: componenta de taburi si dialogul de detalii acoperite de teste"
                                                   }
                                               ]
                               },

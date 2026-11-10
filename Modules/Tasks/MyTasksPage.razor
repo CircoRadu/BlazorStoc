@@ -47,7 +47,7 @@
                 </div>
             }
             var defaultOrder = scope.Where(task => statusFilter.Count == 0 || statusFilter.Contains(task.Status))
-                .OrderBy(task => task.IsAccepted ? 1 : 0).ThenBy(task => task.DueDate is null ? DateOnly.MaxValue : task.DueDate!.Value).ThenByDescending(task => task.CreatedUtc);
+                .OrderBy(task => showDone ? 0 : task.SortOrder).ThenBy(task => task.DueDate is null ? DateOnly.MaxValue : task.DueDate!.Value).ThenByDescending(task => task.CreatedUtc);
             IReadOnlyList<UserTask> rows = TaskSort.Apply(defaultOrder, sortKey, sortDescending);
             @if (rows.Count == 0)
             {
@@ -57,10 +57,11 @@
             else
             {
                 <Paged Items="rows" Id="@(showDone ? "my-tasks-done-size" : "my-tasks-active-size")" Context="pageRows">
-                    <div class="table-scroll"><table><thead><tr><th>BENEFICIAR</th><th>TITLU</th><TaskSortHeader Label="PRIORITATE" Key="TaskSortKey.Priority" Current="sortKey" Descending="sortDescending" Clicked="SortBy" /><TaskSortHeader Label="CREAT" Key="TaskSortKey.Created" Current="sortKey" Descending="sortDescending" Clicked="SortBy" /><TaskSortHeader Label="TERMEN" Key="TaskSortKey.Due" Current="sortKey" Descending="sortDescending" Clicked="SortBy" /><th>STARE</th><th class="number">FIȘIERE</th><th><span class="sr-only">Acțiuni</span></th></tr></thead><tbody>
+                    <div class="table-scroll"><table><thead><tr>@if (!showDone) { <th class="task-number">NR.</th> }<th>BENEFICIAR</th><th>TITLU</th><TaskSortHeader Label="PRIORITATE" Key="TaskSortKey.Priority" Current="sortKey" Descending="sortDescending" Clicked="SortBy" /><TaskSortHeader Label="CREAT" Key="TaskSortKey.Created" Current="sortKey" Descending="sortDescending" Clicked="SortBy" /><TaskSortHeader Label="TERMEN" Key="TaskSortKey.Due" Current="sortKey" Descending="sortDescending" Clicked="SortBy" /><th>STARE</th><th class="number">FIȘIERE</th><th><span class="sr-only">Acțiuni</span></th></tr></thead><tbody>
                     @foreach (var task in pageRows)
                     {
                         <tr @key="task.Id" class="@(task.IsActive && !task.IsAccepted ? "task-row-new" : null)">
+                            @if (!showDone) { <td class="task-number" title="Ordinea în care tratezi taskurile, stabilită de administrator">@(task.SortOrder > 0 ? task.SortOrder.ToString(System.Globalization.CultureInfo.InvariantCulture) : "—")</td> }
                             <td>@if (canSeeBeneficiary) { <a class="category-table-link" href="@($"/beneficiari/{task.BeneficiaryId}")">@task.BeneficiaryName</a> } else { <text>@task.BeneficiaryName</text> }</td>
                             <td><strong>@task.Title</strong>@if (task.IsActive && !task.IsAccepted) { <text> </text><span class="task-new-badge">Nou</span> }<br /><small class="muted" title="@task.Description">@Shorten(task.Description)</small></td>
                             <td><span class="task-prio @UserTaskRules.PriorityClass(task.Priority)">@UserTaskRules.PriorityLabel(task.Priority)</span></td>

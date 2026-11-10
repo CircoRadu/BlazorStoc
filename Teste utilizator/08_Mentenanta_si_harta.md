@@ -85,6 +85,10 @@ Pasi:
 1. La un punct cu alte puncte la aceeasi locatie, apasa unul din lista: popup-ul trece la acel punct.
 2. Ecran ingust: popup-ul incape fara depasire orizontala.
 
+### 10.11.2026 - Tichete decise cat timp Mentenanta e oprita (Maintenance 1.11.1)
+
+**Ce face acum:** Mentenanta are un worker care, la fiecare minut cat modulul ruleaza, inregistreaza interventiile tichetelor ActivityApp decise cat timp era oprita, in ordinea datelor efectuate; scadentele contractelor urmeaza ultimele tichete preluate. Pasii sunt in 18_Preluare_tichete_ActivityApp.md (modificari 10.11.2026).
+
 ## Verificari ramase (fara modificari recente; detalii in docs/TESTE_RAMASE.md, sectiunile N7-N27)
 
 | Pas | Ce faci | Ce trebuie sa vezi | Rezultat |

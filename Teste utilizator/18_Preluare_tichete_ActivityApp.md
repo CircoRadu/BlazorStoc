@@ -261,3 +261,18 @@ Pasi: Notificari -> Tichete de validat -> Arata tichetele discardate -> iconita 
 | 6 | Journal activitate | "Vizualizare tichet exemplu ActivityApp" pentru fiecare tichet deschis, cu numarul tichetului (fara continut) | |
 | 7 | In ActivityApp se adauga/scoate o coloana din Tickete sau EvenimenteAgent, apoi ruleaza o sincronizare | Notificarea "Structura tichetelor" cu lista modificarilor; in sectiunea 6 apare bannerul cu aceeasi lista | |
 | 8 | Verifica corespondenta (cu tichetul exemplu), apasa "Corespondenta verificata" | Bannerul si notificarea dispar; Jurnal: "Confirmare structura tichete ActivityApp" | |
+
+## Modificari de testat - preluarea tichetelor separata de Mentenanta si tichet exemplu usor (10.11.2026, ActivityImport 0.14.1, Maintenance 1.11.1, migrarea 84)
+
+**Ce s-a adaugat:** decizia pe un tichet (Mentenanta / La cerere) se pastreaza ca rezultat (tabelul activity_ticket_outcomes) si tichetul iese din coada indiferent daca modulul Mentenanta ruleaza; un worker al Mentenantei inregistreaza interventiile; in Tichet exemplu coloanele au butonul "Alege..." in loc de o lista pe fiecare rand.
+**Ce face acum:** cu Mentenanta oprita, tichetele se preiau si se valideaza in continuare, iar scadentele nu se muta; la pornirea Mentenantei interventiile se inregistreaza in ordinea datelor si scadentele urmeaza ultimele tichete; fereastra Tichet exemplu se deruleaza usor si de pe alt calculator.
+
+| Nr | Pasi | Asteptat | Rezultat |
+|---|---|---|---|
+| 1 | Setari -> Module: opreste Mentenanta. Mentenanta -> Validare tichete (sau Notificari): valideaza un tichet ca Mentenanta | Tichetul iese din coada; mesajul "N tichete decise asteapta inregistrarea in Mentenanta"; scadenta contractului NU se muta; Jurnal "Preluare tichet ActivityApp ca mentenanta" cu "Inregistrare in Mentenanta: in asteptare" | |
+| 2 | Ruleaza o sincronizare ActivityApp | Tichetul validat nu mai este propus din nou | |
+| 3 | Porneste Mentenanta si asteapta cel mult un minut | Mesajul dispare; intervenia apare la beneficiar, scadenta contractului se muta cu ciclul fata de data efectuarii; tichetul apare legat de interventie | |
+| 4 | Valideaza mai multe tichete cu Mentenanta oprita, date diferite, apoi porneste modulul | Scadenta ramane cea data de cel mai recent tichet | |
+| 5 | Cu Mentenanta pornita valideaza un tichet | Interventia apare imediat, ca inainte | |
+| 6 | Setari -> Preluare ActivityApp -> Tichet exemplu | Fiecare coloana cu text are butonul "Alege..."; la clic apare lista doar pe acel rand; dupa alegere revine butonul; derularea e fluida si de pe alt calculator | |
+

@@ -877,3 +877,22 @@ Cerut de utilizator la 06.10.2026 (verificarea fluxului, apoi deciziile: facturi
 ## Finalizat la 09.11.2026 17:12 - Bara popup-ului ancorata de popup (BUG-0006)
 
 - Bara cu Raporteaza o eroare / Propune / cerc de inchidere se pozitioneaza fata de popup si se muta odata cu el la derulare (nu mai ramane la marginea de sus a ecranului); in colt cand nu e loc deasupra; iese din ecran odata cu popup-ul. Modificare in wwwroot/bug-report.js, nepachetata (dupa 0.5.61).
+
+## Finalizat la 10.11.2026 09:51 - Tichet exemplu: fereastra usoara prin retea
+
+- Fereastra Tichet exemplu (TicketSampleDialog) nu se mai redeseneaza la fiecare randare a panoului: ShouldRender dupa semnatura a ceea ce afiseaza; Folosit pentru si listele de tinte calculate o data per actualizare.
+- Coloana Foloseste pentru are butonul Alege... care deschide lista doar pe randul ales (inainte: o lista pe fiecare coloana cu text); teste actualizate (ActivityFieldSettingsChecks, ActivityImportPanelChecks).
+- Verificari: grupul activityimport trecut.
+
+## Finalizat la 10.11.2026 09:51 - Preluarea tichetelor separata de modulul Mentenanta
+
+- Decizia pe un tichet se pastreaza in activity_ticket_outcomes (migrarea 84, stari pending/applying/applied/failed); tichetul iese din coada si ramane legat in harta si cu Mentenanta oprita.
+- Interventia si scadentele se inregistreaza prin TicketOutcomeApplication (la decizie, daca Mentenanta ruleaza) sau de TicketOutcomeWorker din Mentenanta (fiecare minut, in ordinea datelor, la pornirea modulului) prin ITicketOutcomeProcessor din Services; mesaje de in asteptare/refuzate in Validare tichete; audit cu Inregistrare in Mentenanta.
+- Calea veche (tichet cu interventie la cerere existenta) cere in continuare Mentenanta. ActivityImport 0.14.1, Maintenance 1.11.1.
+- Verificari: sectiunea MariaDB Activity import (170, inclusiv scenariul cu Mentenanta oprita), grupurile activityimport, modules (arhitectura), moduleversions, help.
+
+## Finalizat la 10.11.2026 09:51 - Taskuri: taburi pe utilizator, ordine proprie, stadiu si jurnal al taskului
+
+- Pagina Taskuri utilizator: tab Nepreluate (global) si un tab pe utilizator cu taskuri (UserTaskTabs), taskuri active numerotate cu ordine proprie (maner de tragere task-order.js si sageti), finalizate dedesubt cu comutator de ascundere, taskuri finalizate editabile.
+- Camp nou Stadiu / note de lucru (SetNoteAsync, utilizator sau administrator, si dupa finalizare), Jurnalul taskului pliabil in detalii (GetHistoryAsync din audit_events cu regula de vizibilitate a taskului), actiuni de jurnal Modificare stadiu task si Reordonare taskuri utilizator; Taskurile mele arata numarul curent. Migrarea 85 (sort_order, progress_note; numerotarea taskurilor vechi o face aplicatia, migratorul nu are drepturi pe date). Tasks 1.2.1, Journal 1.4.21.
+- Verificari: sectiunea MariaDB User tasks (70), grupul usertasks (tabs si detalii, 14), help, moduleversions, package.

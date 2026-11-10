@@ -364,7 +364,7 @@ public static class HelpChecks
         // The editors of the beneficiary page open in a window made here around forms that have their own help button; the file panel has a delete confirmation and a plain file preview.
         "EntityFilePreview.razor", "BeneficiaryDetail.razor", "ServiceContractsSection.razor", "ServiceInterventionsSection.razor", "RiskAnalysesSection.razor", "EntityFilesPanel.razor",
         // Module Taskuri: the page wraps the existing beneficiary editor, the tables wrap the task form (own help button), the file panel only confirms a deletion and previews a file.
-        "AddUserTaskPage.razor", "TaskTables.razor", "TaskFilesPanel.razor",
+        "AddUserTaskPage.razor", "TaskTables.razor", "UserTaskTabs.razor", "TaskFilesPanel.razor",
         // The popups of the validation queue of the tickets (view, edit + take, discard confirmation) and the view of a discarded ticket: their topic is to be written (listed in docs/HELP_DE_REGENERAT.md).
         "ActivityReviewSection.razor", "ActivityDiscardedSection.razor"
     };

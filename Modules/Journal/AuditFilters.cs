@@ -115,7 +115,7 @@ public static class AuditFilterOptions
         (AuditActions.ImportOffer, AuditActions.ImportOffer), (AuditActions.ReviseOffer, AuditActions.ReviseOffer), (AuditActions.LinkOfferLine, AuditActions.LinkOfferLine),
         (AuditActions.AddBeneficiaryAlias, AuditActions.AddBeneficiaryAlias),
         (AuditActions.CreateUserTask, AuditActions.CreateUserTask), (AuditActions.EditUserTask, AuditActions.EditUserTask), (AuditActions.EditUserTaskDueDate, AuditActions.EditUserTaskDueDate), (AuditActions.EditUserTaskPriority, AuditActions.EditUserTaskPriority),
-        (AuditActions.MoveUserTask, AuditActions.MoveUserTask), (AuditActions.DeleteUserTask, AuditActions.DeleteUserTask), (AuditActions.ChangeUserTaskStatus, AuditActions.ChangeUserTaskStatus),
+        (AuditActions.MoveUserTask, AuditActions.MoveUserTask), (AuditActions.DeleteUserTask, AuditActions.DeleteUserTask), (AuditActions.ChangeUserTaskStatus, AuditActions.ChangeUserTaskStatus), (AuditActions.EditUserTaskNote, AuditActions.EditUserTaskNote), (AuditActions.ReorderUserTasks, AuditActions.ReorderUserTasks),
         (AuditActions.AcceptUserTask, AuditActions.AcceptUserTask), (AuditActions.AddUserTaskFile, AuditActions.AddUserTaskFile), (AuditActions.DeleteUserTaskFile, AuditActions.DeleteUserTaskFile),
         (AuditActions.EditTaskWarningDays, AuditActions.EditTaskWarningDays),
         (AuditActions.CreateOfferTemplate, AuditActions.CreateOfferTemplate), (AuditActions.EditOfferTemplate, AuditActions.EditOfferTemplate),

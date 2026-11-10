@@ -55,7 +55,7 @@
 
 <section class="catalog">
     <div class="catalog-heading"><h2>Taskuri utilizatori</h2><small>Taskurile active și cele finalizate, ale tuturor utilizatorilor</small></div>
-    <TaskTables @ref="tables" BeneficiaryId="0" OpenTaskId="@(TaskId ?? 0)" />
+    <UserTaskTabs @ref="tables" OpenTaskId="@(TaskId ?? 0)" />
 </section>
 
 </PageBoundary>
@@ -63,7 +63,7 @@
 @code {
     [SupplyParameterFromQuery(Name = "task")] public int? TaskId { get; set; }
 
-    private TaskTables? tables;
+    private UserTaskTabs? tables;
     private IReadOnlyList<Beneficiary> beneficiaries = Array.Empty<Beneficiary>();
     private Beneficiary? chosen;
     private int? chosenId;

@@ -34,6 +34,12 @@ internal sealed class GuardedUserTaskRepository(IUserTaskRepository inner, Modul
 
     public Task<UserTask> SetStatusAsync(UserTask original, UserTaskStatus status, CancellationToken cancellationToken = default) =>
         modules.RunAsync(Id, () => inner.SetStatusAsync(original, status, cancellationToken));
+    public Task<UserTask> SetNoteAsync(UserTask original, string note, CancellationToken cancellationToken = default) =>
+        modules.RunAsync(Id, () => inner.SetNoteAsync(original, note, cancellationToken));
+    public Task MoveInListAsync(UserTask task, int newPosition, CancellationToken cancellationToken = default) =>
+        modules.RunAsync(Id, () => inner.MoveInListAsync(task, newPosition, cancellationToken));
+    public Task<IReadOnlyList<UserTaskHistoryEntry>> GetHistoryAsync(int taskId, CancellationToken cancellationToken = default) =>
+        modules.RunAsync(Id, () => inner.GetHistoryAsync(taskId, cancellationToken));
 
     public Task<UserTask> AcceptAsync(UserTask original, CancellationToken cancellationToken = default) =>
         modules.RunAsync(Id, () => inner.AcceptAsync(original, cancellationToken));
@@ -76,6 +82,9 @@ internal sealed class UnavailableUserTaskRepository : IUserTaskRepository
     public Task<UserTask> UpdateAsync(UserTask original, UserTaskInput input, CancellationToken cancellationToken = default) => Out<UserTask>();
     public Task DeleteAsync(UserTask original, string reason, CancellationToken cancellationToken = default) => Out<bool>();
     public Task<UserTask> SetStatusAsync(UserTask original, UserTaskStatus status, CancellationToken cancellationToken = default) => Out<UserTask>();
+    public Task<UserTask> SetNoteAsync(UserTask original, string note, CancellationToken cancellationToken = default) => Out<UserTask>();
+    public Task MoveInListAsync(UserTask task, int newPosition, CancellationToken cancellationToken = default) => Task.FromException(new ModuleUnavailableException(TasksModule.ModuleId));
+    public Task<IReadOnlyList<UserTaskHistoryEntry>> GetHistoryAsync(int taskId, CancellationToken cancellationToken = default) => Out<IReadOnlyList<UserTaskHistoryEntry>>();
     public Task<UserTask> AcceptAsync(UserTask original, CancellationToken cancellationToken = default) => Out<UserTask>();
     public Task<int> GetWarningDaysAsync(CancellationToken cancellationToken = default) => Out<int>();
     public Task SetWarningDaysAsync(int days, CancellationToken cancellationToken = default) => Out<bool>();

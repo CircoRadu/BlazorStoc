@@ -1,0 +1,354 @@
+@using Microsoft.JSInterop
+@inject IUserTaskRepository Repository
+@inject IAccessControl Access
+@inject IChangeFeed ChangeFeed
+@inject ChangeOrigin Origin
+@inject IJSRuntime JS
+@inject ILogger<UserTaskTabs> Logger
+@implements IAsyncDisposable
+@* The tables of the administrator (Administrare -> Taskuri utilizator): one tab "Nepreluate" with the active tasks nobody took over yet (all users) and one tab for every user who has tasks
+   (a tab appears with the first task of a user and goes away with the last). In a user's tab the active tasks are numbered in the order the administrator arranged for that user (drag the
+   handle of a row, or the arrows up / down on the focused handle) and the finished ones follow, in the order they were finished, unless the switch hides them. A finished task stays
+   editable: the stage it reached is written in its note (the user or the administrator) and every change is kept in the journal of the task (the view dialog). *@
+
+<LiveChangeNotice Visible="live?.HasPendingChange == true" Reload="ReloadLiveAsync" />
+@if (error is not null) { <div class="error-banner" role="alert">@error</div> }
+@if (notice is not null) { <div class="success-banner" role="status">@notice</div> }
+
+@if (formOpen)
+{
+    <div class="delete-overlay"><div class="delete-dialog template-popup" role="dialog" aria-modal="true" tabindex="-1" aria-labelledby="task-editor-title">
+        <TaskForm @key="formKey" BeneficiaryId="@(editing?.BeneficiaryId ?? 0)" BeneficiaryName="@(editing?.BeneficiaryName ?? "")" Original="editing" Saved="SavedAsync" Closed="CloseFormAsync" />
+    </div></div>
+}
+@if (viewingId is { } viewId)
+{
+    <TaskDetailsDialog @key="viewId" TaskId="viewId" Changed="ReloadAsync" Closed="CloseViewAsync" />
+}
+@if (deleting is not null)
+{
+    <DeleteConfirmationDialog @key="deleting.Id" Title="Ștergi taskul?" Subject="Taskul" ObjectLabel="@($"{deleting.Title} · {deleting.BeneficiaryName}")"
+                              Description="@($"Taskul și fișierele lui se șterg definitiv. Utilizator: {deleting.AssignedUserName}.")"
+                              ConfirmationNote="Operația este înregistrată în jurnal, cu toate datele taskului."
+                              Busy="@deleteBusy" Error="@deleteError" Confirmed="DeleteAsync" Cancelled="CancelDeleteAsync" />
+}
+
+<div class="settings-tabs" role="tablist" aria-label="Taskuri">
+    <button type="button" role="tab" id="tab-tasks-unaccepted" class="settings-tab @(IsUnacceptedTab ? "active" : "") @(Unaccepted.Count > 0 ? "needs-attention" : "")" aria-selected="@(IsUnacceptedTab ? "true" : "false")" aria-controls="panel-tasks" @onclick="() => OpenTab(UnacceptedTab)">Nepreluate <span class="count-badge">@Unaccepted.Count</span></button>
+    @foreach (var user in Users)
+    {
+        var id = user.Id;
+        <button type="button" role="tab" id="@($"tab-tasks-user-{id}")" class="settings-tab @(tab == UserTab(id) ? "active" : "") @(user.NotAccepted > 0 ? "needs-attention" : "")" aria-selected="@(tab == UserTab(id) ? "true" : "false")" aria-controls="panel-tasks" @onclick="() => OpenTab(UserTab(id))">@user.Name <span class="count-badge">@user.Active</span></button>
+    }
+</div>
+<div id="panel-tasks" role="tabpanel" aria-labelledby="@(IsUnacceptedTab ? "tab-tasks-unaccepted" : $"tab-tasks-user-{CurrentUserId}")">
+    <div class="filters"><label class="search-box"><span>⌕</span><input aria-label="Caută taskuri" placeholder="Caută după titlu, descriere, stadiu sau beneficiar…" @bind="query" @bind:event="oninput" /></label>
+        @if (!IsUnacceptedTab) { <ToggleSwitch Id="tasks-hide-done" Value="hideDone" ValueChanged="value => hideDone = value" OnText="Da" OffText="Nu">Ascunde taskurile finalizate</ToggleSwitch> }
+    </div>
+    @if (loading) { <div class="empty-state" role="status"><div class="spinner"></div><h3>Se încarcă taskurile</h3></div> }
+    else
+    {
+        var scope = Scope();
+        <div class="task-label-bar" role="group" aria-label="Filtre taskuri">
+            @foreach (var status in new[] { UserTaskStatus.Future, UserTaskStatus.InProgress })
+            {
+                var count = scope.Count(task => task.Status == status);
+                @if (count > 0 || statusFilter.Contains(status))
+                {
+                    <button type="button" class="task-label @(statusFilter.Contains(status) ? "active" : "")" aria-pressed="@(statusFilter.Contains(status) ? "true" : "false")" title="@($"Filtrează după starea {UserTaskRules.StatusLabel(status)}")" @onclick="() => ToggleStatus(status)">@UserTaskRules.StatusLabel(status) <span class="task-label-count">@count</span></button>
+                }
+            }
+            @if (scope.Any(IsOverdue) || overdueOnly)
+            {
+                <button type="button" class="task-label @(overdueOnly ? "active" : "")" aria-pressed="@(overdueOnly ? "true" : "false")" title="Arată doar taskurile cu termenul depășit" @onclick="() => overdueOnly = !overdueOnly">Termen depășit <span class="task-label-count">@scope.Count(IsOverdue)</span></button>
+            }
+            @foreach (var priority in UserTaskRules.Priorities)
+            {
+                var count = scope.Count(task => task.Priority == priority);
+                @if (count > 0 || priorityFilter.Contains(priority))
+                {
+                    <button type="button" class="task-label task-prio @UserTaskRules.PriorityClass(priority) @(priorityFilter.Contains(priority) ? "active" : "")" aria-pressed="@(priorityFilter.Contains(priority) ? "true" : "false")" title="@($"Filtrează după prioritatea {UserTaskRules.PriorityLabel(priority).ToLowerInvariant()}")" @onclick="() => TogglePriority(priority)">Prioritate @UserTaskRules.PriorityLabel(priority).ToLowerInvariant() <span class="task-label-count">@count</span></button>
+                }
+            }
+            @if (HasFilters) { <button type="button" class="refresh act-close" @onclick="ClearFilters">Șterge filtrele</button> }
+        </div>
+        var active = ActiveRows(scope);
+        var finished = IsUnacceptedTab || hideDone ? Array.Empty<UserTask>() : FinishedRows(scope);
+        var dragOn = DragEnabled;
+        @if (!IsUnacceptedTab && canEdit && scope.Count(task => task.IsActive) > 1 && !dragOn)
+        {
+            <p class="muted" id="task-order-note"><small>Ca să aranjezi ordinea taskurilor, șterge filtrele și revino la ordinea implicită (fără sortare după un antet).</small></p>
+        }
+        @if (active.Count == 0 && finished.Count == 0)
+        {
+            <div class="empty-state"><span class="empty-icon">▦</span><h3>@(scope.Count == 0 ? (IsUnacceptedTab ? "Nu există taskuri nepreluate" : "Utilizatorul nu are taskuri") : "Niciun task pentru filtrele curente")</h3>
+                <p>@(scope.Count == 0 ? (IsUnacceptedTab ? "Un task nou apare aici până îl preia utilizatorul." : "Adaugă un task ca să apară aici.") : "Elimină un filtru sau șterge textul din câmpul de căutare.")</p></div>
+        }
+        else
+        {
+            <div class="table-scroll"><table id="@(IsUnacceptedTab ? "tasks-unaccepted-table" : "tasks-user-table")"><thead><tr>
+                @if (!IsUnacceptedTab) { <th class="drag-column"><span class="sr-only">Mută</span></th><th class="task-number">NR.</th> }
+                <th>BENEFICIAR</th><th>TITLU</th>@if (IsUnacceptedTab) { <th>UTILIZATOR</th> }<TaskSortHeader Label="PRIORITATE" Key="TaskSortKey.Priority" Current="sortKey" Descending="sortDescending" Clicked="SortBy" /><TaskSortHeader Label="CREAT" Key="TaskSortKey.Created" Current="sortKey" Descending="sortDescending" Clicked="SortBy" /><TaskSortHeader Label="TERMEN" Key="TaskSortKey.Due" Current="sortKey" Descending="sortDescending" Clicked="SortBy" /><th>STARE</th><th>PRELUAT</th><th class="number">FIȘIERE</th><th><span class="sr-only">Acțiuni</span></th></tr></thead><tbody>
+            @for (var index = 0; index < active.Count; index++)
+            {
+                @RowFor(active[index], index, dragOn)
+            }
+            @if (finished.Count > 0)
+            {
+                <tr class="task-done-separator"><td colspan="@ColumnCount">Finalizate (@finished.Count)</td></tr>
+                @foreach (var task in finished) { @RowFor(task, -1, false) }
+            }
+            </tbody></table></div>
+        }
+    }
+</div>
+
+@code {
+    private const string UnacceptedTab = "nepreluate";
+
+    // 0 = nothing to open; a task to open once loaded (the link from the journal): in the edit window when active, in the details when finished.
+    [Parameter] public int OpenTaskId { get; set; }
+
+    private sealed record UserTabInfo(int Id, string Name, int Active, int NotAccepted);
+
+    private IReadOnlyList<UserTask> tasks = [];
+    private readonly HashSet<UserTaskStatus> statusFilter = [];
+    private readonly HashSet<UserTaskPriority> priorityFilter = [];
+    private TaskSortKey sortKey;
+    private bool sortDescending;
+    private bool overdueOnly, hideDone, loading = true, canEdit, canDelete, formOpen, deleteBusy, openedLinked, busy;
+    private string query = "";
+    private string tab = UnacceptedTab;
+    private string? error, notice, deleteError;
+    private UserTask? editing, deleting;
+    private int? viewingId;
+    private Guid formKey = Guid.NewGuid();
+    private int warningDays = UserTaskRules.DefaultWarningDays;
+    private LiveRefresh? live;
+    private DotNetObjectReference<UserTaskTabs>? reference;
+    private readonly CancellationTokenSource lifetime = new();
+
+    private static string UserTab(int id) => "u" + id;
+    private bool IsUnacceptedTab => tab == UnacceptedTab;
+    private int CurrentUserId => int.TryParse(tab.AsSpan(1), out var id) ? id : 0;
+    private DateOnly Today => DateOnly.FromDateTime(DateTime.Now);
+    private bool HasFilters => statusFilter.Count > 0 || overdueOnly || priorityFilter.Count > 0 || query.Trim().Length > 0;
+    private bool DragEnabled => canEdit && !IsUnacceptedTab && !busy && !HasFilters && sortKey == TaskSortKey.None;
+    private int ColumnCount => IsUnacceptedTab ? 11 : 12;
+    private bool IsOverdue(UserTask task) => task.IsActive && task.DueDate is { } due && due < Today;
+    private IReadOnlyList<UserTask> Unaccepted => [.. tasks.Where(task => task.IsActive && !task.IsAccepted)];
+    private static string Shorten(string text) => text.Length <= 90 ? text : text[..87] + "…";
+    private string DueClass(UserTask task) => !task.IsActive || task.DueDate is not { } due ? "" : due < Today ? "task-due-overdue" : due <= Today.AddDays(warningDays) ? "task-due-soon" : "";
+
+    // A tab for every user who has at least one task (active or finished).
+    private IReadOnlyList<UserTabInfo> Users => [.. tasks.GroupBy(task => task.AssignedUserId)
+        .Select(group => new UserTabInfo(group.Key, group.First().AssignedUserName, group.Count(task => task.IsActive), group.Count(task => task.IsActive && !task.IsAccepted)))
+        .OrderBy(user => user.Name, StringComparer.CurrentCultureIgnoreCase)];
+
+    // The tasks of the open tab before the filters: the active tasks nobody took over, or every task of the user.
+    private IReadOnlyList<UserTask> Scope() => IsUnacceptedTab ? Unaccepted : [.. tasks.Where(task => task.AssignedUserId == CurrentUserId)];
+
+    private bool Matches(UserTask task)
+    {
+        var text = query.Trim();
+        return (text.Length == 0 || task.Title.Contains(text, StringComparison.OrdinalIgnoreCase) || task.Description.Contains(text, StringComparison.OrdinalIgnoreCase)
+                || task.ProgressNote.Contains(text, StringComparison.OrdinalIgnoreCase) || task.BeneficiaryName.Contains(text, StringComparison.OrdinalIgnoreCase))
+            && (statusFilter.Count == 0 || statusFilter.Contains(task.Status)) && (!overdueOnly || IsOverdue(task)) && (priorityFilter.Count == 0 || priorityFilter.Contains(task.Priority));
+    }
+
+    // The active tasks in the order of the user (the number of the task), or ordered by the header chosen; the unaccepted ones, newest first.
+    private IReadOnlyList<UserTask> ActiveRows(IReadOnlyList<UserTask> scope)
+    {
+        var rows = scope.Where(task => task.IsActive && Matches(task));
+        IEnumerable<UserTask> ordered = IsUnacceptedTab ? rows.OrderByDescending(task => task.CreatedUtc) : rows.OrderBy(task => task.SortOrder).ThenBy(task => task.Id);
+        return TaskSort.Apply(ordered, sortKey, sortDescending);
+    }
+
+    private IReadOnlyList<UserTask> FinishedRows(IReadOnlyList<UserTask> scope) =>
+        [.. scope.Where(task => !task.IsActive && Matches(task)).OrderByDescending(task => task.FinishedUtc ?? task.CreatedUtc)];
+
+    private void SortBy(TaskSortKey clicked) => (sortKey, sortDescending) = TaskSort.Next(sortKey, sortDescending, clicked);
+    private void TogglePriority(UserTaskPriority priority) { if (!priorityFilter.Add(priority)) priorityFilter.Remove(priority); }
+    private void ToggleStatus(UserTaskStatus status) { if (!statusFilter.Add(status)) statusFilter.Remove(status); }
+    private void ClearFilters() { statusFilter.Clear(); priorityFilter.Clear(); overdueOnly = false; query = ""; }
+    private void OpenTab(string value) { tab = value; ClearFilters(); sortKey = TaskSortKey.None; sortDescending = false; }
+
+    private RenderFragment RowFor(UserTask task, int activeIndex, bool dragOn)
+    {
+        var numbered = !IsUnacceptedTab;
+        return @<tr @key="task.Id" class="@(task.IsActive && !task.IsAccepted ? "task-row-new" : null) @(task.IsActive ? null : "task-done-row")" data-task-index="@(dragOn && activeIndex >= 0 ? activeIndex : null)" data-task-title="@task.Title">
+            @if (numbered)
+            {
+                <td class="drag-column">@if (dragOn && activeIndex >= 0)
+                    {
+                        @* A span, not a button: Firefox does not start a drag from a button. *@
+                        <span role="button" tabindex="0" class="row-icon drag" draggable="true" data-task-handle aria-label="@($"Mută taskul {task.Title} (trage sau folosește săgețile sus / jos)")" title="@($"Trage ca să muți taskul {task.Title} în lista utilizatorului")"
+                              @onkeydown="args => HandleKeyAsync(args, activeIndex)"></span>
+                    }</td>
+                <td class="task-number">@(task.IsActive && task.SortOrder > 0 ? task.SortOrder.ToString(System.Globalization.CultureInfo.InvariantCulture) : "—")</td>
+            }
+            <td><a class="category-table-link" href="@($"/beneficiari/{task.BeneficiaryId}")">@task.BeneficiaryName</a></td>
+            <td><strong>@task.Title</strong><br /><small class="muted" title="@task.Description">@Shorten(task.Description)</small>@if (task.ProgressNote.Length > 0) { <br /><small title="@task.ProgressNote"><strong>Stadiu:</strong> @Shorten(task.ProgressNote)</small> }</td>
+            @if (IsUnacceptedTab)
+            {
+                <td><button type="button" class="task-label" title="@($"Deschide taburile utilizatorului {task.AssignedUserName}")" @onclick="() => OpenTab(UserTab(task.AssignedUserId))">@task.AssignedUserName</button>@if (!task.AssignedUserActive) { <br /><small class="muted">dezactivat</small> }</td>
+            }
+            <td><span class="task-prio @UserTaskRules.PriorityClass(task.Priority)">@UserTaskRules.PriorityLabel(task.Priority)</span></td>
+            <td>@task.CreatedUtc.ToLocalTime().ToString("dd.MM.yyyy HH:mm", System.Globalization.CultureInfo.InvariantCulture)<br /><small class="muted">@task.CreatedBy</small></td>
+            <td class="@DueClass(task)">@UserTaskRules.DueText(task.DueDate)</td>
+            <td><button type="button" class="task-label @(statusFilter.Contains(task.Status) ? "active" : "")" aria-pressed="@(statusFilter.Contains(task.Status) ? "true" : "false")" title="@($"Filtrează după starea {UserTaskRules.StatusLabel(task.Status)}")" @onclick="() => ToggleStatus(task.Status)">@UserTaskRules.StatusLabel(task.Status)</button></td>
+            <td>@if (task.IsAccepted) { <text>@(task.AcceptedUtc!.Value.ToLocalTime().ToString("dd.MM.yyyy HH:mm", System.Globalization.CultureInfo.InvariantCulture))</text> } else if (task.IsActive) { <span class="task-new-badge">Nepreluat</span> } else { <text>—</text> }</td>
+            <td class="number">@task.FileCount</td>
+            <td class="row-actions">
+                <button class="row-icon view" aria-label="@($"Vezi taskul {task.Title}")" title="@($"Vezi taskul {task.Title} și jurnalul lui")" @onclick="() => viewingId = task.Id"></button>
+                @if (canEdit) { <button class="row-icon edit" aria-label="@($"Editează taskul {task.Title}")" title="@($"Editează taskul {task.Title}")" @onclick="() => OpenEdit(task)"></button> }
+                @if (canDelete && task.IsActive) { <button class="row-icon delete" aria-label="@($"Șterge taskul {task.Title}")" title="@($"Șterge taskul {task.Title}")" @onclick="() => deleting = task"></button> }
+            </td>
+        </tr>;
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            canEdit = await Access.HasAsync("taskuri.edit", lifetime.Token);
+            canDelete = await Access.HasAsync("taskuri.delete", lifetime.Token);
+        }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { return; }
+        catch (Exception) { canEdit = canDelete = false; }
+        live = new LiveRefresh(ChangeFeed, Origin.Id, change => change.EntityType == AuditEntities.UserTask,
+            () => InvokeAsync(RefreshSilentlyAsync), () => formOpen || deleting is not null || viewingId is not null || busy, () => InvokeAsync(StateHasChanged), fallbackInterval: TimeSpan.FromSeconds(60));
+        await LoadAsync();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+        reference = DotNetObjectReference.Create(this);
+        try { await JS.InvokeVoidAsync("blazorStocTaskOrder.register", reference); }
+        catch (Exception exception) when (exception is JSException or InvalidOperationException or JSDisconnectedException) { }
+    }
+
+    protected override Task OnParametersSetAsync()
+    {
+        if (OpenTaskId > 0 && !openedLinked && !loading)
+        {
+            openedLinked = true;
+            if (tasks.FirstOrDefault(task => task.Id == OpenTaskId) is { } linked)
+            {
+                tab = linked.IsActive && !linked.IsAccepted ? UnacceptedTab : UserTab(linked.AssignedUserId);
+                if (linked.IsActive && canEdit) OpenEdit(linked);
+                else viewingId = linked.Id;
+            }
+            else error = "Taskul din legătură nu mai există.";
+        }
+        return Task.CompletedTask;
+    }
+
+    private async Task FetchAsync()
+    {
+        tasks = await Repository.GetAllAsync(lifetime.Token);
+        try { warningDays = await Repository.GetWarningDaysAsync(lifetime.Token); } catch (Exception exception) when (exception is not OperationCanceledException) { }
+        // The tab of a user without tasks goes away; the open one falls back to the tasks nobody took over.
+        if (!IsUnacceptedTab && tasks.All(task => UserTab(task.AssignedUserId) != tab)) tab = UnacceptedTab;
+    }
+
+    private async Task LoadAsync()
+    {
+        loading = true;
+        error = null;
+        try { await FetchAsync(); }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { return; }
+        catch (AccessDeniedException exception) { error = exception.Message; tasks = []; }
+        catch (Exception exception)
+        {
+            Logger.LogWarning("Tasks loading failed ({ErrorType}).", exception.GetType().Name);
+            error = "Taskurile nu au putut fi încărcate. Reîncearcă după o clipă.";
+            tasks = [];
+        }
+        loading = false;
+        await OnParametersSetAsync();
+    }
+
+    private async Task RefreshSilentlyAsync()
+    {
+        try { await FetchAsync(); StateHasChanged(); }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (Exception exception) { Logger.LogDebug("Tasks refresh failed ({ErrorType}).", exception.GetType().Name); }
+    }
+
+    private Task ReloadLiveAsync() => live?.ReloadPendingAsync() ?? Task.CompletedTask;
+    private async Task ReloadAsync() { await LoadAsync(); StateHasChanged(); }
+
+    // Reloads the lists after a task was added or changed elsewhere on the same page (the changes of this session are not announced back to it).
+    public Task RefreshAsync() => ReloadAsync();
+
+    // ---- the order of the active tasks of the user (administrator): drag the handle (task-order.js) or the arrows on the focused handle ----
+    [JSInvokable]
+    public Task MoveTask(int from, int to) => InvokeAsync(() => MoveTaskAsync(from, to));
+
+    private Task HandleKeyAsync(KeyboardEventArgs args, int index) => args.Key switch
+    {
+        "ArrowUp" => MoveTaskAsync(index, index - 1),
+        "ArrowDown" => MoveTaskAsync(index, index + 1),
+        _ => Task.CompletedTask
+    };
+
+    private async Task MoveTaskAsync(int from, int to)
+    {
+        var list = ActiveRows(Scope());
+        if (!DragEnabled || from == to || from < 0 || to < 0 || from >= list.Count || to >= list.Count) return;
+        var task = list[from];
+        busy = true; error = null; notice = null;
+        StateHasChanged();
+        try
+        {
+            await Repository.MoveInListAsync(task, to + 1, lifetime.Token);
+            notice = $"Taskul „{task.Title}” este acum al {to + 1}-lea în lista lui {task.AssignedUserName}.";
+        }
+        catch (UserTaskOperationException exception) { error = exception.Message; }
+        catch (AccessDeniedException exception) { error = exception.Message; }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (Exception exception) { Logger.LogError("Task reordering failed ({ErrorType}).", exception.GetType().Name); error = "Ordinea taskurilor nu a putut fi salvată. Actualizează pagina înainte să reîncerci."; }
+        finally { busy = false; }
+        await ReloadAsync();
+    }
+
+    private void OpenEdit(UserTask task) { editing = task; formKey = Guid.NewGuid(); formOpen = true; notice = null; }
+    private async Task SavedAsync(UserTask saved) { formOpen = false; editing = null; notice = $"Taskul „{saved.Title}” a fost salvat."; await ReloadAsync(); }
+    private async Task CloseFormAsync() { formOpen = false; editing = null; await ReloadAsync(); }
+    private async Task CloseViewAsync() { viewingId = null; await ReloadAsync(); }
+    private Task CancelDeleteAsync() { deleting = null; deleteError = null; return Task.CompletedTask; }
+
+    private async Task DeleteAsync(string reason)
+    {
+        if (deleting is not { } task || deleteBusy) return;
+        deleteBusy = true; deleteError = null;
+        try
+        {
+            await Repository.DeleteAsync(task, reason, lifetime.Token);
+            notice = $"Taskul „{task.Title}” a fost șters.";
+            deleting = null;
+        }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (UserTaskOperationException exception) { deleteError = exception.Message; }
+        catch (AccessDeniedException exception) { deleteError = exception.Message; }
+        catch (Exception exception)
+        {
+            Logger.LogError("Task deletion failed ({ErrorType}).", exception.GetType().Name);
+            deleteError = "Taskul nu a putut fi șters. Actualizează pagina înainte să reîncerci.";
+        }
+        finally { deleteBusy = false; }
+        await ReloadAsync();
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        live?.Dispose();
+        lifetime.Cancel();
+        try { await JS.InvokeVoidAsync("blazorStocTaskOrder.unregister"); }
+        catch (Exception exception) when (exception is JSException or InvalidOperationException or JSDisconnectedException or TaskCanceledException) { }
+        reference?.Dispose();
+        lifetime.Dispose();
+    }
+}

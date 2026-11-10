@@ -15,7 +15,7 @@
         }
         else
         {
-            <div class="catalog-heading"><h2 id="task-details-title">@(editing ? "Editare task" : "Vizualizare task") – @task.Title · @task.BeneficiaryName</h2><span class="heading-actions"><HelpButton Topic="task-detalii" About="Detaliile taskului" />@if (isAssignee && !editing) { <button type="button" class="refresh act-edit" disabled="@busy" @onclick="() => editing = true">Editează</button> }<button type="button" class="refresh act-close" @onclick="() => Closed.InvokeAsync()">Închide</button></span></div>
+            <div class="catalog-heading"><h2 id="task-details-title">@(editing ? "Editare task" : "Vizualizare task") – @task.Title · @task.BeneficiaryName</h2><span class="heading-actions"><HelpButton Topic="task-detalii" About="Detaliile taskului" />@if (canChangeStatus && !editing) { <button type="button" class="refresh act-edit" disabled="@busy" @onclick="StartEditing">Editează</button> }<button type="button" class="refresh act-close" @onclick="() => Closed.InvokeAsync()">Închide</button></span></div>
             @if (error is not null) { <div class="error-banner" role="alert">@error</div> }
             @if (!task.IsAccepted && isAssignee)
             {
@@ -33,12 +33,17 @@
             </dl>
             @if (editing)
             {
-                <p class="form-note">Poți schimba starea taskului și adăuga fișiere proprii (le poți și șterge). Celelalte date le modifică administratorul. Se salvează imediat.</p>
+                <p class="form-note">Poți schimba starea taskului, scrie stadiul în care s-a ajuns (și după ce taskul e finalizat) și adăuga fișiere proprii (le poți și șterge). Descrierea o modifică administratorul. Starea și fișierele se salvează imediat; stadiul se salvează cu butonul lui.</p>
                 <label for="task-details-status">Stare
                     <select id="task-details-status" value="@((int)task.Status)" disabled="@(busy || !canChangeStatus)" @onchange="StatusChangedAsync">
                         @foreach (var status in UserTaskRules.Statuses) { <option value="@((int)status)">@UserTaskRules.StatusLabel(status)</option> }
                     </select></label>
                 <div class="task-description"><strong>Descriere</strong><p>@task.Description</p></div>
+                <div class="task-note">
+                    <label for="task-details-note"><strong>Stadiu / note de lucru</strong></label>
+                    <textarea id="task-details-note" maxlength="@UserTaskRules.NoteMaxLength" disabled="@busy" placeholder="De exemplu: trimis la poliție la 12.11.2026" @bind="noteText" @bind:event="oninput"></textarea>
+                    <div class="editor-actions"><button type="button" id="task-note-save" class="refresh act-confirm" disabled="@(busy || noteText.Trim() == task.ProgressNote)" @onclick="SaveNoteAsync">Salvează stadiul</button></div>
+                </div>
                 <TaskFilesPanel TaskId="task.Id" Changed="ReloadAsync" />
                 <div class="editor-actions"><button type="button" class="refresh act-nav" @onclick="() => editing = false">Înapoi la vizualizare</button></div>
             }
@@ -46,8 +51,28 @@
             {
                 <div class="task-facts-extra"><strong>Stare</strong> <span class="task-label static">@UserTaskRules.StatusLabel(task.Status)</span></div>
                 <div class="task-description"><strong>Descriere</strong><p>@task.Description</p></div>
+                <div class="task-description" id="task-note-view"><strong>Stadiu / note de lucru</strong><p>@(task.ProgressNote.Length > 0 ? task.ProgressNote : "—")</p></div>
                 <TaskFilesPanel TaskId="task.Id" ReadOnly="true" />
             }
+            <section class="task-history" aria-label="Jurnalul taskului">
+                <button type="button" id="task-history-toggle" class="refresh act-nav" aria-expanded="@(historyOpen ? "true" : "false")" aria-controls="task-history-list" @onclick="ToggleHistoryAsync">@(historyOpen ? "Ascunde jurnalul taskului" : "Jurnalul taskului")</button>
+                @if (historyOpen)
+                {
+                    <div id="task-history-list">
+                        @if (history is null) { <p class="muted" role="status">Se citește jurnalul…</p> }
+                        else if (history.Count == 0) { <p class="muted">Jurnalul taskului este gol.</p> }
+                        else
+                        {
+                            <ol>
+                                @foreach (var entry in history)
+                                {
+                                    <li><time datetime="@entry.TimestampUtc.ToString("O")">@entry.TimestampUtc.ToLocalTime().ToString("dd.MM.yyyy HH:mm", System.Globalization.CultureInfo.InvariantCulture)</time><span>@UserTaskRules.HistoryText(entry)</span></li>
+                                }
+                            </ol>
+                        }
+                    </div>
+                }
+            </section>
         }
     </div>
 </div>
@@ -59,7 +84,9 @@
     [Parameter] public EventCallback Closed { get; set; }
 
     private UserTask? task;
-    private bool isAssignee, canChangeStatus, busy, editing;
+    private bool isAssignee, canChangeStatus, busy, editing, historyOpen;
+    private string noteText = "";
+    private IReadOnlyList<UserTaskHistoryEntry>? history;
     private string? error, loadError;
     private readonly CancellationTokenSource lifetime = new();
 
@@ -82,6 +109,29 @@
         }
     }
 
+    private void StartEditing() { noteText = task?.ProgressNote ?? ""; editing = true; }
+
+    private async Task SaveNoteAsync()
+    {
+        if (task is null || busy) return;
+        await RunAsync(() => Repository.SetNoteAsync(task, noteText, lifetime.Token), "Stadiul nu a putut fi salvat.");
+        if (task is not null) noteText = task.ProgressNote;
+        if (historyOpen) await LoadHistoryAsync();
+    }
+
+    private async Task ToggleHistoryAsync()
+    {
+        historyOpen = !historyOpen;
+        if (historyOpen) await LoadHistoryAsync();
+    }
+
+    private async Task LoadHistoryAsync()
+    {
+        try { history = await Repository.GetHistoryAsync(TaskId, lifetime.Token); }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (Exception exception) { Logger.LogWarning("Task history loading failed ({ErrorType}).", exception.GetType().Name); history = []; }
+    }
+
     private async Task ReloadAsync()
     {
         try { task = await Repository.GetAsync(TaskId, lifetime.Token) ?? task; }
@@ -94,12 +144,14 @@
     {
         if (task is null || busy || !int.TryParse(args.Value?.ToString(), out var value) || !Enum.IsDefined((UserTaskStatus)value)) return;
         await RunAsync(() => Repository.SetStatusAsync(task, (UserTaskStatus)value, lifetime.Token), "Starea taskului nu a putut fi schimbată.");
+        if (historyOpen) await LoadHistoryAsync();
     }
 
     private async Task AcceptAsync()
     {
         if (task is null || busy) return;
         await RunAsync(() => Repository.AcceptAsync(task, lifetime.Token), "Taskul nu a putut fi preluat.");
+        if (historyOpen) await LoadHistoryAsync();
     }
 
     private async Task RunAsync(Func<Task<UserTask>> operation, string fallback)

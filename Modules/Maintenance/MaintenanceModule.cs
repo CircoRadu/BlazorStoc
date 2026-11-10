@@ -11,7 +11,7 @@ public sealed class MaintenanceModule : IModule
 
     public string Id => ModuleId;
     public string Name => "Mentenanță";
-    public Version Version { get; } = new(1, 10, 2);
+    public Version Version { get; } = new(1, 11, 1);
     public IReadOnlyList<ModuleNavItem> Nav { get; } = [new("/mentenanta", "Mentenanță", "⚒", ModuleId)];
 
     public void Register(IServiceCollection services, IConfiguration configuration)
@@ -26,6 +26,7 @@ public sealed class MaintenanceModule : IModule
         services.AddScoped<IOnDemandInterventionRecorderFactory, OnDemandInterventionRecorderFactory>();
         services.AddScoped<IMaintenanceNotificationReader>(provider => new GuardedMaintenanceNotificationReader(
             ActivatorUtilities.CreateInstance<MariaMaintenanceNotificationReader>(provider), provider.GetRequiredService<ModuleRegistry>()));
+        services.AddHostedService<TicketOutcomeWorker>();
         services.Configure<MapOptions>(configuration.GetSection(MapOptions.SectionName));
         services.AddSingleton<MapConfigStore>();
         services.AddScoped<IMapConfigurationService>(provider => new GuardedMapConfigurationService(

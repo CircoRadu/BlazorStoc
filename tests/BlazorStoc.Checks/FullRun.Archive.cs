@@ -62,6 +62,7 @@ data = await new DemoProductRepository().GetProductsAsync();
             ["parameters"] = () => ParameterChecks.RunAsync(Check),
             ["moduleversions"] = () => ModuleVersionChecks.RunAsync(Check),
             ["activityimport"] = () => ActivityImportChecks.RunAsync(Check),
+            ["usertasks"] = () => UserTaskTabsChecks.RunAsync(Check),
             ["elcomtur"] = () => ElcomturChecks.RunAsync(Check),
             ["ocrworker"] = () => OcrWorkerChecks.RunAsync(Check),
             ["backupworker"] = () => BackupWorkerChecks.RunAsync(Check),

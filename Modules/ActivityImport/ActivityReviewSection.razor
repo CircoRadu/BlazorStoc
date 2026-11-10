@@ -13,6 +13,8 @@
     <div class="catalog-body">
         <p class="muted"><small>Toate tichetele rezolvate din ActivityApp (service și mentenanță) așteaptă aici; niciunul nu se înregistrează singur. Fiecare este propus ca <strong>mentenanță</strong> (tip de mentenanță sau cuvânt cheie în ce s-a făcut, chiar dacă punctul nu are încă un contract) sau ca <strong>service</strong>. Alege: <strong>ochiul</strong> = vizualizare, <strong>creionul</strong> = modifici și preiei, <strong>bifa</strong> = preiei așa cum este propus, <strong>coșul</strong> = discard (tichetul nu se mai preia).</small></p>
         @if (notice is not null) { <div class="notice" role="status">@notice</div> }
+        @if (outcomes.Pending > 0) { <div class="notice" role="status" id="ai-outcomes-pending">@outcomes.Pending tichete decise așteaptă înregistrarea în Mentenanță (modulul este oprit sau încă nu a ajuns la ele); intervențiile și scadențele se actualizează când pornește.</div> }
+        @if (outcomes.Failed > 0) { <div class="error-banner" role="alert" id="ai-outcomes-failed">@outcomes.Failed tichete decise au fost refuzate de registrul de mentenanță la înregistrare (de exemplu data sau punctul de lucru nu mai sunt valide).</div> }
         @if (error is not null && popup == Popup.None) { <div class="error-banner" role="alert">@error</div> }
         @if (items is null) { <p class="muted" role="status">Se citește lista…</p> }
         else if (items.Count == 0) { <p class="muted" id="ai-review-empty">Nu sunt evenimente de validat.</p> }
@@ -134,6 +136,7 @@
     [Parameter] public EventCallback Decided { get; set; }
     private static readonly string MinDate = StockMovementRules.StorageDate(StockMovementRules.EarliestDate);
     private IReadOnlyList<ActivityReviewItem>? items;
+    private TicketOutcomeCounts outcomes = new(0, 0);
     private Popup popup;
     private ActivityReviewItem? target;
     private ActivityReviewDetail? detail;
@@ -160,7 +163,7 @@
     {
         busy = true;
         error = null;
-        try { items = await Reviews.GetPendingAsync(lifetime.Token); }
+        try { items = await Reviews.GetPendingAsync(lifetime.Token); outcomes = await Reviews.GetOutcomeCountsAsync(lifetime.Token); }
         catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
         catch (ModuleUnavailableException) { items = []; error = "Modulul de preluare ActivityApp este oprit."; }
         catch (AccessDeniedException exception) { items = []; error = exception.Message; }

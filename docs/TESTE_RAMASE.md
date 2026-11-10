@@ -922,3 +922,5 @@ Taskuri: prioritate, ordonare, editare de utilizator; popup-uri uniforme (0.5.58
 Modulul Propuneri (0.5.61) (09.11.2026): Notificari pentru rapoartele de erori; help si capturi pentru ferestrele noi; verificare in browser ca utilizator simplu, tema intunecata, telefon.
 
 Bara popup-ului ancorata de popup (BUG-0006) (09.11.2026): Pachet cu corectia (0.5.62), la cerere; verificare in aplicatie pe telefon.
+
+Taskuri: taburi pe utilizator, ordine proprie, stadiu si jurnal al taskului (10.11.2026): Taskuri: tragerea cu mouse-ul a randurilor (task-order.js) verificata doar sintactic si prin tastatura in teste; de incercat in browser real

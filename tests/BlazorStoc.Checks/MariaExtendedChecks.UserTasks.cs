@@ -35,6 +35,8 @@ public static partial class MariaExtendedChecks
         var adminAccess = new TaskTestAccess(null, "integration.tester", true);
         var accessA = new TaskTestAccess(userA.Id, userA.Username, false);
         var accessB = new TaskTestAccess(userB.Id, userB.Username, false);
+        var userC = await users.CreateAsync(new WebUserInput { Username = "ext.tc." + suffix, DisplayName = "Ext Task C", Role = AccessRoles.LimitedUser, Password = "Parola-ext-veche-123!" });
+        var accessC = new TaskTestAccess(userC.Id, userC.Username, false);
         MariaUserTaskRepository RepositoryOf(IAccessControl access) => new(configuration, access, audit);
         MariaUserTaskFileStore FilesOf(IAccessControl access) => new(configuration, access, audit, RepositoryOf(access));
         var tasks = RepositoryOf(adminAccess);
@@ -149,6 +151,54 @@ public static partial class MariaExtendedChecks
             await tasks.SetWarningDaysAsync(5);
             Check(await asA.GetWarningDaysAsync() == 5 && (await audit.GetEventsAsync()).Count(item => item.TimestampUtc > since && item.Action == AuditActions.EditTaskWarningDays) == 1, "The warning period is saved and any user reads it");
 
+            // ---- The order of the active tasks of a user, the stage written in the note, the journal of one task ----
+            UserTaskInput NewInput(string title) => new() { BeneficiaryId = owner.Id, AssignedUserId = userC.Id, Title = title, Description = "Ext descriere " + title };
+            var first = await tasks.CreateAsync(NewInput("Ext ordine 1"));
+            var second = await tasks.CreateAsync(NewInput("Ext ordine 2"));
+            var third = await tasks.CreateAsync(NewInput("Ext ordine 3"));
+            created.AddRange([first.Id, second.Id, third.Id]);
+            async Task<int[]> OrderOf() => [.. (await tasks.GetAllAsync()).Where(item => item.AssignedUserId == userC.Id && item.IsActive).OrderBy(item => item.SortOrder).Select(item => item.Id)];
+            async Task<int[]> NumbersOf() => [.. (await tasks.GetAllAsync()).Where(item => item.AssignedUserId == userC.Id && item.IsActive).OrderBy(item => item.SortOrder).Select(item => item.SortOrder)];
+            Check((await OrderOf()).SequenceEqual([first.Id, second.Id, third.Id]) && (await NumbersOf()).SequenceEqual([1, 2, 3]), "A new task takes the last place of the list of its user (numbered 1, 2, 3)");
+            await tasks.MoveInListAsync(third, 1);
+            Check((await OrderOf()).SequenceEqual([third.Id, first.Id, second.Id]) && (await NumbersOf()).SequenceEqual([1, 2, 3]) && await Events(third.Id, AuditActions.ReorderUserTasks) == 1
+                && AuditActions.IsCreateOrEdit(AuditActions.ReorderUserTasks), "The administrator moves a task in the list of its user: the others move along, the numbers stay 1, 2, 3 and the move is journaled by name");
+            await tasks.MoveInListAsync(third, 1);
+            Check(await Events(third.Id, AuditActions.ReorderUserTasks) == 1, "Moving a task to the place it already has is not journaled");
+            await Rejects<AccessDeniedException>(() => RepositoryOf(accessC).MoveInListAsync(first, 3), "A user cannot arrange the order of the tasks");
+            await Rejects<UserTaskOperationException>(() => tasks.MoveInListAsync(first with { AssignedUserId = userA.Id }, 1), "A task that is not in the list of that user cannot be moved there");
+            var finishedSecond = await tasks.SetStatusAsync((await tasks.GetAsync(second.Id))!, UserTaskStatus.Done);
+            Check(finishedSecond.SortOrder == 0 && (await OrderOf()).SequenceEqual([third.Id, first.Id]) && (await NumbersOf()).SequenceEqual([1, 2]), "A finished task leaves the list and the others are numbered again");
+            var reactivated = await tasks.SetStatusAsync(finishedSecond, UserTaskStatus.InProgress);
+            Check(reactivated.SortOrder == 3 && (await OrderOf()).SequenceEqual([third.Id, first.Id, second.Id]), "A task that is active again takes the last place of the list");
+            var movedAway = await tasks.UpdateAsync(reactivated, new UserTaskInput { BeneficiaryId = owner.Id, AssignedUserId = userA.Id, Title = reactivated.Title, Description = reactivated.Description, Status = reactivated.Status, Priority = reactivated.Priority });
+            Check((await NumbersOf()).SequenceEqual([1, 2]) && movedAway.SortOrder > 0 && (await tasks.GetAllAsync()).Where(item => item.AssignedUserId == userA.Id && item.IsActive).Select(item => item.SortOrder).Distinct().Count() == (await tasks.GetAllAsync()).Count(item => item.AssignedUserId == userA.Id && item.IsActive),
+                "A task given to another user leaves the list and takes the last place of the new one (no number twice)");
+
+            var finishedThird = await tasks.SetStatusAsync((await tasks.GetAsync(third.Id))!, UserTaskStatus.Done);
+            var asCTasks = RepositoryOf(accessC);
+            var noted = await asCTasks.SetNoteAsync(finishedThird, "  Proiect depus la politie pe 12.11.2026  ");
+            Check(noted.ProgressNote == "Proiect depus la politie pe 12.11.2026" && noted.Status == UserTaskStatus.Done && noted.FinishedUtc == finishedThird.FinishedUtc && noted.SortOrder == 0 && await Events(third.Id, AuditActions.EditUserTaskNote) == 1
+                && AuditActions.IsCreateOrEdit(AuditActions.EditUserTaskNote), "The user writes the stage in the note of a finished task: the task stays finished, keeps its date of finishing and the change is journaled by name");
+            Check((await asCTasks.SetNoteAsync(noted, noted.ProgressNote)).Version == noted.Version + 1 && await Events(third.Id, AuditActions.EditUserTaskNote) == 1, "Saving the same note changes nothing in the journal");
+            await Rejects<AccessDeniedException>(() => RepositoryOf(accessA).SetNoteAsync(noted, "alt text"), "Another user cannot write the note of the task");
+            var currentThird = (await asCTasks.GetAsync(third.Id))!;
+            await Rejects<UserTaskOperationException>(() => asCTasks.SetNoteAsync(currentThird, new string('x', UserTaskRules.NoteMaxLength + 1)), "The note has a length limit");
+            var adminNoted = await tasks.SetNoteAsync((await tasks.GetAsync(third.Id))!, "Proiect depus la politie pe 12.11.2026; raspuns asteptat");
+            Check(adminNoted.ProgressNote.EndsWith("raspuns asteptat", StringComparison.Ordinal) && await Events(third.Id, AuditActions.EditUserTaskNote) == 2, "The administrator also writes the stage of a finished task");
+            var editedDone = await tasks.UpdateAsync(adminNoted, new UserTaskInput { BeneficiaryId = owner.Id, AssignedUserId = userC.Id, Title = adminNoted.Title + " (editat)", Description = adminNoted.Description, Status = UserTaskStatus.Done, Priority = UserTaskPriority.High });
+            Check(editedDone.Title.EndsWith("(editat)", StringComparison.Ordinal) && editedDone.Status == UserTaskStatus.Done && editedDone.FinishedUtc == adminNoted.FinishedUtc && editedDone.SortOrder == 0 && editedDone.ProgressNote == adminNoted.ProgressNote,
+                "A finished task can still be edited: it stays finished, outside the list, with its date of finishing and its note");
+
+            var history = await asCTasks.GetHistoryAsync(third.Id);
+            Check(history.Count >= 5 && history[0].Action == AuditActions.CreateUserTask && history.Any(item => item.Action == AuditActions.ChangeUserTaskStatus && UserTaskRules.HistoryText(item).StartsWith("Finalizat de ", StringComparison.Ordinal))
+                && history.Any(item => item.Action == AuditActions.EditUserTaskNote && UserTaskRules.HistoryText(item).Contains("Proiect depus la politie", StringComparison.Ordinal) && item.Actor == userC.Username)
+                && history.Any(item => item.Action == AuditActions.ReorderUserTasks) && history.Zip(history.Skip(1), (a, b) => a.TimestampUtc <= b.TimestampUtc).All(ok => ok),
+                "The journal of a task lists, oldest first, who created, moved, finished and wrote the stage of it, and when");
+            Check((await RepositoryOf(accessA).GetHistoryAsync(third.Id)).Count == 0 && (await tasks.GetHistoryAsync(third.Id)).Count == history.Count, "The journal of a task is read by its user and by who may view tasks, not by another user");
+            Check(UserTaskRules.HistoryText(new(DateTime.UtcNow, "ana", AuditActions.AcceptUserTask, "")) == "Preluat de ana" && UserTaskRules.HistoryText(new(DateTime.UtcNow, "ana", AuditActions.CreateUserTask, "")) == "Creat de ana",
+                "The lines of the journal of a task say what happened and who did it");
+
             // ---- Beneficiary deletion and task deletion ----
             await Rejects<BeneficiaryOperationException>(() => beneficiaries.DeleteAsync(owner, "Ext motiv stergere"), "A beneficiary with tasks cannot be deleted");
             current = (await tasks.GetAsync(task.Id))!;
@@ -171,7 +221,7 @@ public static partial class MariaExtendedChecks
             }
             foreach (var id in created)
                 if (await tasks.GetAsync(id) is { } left) await tasks.DeleteAsync(left, "Ext curatare");
-            foreach (var user in new[] { userA, userB })
+            foreach (var user in new[] { userA, userB, userC })
                 if ((await users.GetUsersAsync()).FirstOrDefault(item => item.Id == user.Id) is { } live) await users.DeleteAsync(live, "Ext curatare");
             if ((await beneficiaries.GetBeneficiariesAsync()).FirstOrDefault(current => current.Id == owner.Id) is { } liveBeneficiary) await beneficiaries.DeleteAsync(liveBeneficiary, "Ext curatare");
         }

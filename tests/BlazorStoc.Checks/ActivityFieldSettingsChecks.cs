@@ -116,10 +116,12 @@ public static class ActivityFieldSettingsChecks
             "Example ticket window: the column in use shows which piece (or extra field) reads it");
         check(!cut.Find("#ticket-sample-older").HasAttribute("disabled") && cut.Find("#ticket-sample-newer").HasAttribute("disabled"), "Example ticket window: the previous ticket can be asked for, the newer one only after going back");
         cut.Find("#ticket-sample-older").Click();
+        cut.Find("button[aria-label='Alege pentru ce folosești coloana Detalii']").Click();
         cut.Find("select[aria-label='Folosește coloana Detalii pentru']").Change("problem");
         check(older == 1 && chosen is { Table: "Tickete", Column: "Detalii", For: "problem" }, "Example ticket window: the previous ticket button and the choice of a column for a piece are passed on");
+        cut.Find("button[aria-label='Alege pentru ce folosești coloana DescriptionInternal']").Click();
         cut.Find("select[aria-label='Folosește coloana DescriptionInternal pentru']").Change("extra");
-        check(chosen is { For: "extra" } && cut.FindAll("select[aria-label='Folosește coloana ID pentru']").Count == 0, "Example ticket window: a column can become an extra field, and a column without text cannot be chosen");
+        check(chosen is { For: "extra" } && cut.FindAll("[aria-label*='coloana ID ']").Count == 0, "Example ticket window: a column can become an extra field, and a column without text cannot be chosen");
     }
 
     private static void Map(Action<bool, string> check)

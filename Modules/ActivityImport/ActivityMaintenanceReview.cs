@@ -42,6 +42,8 @@ public interface IActivityReviewService
     Task TakeAsync(long id, ReviewTakeInput input, CancellationToken cancellationToken = default);
     /// <summary>The components the operator can choose for the ticket when the intervention is recorded at the work point.</summary>
     Task<InterventionComponentChoice> GetComponentChoiceAsync(long id, int workPointId, CancellationToken cancellationToken = default) => Task.FromResult(InterventionComponentChoice.None);
+    /// <summary>How many decided tickets still wait for the maintenance module to record their intervention, and how many it refused.</summary>
+    Task<TicketOutcomeCounts> GetOutcomeCountsAsync(CancellationToken cancellationToken = default) => Task.FromResult(new TicketOutcomeCounts(0, 0));
     /// <summary>The tickets discarded, newest first.</summary>
     Task<IReadOnlyList<ActivityDiscardedTicket>> GetDiscardedAsync(CancellationToken cancellationToken = default);
     /// <summary>The ticket as read from ActivityApp, to view a discarded one (read only).</summary>
@@ -180,6 +182,12 @@ public sealed class MariaActivityReviewService(IConfiguration configuration, IAc
             item.Kind == ActivityTicketPlanner.ServiceKind ? ReviewCategory.Service : ReviewCategory.Maintenance, row.InterventionId is not null, components);
     }
 
+    public async Task<TicketOutcomeCounts> GetOutcomeCountsAsync(CancellationToken cancellationToken = default)
+    {
+        await access.EnsureAnyAsync(ViewKeys, cancellationToken).ConfigureAwait(false);
+        return await ActivityTicketOutcomeStore.CountAsync(configuration, cancellationToken).ConfigureAwait(false);
+    }
+
     public async Task<InterventionComponentChoice> GetComponentChoiceAsync(long id, int workPointId, CancellationToken cancellationToken = default)
     {
         if (interventions is null) return InterventionComponentChoice.None;
@@ -200,7 +208,6 @@ public sealed class MariaActivityReviewService(IConfiguration configuration, IAc
     {
         await access.EnsureAnyAsync(DecideKeys, cancellationToken).ConfigureAwait(false);
         if (!MariaDatabaseGuard.IsAllowedDatabase(configuration)) throw new ActivityImportException("Modificările sunt permise numai în baza BlazorStoc. Verifică numele bazei configurate.");
-        if (interventions is null) throw new ActivityImportException("Modulul Mentenanță nu este disponibil.");
         var actor = (await RepositoryAudit.ActorAsync(access, cancellationToken).ConfigureAwait(false)).Username;
         var item = (await ReadPendingAsync(configuration, cancellationToken).ConfigureAwait(false)).FirstOrDefault(entry => entry.Id == id);
         var row = await FindAsync(id, cancellationToken).ConfigureAwait(false);
@@ -209,28 +216,37 @@ public sealed class MariaActivityReviewService(IConfiguration configuration, IAc
         if (notes.Length > OnDemandInterventionRules.NotesMaximumLength) throw new ActivityImportException($"Observațiile pot avea cel mult {OnDemandInterventionRules.NotesMaximumLength} de caractere.");
         var maintenance = input.Category == ReviewCategory.Maintenance;
         var edited = input.WorkPointId != row.WorkPointId || input.PerformedOn != row.PerformedOn;
-        int interventionId;
+        int? interventionId;
         var gpsNote = "";
+        var applied = false;
         try
         {
             if (row.InterventionId is { } existing)
             {
-                // A ticket proposed before the approval queue existed already has its on-demand intervention: the maintenance replaces it, the service keeps it.
+                // A ticket proposed before the approval queue existed already has its on-demand intervention: the maintenance replaces it, the service keeps it (this needs the maintenance module).
+                if (interventions is null) throw new ActivityImportException("Modulul Mentenanță nu este disponibil.");
                 interventionId = maintenance ? await ConvertToMaintenanceAsync(row, item, existing, input.ComponentIds, cancellationToken).ConfigureAwait(false) : existing;
+                applied = true;
             }
             else
             {
-                interventionId = maintenance
-                    ? await interventions.RecordMaintenanceUncoveredAsync(row.BeneficiaryId, input.WorkPointId, input.PerformedOn, notes, input.ComponentIds ?? [], cancellationToken).ConfigureAwait(false)
-                    : await interventions.RecordAsync(row.BeneficiaryId, input.WorkPointId, input.PerformedOn, notes, cancellationToken).ConfigureAwait(false);
+                // The decision is kept first; the intervention is recorded by the maintenance module - now when it runs, later (in the order of the dates) when it is out.
+                await ActivityTicketOutcomeStore.AddAsync(configuration, new(0, row.TicketId, row.BeneficiaryId, input.WorkPointId, maintenance, input.PerformedOn, notes, input.ComponentIds ?? [], actor), cancellationToken).ConfigureAwait(false);
+                if (interventions is not null)
+                {
+                    try { await TicketOutcomeApplication.ApplyPendingAsync(configuration, interventions, cancellationToken).ConfigureAwait(false); }
+                    catch (ModuleUnavailableException) { }
+                }
+                var outcome = await ActivityTicketOutcomeStore.FindAsync(configuration, row.TicketId, cancellationToken).ConfigureAwait(false);
+                if (outcome is { Status: TicketOutcomeStates.Failed }) throw new ActivityImportException(outcome.Error);
+                interventionId = outcome?.InterventionId;
+                applied = interventionId is not null;
                 var stored = await ActivityTicketStore.FindAsync(configuration, row.TicketId, cancellationToken).ConfigureAwait(false);
                 if (stored is not null)
                 {
-                    var map = await ActivityFieldSettingsStore.ReadAsync(configuration, cancellationToken).ConfigureAwait(false);
-                    await ActivityTicketSourceStore.WriteAsync(configuration, interventionId, stored.Ticket, map, cancellationToken).ConfigureAwait(false);
                     gpsNote = await CompleteCoordinatesAsync(input.WorkPointId, stored.Ticket.Gps, cancellationToken).ConfigureAwait(false);
                     await ActivityTicketStore.SaveAsync(configuration, stored.Ticket, TicketStates.Imported, interventionId, cancellationToken).ConfigureAwait(false);
-                    await ImportStore.WriteMapAsync(configuration, ActivityTicketPlanner.TicketEntity, row.TicketId, interventionId, "created", ActivityTicketPlanner.HashOf(stored.Ticket), cancellationToken).ConfigureAwait(false);
+                    await ImportStore.WriteMapAsync(configuration, ActivityTicketPlanner.TicketEntity, row.TicketId, interventionId ?? 0, "created", ActivityTicketPlanner.HashOf(stored.Ticket), cancellationToken).ConfigureAwait(false);
                 }
             }
         }
@@ -241,13 +257,13 @@ public sealed class MariaActivityReviewService(IConfiguration configuration, IAc
             p.AddWithValue("@status", maintenance ? ActivityReviewStore.Confirmed : ActivityReviewStore.Rejected);
             p.AddWithValue("@by", actor);
             p.AddWithValue("@now", DateTime.UtcNow);
-            p.AddWithValue("@intervention", interventionId);
+            p.AddWithValue("@intervention", (object?)interventionId ?? DBNull.Value);
             p.AddWithValue("@id", id);
         }, cancellationToken).ConfigureAwait(false);
         await AuditRecorder.RecordActionAsync(audit, access, AuditEntities.ActivityImport, AuditActions.DecideActivityMaintenance, id.ToString(),
             maintenance ? "Preluare tichet ActivityApp ca mentenanță" : "Preluare tichet ActivityApp ca service la cerere",
             AuditDetails.Identification(("Tichet", $"{item.TicketNumber} {item.Title}".Trim()), ("Beneficiar", item.Beneficiary.Length > 0 ? item.Beneficiary : "—"), ("Propus ca", item.Kind == ActivityTicketPlanner.ServiceKind ? "service" : "mentenanță"),
-                ("Decizie", maintenance ? "este mentenanță (intervenția devine mentenanță)" : "este service la cerere"), ("Modificat de operator", edited || notes.Length == 0 ? "da" : "nu"), ("Coordonate GPS punct de lucru", gpsNote.Length > 0 ? gpsNote : "neschimbate")), "", cancellationToken).ConfigureAwait(false);
+                ("Decizie", maintenance ? "este mentenanță (intervenția devine mentenanță)" : "este service la cerere"), ("Modificat de operator", edited || notes.Length == 0 ? "da" : "nu"), ("Înregistrare în Mentenanță", applied ? "făcută" : "în așteptare (modulul Mentenanță este oprit; se face la pornire)"), ("Coordonate GPS punct de lucru", gpsNote.Length > 0 ? gpsNote : "neschimbate")), "", cancellationToken).ConfigureAwait(false);
     }
 
     // The GPS location of the event completes the work point when the point has none (a point that already has coordinates keeps them); 0, 0 and text that is not a pair are ignored.
@@ -443,6 +459,7 @@ internal sealed class GuardedActivityReviewService(IActivityReviewService inner,
     public Task<ActivityReviewDetail> GetDetailAsync(long id, CancellationToken cancellationToken = default) => modules.RunAsync(Id, () => inner.GetDetailAsync(id, cancellationToken));
     public Task DecideAsync(long id, ReviewDecision decision, CancellationToken cancellationToken = default) => modules.RunAsync(Id, () => inner.DecideAsync(id, decision, cancellationToken));
     public Task TakeAsync(long id, ReviewTakeInput input, CancellationToken cancellationToken = default) => modules.RunAsync(Id, () => inner.TakeAsync(id, input, cancellationToken));
+    public Task<TicketOutcomeCounts> GetOutcomeCountsAsync(CancellationToken cancellationToken = default) => modules.RunAsync(Id, () => inner.GetOutcomeCountsAsync(cancellationToken));
     public Task<InterventionComponentChoice> GetComponentChoiceAsync(long id, int workPointId, CancellationToken cancellationToken = default) => modules.RunAsync(Id, () => inner.GetComponentChoiceAsync(id, workPointId, cancellationToken));
     public Task<IReadOnlyList<ActivityDiscardedTicket>> GetDiscardedAsync(CancellationToken cancellationToken = default) => modules.RunAsync(Id, () => inner.GetDiscardedAsync(cancellationToken));
     public Task<TicketSource> GetDiscardedDetailAsync(long ticketId, CancellationToken cancellationToken = default) => modules.RunAsync(Id, () => inner.GetDiscardedDetailAsync(ticketId, cancellationToken));

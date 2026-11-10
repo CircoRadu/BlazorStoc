@@ -46,15 +46,22 @@
                         <td>@column.Column</td>
                         <td>@column.DataType</td>
                         <td class="review-text">@(column.Value is { Length: > 0 } value ? value : "—")</td>
-                        <td>@UsedBy(table.Table, column.Column)</td>
+                        <td>@UsedByCached(table.Table, column.Column)</td>
                         <td>
                             @if (column.IsText)
                             {
-                                <select aria-label="@($"Folosește coloana {column.Column} pentru")" value="" disabled="@Busy" @onchange="args => Choose(table.Table, column.Column, args.Value?.ToString())">
-                                    <option value="">— alege —</option>
-                                    @foreach (var target in Targets.Where(item => item.Table == table.Table)) { <option value="@target.Key">@target.Label</option> }
-                                    <option value="extra">Câmp suplimentar nou</option>
-                                </select>
+                                @if (editing == (table.Table, column.Column))
+                                {
+                                    <select aria-label="@($"Folosește coloana {column.Column} pentru")" value="" disabled="@Busy" @onchange="args => Choose(table.Table, column.Column, args.Value?.ToString())" @onblur="StopEditing">
+                                        <option value="">— alege —</option>
+                                        @foreach (var target in TargetsOf(table.Table)) { <option value="@target.Key">@target.Label</option> }
+                                        <option value="extra">Câmp suplimentar nou</option>
+                                    </select>
+                                }
+                                else
+                                {
+                                    <button type="button" class="refresh act-confirm" disabled="@Busy" aria-label="@($"Alege pentru ce folosești coloana {column.Column}")" @onclick="() => StartEditing(table.Table, column.Column)">Alege…</button>
+                                }
                             }
                             else { <span class="muted">nu are text</span> }
                         </td>
@@ -86,8 +93,47 @@
     [Parameter] public EventCallback<SampleAssignment> Assign { get; set; }
 
     private SamplePreview? preview;
+    private Dictionary<string, string> usedBy = [];
+    private Dictionary<string, List<SampleTarget>> targetsByTable = [];
+    private string signature = "";
+    private TicketSample? lastSample;
+    private bool dirty = true;
 
-    protected override void OnParametersSet() => preview = Map is null ? null : ActivityTicketSampleRules.Preview(Sample, Map);
+    // The parent rebuilds Map and Targets on every one of its renders, which would re-send this whole window
+    // (hundreds of rows with a list each) over the connection each time; it is drawn again only when what it shows changed.
+    protected override void OnParametersSet()
+    {
+        preview = Map is null ? null : ActivityTicketSampleRules.Preview(Sample, Map);
+        targetsByTable = Targets.GroupBy(item => item.Table).ToDictionary(group => group.Key, group => group.ToList());
+        usedBy = [];
+        foreach (var table in Sample.Tables)
+            foreach (var column in table.Columns)
+                if (column.IsText) usedBy[table.Table + "\u0001" + column.Column] = UsedBy(table.Table, column.Column);
+        var text = new System.Text.StringBuilder();
+        text.Append(Busy).Append('|').Append(Error).Append('|').Append(Problem).Append('|').Append(HasNewer).Append('|').Append(Sample.Number).Append('|').Append(Sample.Title).Append('|').Append(Sample.TicketId);
+        foreach (var target in Targets) text.Append('|').Append(target.Key).Append(':').Append(target.Label);
+        foreach (var pair in usedBy) text.Append('|').Append(pair.Key).Append('=').Append(pair.Value);
+        if (preview is not null)
+        {
+            foreach (var item in preview.Items) text.Append('|').Append(item.Label).Append('=').Append(item.Target).Append('=').Append(item.Value);
+            text.Append('|').Append(preview.Notes);
+        }
+        var changed = !ReferenceEquals(lastSample, Sample) || text.ToString() != signature;
+        lastSample = Sample;
+        signature = text.ToString();
+        if (changed) dirty = true;
+    }
+
+    protected override bool ShouldRender()
+    {
+        if (!dirty) return false;
+        dirty = false;
+        return true;
+    }
+
+    private IReadOnlyList<SampleTarget> TargetsOf(string table) => targetsByTable.TryGetValue(table, out var list) ? list : [];
+
+    private string UsedByCached(string table, string column) => usedBy.TryGetValue(table + "\u0001" + column, out var text) ? text : "—";
 
     private static string TargetText(string target) => target switch
     {
@@ -111,8 +157,19 @@
         return names.Count == 0 ? "—" : string.Join(", ", names);
     }
 
-    private Task Choose(string table, string column, string? value) =>
-        string.IsNullOrEmpty(value) ? Task.CompletedTask : Assign.InvokeAsync(new SampleAssignment(table, column, value));
+    // Only the row being chosen for draws its list; the other rows show a button, so the window stays light.
+    private (string Table, string Column)? editing;
+
+    private void StartEditing(string table, string column) { editing = (table, column); dirty = true; }
+
+    private void StopEditing() { if (editing is null) return; editing = null; dirty = true; }
+
+    private Task Choose(string table, string column, string? value)
+    {
+        editing = null;
+        dirty = true;
+        return string.IsNullOrEmpty(value) ? Task.CompletedTask : Assign.InvokeAsync(new SampleAssignment(table, column, value));
+    }
 
     private Task Key(KeyboardEventArgs args) => args.Key == "Escape" ? Close.InvokeAsync() : Task.CompletedTask;
 }
