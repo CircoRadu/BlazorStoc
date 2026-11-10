@@ -78,11 +78,12 @@
         target.addEventListener("pointercancel", end);
     };
     document.addEventListener("pointerdown", (event) => {
-        if (event.button !== 0 || narrow() || !(event.target instanceof Element)) return;
+        if (event.button !== 0 || !(event.target instanceof Element)) return;   // the move works on a phone too; only the resize handle is left out there
         const frame = event.target.closest("[data-app-dialog-frame]");
         const panel = frame && frame.querySelector(".app-dialog-panel");
         if (!frame || !panel) return;
         if (event.target.closest("[data-app-dialog-resize]")) {
+            if (narrow()) return;
             const rect = panel.getBoundingClientRect();
             const maxWidth = window.innerWidth - MARGIN - rect.left;
             const maxHeight = window.innerHeight - MARGIN - rect.top;
@@ -121,3 +122,18 @@
         if (Date.now() < suppressClickUntil) { event.stopPropagation(); event.preventDefault(); }
     }, true);
 })();
+
+// A window that writes its title inside its content (LabelledBy = the id of its heading): the text goes into the bar of the window and the heading is hidden, so every window shows its
+// name in the same bar (BUG-0015). Called by AppDialog after each render; one call per window, no observer.
+window.appDialog = {
+    syncTitle(panel, headingId) {
+        if (!panel || !headingId) return;
+        const bar = panel.querySelector(":scope > .app-dialog-grip");
+        const heading = document.getElementById(headingId);
+        if (!bar || !heading || !panel.contains(heading)) return;
+        const text = (heading.textContent || "").trim();
+        let title = bar.querySelector(".app-dialog-grip-title");
+        if (!title) { title = document.createElement("span"); title.className = "app-dialog-grip-title"; bar.appendChild(title); }
+        if (text) { title.textContent = text; heading.classList.add("app-dialog-title-moved"); }
+    }
+};

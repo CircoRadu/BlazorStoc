@@ -931,3 +931,7 @@ Cerut de utilizator la 06.10.2026 (verificarea fluxului, apoi deciziile: facturi
 ## Finalizat la 10.11.2026 16:07 - Ferestre unitare: bara de prindere, redimensionare, Ajutor si marcare pe structura comuna (0.5.69)
 
 - AppDialog da bara de prindere ferestrelor fara titlu, redimensionarea muta cadrul si panoul umple cadrul, fereastra de Ajutor (help.js) si ImageAnnotator folosesc structura AppDialog (mutare/redimensionare din app-dialog.js), test care impune structura comuna (BUG-0015),Verificari: build Release, suita completa, browser pe instanta de test (analize de risc, Ajutor, marcare zone)
+
+## Finalizat la 10.11.2026 18:09 - Bara ferestrelor template v2 pentru toate dialogurile (0.5.70)
+
+- Bara din margine in margine cu pictograma de mutare, denumirea ferestrei si ajutor; padding mutat din panou in corp (variabile --dlg-*), titlul din continut copiat in bara (appDialog.syncTitle); verificat pe 32 de clase de ferestre si pe ferestre reale

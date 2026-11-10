@@ -50,7 +50,7 @@ public static class DiskUsageChecks
             check(text.Contains("-detail-description") && text.Contains("UpdateContentAsync") && text.Contains("OnAddFilesAsync") && text.Contains("-detail-title-input"), $"BUG-0014: {Path.GetFileName(panel)} edits the title and the description and adds pictures in the edit mode");
         }
         var dialogCss = File.ReadAllText(Path.Combine(Root(), "wwwroot", "app.css"));
-        check(dialogCss.Contains(".app-dialog-frame:has(> .app-dialog-panel.app-dialog-l) { width:min(960px, 100%); }") && dialogCss.Contains(".app-dialog-panel > .app-dialog-head { align-items:center") && dialogCss.Contains(".bug-detail:not(.app-dialog-panel)"), "BUG-0014: the frame has the width of the window so the bar sits on the panel edge, the head is a visible title bar, the detail panel has no stray margin");
+        check(dialogCss.Contains(".app-dialog-frame:has(> .app-dialog-panel.app-dialog-l) { width:min(960px, 100%); }") && dialogCss.Contains(".app-dialog-panel > .app-dialog-head, .app-dialog-panel > .app-dialog-grip { flex:none; display:flex") && dialogCss.Contains(".bug-detail:not(.app-dialog-panel)"), "BUG-0014: the frame has the width of the window so the bar sits on the panel edge, the head is a visible title bar, the detail panel has no stray margin");
         check(dialogCss.Contains(".bug-filters { margin-bottom:12px; padding:18px 16px 0; }"), "The filters of the lists of reports and proposals have room under the tabs and from the edge of the section");
         foreach (var panel2 in new[] { Path.Combine("Modules", "Proposals", "ProposalsPanel.razor"), Path.Combine("Components", "Shared", "BugReportsPanel.razor") })
         {
@@ -69,6 +69,7 @@ public static class DiskUsageChecks
         check(ownFrames.All(file => File.ReadAllText(file).Contains("data-app-dialog-frame") && File.ReadAllText(file).Contains("data-app-dialog-resize") && File.ReadAllText(file).Contains("app-dialog-head")), "Windows: a component that draws its own window uses the frame, the head and the resize handle of AppDialog (" + string.Join(", ", ownFrames.Select(Path.GetFileName)) + ")");
         var appDialog = File.ReadAllText(Path.Combine(Root(), "Components", "Shared", "AppDialog.razor"));
         check(appDialog.Contains("app-dialog-head") && appDialog.Contains("app-dialog-grip") && appDialog.Contains("data-app-dialog-resize") && appDialog.Contains("data-app-dialog-bar"), "Windows: AppDialog gives every window a title bar or a grip bar, the bar of buttons and the resize handle");
+        check(dialogCss.Contains(".app-dialog-panel.map-dialog { --dlg-px:22px") && dialogCss.Contains("--dlg-px:30px") && File.ReadAllText(Path.Combine(Root(), "wwwroot", "app-dialog.js")).Contains("syncTitle"), "Windows: the padding of a window is in its body (variables --dlg-*) and the bar goes from edge to edge, the title of a window that writes it in its content is copied into the bar");
         var anaf = File.ReadAllText(Path.Combine(Root(), "Modules", "Anaf", "AnafConfigurator.razor"));
         check(anaf.Split("<details class=\"anaf-section anaf-collapse\">").Length == 6 && !anaf.Contains("<fieldset"), "ANAF page: the five sections are collapsed by default");
     }

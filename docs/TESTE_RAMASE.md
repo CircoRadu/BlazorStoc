@@ -933,3 +933,5 @@ Setari: Spatiu pe disc, popup propuneri/erori, marcarea zonelor, mutare/redimens
 Dezvoltator (cont), stergere in bloc, popup propunere fara taburi, editare continut, capturi mari (0.5.68) (10.11.2026): Marcarea unui cont obisnuit (nu administrator) ca dezvoltator verificata doar prin test MariaDB; help .help/capturi in docs/HELP_DE_REGENERAT.md
 
 Ferestre unitare: bara de prindere, redimensionare, Ajutor si marcare pe structura comuna (0.5.69) (10.11.2026): Ferestrele cu antetul scris in continut (aprox. 60 de utilizari AppDialog fara Title) au bara de prindere deasupra, nu antet in AppDialog; migrarea lor pe Title ramane de facut pe module
+
+Bara ferestrelor template v2 pentru toate dialogurile (0.5.70) (10.11.2026): Verificare vizuala pe ferestrele reale din module cu date (Facturi, Mișcari): doar clasele au fost comparate in harness

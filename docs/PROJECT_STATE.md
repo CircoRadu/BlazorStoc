@@ -403,3 +403,5 @@ Actualizare 04.11.2026 (branch Elcomtur): versiunea 0.5.38, schema 62. Modul nou
 - Versiunea 0.5.68 (10.11.2026): contul Dezvoltator (migrarea 86, web_users.is_developer; Setari -> Utilizatori, sub-tab Dezvoltatori, fila Bugs in Notificari, Dezvoltare doar pentru dezvoltatori), stergere in bloc a celor rezolvate, popup propunere fara taburi, editare descriere + imagini la rapoarte/propuneri, capturi la rezolutie mare, spatieri Setari. Verificat in browser pe instanta de test; suita completa rulata inainte de commit.
 
 - Versiunea 0.5.69 (10.11.2026): ferestrele unitare: bara de prindere vizibila pentru ferestrele fara titlu propriu, redimensionarea urmareste panoul, Ajutorul si fereastra de marcare pe structura AppDialog (test care o impune). Ferestrele cu antetul scris in continut raman cu bara gri deasupra (nu s-au mutat pe Title).
+
+- Versiunea 0.5.70 (10.11.2026): bara ferestrelor (template v2) pentru toate dialogurile: padding-ul mutat din panou in corp (variabile --dlg-px/pt/pb pe clasa ferestrei), titlul din continut copiat in bara (appDialog.syncTitle). Verificat pe 32 de clase de ferestre (harness) si pe ferestre reale.

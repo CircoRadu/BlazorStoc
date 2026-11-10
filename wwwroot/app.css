@@ -1774,7 +1774,7 @@ dialog.app-dialog-native::backdrop { background:#142d2870; }
     background:linear-gradient(135deg, transparent 0 52%, var(--muted) 52% 58%, transparent 58% 70%, var(--muted) 70% 76%, transparent 76% 88%, var(--muted) 88% 94%, transparent 94%); opacity:.55; border-bottom-right-radius:inherit; }
 .app-dialog-resize:hover { opacity:1; }
 html.app-dialog-adjusting, html.app-dialog-adjusting * { user-select:none !important; cursor:grabbing; }
-@media (max-width:719px) { .app-dialog-resize { display:none; } .app-dialog-head, .app-dialog-panel > .dialog-head { cursor:auto; touch-action:auto; } }
+@media (max-width:719px) { .app-dialog-resize { display:none; } }
 .settings-body details.db-collapse { margin:12px 0 0; font-size:inherit; }
 .disk-usage .disk-total { margin:10px 0 14px; font-size:15px; }
 /* Marking zones on a picture (PROP-0009, Components/Shared/ImageAnnotator.razor + wwwroot/image-annotate.js): a window that floats over the popup; frame and panel are those of every window (app-dialog.js moves and resizes it). */
@@ -1801,18 +1801,33 @@ html.app-dialog-adjusting, html.app-dialog-adjusting * { user-select:none !impor
 .app-dialog-frame:has(> .app-dialog-panel.app-dialog-l) { width:min(960px, 100%); }
 .app-dialog-frame:has(> .app-dialog-panel.app-dialog-xl) { width:min(1280px, 100%); }
 .app-dialog-frame > .app-dialog-panel.app-dialog-s, .app-dialog-frame > .app-dialog-panel.app-dialog-m, .app-dialog-frame > .app-dialog-panel.app-dialog-l, .app-dialog-frame > .app-dialog-panel.app-dialog-xl { width:100%; }
-/* BUG-0014: the head of a window is a visible title bar (the grip of the move): tinted, framed, with a grip of dots. */
-.app-dialog-panel > .app-dialog-head { align-items:center; justify-content:flex-start; gap:12px; padding:8px 12px; margin-bottom:14px; background:var(--c-f5f7f6); border:1px solid var(--line); border-radius:8px; }
-.app-dialog-panel > .app-dialog-head::before { content:""; flex:none; width:10px; height:18px; opacity:.75; background:radial-gradient(circle, var(--muted) 1.4px, transparent 1.7px) 0 0 / 5px 6px; }
-.app-dialog-panel > .app-dialog-head > h2 { margin:0; flex:1 1 auto; min-width:0; }
-.app-dialog-panel > .app-dialog-head:hover { background:var(--c-eaf4f0); }
-/* BUG-0015: a window without a title of its own has a slim visible bar to drag it by. */
-.app-dialog-grip { flex:none; height:26px; margin:-14px -14px 14px; display:flex; align-items:center; justify-content:center; background:var(--line); border:1px solid var(--c-c9d6d2); border-radius:8px; cursor:grab; touch-action:none; user-select:none; }
-.app-dialog-grip::before { content:""; width:56px; height:12px; opacity:.8; background:radial-gradient(circle, var(--ink) 1.5px, transparent 1.8px) 0 0 / 8px 6px; }
-.app-dialog-grip:hover { background:var(--c-d8e2de); }
-@media (max-width:719px) { .app-dialog-grip { display:none; } }
-/* The window of the help is a window like the others (wwwroot/help.js builds the structure of AppDialog); its body scrolls, the head is the bar. */
-.app-dialog-panel.help-panel { width:min(1100px, 100%); padding:0; }
-.help-panel > .app-dialog-head { margin:12px 16px 8px; }
-.help-panel .help-body { padding:8px 24px 28px; }
-.help-panel .help-search { padding:8px 24px 0; }
+/* BAR OF EVERY WINDOW (BUG-0015, template v2): one bar from edge to edge, the move icon at the top-left, the name of the window, the help at the right. The padding of a window moved from
+   the panel to its body (variables --dlg-*), so the bar touches the edges whatever the class of the window; the title of a window that writes it in its content is copied into the bar
+   (app-dialog.js, appDialog.syncTitle) and its own heading is hidden. */
+.app-dialog-panel { --dlg-px:30px; --dlg-pt:30px; --dlg-pb:30px; }
+.app-dialog-panel.template-popup { --dlg-px:22px; --dlg-pt:18px; --dlg-pb:24px; }
+.app-dialog-panel.archive-dialog, .app-dialog-panel.subcategory-parameters-dialog { --dlg-px:28px; --dlg-pt:22px; --dlg-pb:28px; }
+.app-dialog-panel.invoice-modal { --dlg-px:20px; --dlg-pt:20px; --dlg-pb:20px; }
+.app-dialog-panel.map-dialog { --dlg-px:22px; --dlg-pt:18px; --dlg-pb:22px; }
+.app-dialog-panel.pdf-preview-dialog { --dlg-px:26px; --dlg-pt:22px; --dlg-pb:22px; }
+.app-dialog-panel.help-panel, .app-dialog-panel.image-annotator-panel { --dlg-px:0px; --dlg-pt:0px; --dlg-pb:0px; }
+.app-dialog-panel:not(.image-figure):not(.image-lightbox-panel) { padding:0 !important; }
+.app-dialog-panel:not(.image-figure):not(.image-lightbox-panel) > .app-dialog-body { padding:var(--dlg-pt) var(--dlg-px) var(--dlg-pb); }
+.app-dialog-panel:not(.image-figure):not(.image-lightbox-panel):has(> .app-dialog-head, > .app-dialog-grip) > .app-dialog-body { padding-top:calc(var(--dlg-pt) * .6); }
+.app-dialog-panel:not(.image-figure):not(.image-lightbox-panel):has(> .app-dialog-foot) > .app-dialog-body { padding-bottom:0; }
+.app-dialog-panel:not(.image-figure):not(.image-lightbox-panel) > .app-dialog-foot { padding:14px var(--dlg-px) var(--dlg-pb); }
+.app-dialog-panel > .app-dialog-head, .app-dialog-panel > .app-dialog-grip { flex:none; display:flex; align-items:center; gap:8px; height:26px; box-sizing:border-box; margin:0; padding:0 10px;
+    background:var(--c-eaf4f0); border:0; border-bottom:1px solid var(--c-9fc9bd); border-radius:12px 12px 0 0; cursor:grab; touch-action:none; user-select:none; }
+.app-dialog-panel > .app-dialog-head:hover, .app-dialog-panel > .app-dialog-grip:hover { border-bottom-color:var(--green); }
+.app-dialog-panel > .app-dialog-head::before, .app-dialog-panel > .app-dialog-grip::before { content:""; flex:none; width:12px; height:12px; background:var(--green);
+    -webkit-mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='5 9 2 12 5 15'/%3E%3Cpolyline points='9 5 12 2 15 5'/%3E%3Cpolyline points='15 19 12 22 9 19'/%3E%3Cpolyline points='19 9 22 12 19 15'/%3E%3Cline x1='2' y1='12' x2='22' y2='12'/%3E%3Cline x1='12' y1='2' x2='12' y2='22'/%3E%3C/svg%3E") center/contain no-repeat; mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='5 9 2 12 5 15'/%3E%3Cpolyline points='9 5 12 2 15 5'/%3E%3Cpolyline points='15 19 12 22 9 19'/%3E%3Cpolyline points='19 9 22 12 19 15'/%3E%3Cline x1='2' y1='12' x2='22' y2='12'/%3E%3Cline x1='12' y1='2' x2='12' y2='22'/%3E%3C/svg%3E") center/contain no-repeat; }
+.app-dialog-panel > .app-dialog-head > h2, .app-dialog-grip-title { margin:0; flex:1 1 auto; min-width:0; font-size:12.5px; font-weight:600; line-height:1; color:var(--ink); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.app-dialog-panel > .app-dialog-head .help-icon { width:16px; height:16px; }
+.app-dialog-panel > .app-dialog-head .help-icon::before { width:10px; height:10px; }
+.app-dialog-panel > .app-dialog-head button.refresh { height:20px; min-height:0; padding:0 8px; font-size:11px; line-height:1; }
+.app-dialog-title-moved { display:none !important; }
+.dialog-head:has(> .app-dialog-title-moved):not(:has(> :not(.app-dialog-title-moved))), .catalog-heading:has(> .app-dialog-title-moved):not(:has(> :not(.app-dialog-title-moved))) { display:none; }
+.app-dialog-panel.help-panel .help-body { padding:8px 24px 28px; }
+.app-dialog-panel.help-panel .help-search { padding:8px 24px 0; }
+.app-dialog-panel.help-panel { width:min(1100px, 100%); }
+.dialog-head:has(> .app-dialog-title-moved), .catalog-heading:has(> .app-dialog-title-moved) { justify-content:flex-end; }

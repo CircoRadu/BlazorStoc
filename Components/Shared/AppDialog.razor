@@ -3,6 +3,7 @@
 @using BlazorStoc.Services
 
 @inject IServiceProvider Provider
+@inject IJSRuntime JS
 @implements IDisposable
 @* The one structure of every window over a page: backdrop > frame > [bar | panel]. The bar has its own place ABOVE the panel (the frame reserves it, so it never covers the head):
    the buttons registered by the working modules (DialogBarActions: "Raportează o eroare", "Propune") and the round red close button, which calls OnClose (the same flow as the
@@ -76,6 +77,14 @@ else
     private IReadOnlyList<DialogBarAction> Actions => ShowModuleActions && Modules is { } registry ? DialogBarActions.Ordered(Provider.GetServices<DialogBarAction>(), registry.IsAvailable) : [];
     private string SizeClass => Size switch { AppDialogSize.S => "app-dialog-s", AppDialogSize.M => "app-dialog-m", AppDialogSize.L => "app-dialog-l", AppDialogSize.XL => "app-dialog-xl", _ => "" };
 
+    // The title of a window that writes it in its content goes into the bar of the window (wwwroot/app-dialog.js).
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (HasTitle || !ShowGrip || string.IsNullOrEmpty(LabelledBy)) return;
+        try { await JS.InvokeVoidAsync("appDialog.syncTitle", panel, LabelledBy); }
+        catch (Exception exception) when (exception is JSException or InvalidOperationException or TaskCanceledException or JSDisconnectedException) { }
+    }
+
     protected override void OnInitialized() { if (Modules is { } registry) registry.Changed += OnModulesChanged; }
     // A module stopped or started in Setari -> Module: the buttons appear / disappear in the windows that are open right now.
     private void OnModulesChanged() { _ = InvokeAsync(() => { try { StateHasChanged(); } catch (ObjectDisposedException) { } }); }
@@ -102,7 +111,7 @@ else
 }
             else if (ShowGrip)
             {
-                <div class="app-dialog-grip" title="Trage de bara aceasta pentru a muta fereastra" aria-hidden="true"></div>
+                <div class="app-dialog-grip" title="Trage de bara aceasta pentru a muta fereastra">@if (!string.IsNullOrWhiteSpace(Label)) { <span class="app-dialog-grip-title">@Label</span> }</div>
             }
             <div class="app-dialog-body">@ChildContent</div>
             @if (Footer is not null) { <div class="app-dialog-foot">@Footer</div> }
