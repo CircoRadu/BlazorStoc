@@ -19,6 +19,7 @@ internal sealed class GuardedProposalService(IProposalService inner, ModuleRegis
     public Task DeleteAsync(int proposalId, CancellationToken cancellationToken = default) => modules.RunAsync(Id, () => inner.DeleteAsync(proposalId, cancellationToken));
     public Task<ProposalExportResult> ExportAsync(IReadOnlyList<int> proposalIds, CancellationToken cancellationToken = default) => modules.RunAsync(Id, () => inner.ExportAsync(proposalIds, cancellationToken));
     public Task MarkSeenAsync(int proposalId, CancellationToken cancellationToken = default) => modules.RunAsync(Id, () => inner.MarkSeenAsync(proposalId, cancellationToken));
+    public Task<int> CountOpenAsync(CancellationToken cancellationToken = default) => modules.RunAsync(Id, () => inner.CountOpenAsync(cancellationToken));
     public Task<IReadOnlyList<ProposalAlert>> GetAlertsAsync(CancellationToken cancellationToken = default) => modules.RunAsync(Id, () => inner.GetAlertsAsync(cancellationToken));
 }
 

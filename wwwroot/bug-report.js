@@ -263,7 +263,8 @@
         const wanted = new Set();
         for (const popup of shownPopups()) { const button = closeButtonOf(popup); if (button && inHead(button, popup)) wanted.add(button); }
         for (const button of document.querySelectorAll(".popup-close-moved")) if (!wanted.has(button)) button.classList.remove("popup-close-moved");
-        for (const button of wanted) button.classList.add("popup-close-moved");
+        // Only a button that does not have the class yet: classList.add on one that has it still writes the attribute, the observer below sees a change and places the bar again, without end.
+        for (const button of wanted) if (!button.classList.contains("popup-close-moved")) button.classList.add("popup-close-moved");
     };
 
     let lastTop = null;

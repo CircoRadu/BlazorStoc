@@ -113,3 +113,5 @@ Stare: **text** = topicul `.help` este la zi; **captura** = imaginea si harta el
 - Validare tichete (Mentenanta -> Validare tichete ActivityApp, 10.11.2026): mesaj nou „N tichete decise asteapta inregistrarea in Mentenanta” si „refuzate”; decizia pe un tichet merge si cu modulul Mentenanta oprit; topicuri .help ale validarii: text si captura de facut.
 
 - Taskuri utilizator (Administrare, 10.11.2026, migrarea 085): tab „Nepreluate” + un tab pe utilizator (UserTaskTabs), ordine proprie cu mâner de tragere si numar curent, comutator „Ascunde taskurile finalizate”, taskuri finalizate editabile, camp „Stadiu / note de lucru” (SetNoteAsync) si „Jurnalul taskului” pliabil in detalii; „Taskurile mele” arata numarul curent; topicuri task-detalii si pagina Taskuri utilizator: text si captura de facut.
+
+- Setari -> Dezvoltare (10.11.2026): insigne cu numarul de rapoarte nerezolvate / propuneri active pe tile-ul Dezvoltare si pe sub-taburile Erori si Propuneri (DevelopmentBadge), actualizate singure la schimbari; topicul dezvoltare: text si captura de facut. (Reincarcarea automata a tabelelor de erori/propuneri la un obiect nou ramane de facut.)

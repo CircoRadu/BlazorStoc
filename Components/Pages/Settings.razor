@@ -20,7 +20,7 @@
         <div class="settings-dashboard" id="settings-dashboard">
             @foreach (var tab in VisibleTabs)
             {
-                <button type="button" class="settings-tile" id="tile-@tab.Id" aria-label="@tab.Title" @onclick="() => SelectTab(tab.Id)"><span class="main-menu-icon" aria-hidden="true">@TileIcon(tab.Id)</span><strong>@tab.Title</strong><small>@TileText(tab.Id)</small></button>
+                <button type="button" class="settings-tile" id="tile-@tab.Id" aria-label="@tab.Title" @onclick="() => SelectTab(tab.Id)"><span class="main-menu-icon" aria-hidden="true">@TileIcon(tab.Id)</span><strong>@tab.Title@if (tab.Id == BugTab) { <DevelopmentBadge Kind="DevelopmentBadgeKind.Total" Id="tile-dezvoltare-badge" /> }</strong><small>@TileText(tab.Id)</small></button>
             }
         </div>
     }
@@ -477,6 +477,14 @@
             builder.AddAttribute(seq++, "tabindex", selected ? "0" : "-1");
             builder.AddAttribute(seq++, "onclick", EventCallback.Factory.Create(this, () => SelectSubtab(subtabs, id)));
             builder.AddContent(seq++, subtab.Title);
+            if (subtab.Id == DevErrorsSubtab || subtab.Id == DevProposalsSubtab)
+            {
+                builder.AddContent(seq++, " ");
+                builder.OpenComponent<DevelopmentBadge>(seq++);
+                builder.AddAttribute(seq++, "Kind", subtab.Id == DevErrorsSubtab ? DevelopmentBadgeKind.Errors : DevelopmentBadgeKind.Proposals);
+                builder.AddAttribute(seq++, "Id", "subtab-" + subtab.Id + "-badge");
+                builder.CloseComponent();
+            }
             builder.CloseElement();
         }
         builder.CloseElement();

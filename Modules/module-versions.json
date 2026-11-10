@@ -712,8 +712,8 @@
                                                  ]
                                  },
                     "BugReports":  {
-                                       "version":  "1.1.2",
-                                       "hash":  "fe021682a29af22240f40b825ee1f3552d9e67bb9e3adb238fcac4cc2e1db3ab",
+                                       "version":  "1.1.3",
+                                       "hash":  "f256a2c7570b0aec726c5fa0bb54771b40536a3b8a16b2e74e12ec74df901a58",
                                        "history":  [
                                                        {
                                                            "version":  "1.0.0",
@@ -734,6 +734,11 @@
                                                            "version":  "1.1.2",
                                                            "date":  "09.11.2026",
                                                            "note":  "Propuneri: bara popup-ului cu Propune, Setari -\u003e Dezvoltare, fila Propuneri in Notificari"
+                                                       },
+                                                       {
+                                                           "version":  "1.1.3",
+                                                           "date":  "10.11.2026",
+                                                           "note":  "Insigna cu numarul de rapoarte nerezolvate pe tab (CountOpenAsync) si evenimente de schimbare publicate in feed"
                                                        }
                                                    ]
                                    },
@@ -794,13 +799,18 @@
                                               ]
                               },
                     "Proposals":  {
-                                      "version":  "1.0.0",
-                                      "hash":  "28a0d716b01d1ad935d522e56cc7837e9a9db41753f8933c8b721b490a79d5a9",
+                                      "version":  "1.0.1",
+                                      "hash":  "00ef7a26d9ef17dcde9e2ce99778a22586bbc3fc84043c2b8f612678113d3a82",
                                       "history":  [
                                                       {
                                                           "version":  "1.0.0",
                                                           "date":  "09.11.2026",
                                                           "note":  "Versiune de pornire (inceputul versionarii modulelor)"
+                                                      },
+                                                      {
+                                                          "version":  "1.0.1",
+                                                          "date":  "10.11.2026",
+                                                          "note":  "Insigna cu numarul de propuneri active pe tab (CountOpenAsync) si evenimente de schimbare publicate in feed"
                                                       }
                                                   ]
                                   }

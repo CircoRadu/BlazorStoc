@@ -1,0 +1,55 @@
+@using BlazorStoc.Modules.BugReports
+@using BlazorStoc.Modules.Proposals
+@inject IBugReportService BugReports
+@inject IProposalService Proposals
+@inject IChangeFeed ChangeFeed
+@implements IDisposable
+@* The number of what is not resolved yet, on the tab itself (the tile Dezvoltare of Setari, the sub-tabs Erori and Propuneri): the reports not resolved or rejected, the proposals not closed. It is
+   hidden at 0 and while the module is out, and follows by itself when a report or a proposal is added, changed or deleted (from any session). *@
+@if (count > 0)
+{
+    <span class="count-badge" id="@Id" title="@Title" aria-label="@($"{count} {Title}")">@count</span>
+}
+
+@code {
+    [Parameter] public DevelopmentBadgeKind Kind { get; set; }
+    [Parameter] public string? Id { get; set; }
+
+    private int count;
+    private IDisposable? subscription;
+    private readonly CancellationTokenSource lifetime = new();
+
+    private string Title => Kind switch { DevelopmentBadgeKind.Errors => "rapoarte de eroare nerezolvate", DevelopmentBadgeKind.Proposals => "propuneri active", _ => "rapoarte de eroare nerezolvate și propuneri active" };
+
+    protected override async Task OnInitializedAsync()
+    {
+        subscription = ChangeFeed.Subscribe(change =>
+        {
+            if (change.EntityType is AuditEntities.BugReport or AuditEntities.Proposal) return InvokeAsync(RefreshAsync);
+            return Task.CompletedTask;
+        });
+        await RefreshAsync();
+    }
+
+    private async Task RefreshAsync()
+    {
+        if (lifetime.IsCancellationRequested) return;
+        var errors = 0;
+        var proposals = 0;
+        try { if (Kind != DevelopmentBadgeKind.Proposals) errors = await BugReports.CountOpenAsync(lifetime.Token); }
+        catch (Exception exception) when (exception is not OperationCanceledException) { errors = 0; }
+        try { if (Kind != DevelopmentBadgeKind.Errors) proposals = await Proposals.CountOpenAsync(lifetime.Token); }
+        catch (Exception exception) when (exception is not OperationCanceledException) { proposals = 0; }
+        var total = errors + proposals;
+        if (total == count) return;
+        count = total;
+        StateHasChanged();
+    }
+
+    public void Dispose()
+    {
+        subscription?.Dispose();
+        lifetime.Cancel();
+        lifetime.Dispose();
+    }
+}

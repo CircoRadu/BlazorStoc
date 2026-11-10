@@ -78,4 +78,6 @@ public interface IProposalService
     Task MarkSeenAsync(int proposalId, CancellationToken cancellationToken = default);
     /// <summary>The alerts of the signed-in user (the tab "Propuneri" of Notificari): new proposals for the administrator, changes and answers on one's own proposals for the author.</summary>
     Task<IReadOnlyList<ProposalAlert>> GetAlertsAsync(CancellationToken cancellationToken = default);
+    /// <summary>How many proposals are not closed (the badge of the tab Propuneri of Setari -> Dezvoltare); 0 without the right to see the proposals of everybody.</summary>
+    Task<int> CountOpenAsync(CancellationToken cancellationToken = default) => Task.FromResult(0);
 }

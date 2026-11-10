@@ -63,6 +63,8 @@ data = await new DemoProductRepository().GetProductsAsync();
             ["moduleversions"] = () => ModuleVersionChecks.RunAsync(Check),
             ["activityimport"] = () => ActivityImportChecks.RunAsync(Check),
             ["usertasks"] = () => UserTaskTabsChecks.RunAsync(Check),
+            ["devbadge"] = () => DevelopmentBadgeChecks.RunAsync(Check),
+            ["popupscript"] = () => PopupScriptChecks.RunAsync(Check),
             ["elcomtur"] = () => ElcomturChecks.RunAsync(Check),
             ["ocrworker"] = () => OcrWorkerChecks.RunAsync(Check),
             ["backupworker"] = () => BackupWorkerChecks.RunAsync(Check),

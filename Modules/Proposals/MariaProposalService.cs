@@ -7,7 +7,7 @@ using MySqlConnector;
 
 namespace BlazorStoc.Modules.Proposals;
 
-public sealed class MariaProposalService(IConfiguration configuration, IAccessControl access, IAuditTrail audit) : IProposalService
+public sealed class MariaProposalService(IConfiguration configuration, IAccessControl access, IAuditTrail audit, IChangeFeed? changeFeed = null, ChangeOrigin? origin = null) : IProposalService
 {
     private const string Columns = """
         p.id, p.number, p.kind, p.area_route, p.area_title, p.title, p.description, p.benefit, p.wanted_importance, p.state, p.user_name, p.user_role, p.app_version, p.implemented_version,
@@ -99,6 +99,7 @@ public sealed class MariaProposalService(IConfiguration configuration, IAccessCo
         }
         await AuditRecorder.RecordActionAsync(audit, access, AuditEntities.Proposal, AuditActions.CreateProposal, id.ToString(CultureInfo.InvariantCulture), ProposalRules.Number(id),
             $"Tip: {input.Kind}; importanță: {input.WantedImportance}; zona: {Trim(input.AreaTitle, 100)}; imagini: {images.Count}; titlu: {Trim(title, 120)}", "", cancellationToken).ConfigureAwait(false);
+        Publish(AuditActions.CreateProposal, id);
         return (await GetAsync(id, cancellationToken).ConfigureAwait(false))!;
     }
 
@@ -318,6 +319,7 @@ public sealed class MariaProposalService(IConfiguration configuration, IAccessCo
                 AuditDetails.Changes([new AuditChange("Stare", before.State, state), new AuditChange("Implementată în versiunea", before.ImplementedVersion, implementedVersion)]), "", cancellationToken).ConfigureAwait(false);
         }
         if (note.Length > 0) await AddNoteAsync(proposalId, note, cancellationToken).ConfigureAwait(false);
+        Publish(AuditActions.ChangeProposalState, proposalId);
         return (await GetAsync(proposalId, cancellationToken).ConfigureAwait(false))!;
     }
 
@@ -333,6 +335,20 @@ public sealed class MariaProposalService(IConfiguration configuration, IAccessCo
         }
         await AuditRecorder.RecordActionAsync(audit, access, AuditEntities.Proposal, AuditActions.DeleteProposal, proposalId.ToString(CultureInfo.InvariantCulture), before.Number,
             $"Titlu: {Trim(before.Title, 120)}; autor: {before.UserName}; stare: {before.State}", "", cancellationToken).ConfigureAwait(false);
+        Publish(AuditActions.DeleteProposal, proposalId);
+    }
+
+    // The tab badges and the open lists of the other sessions follow (the identifiers only).
+    private void Publish(string action, int id) =>
+        changeFeed?.Publish(new ChangeEvent(AuditEntities.Proposal, action, id.ToString(CultureInfo.InvariantCulture), origin?.Id ?? Guid.Empty, DateTime.UtcNow));
+
+    public async Task<int> CountOpenAsync(CancellationToken cancellationToken = default)
+    {
+        if (!await access.HasAsync("setari-propuneri.view", cancellationToken).ConfigureAwait(false)) return 0;
+        await using var connection = await MariaDb.OpenAsync(configuration, cancellationToken).ConfigureAwait(false);
+        await using var command = new MySqlCommand("SELECT COUNT(*) FROM proposals WHERE state NOT IN (@s1, @s2, @s3)", connection);
+        for (var index = 0; index < ProposalRules.ClosedStates.Count; index++) command.Parameters.AddWithValue("@s" + (index + 1), ProposalRules.ClosedStates[index]);
+        return Convert.ToInt32(await command.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false), CultureInfo.InvariantCulture);
     }
 
     public async Task MarkSeenAsync(int proposalId, CancellationToken cancellationToken = default)

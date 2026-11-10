@@ -1,3 +1,7 @@
+## 0.5.63 | 10.11.2026
+- Corecție importantă: ferestrele (popup-urile) nu mai blochează aplicația. Scriptul barei de deasupra popup-urilor intra într-o buclă fără sfârșit cât un popup era deschis, ceea ce făcea listele derulante să se deschidă greu, închiderea ferestrelor lentă și ducea la pierderea conexiunii cu serverul (defectul era în versiunile 0.5.60–0.5.62).
+- Setări → Dezvoltare: insigne cu numărul de rapoarte de eroare nerezolvate și de propuneri active pe tile-ul „Dezvoltare” și pe sub-taburile „Erori” și „Propuneri”; se actualizează singure când se adaugă sau se schimbă un raport ori o propunere.
+
 ## 0.5.62 | 10.11.2026
 - Taskuri utilizator: tab „Nepreluate” și câte un tab pentru fiecare utilizator care are taskuri; în tab, taskurile active sunt numerotate în ordinea stabilită de administrator (se trage de mâner sau se folosesc săgețile), cele finalizate urmează dedesubt, cu un comutator care le ascunde. „Taskurile mele” arată aceeași ordine.
 - Taskurile finalizate se pot edita în continuare. Câmp nou „Stadiu / note de lucru”, pe care îl scriu utilizatorul și administratorul (și după finalizare), și secțiunea pliabilă „Jurnalul taskului” (creat, preluat, finalizat, stadiu modificat, mutat, reordonat, cu cine și când).

@@ -2,6 +2,19 @@
 
 ## Modificari de testat
 
+### 10.11.2026 - Insigne pe taburile Setari -> Dezvoltare
+
+**Ce s-a adaugat:** insigna cu numarul de obiecte nerezolvate pe tile-ul Dezvoltare si pe sub-taburile Erori si Propuneri.
+**Ce face acum:** Erori arata cate rapoarte nu sunt Rezolvate sau Respinse, Propuneri cate nu sunt inchise (Implementata, Amanata, Respinsa), tile-ul suma lor; insigna dispare la 0 si se actualizeaza singura cand se adauga sau se schimba un raport / o propunere.
+
+| Nr | Pasi | Asteptat | Rezultat |
+|---|---|---|---|
+| 1 | Setari | Pe tile-ul Dezvoltare apare insigna cu suma rapoartelor nerezolvate si a propunerilor active | |
+| 2 | Setari -> Dezvoltare | Sub-taburile Erori si Propuneri au fiecare insigna cu numarul lor | |
+| 3 | Marcheaza un raport Rezolvat | Insigna de pe Erori scade cu 1, fara reincarcarea paginii | |
+| 4 | Din alt cont adauga o propunere | Insigna de pe Propuneri creste singura | |
+| 5 | Cand nu mai e nimic nerezolvat | Insignele dispar | |
+
 ### 07.11.2026 - Modulul de raportare a erorilor
 
 **Ce s-a adaugat:** intrarea "Raporteaza o eroare" in meniul principal, deasupra lui "Ajutor" (vizibila oricarui utilizator autentificat, pe paginile cu meniul principal); fereastra de raportare cu sectiuni explicative inchise implicit, captura automata a paginii, lipire de imagini cu Ctrl+V, alegere de fisiere, comutator pentru detaliile tehnice; fila "Rapoartele mele"; fila "Rapoarte erori" din Setari (administrator) cu filtre, stare + nota, stergere si export ZIP.

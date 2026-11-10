@@ -41,9 +41,12 @@ public static partial class MariaExtendedChecks
 
             var page = await boss.QueryAsync(new BugReportQuery(State: BugReportRules.StateNew, Severity: BugReportRules.SeverityBlocking, User: "proba.rap"), 1, 10);
             Check(page.Items.Any(item => item.Id == report.Id), "Bug report: the administrator filters by state, severity and author");
+            var openBefore = await boss.CountOpenAsync();
+            Check(openBefore >= 1 && await author.CountOpenAsync() == 0, "Bug report: the badge of the tab counts the reports not resolved or rejected, for who may see them all (an ordinary user gets 0)");
             var changed = await boss.ChangeStateAsync(report.Id, BugReportRules.StateResolved, "Rezolvat in proba");
             Check(changed.State == BugReportRules.StateResolved && changed.ResolvedUtc is not null && changed.AdminNote == "Rezolvat in proba", "Bug report: the administrator changes the state with a note (Rezolvat records the time)");
 
+            Check(await boss.CountOpenAsync() == openBefore - 1, "Bug report: a resolved report leaves the count of the badge");
             var closedPage = await boss.QueryAsync(new BugReportQuery(User: "proba.rap", Closed: true), 1, 10);
             var openPage = await boss.QueryAsync(new BugReportQuery(User: "proba.rap", Closed: false), 1, 10);
             Check(closedPage.Items.Any(item => item.Id == report.Id) && openPage.Items.All(item => item.Id != report.Id), "Bug report: the tabs split resolved/rejected reports from the unresolved ones");

@@ -896,3 +896,9 @@ Cerut de utilizator la 06.10.2026 (verificarea fluxului, apoi deciziile: facturi
 - Pagina Taskuri utilizator: tab Nepreluate (global) si un tab pe utilizator cu taskuri (UserTaskTabs), taskuri active numerotate cu ordine proprie (maner de tragere task-order.js si sageti), finalizate dedesubt cu comutator de ascundere, taskuri finalizate editabile.
 - Camp nou Stadiu / note de lucru (SetNoteAsync, utilizator sau administrator, si dupa finalizare), Jurnalul taskului pliabil in detalii (GetHistoryAsync din audit_events cu regula de vizibilitate a taskului), actiuni de jurnal Modificare stadiu task si Reordonare taskuri utilizator; Taskurile mele arata numarul curent. Migrarea 85 (sort_order, progress_note; numerotarea taskurilor vechi o face aplicatia, migratorul nu are drepturi pe date). Tasks 1.2.1, Journal 1.4.21.
 - Verificari: sectiunea MariaDB User tasks (70), grupul usertasks (tabs si detalii, 14), help, moduleversions, package.
+
+## Finalizat la 10.11.2026 10:52 - Popup-uri lente si pierderea conexiunii: bucla in bug-report.js
+
+- Cauza: moveHeadingClose scria din nou clasa popup-close-moved pe butonul de inchidere la fiecare trecere (classList.add pe o clasa existenta tot scrie atributul), iar MutationObserver-ul barei popup-ului relua place() fara sfarsit cat era un popup deschis: 237.000 de mutatii in 3 secunde, blocari de pana la 6 secunde, selectii care se deschid greu, inchidere lenta, pierderea conexiunii (pachetele 0.5.60-0.5.62).
+- Corectie: clasa se scrie doar daca butonul nu o are (wwwroot/bug-report.js); masurat pe instanta separata (baza de test): 0 mutatii in 3 secunde cu popup deschis, fara sarcini lungi, popup-ul se inchide imediat. Test nou: grupul popupscript.
+- Nepachetata: necesita pachet nou (0.5.63).

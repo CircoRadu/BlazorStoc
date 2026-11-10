@@ -75,6 +75,8 @@ public interface IBugReportService
     /// <summary>Administrator (setari-bug-raport.view): the reports that match the filters, the newest first.</summary>
     Task<BugReportPage> QueryAsync(BugReportQuery query, int page, int pageSize, CancellationToken cancellationToken = default);
     Task<int> CountNewAsync(CancellationToken cancellationToken = default);
+    /// <summary>How many reports are not resolved or rejected (the badge of the tab Erori of Setari -> Dezvoltare); 0 without the right to see the reports.</summary>
+    Task<int> CountOpenAsync(CancellationToken cancellationToken = default) => Task.FromResult(0);
     /// <summary>The pictures of a report; the author and the administrator only.</summary>
     Task<IReadOnlyList<BugReportFile>> GetFilesAsync(int reportId, CancellationToken cancellationToken = default);
     Task<BugReportFileContent?> GetFileContentAsync(int fileId, CancellationToken cancellationToken = default);
@@ -84,7 +86,7 @@ public interface IBugReportService
     Task<BugReportExportResult> ExportAsync(IReadOnlyList<int> reportIds, CancellationToken cancellationToken = default);
 }
 
-public sealed class MariaBugReportService(IConfiguration configuration, IAccessControl access, IAuditTrail audit) : IBugReportService
+public sealed class MariaBugReportService(IConfiguration configuration, IAccessControl access, IAuditTrail audit, IChangeFeed? changeFeed = null, ChangeOrigin? origin = null) : IBugReportService
 {
     private const string Columns = """
         r.id, r.number, r.title, r.description, r.severity, r.state, r.route, r.page_title, r.app_version, r.user_name, r.user_role, COALESCE(r.tech_json,''), r.admin_note,
@@ -170,6 +172,7 @@ public sealed class MariaBugReportService(IConfiguration configuration, IAccessC
         }
         await AuditRecorder.RecordActionAsync(audit, access, AuditEntities.BugReport, AuditActions.CreateBugReport, id.ToString(CultureInfo.InvariantCulture), BugReportRules.Number(id),
             $"Gravitate: {input.Severity}; pagina: {Trim(input.Route, 200)}; imagini: {images.Count}; titlu: {Trim(title, 120)}", "", cancellationToken).ConfigureAwait(false);
+        Publish(AuditActions.CreateBugReport, id);
         return (await GetAsync(id, cancellationToken).ConfigureAwait(false))!;
     }
 
@@ -234,6 +237,20 @@ public sealed class MariaBugReportService(IConfiguration configuration, IAccessC
     }
 
     private static MySqlParameter Clone(MySqlParameter parameter) => new(parameter.ParameterName, parameter.Value);
+
+    // The tab badges and the open lists of the other sessions follow (the identifiers only).
+    private void Publish(string action, int id) =>
+        changeFeed?.Publish(new ChangeEvent(AuditEntities.BugReport, action, id.ToString(CultureInfo.InvariantCulture), origin?.Id ?? Guid.Empty, DateTime.UtcNow));
+
+    public async Task<int> CountOpenAsync(CancellationToken cancellationToken = default)
+    {
+        if (!await access.HasAsync("setari-bug-raport.view", cancellationToken).ConfigureAwait(false)) return 0;
+        await using var connection = await MariaDb.OpenAsync(configuration, cancellationToken).ConfigureAwait(false);
+        await using var command = new MySqlCommand("SELECT COUNT(*) FROM bug_reports WHERE state NOT IN (@resolved, @rejected)", connection);
+        command.Parameters.AddWithValue("@resolved", BugReportRules.StateResolved);
+        command.Parameters.AddWithValue("@rejected", BugReportRules.StateRejected);
+        return Convert.ToInt32(await command.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false), CultureInfo.InvariantCulture);
+    }
 
     public async Task<int> CountNewAsync(CancellationToken cancellationToken = default)
     {
@@ -313,6 +330,7 @@ public sealed class MariaBugReportService(IConfiguration configuration, IAccessC
         if (before.State != state || before.AdminNote != note)
             await AuditRecorder.RecordActionAsync(audit, access, AuditEntities.BugReport, AuditActions.ChangeBugReportState, reportId.ToString(CultureInfo.InvariantCulture), before.Number,
                 AuditDetails.Changes([new AuditChange("Stare", before.State, state), new AuditChange("Notă administrator", before.AdminNote, note)]), "", cancellationToken).ConfigureAwait(false);
+        Publish(AuditActions.ChangeBugReportState, reportId);
         return (await GetAsync(reportId, cancellationToken).ConfigureAwait(false))!;
     }
 
@@ -328,6 +346,7 @@ public sealed class MariaBugReportService(IConfiguration configuration, IAccessC
         }
         await AuditRecorder.RecordActionAsync(audit, access, AuditEntities.BugReport, AuditActions.DeleteBugReport, reportId.ToString(CultureInfo.InvariantCulture), before.Number,
             $"Titlu: {Trim(before.Title, 120)}; autor: {before.UserName}; stare: {before.State}", "", cancellationToken).ConfigureAwait(false);
+        Publish(AuditActions.DeleteBugReport, reportId);
     }
 
     public async Task<BugReportExportResult> ExportAsync(IReadOnlyList<int> reportIds, CancellationToken cancellationToken = default)
@@ -411,6 +430,7 @@ internal sealed class GuardedBugReportService(IBugReportService inner, ModuleReg
     public Task<IReadOnlyList<BugReport>> GetMineAsync(CancellationToken cancellationToken = default) => modules.RunAsync(Id, () => inner.GetMineAsync(cancellationToken));
     public Task<BugReportPage> QueryAsync(BugReportQuery query, int page, int pageSize, CancellationToken cancellationToken = default) => modules.RunAsync(Id, () => inner.QueryAsync(query, page, pageSize, cancellationToken));
     public Task<int> CountNewAsync(CancellationToken cancellationToken = default) => modules.RunAsync(Id, () => inner.CountNewAsync(cancellationToken));
+    public Task<int> CountOpenAsync(CancellationToken cancellationToken = default) => modules.RunAsync(Id, () => inner.CountOpenAsync(cancellationToken));
     public Task<IReadOnlyList<BugReportFile>> GetFilesAsync(int reportId, CancellationToken cancellationToken = default) => modules.RunAsync(Id, () => inner.GetFilesAsync(reportId, cancellationToken));
     public Task<BugReportFileContent?> GetFileContentAsync(int fileId, CancellationToken cancellationToken = default) => modules.RunAsync(Id, () => inner.GetFileContentAsync(fileId, cancellationToken));
     public Task<BugReport> ChangeStateAsync(int reportId, string state, string note, CancellationToken cancellationToken = default) => modules.RunAsync(Id, () => inner.ChangeStateAsync(reportId, state, note, cancellationToken));
