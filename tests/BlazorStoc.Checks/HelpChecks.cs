@@ -358,7 +358,7 @@ public static class HelpChecks
     // Files with a window over the page that need no help button of their own: confirmations (they explain themselves) and files that only wrap a form with its own help button.
     private static readonly HashSet<string> DialogFilesWithoutHelp = new(StringComparer.OrdinalIgnoreCase)
     {
-        "MainLayout.razor", "ImageLightbox.razor", "AdminOperationDialog.razor", "DeleteConfirmationDialog.razor", "SaveConfirmationDialog.razor", "UnsavedChangesDialog.razor", "RestoreConfirmationDialog.razor", "ForceUnlockDialog.razor", "ServiceContractAddendumReasonDialog.razor",
+        "MainLayout.razor", "ImageLightbox.razor", "ImageAnnotator.razor", "AdminOperationDialog.razor", "DeleteConfirmationDialog.razor", "SaveConfirmationDialog.razor", "UnsavedChangesDialog.razor", "RestoreConfirmationDialog.razor", "ForceUnlockDialog.razor", "ServiceContractAddendumReasonDialog.razor",
         "ParameterValueEditDialog.razor", "BackupSettingsPanel.razor", "AccessSecurityPanel.razor", "AuthenticatorActions.razor", "ProjectComponentsSection.razor",
         "Home.razor", "Beneficiaries.razor", "Suppliers.razor", "Vehicles.razor", "InvoiceTemplatesList.razor", "OfferPickup.razor",
         // The editors of the beneficiary page open in a window made here around forms that have their own help button; the file panel has a delete confirmation and a plain file preview.

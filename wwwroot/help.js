@@ -13,17 +13,27 @@
     function ensureDialog() {
         let dialog = document.getElementById(dialogId);
         if (dialog instanceof HTMLDialogElement) return dialog;
+        // The window has the structure of every window of the application (components/Shared/AppDialog.razor): backdrop > frame > [bar | panel with head, body, resize handle],
+        // so it moves by its head, resizes by the corner and has the round close button, handled by wwwroot/app-dialog.js (PROP-0007, BUG-0015).
         dialog = document.createElement("dialog");
         dialog.id = dialogId;
-        dialog.className = "delete-dialog help-dialog";
+        dialog.className = "app-dialog-native help-dialog";
+        dialog.setAttribute("data-app-dialog", "");
+        dialog.setAttribute("data-native", "true");
         dialog.setAttribute("aria-labelledby", "help-dialog-title");
         dialog.innerHTML =
-            '<header class="help-header"><h2 id="help-dialog-title">Ajutor</h2><span class="help-header-actions">' +
+            '<div class="app-dialog-frame" data-app-dialog-frame>' +
+            '<div class="app-dialog-bar" data-app-dialog-bar><button type="button" class="popup-close-icon" data-app-dialog-close data-app-dialog-proxy aria-label="Închide fereastra" title="Închide fereastra"></button></div>' +
+            '<div class="delete-dialog app-dialog-panel app-dialog-xl help-panel" role="dialog" aria-modal="true" aria-labelledby="help-dialog-title">' +
+            '<div class="dialog-head app-dialog-head" title="Trage de bara de titlu pentru a muta fereastra"><h2 id="help-dialog-title">Ajutor</h2><span class="help-header-actions">' +
             '<button type="button" class="refresh act-nav" data-help-back hidden>Înapoi</button>' +
-            '<button type="button" class="refresh act-close" data-help-close>Închide</button></span></header>' +
+            '<button type="button" class="refresh act-close" data-help-close>Închide</button></span></div>' +
+            '<div class="app-dialog-body help-scroll">' +
             '<div class="help-search" hidden><input type="search" class="help-search-input" placeholder="Caută în tot ajutorul" aria-label="Caută în tot ajutorul" autocomplete="off" />' +
             '<div class="help-search-results" aria-live="polite"></div></div>' +
-            '<div class="help-body" tabindex="-1"></div>';
+            '<div class="help-body" tabindex="-1"></div></div>' +
+            '<span class="app-dialog-resize" data-app-dialog-resize aria-hidden="true" title="Trage pentru a redimensiona (dublu-clic: dimensiunea implicită)"></span>' +
+            '</div></div>';
         document.body.appendChild(dialog);
         return dialog;
     }
@@ -49,7 +59,7 @@
             body.innerHTML = await response.text();
             const title = body.querySelector(".help-title");
             dialog.querySelector("#help-dialog-title").textContent = title ? "Ajutor · " + title.textContent : "Ajutor";
-            body.scrollTop = 0;
+            const scroller = body.closest(".app-dialog-body"); if (scroller) scroller.scrollTop = 0;
         } catch (error) {
             body.textContent = "Ajutorul nu a putut fi încărcat. Încearcă din nou.";
         }
@@ -122,11 +132,11 @@
         shot.classList.add("help-shot-active");
         row.classList.add("help-selected");
         scrollToFrame(shot);
-        // The picture sticks under the header while the table scrolls: the chosen row must not stay behind it.
-        const header = dialog.querySelector(".help-header");
-        const stuckBottom = (header ? header.getBoundingClientRect().bottom : 0) + shot.offsetHeight;
+        // The picture sticks at the top of the scrolling body while the table scrolls: the chosen row must not stay behind it.
+        const scroller = dialog.querySelector(".app-dialog-body");
+        const stuckBottom = (scroller ? scroller.getBoundingClientRect().top : 0) + shot.offsetHeight;
         const gap = row.getBoundingClientRect().top - stuckBottom - 8;
-        if (gap < 0) dialog.scrollBy({ top: gap, behavior: "smooth" });
+        if (gap < 0 && scroller) scroller.scrollBy({ top: gap, behavior: "smooth" });
     }
 
     // The first frame goes to the middle of the scrolling area of the picture.

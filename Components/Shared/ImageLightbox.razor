@@ -1,7 +1,7 @@
 @namespace BlazorStoc.Components.Shared
 @* An image shown large, over the page or over a popup: a dark overlay, the picture fitted to the window and the name under it. A click outside the picture, the button or Escape closes it
    (the close icon of the bar above any popup triggers the same button). Used by the form of a bug report and by the administrator view of the reports. *@
-<AppDialog @ref="appDialog" BackdropClass="image-lightbox front" PanelClass="image-lightbox-panel" Label="@Title" ShowModuleActions="false" OnClose="() => Closed.InvokeAsync()" OnBackdropClick="() => Closed.InvokeAsync()" OnKeyDown="KeyAsync">
+<AppDialog @ref="appDialog" ShowGrip="false" BackdropClass="image-lightbox front" PanelClass="image-lightbox-panel" Label="@Title" ShowModuleActions="false" OnClose="() => Closed.InvokeAsync()" OnBackdropClick="() => Closed.InvokeAsync()" OnKeyDown="KeyAsync">
         <div class="image-lightbox-head"><strong>@Title</strong><button type="button" class="refresh act-close" data-popup-close @onclick="() => Closed.InvokeAsync()">Închide</button></div>
         <img src="@Src" alt="@Title" />
 </AppDialog>

@@ -15,7 +15,7 @@
         @Frame
         @Floating
     </dialog>
-}
+            }
 else
 {
     <div class="app-dialog-backdrop delete-overlay @BackdropClass" data-app-dialog data-own-keys="@(OnKeyDown.HasDelegate ? "" : null)" @onkeydown="OnKeyDown" @onclick="OnBackdropClick" @onmousedown="OnBackdropMouseDown">
@@ -42,6 +42,8 @@ else
     [Parameter] public EventCallback OnClose { get; set; }
     /// <summary>false = the round close button is not drawn (a window that makes the user choose).</summary>
     [Parameter] public bool ShowClose { get; set; } = true;
+    /// <summary>A window without a title of its own (the head is written inside its content) gets a slim bar to drag it by, so the move is always visible (BUG-0015).</summary>
+    [Parameter] public bool ShowGrip { get; set; } = true;
     [Parameter] public RenderFragment? ChildContent { get; set; }
     [Parameter] public RenderFragment? Footer { get; set; }
     /// <summary>A window that floats over the page inside the same dialog (not inside the frame, so a move of the frame does not carry it): the marking of a picture over a popup.</summary>
@@ -97,6 +99,10 @@ else
             @if (HasTitle)
             {
                 <div class="dialog-head app-dialog-head" title="Trage de bara de titlu pentru a muta fereastra"><h2 id="@TitleIdOrDefault">@if (TitleContent is not null) { @TitleContent } else { @Title }</h2>@if (!string.IsNullOrWhiteSpace(HelpTopic)) { <HelpButton Topic="@HelpTopic" About="@HelpAbout" /> }</div>
+}
+            else if (ShowGrip)
+            {
+                <div class="app-dialog-grip" title="Trage de bara aceasta pentru a muta fereastra" aria-hidden="true"></div>
             }
             <div class="app-dialog-body">@ChildContent</div>
             @if (Footer is not null) { <div class="app-dialog-foot">@Footer</div> }

@@ -33,7 +33,7 @@
     document.addEventListener("keydown", (event) => {
         if (event.key !== "Escape" || event.defaultPrevented || event.isComposing) return;
         if (document.querySelector("dialog[open]")) return;
-        const frames = Array.from(document.querySelectorAll("[data-app-dialog-frame]")).filter(shown);
+        const frames = Array.from(document.querySelectorAll("[data-app-dialog-frame]:not([data-app-dialog-floating])")).filter(shown);
         if (frames.length === 0) return;
         let top = frames[0];
         frames.forEach((frame) => { if (layer(frame) >= layer(top)) top = frame; });
@@ -89,14 +89,14 @@
             event.preventDefault();
             track(event, (dx, dy) => {
                 const width = clamp(rect.width + dx, MIN_WIDTH, maxWidth), height = clamp(rect.height + dy, MIN_HEIGHT, maxHeight);
-                frame.style.width = `${width}px`; panel.style.height = `${height}px`;
+                frame.style.width = `${width}px`; panel.style.width = "100%"; panel.style.height = `${height}px`;   // the panel fills the frame whatever width its own class gives it (BUG-0015)
                 // The layout (centred frame) moves the panel when its size changes; measure where it went and bring the top-left corner back, so the corner follows the pointer.
                 const now = panel.getBoundingClientRect(), shifted = offsetOf(frame);
                 place(frame, shifted.x + (rect.left - now.left), shifted.y + (rect.top - now.top));
             });
             return;
         }
-        const head = event.target.closest(".app-dialog-head, .dialog-head");
+        const head = event.target.closest(".app-dialog-head, .app-dialog-grip, .dialog-head");
         if (!head || !panel.contains(head) || event.target.closest(interactive)) return;
         const start = offsetOf(frame);
         const rect = panel.getBoundingClientRect();
@@ -114,7 +114,7 @@
         const panel = frame && frame.querySelector(".app-dialog-panel");
         if (!frame || !panel) return;
         if (event.target.closest("[data-app-dialog-resize]")) { frame.style.width = ""; panel.style.width = ""; panel.style.height = ""; place(frame, 0, 0); return; }
-        const head = event.target.closest(".app-dialog-head, .dialog-head");
+        const head = event.target.closest(".app-dialog-head, .app-dialog-grip, .dialog-head");
         if (head && panel.contains(head) && !event.target.closest(interactive)) place(frame, 0, 0);
     });
     window.addEventListener("click", (event) => {

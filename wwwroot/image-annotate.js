@@ -1,5 +1,5 @@
 // Marking zones on a picture (Components/Shared/ImageAnnotator.razor), used by the form of a bug report and by the form of a proposal (PROP-0009).
-// The picture is shown large in its own floating window (inside the popup, so the description of the popup stays reachable); the user drags rectangles on it, they are numbered 1..N
+// The picture is shown large in its own floating window (the structure and the move / resize of every window: wwwroot/app-dialog.js) (inside the popup, so the description of the popup stays reachable); the user drags rectangles on it, they are numbered 1..N
 // in the order they were drawn, can only be deleted (the button outside the top-right corner) and the numbers follow by themselves. After every change the picture is drawn again from
 // the ORIGINAL with the zones on it (JPEG) and handed to the component; the original and the zones live here, per picture, until the form is left. Pointer events only, no observers.
 window.imageAnnotate = (() => {
@@ -155,41 +155,6 @@ window.imageAnnotate = (() => {
             stage.removeEventListener("pointerdown", down); stage.removeEventListener("pointermove", move); stage.removeEventListener("pointerup", up); stage.removeEventListener("pointercancel", up);
             root.removeEventListener("click", click); root.removeEventListener("keydown", keys);
         };
-        wireWindow(root);
-    };
-
-    // The window moves by its head and changes size by the corner handle (plain pointer events; it is not a frame of AppDialog).
-    const wireWindow = (root) => {
-        if (root.dataset.wired) return;
-        root.dataset.wired = "1";
-        const track = (event, onMove) => {
-            const target = event.target, id = event.pointerId, startX = event.clientX, startY = event.clientY;
-            const move = (e) => { if (e.pointerId === id) onMove(e.clientX - startX, e.clientY - startY); };
-            const end = (e) => {
-                if (e.pointerId !== id) return;
-                target.removeEventListener("pointermove", move); target.removeEventListener("pointerup", end); target.removeEventListener("pointercancel", end);
-                try { target.releasePointerCapture(id); } catch { /* released */ }
-            };
-            try { target.setPointerCapture(id); } catch { /* gone */ }
-            target.addEventListener("pointermove", move); target.addEventListener("pointerup", end); target.addEventListener("pointercancel", end);
-        };
-        root.addEventListener("pointerdown", (event) => {
-            if (event.button !== 0 || !(event.target instanceof Element) || window.matchMedia("(max-width: 719px)").matches) return;
-            const rect = root.getBoundingClientRect();
-            if (event.target.closest("[data-annotator-resize]")) {
-                event.preventDefault();
-                track(event, (dx, dy) => {
-                    root.style.width = `${Math.min(window.innerWidth - rect.left - 8, Math.max(320, rect.width + dx))}px`;
-                    root.style.height = `${Math.min(window.innerHeight - rect.top - 8, Math.max(240, rect.height + dy))}px`;
-                });
-            } else if (event.target.closest("[data-annotator-head]") && !event.target.closest("button")) {
-                event.preventDefault();
-                track(event, (dx, dy) => {
-                    root.style.left = `${Math.min(window.innerWidth - 80, Math.max(80 - rect.width, rect.left + dx))}px`;
-                    root.style.top = `${Math.min(window.innerHeight - 40, Math.max(0, rect.top + dy))}px`;
-                });
-            }
-        });
     };
 
     const close = (root) => {

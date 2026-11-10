@@ -927,3 +927,7 @@ Cerut de utilizator la 06.10.2026 (verificarea fluxului, apoi deciziile: facturi
 ## Finalizat la 10.11.2026 15:44 - Dezvoltator (cont), stergere in bloc, popup propunere fara taburi, editare continut, capturi mari (0.5.68)
 
 - Migrarea 86 (web_users.is_developer), comutator Dezvoltator pe randul si pagina contului, sub-tab Dezvoltatori, Setari -> Dezvoltare si filele Bugs/Propuneri din Notificari doar pentru dezvoltatori, fila Bugs noua, Sterge toate cele rezolvate (rapoarte si propuneri, definitiv, jurnalizat), popup propunere fara taburi, editare titlu/descriere/motivare + imagini adaugate, capturi pana la 3200 px, spatieri Setari (PROP-0013, 0014, 0015, BUG-0014),Verificari: build Release, suita completa, MariaDB (rapoarte, propuneri, tipuri de utilizatori), browser pe instanta de test cu date de test sterse
+
+## Finalizat la 10.11.2026 16:07 - Ferestre unitare: bara de prindere, redimensionare, Ajutor si marcare pe structura comuna (0.5.69)
+
+- AppDialog da bara de prindere ferestrelor fara titlu, redimensionarea muta cadrul si panoul umple cadrul, fereastra de Ajutor (help.js) si ImageAnnotator folosesc structura AppDialog (mutare/redimensionare din app-dialog.js), test care impune structura comuna (BUG-0015),Verificari: build Release, suita completa, browser pe instanta de test (analize de risc, Ajutor, marcare zone)

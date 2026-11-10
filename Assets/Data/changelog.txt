@@ -1,3 +1,8 @@
+## 0.5.69 | 10.11.2026
+- Toate ferestrele (popup-urile) au bara de mutare vizibilă: titlul pentru cele cu titlu, iar cele care își scriu titlul în conținut au o bară subțire cu puncte de prindere deasupra
+- La lărgirea unei ferestre peste dimensiunea inițială se mărește și panoul, nu doar butoanele din bara de sus
+- Fereastra de Ajutor și fereastra de marcare a zonelor pe imagini au aceeași structură și aceleași funcții ca restul ferestrelor (mutare, redimensionare, buton de închidere)
+
 ## 0.5.68 | 10.11.2026
 - Conturile de utilizator pot fi marcate „Dezvoltator” (comutator pe rândul contului și pe pagina contului, sub-tab nou „Dezvoltatori” cu revocare); dala „Dezvoltare” din Setări și filele „Bugs” și „Propuneri” din Notificări se văd numai dezvoltatorilor; după actualizare nimeni nu este dezvoltator, conturile se marchează din Utilizatori
 - Notificări: fila nouă „Bugs” cu rapoartele de eroare noi, după modelul filei „Propuneri”
