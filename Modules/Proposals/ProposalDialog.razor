@@ -7,7 +7,7 @@
 @* Propune o modificare: the popup opened by the menu entry under "Raportează o eroare" or by the button "Propune" of the bar above any popup (wwwroot/bug-report.js). The script photographs
    the page BEFORE the popup shows and hands the picture to Opened; Ctrl+V pictures arrive through AddPasted. Three tabs: the form, "Propunerile mele" and "Toate propunerile" (every proposal,
    text only, with the answers). A proposal opens in the same popup: its data, the answers and, for the author and the administrator, the pictures and the box of a new answer. *@
-<AppDialog Native="true" Id="proposal-dialog" PanelClass="bug-dialog proposal-dialog" Title="@(viewing is null ? "Propune o modificare" : $"{viewing.Number} – {viewing.Title}")" TitleId="proposal-title" HelpTopic="propunere-modificare" HelpAbout="Propunerile de modificări" ShowModuleActions="false" OnClose="CloseAsync">
+<AppDialog Floating="AnnotatorView" Native="true" Id="proposal-dialog" PanelClass="bug-dialog proposal-dialog" Title="@(viewing is null ? "Propune o modificare" : $"{viewing.Number} – {viewing.Title}")" TitleId="proposal-title" HelpTopic="propunere-modificare" HelpAbout="Propunerile de modificări" ShowModuleActions="false" OnClose="CloseAsync">
     @if (viewing is null)
     {
         <div class="bug-tabs" role="tablist" aria-label="Propuneri">
@@ -115,13 +115,13 @@
                 {
                     var item = image;
                     <figure class="bug-image">
-                        <button type="button" class="bug-image-zoom" aria-label="Mărește imaginea @item.Label" title="Mărește imaginea @item.Label" @onclick="() => zoomedUrl = new Picture(item.Label, item.ZoomUrl)">
+                        <button type="button" class="bug-image-zoom" aria-label="Marchează zone pe imaginea @item.Label" title="Deschide imaginea mărită și marchează zone" @onclick="() => annotating = item">
                             @if (item.DataUrl is not null) { <img src="@item.DataUrl" alt="@item.Label" /> }
                             else { <span class="bug-image-large">@item.Name · @(item.Bytes.Length / 1024) KB</span> }
                             <span class="bug-zoom-plus" aria-hidden="true">+</span>
                         </button>
                         <figcaption>@item.Label</figcaption>
-                        <button type="button" class="row-icon delete" aria-label="Scoate imaginea @item.Label din propunere" title="Scoate imaginea @item.Label din propunere" disabled="@busy" @onclick="() => images.Remove(item)"></button>
+                        <button type="button" class="row-icon delete" aria-label="Scoate imaginea @item.Label din propunere" title="Scoate imaginea @item.Label din propunere" disabled="@busy" @onclick="() => RemoveImage(item)"></button>
                     </figure>
                 }
             </div>
@@ -211,10 +211,14 @@
     private sealed class PendingImage(string kind, string name, byte[] bytes, string contentType)
     {
         public string Kind { get; } = kind;
-        public string Name { get; } = name;
-        public byte[] Bytes { get; } = bytes;
-        public string? DataUrl { get; } = bytes.Length <= 1_500_000 ? $"data:{contentType};base64,{Convert.ToBase64String(bytes)}" : null;
-        public string ZoomUrl => DataUrl ?? $"data:{contentType};base64,{Convert.ToBase64String(bytes)}";
+        public string Name { get; private set; } = name;
+        public string Id { get; } = Guid.NewGuid().ToString("N");
+        public byte[] Bytes { get; private set; } = bytes;
+        private string mime = contentType;
+        public string? DataUrl { get; private set; } = bytes.Length <= 1_500_000 ? $"data:{contentType};base64,{Convert.ToBase64String(bytes)}" : null;
+        // The picture marked in the window of marking replaces the bytes (JPEG); the original stays in the script until the form is left.
+        public void Replace(byte[] marked, string type) { Bytes = marked; mime = type; Name = Path.ChangeExtension(Name, ".jpg"); DataUrl = marked.Length <= 1_500_000 ? $"data:{type};base64,{Convert.ToBase64String(marked)}" : null; }
+        public string ZoomUrl => DataUrl ?? $"data:{mime};base64,{Convert.ToBase64String(Bytes)}";
         public string Label => Kind switch { ReportImageRules.KindScreenshot => "Captura paginii", ReportImageRules.KindFile => Name, _ => "Imagine lipită" };
     }
 
@@ -230,6 +234,15 @@
     private IReadOnlyList<ProposalNote> notes = [];
     private List<Picture> viewImages = [];
     private Picture? zoomedUrl;
+    private PendingImage? annotating;
+    private RenderFragment? AnnotatorView => annotating is not { } shown ? null : @<ImageAnnotator @key="shown.Id" ImageId="@shown.Id" Label="@shown.Label" Src="@shown.ZoomUrl" MaxBytes="ReportImageRules.MaxImageBytes" Applied="AppliedAsync" Closed="() => annotating = null" />;
+    private void RemoveImage(PendingImage item) { images.Remove(item); if (annotating == item) annotating = null; _ = ForgetAsync(item.Id); }
+    private async Task ForgetAsync(string id) { try { await JS.InvokeVoidAsync("imageAnnotate.forget", id); } catch (Exception exception) when (exception is JSException or InvalidOperationException or TaskCanceledException or JSDisconnectedException) { } }
+    private Task AppliedAsync((string ImageId, byte[] Bytes, string ContentType) marked)
+    {
+        images.FirstOrDefault(item => item.Id == marked.ImageId)?.Replace(marked.Bytes, marked.ContentType);
+        return Task.CompletedTask;
+    }
     private readonly CancellationTokenSource lifetime = new();
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
@@ -269,7 +282,7 @@
             catch (Exception exception) when (exception is not OperationCanceledException) { Logger.LogWarning("The capture of the page could not be read ({ErrorType}).", exception.GetType().Name); }
         }
         if (sent is not null) ResetForm();
-        viewing = null; zoomedUrl = null; tab = "new"; error = null; confirmDiscard = false;
+        viewing = null; zoomedUrl = null; annotating = null; tab = "new"; error = null; confirmDiscard = false;
         await InvokeAsync(StateHasChanged);
     }
 

@@ -1,0 +1,80 @@
+@using BlazorStoc.Services
+@inject IDiskUsageService Usage
+@inject ILogger<DiskUsagePanel> Logger
+@implements IDisposable
+@* Setari -> Baza de date -> Spatiu: how much room the application takes on disk, by kind of file, and what the partitions have left. Read-only; measured on request
+   (the folders can be large), never on a timer. *@
+
+<section class="catalog disk-usage">
+    <div class="catalog-heading"><h2>Spațiul ocupat pe disc</h2><small>@(report is { } at ? "Măsurat la " + at.MeasuredUtc.ToLocalTime().ToString("dd.MM.yyyy HH:mm:ss") : "")</small></div>
+    <div class="catalog-body">
+        <div class="editor-actions">
+            <button type="button" class="refresh act-reload" disabled="@busy" @onclick="MeasureAsync">@(busy ? "Se măsoară…" : "Recalculează")</button>
+        </div>
+        @if (error is not null) { <div class="error-banner" role="alert">@error</div> }
+        @if (busy && report is null) { <div class="empty-state" role="status"><div class="spinner"></div><h3>Se măsoară fișierele</h3></div> }
+        @if (report is { } r)
+        {
+            @if (r.Note is not null) { <p class="muted">@r.Note</p> }
+            <p class="disk-total" id="disk-total">Total ocupat de aplicație: <strong>@DatabaseStatusText.Size(r.TotalBytes)</strong> <small class="muted">suma tuturor categoriilor din defalcare (aplicația, baza de date, imagini, fișiere adăugate, backup-uri și altele)</small></p>
+            @foreach (var drive in r.Drives)
+            {
+                var used = drive.TotalBytes - drive.FreeBytes;
+                var percent = drive.TotalBytes == 0 ? 0 : (int)Math.Round(100.0 * used / drive.TotalBytes);
+                var appPercent = drive.TotalBytes == 0 ? 0 : Math.Min(100, 100.0 * drive.ApplicationBytes / drive.TotalBytes);
+                <details class="db-collapse"><summary>Partiția @drive.Name — liber @DatabaseStatusText.Size(drive.FreeBytes) din @DatabaseStatusText.Size(drive.TotalBytes)</summary>
+                    <div class="disk-bar" role="img" aria-label="@($"Partiția {drive.Name}: {percent}% ocupat, aplicația {DatabaseStatusText.Size(drive.ApplicationBytes)}")">
+                        <span class="disk-bar-app" style="width:@appPercent.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture)%"></span>
+                        <span class="disk-bar-used" style="width:@Math.Max(0, percent - appPercent).ToString("0.##", System.Globalization.CultureInfo.InvariantCulture)%"></span>
+                    </div>
+                    <p class="muted"><small>@percent% ocupat în total; din care aplicația, cu toate fișierele ei: @DatabaseStatusText.Size(drive.ApplicationBytes).</small></p>
+                </details>
+            }
+            <details class="db-collapse"><summary>Defalcare pe tipuri de fișiere — total @DatabaseStatusText.Size(r.TotalBytes)</summary>
+                <div class="table-scroll">
+                    <table class="database-facts">
+                        <thead><tr><th>TIP</th><th>DIMENSIUNE</th><th>FIȘIERE</th><th>UNDE</th></tr></thead>
+                        <tbody>
+                            @foreach (var category in r.Categories)
+                            {
+                                <tr>
+                                    <th scope="row">@category.Title<br /><small class="muted">@category.Note</small></th>
+                                    <td>@(category.Bytes is { } bytes ? DatabaseStatusText.Size(bytes) : "indisponibil")</td>
+                                    <td>@category.Files</td>
+                                    <td><small>@string.Join(" · ", category.Paths)</small></td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </details>
+        }
+    </div>
+</section>
+
+@code {
+    private readonly CancellationTokenSource lifetime = new();
+    private DiskUsageReport? report;
+    private bool busy;
+    private string? error;
+
+    protected override async Task OnInitializedAsync() => await MeasureAsync();
+
+    private async Task MeasureAsync()
+    {
+        if (busy) return;
+        busy = true;
+        error = null;
+        try { report = await Usage.MeasureAsync(lifetime.Token); }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (AccessDeniedException exception) { error = exception.Message; }
+        catch (Exception exception)
+        {
+            Logger.LogError("Disk usage measuring failed ({ErrorType}).", exception.GetType().Name);
+            error = "Spațiul ocupat nu a putut fi măsurat. Detaliile sunt în jurnalul aplicației.";
+        }
+        finally { busy = false; }
+    }
+
+    public void Dispose() { lifetime.Cancel(); lifetime.Dispose(); }
+}

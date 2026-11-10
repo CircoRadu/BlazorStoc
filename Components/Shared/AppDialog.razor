@@ -13,12 +13,14 @@
 {
     <dialog id="@Id" class="app-dialog-native @BackdropClass" data-app-dialog data-native="true" aria-labelledby="@LabelId">
         @Frame
+        @Floating
     </dialog>
 }
 else
 {
     <div class="app-dialog-backdrop delete-overlay @BackdropClass" data-app-dialog data-own-keys="@(OnKeyDown.HasDelegate ? "" : null)" @onkeydown="OnKeyDown" @onclick="OnBackdropClick" @onmousedown="OnBackdropMouseDown">
         @Frame
+        @Floating
     </div>
 }
 
@@ -42,6 +44,8 @@ else
     [Parameter] public bool ShowClose { get; set; } = true;
     [Parameter] public RenderFragment? ChildContent { get; set; }
     [Parameter] public RenderFragment? Footer { get; set; }
+    /// <summary>A window that floats over the page inside the same dialog (not inside the frame, so a move of the frame does not carry it): the marking of a picture over a popup.</summary>
+    [Parameter] public RenderFragment? Floating { get; set; }
     /// <summary>Extra classes of the panel (the look of the window: template-popup, movement-dialog ...).</summary>
     [Parameter] public string? PanelClass { get; set; }
     /// <summary>Extra classes of the backdrop (front, unsaved-overlay: the layer over other windows).</summary>
@@ -96,6 +100,7 @@ else
             }
             <div class="app-dialog-body">@ChildContent</div>
             @if (Footer is not null) { <div class="app-dialog-foot">@Footer</div> }
+            <span class="app-dialog-resize" data-app-dialog-resize title="Trage pentru a redimensiona (dublu-clic: dimensiunea implicită)" aria-hidden="true"></span>
         </div>
     </div>;
 

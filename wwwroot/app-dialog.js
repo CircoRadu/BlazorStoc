@@ -41,4 +41,83 @@
         if (holder.hasAttribute("data-own-keys") && holder.contains(event.target)) return;
         if (top.querySelector("[data-app-dialog-close]")) { event.preventDefault(); press(top); }
     });
+    // 3) Move and resize (PROP-0007): the head of a window is dragged to move it, the corner handle at the bottom right changes its size. Pointer events only, nothing is observed;
+    //    the position and size live in inline styles of the frame / panel, so a window that is opened again starts at its default. Off on narrow screens (windows fill them).
+    const narrow = () => window.matchMedia("(max-width: 719px)").matches;
+    const MIN_WIDTH = 320, MIN_HEIGHT = 200, MARGIN = 8, DRAG_START = 4;
+    let suppressClickUntil = 0;
+    const offsetOf = (frame) => ({ x: Number.parseFloat(frame.dataset.dx || "0") || 0, y: Number.parseFloat(frame.dataset.dy || "0") || 0 });
+    const place = (frame, x, y) => { frame.dataset.dx = String(x); frame.dataset.dy = String(y); frame.style.transform = x === 0 && y === 0 ? "" : `translate(${x}px, ${y}px)`; };
+    const clamp = (value, min, max) => Math.min(Math.max(value, min), Math.max(min, max));
+    const interactive = "button, a, input, select, textarea, summary, label, [contenteditable], [data-no-drag]";
+    const track = (event, onMove, onEnd) => {
+        const target = event.target;
+        const id = event.pointerId;
+        const startX = event.clientX, startY = event.clientY;
+        let moved = false;
+        const move = (e) => {
+            if (e.pointerId !== id) return;
+            const dx = e.clientX - startX, dy = e.clientY - startY;
+            if (!moved && Math.hypot(dx, dy) < DRAG_START) return;
+            if (!moved) { moved = true; document.documentElement.classList.add("app-dialog-adjusting"); }
+            onMove(dx, dy);
+        };
+        const end = (e) => {
+            if (e.pointerId !== id) return;
+            target.removeEventListener("pointermove", move);
+            target.removeEventListener("pointerup", end);
+            target.removeEventListener("pointercancel", end);
+            try { target.releasePointerCapture(id); } catch { /* already released */ }
+            document.documentElement.classList.remove("app-dialog-adjusting");
+            if (moved) suppressClickUntil = Date.now() + 80;   // the click that ends a drag must not reach the backdrop (it would close the window)
+            if (onEnd) onEnd(moved);
+        };
+        try { target.setPointerCapture(id); } catch { /* the pointer is gone */ }
+        target.addEventListener("pointermove", move);
+        target.addEventListener("pointerup", end);
+        target.addEventListener("pointercancel", end);
+    };
+    document.addEventListener("pointerdown", (event) => {
+        if (event.button !== 0 || narrow() || !(event.target instanceof Element)) return;
+        const frame = event.target.closest("[data-app-dialog-frame]");
+        const panel = frame && frame.querySelector(".app-dialog-panel");
+        if (!frame || !panel) return;
+        if (event.target.closest("[data-app-dialog-resize]")) {
+            const rect = panel.getBoundingClientRect();
+            const maxWidth = window.innerWidth - MARGIN - rect.left;
+            const maxHeight = window.innerHeight - MARGIN - rect.top;
+            event.preventDefault();
+            track(event, (dx, dy) => {
+                const width = clamp(rect.width + dx, MIN_WIDTH, maxWidth), height = clamp(rect.height + dy, MIN_HEIGHT, maxHeight);
+                panel.style.width = `${width}px`; panel.style.height = `${height}px`;
+                // The layout (centred frame) moves the panel when its size changes; measure where it went and bring the top-left corner back, so the corner follows the pointer.
+                const now = panel.getBoundingClientRect(), shifted = offsetOf(frame);
+                place(frame, shifted.x + (rect.left - now.left), shifted.y + (rect.top - now.top));
+            });
+            return;
+        }
+        const head = event.target.closest(".app-dialog-head, .dialog-head");
+        if (!head || !panel.contains(head) || event.target.closest(interactive)) return;
+        const start = offsetOf(frame);
+        const rect = panel.getBoundingClientRect();
+        event.preventDefault();
+        track(event, (dx, dy) => {
+            // At least a strip of the head stays on the screen, so the window can always be taken back.
+            const x = clamp(start.x + dx, start.x - rect.left - rect.width + 80, start.x + window.innerWidth - rect.left - 80);
+            const y = clamp(start.y + dy, start.y - rect.top, start.y + window.innerHeight - rect.top - 40);
+            place(frame, x, y);
+        });
+    });
+    document.addEventListener("dblclick", (event) => {
+        if (narrow() || !(event.target instanceof Element)) return;
+        const frame = event.target.closest("[data-app-dialog-frame]");
+        const panel = frame && frame.querySelector(".app-dialog-panel");
+        if (!frame || !panel) return;
+        if (event.target.closest("[data-app-dialog-resize]")) { panel.style.width = ""; panel.style.height = ""; place(frame, 0, 0); return; }
+        const head = event.target.closest(".app-dialog-head, .dialog-head");
+        if (head && panel.contains(head) && !event.target.closest(interactive)) place(frame, 0, 0);
+    });
+    window.addEventListener("click", (event) => {
+        if (Date.now() < suppressClickUntil) { event.stopPropagation(); event.preventDefault(); }
+    }, true);
 })();

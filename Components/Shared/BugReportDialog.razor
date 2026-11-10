@@ -8,7 +8,7 @@
 @implements IAsyncDisposable
 @* Raportare eroare: the popup opened by the menu entry above "Ajutor" (wwwroot/bug-report.js). The script photographs the page BEFORE the popup shows and hands the picture to Opened;
    Ctrl+V pictures arrive through AddPasted; a file can also be chosen. The flow is described at the top in sections that stay closed until opened. *@
-<AppDialog Native="true" Id="bug-dialog" PanelClass="bug-dialog" Title="Raportează o eroare" TitleId="bug-title" HelpTopic="raportare-eroare" HelpAbout="Raportare eroare" ShowModuleActions="false" OnClose="CloseAsync">
+<AppDialog Floating="AnnotatorView" Native="true" Id="bug-dialog" PanelClass="bug-dialog" Title="Raportează o eroare" TitleId="bug-title" HelpTopic="raportare-eroare" HelpAbout="Raportare eroare" ShowModuleActions="false" OnClose="CloseAsync">
     <div class="bug-tabs" role="tablist" aria-label="Raportare erori">
         <button type="button" role="tab" id="bug-tab-new" class="settings-tab @(tab == "new" ? "active" : "")" aria-selected="@(tab == "new")" @onclick="@(() => SelectTab("new"))">Raport nou</button>
         <button type="button" role="tab" id="bug-tab-mine" class="settings-tab @(tab == "mine" ? "active" : "")" aria-selected="@(tab == "mine")" @onclick="@(() => SelectTab("mine"))">Rapoartele mele @if (mine is not null) { <span class="count-badge">@mine.Count</span> }</button>
@@ -101,13 +101,13 @@
                 {
                     var item = image;
                     <figure class="bug-image">
-                        <button type="button" class="bug-image-zoom" aria-label="Mărește imaginea @item.Label" title="Mărește imaginea @item.Label" @onclick="() => zoomed = item">
+                        <button type="button" class="bug-image-zoom" aria-label="Marchează zone pe imaginea @item.Label" title="Deschide imaginea mărită și marchează zone" @onclick="() => annotating = item">
                             @if (item.DataUrl is not null) { <img src="@item.DataUrl" alt="@item.Label" /> }
                             else { <span class="bug-image-large">@item.Name · @(item.Bytes.Length / 1024) KB</span> }
                             <span class="bug-zoom-plus" aria-hidden="true">+</span>
                         </button>
                         <figcaption>@item.Label</figcaption>
-                        <button type="button" class="row-icon delete" aria-label="Scoate imaginea @item.Label din raport" title="Scoate imaginea @item.Label din raport" disabled="@busy" @onclick="() => images.Remove(item)"></button>
+                        <button type="button" class="row-icon delete" aria-label="Scoate imaginea @item.Label din raport" title="Scoate imaginea @item.Label din raport" disabled="@busy" @onclick="() => RemoveImage(item)"></button>
                     </figure>
                 }
             </div>
@@ -165,26 +165,34 @@
         }
         <div class="editor-actions"><button type="button" class="refresh act-close" id="bug-close-mine" @onclick="CloseAsync">Închide</button></div>
     }
-    @if (zoomed is not null)
-    {
-        <ImageLightbox Src="@zoomed.ZoomUrl" Title="@zoomed.Label" Closed="() => zoomed = null" />
-    }
 </AppDialog>
 @code {
     private sealed class PendingImage(string kind, string name, byte[] bytes, string contentType)
     {
         public string Kind { get; } = kind;
-        public string Name { get; } = name;
-        public byte[] Bytes { get; } = bytes;
-        public string? DataUrl { get; } = bytes.Length <= 1_500_000 ? $"data:{contentType};base64,{Convert.ToBase64String(bytes)}" : null;
+        public string Name { get; private set; } = name;
+        public string Id { get; } = Guid.NewGuid().ToString("N");
+        public byte[] Bytes { get; private set; } = bytes;
+        private string mime = contentType;
+        public string? DataUrl { get; private set; } = bytes.Length <= 1_500_000 ? $"data:{contentType};base64,{Convert.ToBase64String(bytes)}" : null;
+        // The picture marked in the window of marking replaces the bytes (JPEG); the original stays in the script until the form is left.
+        public void Replace(byte[] marked, string type) { Bytes = marked; mime = type; Name = Path.ChangeExtension(Name, ".jpg"); DataUrl = marked.Length <= 1_500_000 ? $"data:{type};base64,{Convert.ToBase64String(marked)}" : null; }
         // The enlarged picture is built on demand (it may be larger than the thumbnails allow).
-        public string ZoomUrl => DataUrl ?? $"data:{contentType};base64,{Convert.ToBase64String(bytes)}";
+        public string ZoomUrl => DataUrl ?? $"data:{mime};base64,{Convert.ToBase64String(Bytes)}";
         public string Label => Kind switch { BugReportRules.KindScreenshot => "Captura paginii", BugReportRules.KindFile => Name, _ => "Imagine lipită" };
     }
 
     private static readonly string DescriptionHint = string.Join(Environment.NewLine, "Ce ai făcut (pașii)?", "Ce te așteptai să se întâmple?", "Ce s-a întâmplat de fapt (mesajul afișat, ce lipsește)?");
     private readonly List<PendingImage> images = [];
-    private PendingImage? zoomed;
+    private PendingImage? annotating;
+    private RenderFragment? AnnotatorView => annotating is not { } shown ? null : @<ImageAnnotator @key="shown.Id" ImageId="@shown.Id" Label="@shown.Label" Src="@shown.ZoomUrl" MaxBytes="BugReportRules.MaxImageBytes" Applied="AppliedAsync" Closed="() => annotating = null" />;
+    private void RemoveImage(PendingImage item) { images.Remove(item); if (annotating == item) annotating = null; _ = ForgetAsync(item.Id); }
+    private async Task ForgetAsync(string id) { try { await JS.InvokeVoidAsync("imageAnnotate.forget", id); } catch (Exception exception) when (exception is JSException or InvalidOperationException or TaskCanceledException or JSDisconnectedException) { } }
+    private Task AppliedAsync((string ImageId, byte[] Bytes, string ContentType) marked)
+    {
+        images.FirstOrDefault(item => item.Id == marked.ImageId)?.Replace(marked.Bytes, marked.ContentType);
+        return Task.CompletedTask;
+    }
     private DotNetObjectReference<BugReportDialog>? self;
     private string tab = "new", title = "", description = "", severity = BugReportRules.SeverityImportant, route = "", pageTitle = "", techJson = "";
     private bool attachTech = true, busy, capturedAuto = true, confirmDiscard;
@@ -230,7 +238,7 @@
             catch (Exception exception) when (exception is not OperationCanceledException) { Logger.LogWarning("The capture of the page could not be read ({ErrorType}).", exception.GetType().Name); }
         }
         if (sent is not null) ResetForm();
-        zoomed = null;
+        annotating = null;
         tab = "new"; error = null; confirmDiscard = false;
         await InvokeAsync(StateHasChanged);
     }

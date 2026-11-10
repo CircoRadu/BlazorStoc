@@ -102,12 +102,12 @@ public static class PopupScriptChecks
                     .Add(x => x.ChildContent, (RenderFragment)(b => b.AddContent(0, "corp"))));
                 var frame = cut.Find("[data-app-dialog-frame]");
                 var children = frame.Children.Select(item => item.ClassList.Contains("app-dialog-bar") ? "bar" : item.ClassList.Contains("app-dialog-panel") ? "panel" : "?").ToList();
-                var panelParts = cut.Find(".app-dialog-panel").Children.Select(item => item.ClassList.Contains("app-dialog-head") ? "head" : item.ClassList.Contains("app-dialog-body") ? "body" : item.ClassList.Contains("app-dialog-foot") ? "foot" : "?").ToList();
+                var panelParts = cut.Find(".app-dialog-panel").Children.Select(item => item.ClassList.Contains("app-dialog-head") ? "head" : item.ClassList.Contains("app-dialog-body") ? "body" : item.ClassList.Contains("app-dialog-foot") ? "foot" : item.ClassList.Contains("app-dialog-resize") ? "resize" : "?").ToList();
                 shapes.Add(string.Join(",", children) + "/" + string.Join(",", panelParts));
                 if (size == AppDialogSize.Auto) check(cut.Find(".app-dialog-head [data-help-topic]").GetAttribute("data-help-topic") == "ajutor" && cut.Find("[role=dialog]").GetAttribute("aria-labelledby") == cut.Find(".app-dialog-head h2").Id, "AppDialog: the head has the title and the help button; the panel is labelled by the title");
                 check(cut.FindAll(".app-dialog-panel .app-dialog-bar").Count == 0, $"AppDialog: the bar is outside the panel, never over its head ({size})");
             }
-            check(shapes.Distinct().Count() == 1 && shapes[0] == "bar,panel/head,body,foot", "AppDialog: the structure (bar above the panel; head, body, foot) is identical for every size");
+            check(shapes.Distinct().Count() == 1 && shapes[0] == "bar,panel/head,body,foot,resize", "AppDialog: the structure (bar above the panel; head, body, foot, resize handle) is identical for every size");
         }
 
         // ---- narrow screens: round icons with the symbol centred (the stylesheet) ----
@@ -116,7 +116,7 @@ public static class PopupScriptChecks
             var narrow = Regex.Match(css, @"@media \(max-width: 720px\) \{[^@]*?\.app-dialog-action \{([^}]*)\}[\s\S]*?\.app-dialog-action-icon \{([^}]*)\}[\s\S]*?\.app-dialog-action-label \{([^}]*)\}");
             check(narrow.Success && narrow.Groups[1].Value.Contains("border-radius:50%") && narrow.Groups[1].Value.Contains("width:32px") && narrow.Groups[1].Value.Contains("height:32px") && narrow.Groups[1].Value.Contains("justify-content:center")
                   && narrow.Groups[3].Value.Contains("clip:rect"), "AppDialog: under 720 px the buttons of the bar are round icons (same size and shape as the red close button), the label stays for screen readers");
-            check(Regex.IsMatch(css, @"\.app-dialog-bar \{[^}]*height:56px"), "AppDialog: the bar has a reserved height in the structure of the frame");
+            check(Regex.IsMatch(css, @"\.app-dialog-bar \{[^}]*padding-bottom:3px") && Regex.IsMatch(css, @"\.app-dialog-bar \{[^}]*align-items:flex-end"), "AppDialog: the bar sits 3 px above the panel (global rule, PROP-0005)");
         }
 
         // ---- no window written by hand outside AppDialog ----

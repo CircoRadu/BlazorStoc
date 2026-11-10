@@ -71,6 +71,7 @@ public static class ModuleChecks
         await ProjectObservationsModuleChecks.RunAsync(check);
         await InventoryModuleChecks.RunAsync(check);
         await AnafModuleChecks.RunAsync(check);
+        DiskUsageChecks.Run(check);
         await InvoiceModuleChecks.RunAsync(check);
         await NotificationModuleChecks.RunAsync(check);
         await SupplierModuleChecks.RunAsync(check);

@@ -19,7 +19,7 @@ else
         <span class="anaf-badge @(tested ? "ok" : "warn")">@(tested ? "Testată cu succes" : "Netestată (sau modificată după test)")</span>
     </div>
 
-    <fieldset class="anaf-section"><legend>1. Conexiune</legend>
+    <details class="anaf-section anaf-collapse"><summary>1. Conexiune</summary>
         <div class="anaf-grid">
             <label>Denumire integrare<input @bind="config.Name" @bind:after="Edited" maxlength="100" /></label>
             <ToggleSwitch @bind-Value="config.Enabled" @bind-Value:after="Edited" OnText="Activ" OffText="Inactiv">Integrare activată</ToggleSwitch>
@@ -43,9 +43,9 @@ else
             </div>
         }
         <button type="button" class="refresh act-confirm" @onclick="() => { config.Headers.Add(new AnafHeader()); Edited(); }">+ Adaugă antet</button>
-    </fieldset>
+    </details>
 
-    <fieldset class="anaf-section"><legend>2. Cerere</legend>
+    <details class="anaf-section anaf-collapse"><summary>2. Cerere</summary>
         <div class="anaf-grid">
             <ToggleSwitch @bind-Value="config.Trim" @bind-Value:after="Edited">Elimină spațiile din CUI</ToggleSwitch>
             <ToggleSwitch @bind-Value="config.StripRO" @bind-Value:after="Edited">Elimină prefixul RO</ToggleSwitch>
@@ -53,9 +53,9 @@ else
         </div>
         <label class="anaf-block">Șablon cerere (listă JSON; variabile <code>{{cui}}</code> și <code>{{data_interogare}}</code>)
             <textarea rows="7" spellcheck="false" @bind="config.Template" @bind:event="oninput" @bind:after="Edited"></textarea></label>
-    </fieldset>
+    </details>
 
-    <fieldset class="anaf-section"><legend>3. Mapare răspuns</legend>
+    <details class="anaf-section anaf-collapse"><summary>3. Mapare răspuns</summary>
         <p class="muted"><small>Căi acceptate: <code>$.camp.subcamp</code> și indici <code>[0]</code>. Câmpurile absente rămân necunoscute (nu false). Politicile „la lipsă” și „la actualizare” se păstrează ca metadate pentru actualizarea viitoare a firmelor. Butonul „Preia date din ANAF” din formularul de beneficiar folosește configurația activă și completează câmpurile după denumirea lor: CUI, Denumire, Adresă fiscală, Nr. Registrul Comerțului, Telefon, Cod poștal, Cod CAEN și Inactiv fiscal; nu redenumi aceste câmpuri.</small></p>
         <div class="anaf-grid">
             <label>Lista găsiților<input @bind="config.Found" @bind:after="Edited" /></label>
@@ -81,9 +81,9 @@ else
         }
         </tbody></table></div>
         <button type="button" class="refresh act-confirm" @onclick="() => { config.Mappings.Add(new AnafMapping()); Edited(); }">+ Adaugă câmp</button>
-    </fieldset>
+    </details>
 
-    <fieldset class="anaf-section"><legend>4. Testare</legend>
+    <details class="anaf-section anaf-collapse"><summary>4. Testare</summary>
         <form class="settings-form" @onsubmit="TestAsync" @onsubmit:preventDefault>
             <label for="anaf-cui">CUI de test (de exemplu RO9178894 sau 28996610)</label>
             <div class="settings-form-row">
@@ -112,9 +112,9 @@ else
             <details><summary>Cerere trimisă</summary><pre class="anaf-pre">@(test.Request is null ? "" : RequestText(test.Request))</pre></details>
             <details><summary>Răspuns brut</summary><pre class="anaf-pre">@test.Raw</pre></details>
         }
-    </fieldset>
+    </details>
 
-    <fieldset class="anaf-section"><legend>5. Versiuni</legend>
+    <details class="anaf-section anaf-collapse"><summary>5. Versiuni</summary>
         <div class="editor-actions">
             <button type="button" class="refresh act-confirm" disabled="@busy" @onclick="SaveDraftAsync">Salvează ciorna</button>
             <button type="button" class="primary" disabled="@(busy || !tested)" title="@(tested ? "Salvează configurația ca versiune nouă și o activează" : "Testează cu succes configurația înainte de salvare și activare")" @onclick="ActivateAsync">Salvează și activează configurația testată</button>
@@ -143,7 +143,7 @@ else
             </tbody></table></div>
         }
         else { <p class="muted">Nicio versiune activată încă.</p> }
-    </fieldset>
+    </details>
 }
 
 @if (deletingVersion is not null)

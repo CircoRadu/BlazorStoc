@@ -1712,7 +1712,7 @@ tr.task-done-separator > td { padding:8px 16px; font-size:12px; font-weight:700;
 .app-dialog-backdrop.front { z-index:2000; }
 .app-dialog-backdrop.unsaved-overlay { z-index:3000; }
 .app-dialog-frame { display:flex; flex-direction:column; align-items:stretch; max-width:100%; max-height:100%; min-height:0; min-width:0; }
-.app-dialog-bar { flex:none; height:56px; box-sizing:border-box; display:flex; align-items:center; justify-content:flex-end; gap:8px; padding-bottom:8px; }
+.app-dialog-bar { flex:none; height:auto; box-sizing:border-box; display:flex; align-items:flex-end; justify-content:flex-end; gap:8px; padding-bottom:3px; }
 .app-dialog-bar [hidden] { display:none !important; }
 .app-dialog-panel { flex:0 1 auto; min-height:0; max-width:100%; max-height:none !important; box-sizing:border-box; display:flex; flex-direction:column; overflow:hidden !important; }
 .app-dialog-head { flex:none; }
@@ -1728,7 +1728,7 @@ tr.task-done-separator > td { padding:8px 16px; font-size:12px; font-weight:700;
 dialog.app-dialog-native { border:0; padding:8px; margin:0; background:transparent; max-width:none; max-height:none; width:100%; height:100%; box-sizing:border-box; overflow:clip; color:inherit; }
 dialog.app-dialog-native[open] { display:flex; align-items:center; justify-content:center; }
 dialog.app-dialog-native::backdrop { background:#142d2870; }
-.app-dialog-action { display:inline-flex; align-items:center; gap:6px; height:32px; padding:0 12px; }
+.app-dialog-action { display:inline-flex; align-items:center; gap:6px; height:32px; padding:0 12px; white-space:nowrap; }
 .app-dialog-action-icon { line-height:1; }
 /* Narrow screens: the buttons of the bar become round icons (like the red close button), the label stays for screen readers (aria-label / title). */
 @media (max-width: 720px) {
@@ -1742,3 +1742,65 @@ dialog.app-dialog-native::backdrop { background:#142d2870; }
 .app-dialog-panel.image-figure { width:auto; background:transparent; box-shadow:none; padding:0; }
 .app-dialog-panel.image-figure .app-dialog-body { display:flex; justify-content:center; }
 .app-dialog-frame:has([data-app-dialog-close]) .image-lightbox-head button.act-close { display:none; }
+.anaf-collapse > summary { cursor:pointer; list-style:none; font-weight:650; display:flex; align-items:center; gap:8px; }
+.anaf-collapse > summary::-webkit-details-marker { display:none; }
+.anaf-collapse > summary::before { content:""; flex:none; width:8px; height:8px; margin-right:6px; border-right:2px solid var(--muted); border-bottom:2px solid var(--muted); transform:rotate(-45deg); transition:transform .15s; }
+.anaf-collapse[open] > summary::before { transform:rotate(45deg); }
+.anaf-collapse > summary:focus-visible { outline:2px solid var(--green); outline-offset:2px; }
+.anaf-collapse[open] > summary { margin-bottom:6px; }
+.db-collapse { margin:12px 0; }
+.db-collapse > summary { cursor:pointer; list-style:none; font-size:16px; font-weight:650; display:flex; align-items:center; gap:8px; padding:6px 0; }
+.db-collapse > summary::-webkit-details-marker { display:none; }
+.db-collapse > summary::before { content:""; flex:none; width:8px; height:8px; margin-right:6px; border-right:2px solid var(--muted); border-bottom:2px solid var(--muted); transform:rotate(-45deg); transition:transform .15s; }
+.db-collapse[open] > summary::before { transform:rotate(45deg); }
+.db-collapse > summary:focus-visible { outline:2px solid var(--green); outline-offset:2px; }
+.disk-bar { display:flex; height:16px; border:1px solid var(--line); border-radius:8px; overflow:hidden; background:transparent; margin:6px 0; }
+.disk-bar-app { background:var(--green); }
+.disk-bar-used { background:var(--muted); opacity:.55; }
+/* Setari -> Baza de date: collapsed sections are one stack of framed rows without gaps (BUG-0009/0010/0011). */
+.db-collapse { margin:0 0 -1px; border:1px solid var(--line); border-radius:0; background:var(--c-ffffff); }
+.db-collapse:first-of-type { border-radius:8px 8px 0 0; }
+.db-collapse:last-of-type { border-radius:0 0 8px 8px; margin-bottom:0; }
+.db-collapse:only-of-type { border-radius:8px; }
+.db-collapse > summary { padding:12px 16px; }
+.db-collapse > :not(summary) { margin-left:16px; margin-right:16px; }
+.db-collapse[open] > :last-child { margin-bottom:16px; }
+.db-stack > .catalog { margin:0 0 -1px !important; border-radius:0; }
+.db-stack > .catalog:first-child { border-radius:10px 10px 0 0; }
+.db-stack > .catalog:last-child { border-radius:0 0 10px 10px; margin-bottom:0 !important; }
+.db-stack > .catalog > details.catalog-collapse { margin:0 !important; }
+.db-stack > .catalog > details.catalog-collapse > summary.catalog-heading { flex-wrap:wrap; justify-content:flex-start; align-items:center; padding:12px 16px; gap:2px 12px; }
+.db-stack > .catalog > details.catalog-collapse > summary.catalog-heading > h2 { margin:0; }
+.db-stack > .catalog > details.catalog-collapse > summary.catalog-heading > small { flex:1 0 100%; margin:0 0 0 26px; }
+/* Move and resize of the windows (PROP-0007, wwwroot/app-dialog.js): the head is the grip, the corner handle changes the size. */
+.app-dialog-panel { position:relative; }
+.app-dialog-head, .app-dialog-panel > .dialog-head { cursor:grab; touch-action:none; }
+.app-dialog-resize { position:absolute; right:0; bottom:0; width:18px; height:18px; cursor:nwse-resize; touch-action:none; z-index:2;
+    background:linear-gradient(135deg, transparent 0 52%, var(--muted) 52% 58%, transparent 58% 70%, var(--muted) 70% 76%, transparent 76% 88%, var(--muted) 88% 94%, transparent 94%); opacity:.55; border-bottom-right-radius:inherit; }
+.app-dialog-resize:hover { opacity:1; }
+html.app-dialog-adjusting, html.app-dialog-adjusting * { user-select:none !important; cursor:grabbing; }
+@media (max-width:719px) { .app-dialog-resize { display:none; } .app-dialog-head, .app-dialog-panel > .dialog-head { cursor:auto; touch-action:auto; } }
+.settings-body details.db-collapse { margin:0 0 -1px; font-size:inherit; }
+.settings-body details.db-collapse:last-of-type { margin-bottom:0; }
+.disk-usage .disk-total { margin:10px 0 14px; font-size:15px; }
+/* Marking zones on a picture (PROP-0009, Components/Shared/ImageAnnotator.razor + wwwroot/image-annotate.js): a window that floats over the popup. */
+.image-annotator { position:fixed; right:24px; top:64px; z-index:5; display:flex; flex-direction:column; width:min(720px, calc(100vw - 48px)); height:min(580px, calc(100vh - 96px)); box-sizing:border-box;
+    background:var(--c-ffffff); border:1px solid var(--line); border-radius:10px; box-shadow:0 12px 40px rgba(0,0,0,.35); overflow:hidden; color:var(--ink); }
+.annotator-head { flex:none; display:flex; align-items:center; justify-content:space-between; gap:12px; padding:10px 14px; border-bottom:1px solid var(--line); cursor:grab; touch-action:none; user-select:none; }
+.annotator-body { flex:1 1 auto; min-height:0; overflow:auto; padding:32px 32px 24px 24px; }
+.annotator-stage { position:relative; display:inline-block; max-width:100%; cursor:crosshair; touch-action:none; user-select:none; line-height:0; }
+.annotator-stage > img { display:block; max-width:100%; height:auto; pointer-events:none; }
+.annotator-layer { position:absolute; inset:0; pointer-events:none; }
+.annotator-zone { position:absolute; box-sizing:border-box; border:2px solid #dc2626; background:rgba(220,38,38,.12); pointer-events:none; }
+.annotator-number { position:absolute; left:0; top:0; min-width:20px; padding:3px 6px; box-sizing:border-box; background:#dc2626; color:#fff; font:700 12px/14px sans-serif; text-align:center; }
+.annotator-remove { position:absolute; right:-26px; top:-26px; width:22px; height:22px; padding:0; border:1px solid #fff; border-radius:50%; background:#8c1c15; color:#fff; font:700 15px/18px sans-serif; text-align:center; cursor:pointer; pointer-events:auto; box-shadow:0 1px 4px rgba(0,0,0,.35); }
+.annotator-remove:hover { background:#b3261e; }
+.annotator-foot { flex:none; display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:6px 14px; padding:10px 14px 14px; border-top:1px solid var(--line); }
+.annotator-tools { display:inline-flex; align-items:center; gap:10px; }
+.annotator-resize { position:absolute; right:0; bottom:0; width:18px; height:18px; cursor:nwse-resize; touch-action:none; opacity:.55;
+    background:linear-gradient(135deg, transparent 0 52%, var(--muted) 52% 58%, transparent 58% 70%, var(--muted) 70% 76%, transparent 76% 88%, var(--muted) 88% 94%, transparent 94%); }
+.annotator-resize:hover { opacity:1; }
+@media (max-width:719px) { .image-annotator { inset:8px; width:auto; height:auto; } .annotator-resize { display:none; } .annotator-head { cursor:auto; } }
+/* Row icon "export" (PROP-0012): a tray with an arrow going down, violet like the export buttons. */
+.row-icon.export { color:#6b4fa0; --row-icon-shape:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4'/%3E%3Cpath d='M7 10l5 5 5-5'/%3E%3Cpath d='M12 15V3'/%3E%3C/svg%3E"); }
+.row-icon.export:hover:not(:disabled) { background:#f1ecf8; border-color:#cdbfe6; }

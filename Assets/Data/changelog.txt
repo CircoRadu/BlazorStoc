@@ -1,3 +1,18 @@
+## 0.5.67 | 10.11.2026
+- Ferestrele (popup-urile) se mută trăgând de antet și se redimensionează din colțul dreapta-jos; dublu-clic pe antet le centrează, pe mâner readuce dimensiunea implicită
+- Raportare eroare și Propunere: un clic pe o imagine o deschide într-o fereastră de marcare plutitoare, în care tragi zone dreptunghiulare numerotate (cel mult 10, se pot doar șterge, numerele se refac singure); imaginea trimisă are zonele desenate pe ea
+- Setări → Dezvoltare: detaliul unei propuneri sau al unui raport se deschide în popup, cu vizualizare (Editează, Exportă) și editare (Salvează, Renunță); pe rândurile tabelelor apar iconițele de vizualizare, editare, export (ZIP) și ștergere
+- Setări → Bază de date → Spațiu: totalul ocupat de aplicație este suma tuturor categoriilor și coincide cu cifra de pe partiție
+- Setări → Bază de date: secțiunile din Stare și Conexiune sunt lipite, fără goluri între ele, cu chenar și titlul aliniat la stânga
+
+## 0.5.66 | 10.11.2026
+- Setări → Bază de date: secțiunile din Stare și Conexiune sunt restrânse implicit; fila nouă „Spațiu” arată cât ocupă aplicația pe disc (baza de date, imagini, fișiere adăugate, backup-uri, fișierele aplicației, alte fișiere) și spațiul liber al partițiilor, cu „Recalculează”
+- Setări → Preluare date ANAF: cele cinci secțiuni sunt restrânse implicit
+- Tabelele de propuneri și de rapoarte de eroare din Setări se actualizează singure când se adaugă, se schimbă sau se șterge o intrare
+- Ferestrele (popup-urile): distanța dintre marginea de sus și butoanele din bară (Raportează, Propune, Închide) este de 3 px, prin clasa globală a ferestrei; butonul „Raportează o eroare” nu se mai rupă pe două rânduri
+- Taskuri utilizator: tabelul are număr curent, iar rândurile au mâner de tragere pentru ordinea de tratare a taskurilor
+- Setări → Dezvoltare: insigne cu numărul de rapoarte de eroare nerezolvate și de propuneri active pe tabul Dezvoltare și pe sub-tab-urile Erori și Propuneri
+
 ## 0.5.65 | 10.11.2026
 - Toate ferestrele (popup-urile) aplicației folosesc aceeași structură: fundal, cadru cu bara de sus rezervată și panou cu antet, corp care derulează singur și, la nevoie, subsol. Bara cu „Raportează o eroare”, „Propune” și butonul roșu rotund de închidere stă întotdeauna deasupra panoului, niciodată peste antet, indiferent cât de înalt este panoul.
 - Pe ecrane înguste butoanele barei devin iconițe rotunde cu simbolul centrat (ca butonul roșu de închidere), cu text alternativ pentru cititoarele de ecran; pe ecran lat fereastra arată ca înainte.

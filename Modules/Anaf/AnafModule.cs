@@ -12,7 +12,7 @@ public sealed class AnafModule : IModule
 
     public string Id => ModuleId;
     public string Name => "ANAF (date firme)";
-    public Version Version { get; } = new(1, 0, 0);
+    public Version Version { get; } = new(1, 0, 1);
     public IReadOnlyList<ModuleNavItem> Nav { get; } = [];
 
     public void Register(IServiceCollection services, IConfiguration configuration)

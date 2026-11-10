@@ -1,5 +1,6 @@
 @inject IProposalService Proposals
 @inject IAccessControl Access
+@inject IChangeFeed ChangeFeed
 @inject IJSRuntime JS
 @inject ILogger<ProposalsPanel> Logger
 @implements IAsyncDisposable
@@ -70,6 +71,8 @@
                                     <td>@ProposalRules.Display(item.CreatedUtc)</td><td>@item.FileCount</td><td>@item.NoteCount</td>
                                     <td class="row-actions">
                                         <button type="button" class="row-icon view" aria-label="Deschide propunerea @item.Number" title="Deschide propunerea @item.Number" @onclick="() => OpenAsync(item)"></button>
+                                        @if (canEdit) { <button type="button" class="row-icon edit" aria-label="Editează propunerea @item.Number" title="Editează propunerea @item.Number" @onclick="() => OpenAsync(item, true)"></button> }
+                                        @if (canExport) { <button type="button" class="row-icon export" aria-label="Exportă propunerea @item.Number" title="Exportă propunerea @item.Number (ZIP)" disabled="@busy" @onclick="() => ExportRowAsync(item)"></button> }
                                         @if (canEdit) { <button type="button" class="row-icon delete" aria-label="Șterge propunerea @item.Number" title="Șterge propunerea @item.Number" @onclick="() => AskDelete(item)"></button> }
                                     </td>
                                 </tr>
@@ -95,15 +98,15 @@
 
         @if (opened is not null)
         {
-            <section class="catalog bug-detail" id="proposal-detail" aria-labelledby="proposal-detail-title">
-                <div class="catalog-heading"><h3 id="proposal-detail-title">@opened.Number · @opened.Title</h3></div>
-                <div class="catalog-body">
+            <AppDialog Size="AppDialogSize.L" Title="@($"{opened.Number} · {opened.Title}")" TitleId="proposal-detail-title" HelpTopic="propunere-modificare" HelpAbout="Propuneri" OnClose="RequestClose" PanelClass="bug-detail">
+                <div id="proposal-detail" class="catalog-body">
                     <dl class="bug-facts">
                         <dt>Tip</dt><dd>@opened.Kind</dd>
                         <dt>Importanță pentru autor</dt><dd>@opened.WantedImportance</dd>
                         <dt>Autor</dt><dd>@opened.UserName (@opened.UserRole)</dd>
                         <dt>Trimis</dt><dd>@ProposalRules.Display(opened.CreatedUtc) · versiunea @opened.AppVersion</dd>
                         <dt>Zona</dt><dd>@opened.AreaTitle <code>@opened.AreaRoute</code></dd>
+                        <dt>Stare</dt><dd id="proposal-detail-state-text">@opened.State@(opened.ImplementedVersion.Length > 0 ? $" ({opened.ImplementedVersion})" : "")</dd>
                     </dl>
                     <h4>Descriere</h4>
                     <p class="bug-description">@opened.Description</p>
@@ -121,6 +124,11 @@
                     {
                         <div class="proposal-note @(note.AuthorRole == "Administrator" ? "from-admin" : "")"><strong>@note.Author</strong> <small class="muted">@(note.AuthorRole) · @ProposalRules.Display(note.CreatedUtc)</small><p>@note.Body</p></div>
                     }
+                    @if (error is not null) { <div class="error-banner" role="alert" id="proposal-detail-error">@error</div> }
+                    @if (confirmDiscard) { <div class="error-banner" role="alert" id="proposal-detail-discard">Ai modificări nesalvate. <span class="editor-actions"><button type="button" class="danger" id="proposal-detail-discard-yes" @onclick="CloseDetail">Renunț la modificări</button> <button type="button" class="refresh act-nav" id="proposal-detail-discard-no" @onclick="() => confirmDiscard = false">Rămân</button></span></div> }
+                    @if (editing)
+                    {
+                        <h4>Modificarea propunerii</h4>
                     <div class="editor-grid bug-form">
                         <label>Stare
                             <select id="proposal-detail-state" @bind="newState" disabled="@(!canEdit || busy)">
@@ -134,13 +142,21 @@
                         <label class="wide">Răspuns pentru autor (opțional)
                             <textarea id="proposal-detail-note" rows="3" maxlength="@ProposalRules.MaxNote" @bind="note" @bind:event="oninput" disabled="@(!canEdit || busy)"></textarea></label>
                     </div>
-                    <div class="editor-actions">
-                        @if (canEdit) { <button type="button" class="primary" id="proposal-detail-save" disabled="@busy" @onclick="SaveStateAsync">@(busy ? "Se salvează…" : "Salvează")</button> }
-                        @if (canExport) { <button type="button" class="refresh act-export" id="proposal-detail-export" disabled="@busy" @onclick="ExportOpenedAsync">Exportă propunerea (ZIP)</button> }
-                        <button type="button" class="refresh act-close" id="proposal-detail-close" @onclick="CloseDetail">Închide propunerea</button>
-                    </div>
+                        <div class="editor-actions">
+                            <button type="button" class="primary" id="proposal-detail-save" disabled="@busy" @onclick="SaveStateAsync">@(busy ? "Se salvează…" : "Salvează")</button>
+                            <button type="button" class="refresh act-nav" id="proposal-detail-cancel" disabled="@busy" @onclick="CancelEdit">Renunță</button>
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="editor-actions">
+                            @if (canEdit) { <button type="button" class="refresh act-edit" id="proposal-detail-edit" @onclick="BeginEdit">Editează</button> }
+                            @if (canExport) { <button type="button" class="refresh act-export" id="proposal-detail-export" disabled="@busy" @onclick="ExportOpenedAsync">Exportă propunerea (ZIP)</button> }
+                            <button type="button" class="refresh act-close" id="proposal-detail-close" @onclick="RequestClose">Închide propunerea</button>
+                        </div>
+                    }
                 </div>
-            </section>
+            </AppDialog>
         }
     </div>
 </section>
@@ -164,6 +180,7 @@
 
     protected override async Task OnInitializedAsync()
     {
+        StartLive();
         try
         {
             canEdit = await Access.HasAsync("setari-propuneri.edit", lifetime.Token);
@@ -183,9 +200,15 @@
         await LoadAsync();
     }
 
-    private async Task LoadAsync()
+    // A proposal / report added, changed or deleted by any session (also the dialog of this one) refreshes the table in place, without the spinner.
+    private LiveRefresh? live;
+    private void StartLive() => live = new LiveRefresh(ChangeFeed, Guid.NewGuid(), change => change.EntityType == AuditEntities.Proposal,
+        () => InvokeAsync(async () => { await LoadAsync(silent: true); StateHasChanged(); }), () => busy, () => Task.CompletedTask, fallbackInterval: TimeSpan.FromSeconds(60));
+
+    private Task LoadAsync() => LoadAsync(silent: false);
+    private async Task LoadAsync(bool silent)
     {
-        loading = true; error = null;
+        if (!silent) { loading = true; error = null; }
         try
         {
             var result = await Proposals.QueryAsync(Query, page, pageSize, lifetime.Token);
@@ -206,9 +229,10 @@
     private async Task PageChangedAsync(int value) { page = value; await LoadAsync(); }
     private async Task SizeChangedAsync(int value) { pageSize = value; page = 1; await LoadAsync(); }
 
-    private async Task OpenAsync(Proposal proposal)
+    private bool editing, confirmDiscard;
+    private async Task OpenAsync(Proposal proposal, bool edit = false)
     {
-        error = notice = null; deleting = null; zoomed = null;
+        error = notice = null; deleting = null; zoomed = null; editing = edit && canEdit; confirmDiscard = false;
         opened = proposal; newState = proposal.State; implementedVersion = proposal.ImplementedVersion; note = ""; pictures = []; notes = [];
         try
         {
@@ -223,7 +247,12 @@
 
     private const string ReportImageRulesKindScreenshot = BlazorStoc.Services.ReportImageRules.KindScreenshot;
 
-    private void CloseDetail() { opened = null; pictures = []; notes = []; zoomed = null; }
+    private void CloseDetail() { opened = null; pictures = []; notes = []; zoomed = null; editing = false; confirmDiscard = false; }
+    private bool Dirty => editing && opened is not null && (note.Trim().Length > 0 || newState != opened.State || implementedVersion != opened.ImplementedVersion);
+    private void RequestClose() { if (Dirty) confirmDiscard = true; else CloseDetail(); }
+    private void BeginEdit() { if (!canEdit || opened is null) return; editing = true; newState = opened.State; implementedVersion = opened.ImplementedVersion; note = ""; }
+    private void CancelEdit() { if (Dirty && !confirmDiscard) { confirmDiscard = true; return; } editing = false; confirmDiscard = false; if (opened is not null) { newState = opened.State; implementedVersion = opened.ImplementedVersion; } note = ""; }
+    private Task ExportRowAsync(Proposal proposal) => RunAsync(() => ExportAsync([proposal.Id]), "Exportul nu a putut fi făcut.");
     private void AskDelete(Proposal proposal) { deleting = proposal; error = notice = null; }
 
     private async Task RunAsync(Func<Task> work, string failure)
@@ -244,7 +273,7 @@
     private Task SaveStateAsync() => RunAsync(async () =>
     {
         var saved = await Proposals.ChangeStateAsync(opened!.Id, newState, implementedVersion, note, lifetime.Token);
-        opened = saved; note = "";
+        opened = saved; note = ""; editing = false; confirmDiscard = false;
         notes = await Proposals.GetNotesAsync(saved.Id, lifetime.Token);
         notice = $"Propunerea {saved.Number} este acum „{saved.State}”.";
         await LoadAsync();
@@ -279,6 +308,12 @@
     }
 
     public async ValueTask DisposeAsync()
+    {
+        live?.Dispose();
+        await DisposeCoreAsync();
+    }
+
+    private async ValueTask DisposeCoreAsync()
     {
         lifetime.Cancel();
         if (downloads is not null)

@@ -118,3 +118,7 @@ Stare: **text** = topicul `.help` este la zi; **captura** = imaginea si harta el
 
 - Tichet exemplu si Setari -> Preluare ActivityApp sectiunea 6 (10.11.2026, ActivityImport 0.15.0): optiuni Tichet/Eveniment, mutare la realocare, fereastra "Camp suplimentar nou", fara limita de campuri, sumar la final, importul suspendat la schimbarea structurii. Topicuri: setari-tichet-exemplu, setari-preluare-activityapp; capturi de refacut.
 | Ferestre (toate) | Bara cu "Raporteaza o eroare", "Propune" si inchidere are loc propriu deasupra panoului (AppDialog); pe ecran ingust butoanele sunt iconite rotunde. Elementele ferestrelor nu s-au schimbat | topicurile ferestrelor: capturile arata bara in pozitia ei; de refacut doar daca se cere (`--topic cheie`) | nu e nevoie | de facut (optional) | 10.11.2026 |
+
+- Setari -> Baza de date (10.11.2026): fila noua "Spatiu" (spatiul ocupat pe disc, defalcat, partitii) si sectiuni restranse implicit in Stare/Conexiune; topic .help si captura de facut pentru fila Spatiu. Setari -> Preluare date ANAF: cele 5 sectiuni restranse implicit.
+- Ferestre (toate) (10.11.2026): se muta de antet (drag) si se redimensioneaza din coltul dreapta-jos (dublu-clic = resetare); distanta bara-panou 3 px. De adaugat in topicurile ferestrelor, fara recapturare.
+- Raportare eroare si Propune o modificare (10.11.2026, PROP-0009): imaginile se deschid mari intr-o fereastra de marcare (zone dreptunghiulare numerotate, cel mult 10, doar stergere); topicurile raportare-eroare si propunere-modificare si capturile lor de refacut.

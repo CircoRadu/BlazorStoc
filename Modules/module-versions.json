@@ -112,13 +112,18 @@
                                                        ]
                                        },
                     "Anaf":  {
-                                 "version":  "1.0.0",
-                                 "hash":  "253362708119eb3ada4f7bcb4dd3eeb9927a62f7b828944c3cf184aa85735fca",
+                                 "version":  "1.0.1",
+                                 "hash":  "cac088db532d3d6507c9e6bb1f3e226abb24c661a2e19cd181bb1c55e0a9905b",
                                  "history":  [
                                                  {
                                                      "version":  "1.0.0",
                                                      "date":  "24.10.2026",
                                                      "note":  "Versiune de pornire (inceputul versionarii modulelor)"
+                                                 },
+                                                 {
+                                                     "version":  "1.0.1",
+                                                     "date":  "10.11.2026",
+                                                     "note":  "Sectiunile paginii Preluare date ANAF sunt restranse implicit"
                                                  }
                                              ]
                              },
@@ -596,8 +601,8 @@
                                                ]
                                },
                     "ProjectObservations":  {
-                                                "version":  "1.0.1",
-                                                "hash":  "f36d3c9f63bcc7210b0b15f447603608e19808cedf0e47b0a7c346e953a922cc",
+                                                "version":  "1.0.2",
+                                                "hash":  "b58a4cff4feb3ee7b384deb6b1b21a2333ed8462786f08c5b005ff58254aac5c",
                                                 "history":  [
                                                                 {
                                                                     "version":  "1.0.0",
@@ -608,6 +613,11 @@
                                                                     "version":  "1.0.1",
                                                                     "date":  "09.11.2026",
                                                                     "note":  "Titluri popup cu numele obiectului, mesaj de sectiune indisponibila cu nume, add task in popup"
+                                                                },
+                                                                {
+                                                                    "version":  "1.0.2",
+                                                                    "date":  "10.11.2026",
+                                                                    "note":  "Modificari din lucrari anterioare, necomise pana acum"
                                                                 }
                                                             ]
                                             },
@@ -767,8 +777,8 @@
                                                  ]
                                  },
                     "BugReports":  {
-                                       "version":  "1.1.4",
-                                       "hash":  "499e2387e27402a1818473cdee5a44831b356ce6254e01783d8447aae17f0a62",
+                                       "version":  "1.2.0",
+                                       "hash":  "1552c0aaa3d0a472828834b0b53455946e5a2feee730f40eb31f4f71450ae0ea",
                                        "history":  [
                                                        {
                                                            "version":  "1.0.0",
@@ -799,6 +809,11 @@
                                                            "version":  "1.1.4",
                                                            "date":  "10.11.2026",
                                                            "note":  "Ferestrele folosesc componenta globala AppDialog (bara cu butoane deasupra panoului)"
+                                                       },
+                                                       {
+                                                           "version":  "1.2.0",
+                                                           "date":  "10.11.2026",
+                                                           "note":  "Detaliul se deschide in popup cu vizualizare si editare; iconite de editare si export pe randurile tabelului (PROP-0012)"
                                                        }
                                                    ]
                                    },
@@ -864,8 +879,8 @@
                                               ]
                               },
                     "Proposals":  {
-                                      "version":  "1.0.2",
-                                      "hash":  "b30d9b638e726bf11ed0cfffc238ec734b2c4e1ae89cd4be9526cc1308437337",
+                                      "version":  "1.1.0",
+                                      "hash":  "d0e368825c87c60fba02dc60ee4e07b7c05f4f061dc95605e4dbc78cdef94fad",
                                       "history":  [
                                                       {
                                                           "version":  "1.0.0",
@@ -881,6 +896,16 @@
                                                           "version":  "1.0.2",
                                                           "date":  "10.11.2026",
                                                           "note":  "Ferestrele folosesc componenta globala AppDialog (bara cu butoane deasupra panoului)"
+                                                      },
+                                                      {
+                                                          "version":  "1.0.3",
+                                                          "date":  "10.11.2026",
+                                                          "note":  "Tabelul de propuneri se actualizeaza singur la o propunere noua (PROP-0003)"
+                                                      },
+                                                      {
+                                                          "version":  "1.1.0",
+                                                          "date":  "10.11.2026",
+                                                          "note":  "Detaliul se deschide in popup cu vizualizare si editare; iconite de editare si export pe randurile tabelului (PROP-0012)"
                                                       }
                                                   ]
                                   }

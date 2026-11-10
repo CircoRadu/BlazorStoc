@@ -3,6 +3,7 @@
 @using BlazorStoc.Modules.BugReports
 @inject IBugReportService Reports
 @inject IAccessControl Access
+@inject IChangeFeed ChangeFeed
 @inject IJSRuntime JS
 @inject ILogger<BugReportsPanel> Logger
 @implements IAsyncDisposable
@@ -67,6 +68,8 @@
                                 <td>@BugReportRules.Display(item.CreatedUtc)</td><td>@item.FileCount</td>
                                 <td class="row-actions">
                                     <button type="button" class="row-icon view" aria-label="Deschide raportul @item.Number" title="Deschide raportul @item.Number" @onclick="() => OpenAsync(item)"></button>
+                                    @if (canEdit) { <button type="button" class="row-icon edit" aria-label="Editează raportul @item.Number" title="Editează raportul @item.Number" @onclick="() => OpenAsync(item, true)"></button> }
+                                    @if (canExport) { <button type="button" class="row-icon export" aria-label="Exportă raportul @item.Number" title="Exportă raportul @item.Number (ZIP)" disabled="@busy" @onclick="() => ExportRowAsync(item)"></button> }
                                     @if (canEdit) { <button type="button" class="row-icon delete" aria-label="Șterge raportul @item.Number" title="Șterge raportul @item.Number" @onclick="() => AskDelete(item)"></button> }
                                 </td>
                             </tr>
@@ -92,14 +95,14 @@
 
         @if (opened is not null)
         {
-            <section class="catalog bug-detail" id="bug-detail" aria-labelledby="bug-detail-title">
-                <div class="catalog-heading"><h3 id="bug-detail-title">@opened.Number · @opened.Title</h3></div>
-                <div class="catalog-body">
+            <AppDialog Size="AppDialogSize.L" Title="@($"{opened.Number} · {opened.Title}")" TitleId="bug-detail-title" HelpTopic="raportare-eroare" HelpAbout="Rapoarte de eroare" OnClose="RequestClose" PanelClass="bug-detail">
+                <div id="bug-detail" class="catalog-body">
                     <dl class="bug-facts">
                         <dt>Gravitate</dt><dd>@opened.Severity</dd>
                         <dt>Autor</dt><dd>@opened.UserName (@opened.UserRole)</dd>
                         <dt>Trimis</dt><dd>@BugReportRules.Display(opened.CreatedUtc) · versiunea @opened.AppVersion</dd>
                         <dt>Pagina</dt><dd>@opened.PageTitle <code>@opened.Route</code></dd>
+                        <dt>Stare</dt><dd id="bug-detail-state-text">@opened.State</dd>
                     </dl>
                     <h4>Descriere</h4>
                     <p class="bug-description">@opened.Description</p>
@@ -114,6 +117,11 @@
                         <Header>Detalii tehnice</Header>
                         <ChildContent><pre class="bug-tech-text">@(string.IsNullOrWhiteSpace(opened.TechJson) ? "(neatașate)" : opened.TechJson)</pre></ChildContent>
                     </CollapsibleSection>
+                    @if (error is not null) { <div class="error-banner" role="alert" id="bug-detail-error">@error</div> }
+                    @if (confirmDiscard) { <div class="error-banner" role="alert" id="bug-detail-discard">Ai modificări nesalvate. <span class="editor-actions"><button type="button" class="danger" id="bug-detail-discard-yes" @onclick="CloseDetail">Renunț la modificări</button> <button type="button" class="refresh act-nav" id="bug-detail-discard-no" @onclick="() => confirmDiscard = false">Rămân</button></span></div> }
+                    @if (editing)
+                    {
+                        <h4>Modificarea raportului</h4>
                     <div class="editor-grid bug-form">
                         <label>Stare
                             <select id="bug-detail-state" @bind="newState" disabled="@(!canEdit || busy)">
@@ -122,13 +130,21 @@
                         <label class="wide">Notă pentru autor
                             <textarea id="bug-detail-note" rows="3" maxlength="@BugReportRules.MaxNote" @bind="note" @bind:event="oninput" disabled="@(!canEdit || busy)"></textarea></label>
                     </div>
-                    <div class="editor-actions">
-                        @if (canEdit) { <button type="button" class="primary" id="bug-detail-save" disabled="@busy" @onclick="SaveStateAsync">@(busy ? "Se salvează…" : "Salvează starea")</button> }
-                        @if (canExport) { <button type="button" class="refresh act-export" id="bug-detail-export" disabled="@busy" @onclick="ExportOpenedAsync">Exportă raportul (ZIP)</button> }
-                        <button type="button" class="refresh act-close" id="bug-detail-close" @onclick="CloseDetail">Închide raportul</button>
-                    </div>
+                        <div class="editor-actions">
+                            <button type="button" class="primary" id="bug-detail-save" disabled="@busy" @onclick="SaveStateAsync">@(busy ? "Se salvează…" : "Salvează starea")</button>
+                            <button type="button" class="refresh act-nav" id="bug-detail-cancel" disabled="@busy" @onclick="CancelEdit">Renunță</button>
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="editor-actions">
+                            @if (canEdit) { <button type="button" class="refresh act-edit" id="bug-detail-edit" @onclick="BeginEdit">Editează</button> }
+                            @if (canExport) { <button type="button" class="refresh act-export" id="bug-detail-export" disabled="@busy" @onclick="ExportOpenedAsync">Exportă raportul (ZIP)</button> }
+                            <button type="button" class="refresh act-close" id="bug-detail-close" @onclick="RequestClose">Închide raportul</button>
+                        </div>
+                    }
                 </div>
-            </section>
+            </AppDialog>
         }
     </div>
 </section>
@@ -151,6 +167,7 @@
 
     protected override async Task OnInitializedAsync()
     {
+        StartLive();
         try
         {
             canEdit = await Access.HasAsync("setari-bug-raport.edit", lifetime.Token);
@@ -169,9 +186,15 @@
         await LoadAsync();
     }
 
-    private async Task LoadAsync()
+    // A proposal / report added, changed or deleted by any session (also the dialog of this one) refreshes the table in place, without the spinner.
+    private LiveRefresh? live;
+    private void StartLive() => live = new LiveRefresh(ChangeFeed, Guid.NewGuid(), change => change.EntityType == AuditEntities.BugReport,
+        () => InvokeAsync(async () => { await LoadAsync(silent: true); StateHasChanged(); }), () => busy, () => Task.CompletedTask, fallbackInterval: TimeSpan.FromSeconds(60));
+
+    private Task LoadAsync() => LoadAsync(silent: false);
+    private async Task LoadAsync(bool silent)
     {
-        loading = true; error = null;
+        if (!silent) { loading = true; error = null; }
         try
         {
             var result = await Reports.QueryAsync(Query, page, pageSize, lifetime.Token);
@@ -192,9 +215,10 @@
     private async Task PageChangedAsync(int value) { page = value; await LoadAsync(); }
     private async Task SizeChangedAsync(int value) { pageSize = value; page = 1; await LoadAsync(); }
 
-    private async Task OpenAsync(BugReport report)
+    private bool editing, confirmDiscard;
+    private async Task OpenAsync(BugReport report, bool edit = false)
     {
-        error = notice = null; deleting = null;
+        error = notice = null; deleting = null; editing = edit && canEdit; confirmDiscard = false;
         opened = report; newState = report.State; note = report.AdminNote; pictures = [];
         try
         {
@@ -206,7 +230,12 @@
         catch (Exception exception) when (exception is AccessDeniedException or ModuleUnavailableException) { error = exception.Message; }
     }
 
-    private void CloseDetail() { opened = null; pictures = []; zoomed = null; }
+    private void CloseDetail() { opened = null; pictures = []; zoomed = null; editing = false; confirmDiscard = false; }
+    private bool Dirty => editing && opened is not null && (newState != opened.State || note != opened.AdminNote);
+    private void RequestClose() { if (Dirty) confirmDiscard = true; else CloseDetail(); }
+    private void BeginEdit() { if (!canEdit || opened is null) return; editing = true; newState = opened.State; note = opened.AdminNote; }
+    private void CancelEdit() { if (Dirty && !confirmDiscard) { confirmDiscard = true; return; } editing = false; confirmDiscard = false; if (opened is not null) { newState = opened.State; note = opened.AdminNote; } }
+    private Task ExportRowAsync(BugReport report) => RunAsync(() => ExportAsync([report.Id]), "Exportul nu a putut fi făcut.");
     private void AskDelete(BugReport report) { deleting = report; error = notice = null; }
 
     private async Task RunAsync(Func<Task> work, string failure)
@@ -227,7 +256,7 @@
     private Task SaveStateAsync() => RunAsync(async () =>
     {
         var saved = await Reports.ChangeStateAsync(opened!.Id, newState, note, lifetime.Token);
-        opened = saved;
+        opened = saved; note = saved.AdminNote; editing = false; confirmDiscard = false;
         notice = $"Raportul {saved.Number} este acum „{saved.State}”.";
         await LoadAsync();
     }, "Starea nu a putut fi salvată.");
@@ -261,6 +290,12 @@
     }
 
     public async ValueTask DisposeAsync()
+    {
+        live?.Dispose();
+        await DisposeCoreAsync();
+    }
+
+    private async ValueTask DisposeCoreAsync()
     {
         lifetime.Cancel();
         if (downloads is not null)

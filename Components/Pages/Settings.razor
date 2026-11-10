@@ -113,9 +113,13 @@
     {
         <div role="tabpanel" id="panel-@DatabaseTab" aria-labelledby="tab-@DatabaseTab" class="settings-body">
             @SubtabBar(DatabaseSubtabs, "Secțiuni bază de date")
-            @if (databaseSubtab == DatabaseConnectionSubtab)
+            @if (databaseSubtab == DatabaseSpaceSubtab)
             {
-                <div role="tabpanel" id="subpanel-@DatabaseConnectionSubtab" aria-labelledby="subtab-@DatabaseConnectionSubtab"><DatabaseServerPanel Changed="ServerChanged" /><DatabaseConnectionPanel @key="@($"connection-{connectionRevision}")" /><ApplicationPanel @key="@($"application-{connectionRevision}")" /><ReverseProxyPanel /><DatabaseAccountsPanel /></div>
+                <div role="tabpanel" id="subpanel-@DatabaseSpaceSubtab" aria-labelledby="subtab-@DatabaseSpaceSubtab"><DiskUsagePanel /></div>
+            }
+            else if (databaseSubtab == DatabaseConnectionSubtab)
+            {
+                <div role="tabpanel" id="subpanel-@DatabaseConnectionSubtab" aria-labelledby="subtab-@DatabaseConnectionSubtab" class="db-stack"><DatabaseServerPanel Changed="ServerChanged" /><DatabaseConnectionPanel @key="@($"connection-{connectionRevision}")" /><ApplicationPanel @key="@($"application-{connectionRevision}")" /><ReverseProxyPanel /><DatabaseAccountsPanel /></div>
             }
             else
             {
@@ -221,7 +225,8 @@
     private const string AuthTab = "autentificare";
     private const string DatabaseStatusSubtab = "stare";
     private const string DatabaseConnectionSubtab = "conexiune";
-    private static readonly (string Id, string Title)[] DatabaseSubtabs = [(DatabaseStatusSubtab, "Stare"), (DatabaseConnectionSubtab, "Conexiune")];
+    private const string DatabaseSpaceSubtab = "spatiu";
+    private static readonly (string Id, string Title)[] DatabaseSubtabs = [(DatabaseStatusSubtab, "Stare"), (DatabaseSpaceSubtab, "Spațiu"), (DatabaseConnectionSubtab, "Conexiune")];
     private string databaseSubtab = DatabaseStatusSubtab;
     // Users is one tab with two sub-tabs: the accounts and the user types (their rights). The old tab id of the types keeps working in addresses.
     private const string UsersTab = "utilizatori";

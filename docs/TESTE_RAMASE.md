@@ -927,3 +927,5 @@ Taskuri: taburi pe utilizator, ordine proprie, stadiu si jurnal al taskului (10.
 
 ### 10.11.2026 - Fereastra Tichet exemplu cu ActivityApp real (ActivityImport 0.15.0)
 - Motiv: baza de test nu are un ActivityApp real de unde sa se citeasca tichetul exemplu; fluxul (alegere, mutare, camp nou, sumar) este verificat cu teste de componenta, iar suspendarea importului cu MariaDB. Pasii sunt in Teste utilizator/18 (modificarile 10.11.2026).
+
+Setari: Spatiu pe disc, popup propuneri/erori, marcarea zonelor, mutare/redimensionare ferestre (0.5.67) (10.11.2026): Preview-ul 5087 si pachetul 0.5.66 nu contin aceste modificari; help .help/capturi in docs/HELP_DE_REGENERAT.md

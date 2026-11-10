@@ -95,3 +95,5 @@ Acest proiect folosește colaborare strict secvențială între Claude și Codex
 
 Cand `/compact` este lansat fara argumente, rezumatul se scrie ca `/compact Keep: ce ai facut, ce decizii au fost luate, ce mai trebuie testat`, sub forma de bullet points concise (regula utilizatorului, 09.10.2026). Argumentele date explicit la `/compact` au prioritate.
 
+
+- **Preview nou pentru verificare, fara confirmare (regula permanenta, 10 noiembrie 2026; completeaza regula „republicare preview doar la comanda”):** cand Claude are nevoie de un preview nou ca sa verifice un bug sau o schimbare, il porneste singur (instanta proprie de verificare, `artifacts/verify-<nume>`, port liber, baza de test, conturile `claude.verify`), fara sa mai ceara confirmarea utilizatorului. Republicarea preview-ului utilizatorului (5087) ramane la comanda „preview”/„review”.
