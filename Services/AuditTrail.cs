@@ -300,6 +300,7 @@ public static class AuditActions
     public const string DiscardActivityTicket = "Discard tichet ActivityApp";
     public const string ReactivateActivityTicket = "Reactivare tichet ActivityApp discardat";
     public const string ResetActivityWatermark = "Recitire completă tichete ActivityApp";
+    public const string SuspendActivityImport = "Suspendare preluare ActivityApp: structură schimbată";
     public const string SimulateActivityImport = "Simulare import ActivityApp";
     public const string ImportActivityPartners = "Import beneficiari ActivityApp";
     public const string ImportActivityTickets = "Import tichete ActivityApp";

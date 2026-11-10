@@ -28,7 +28,7 @@ public sealed class ActivityFieldMap
 {
     public const string Notes = "notes", Separate = "separate", Both = "both";
     public const string Title = "title", Number = "number", Problem = "problem", Resolution = "resolution", Report = "report", Executor = "executor";
-    public const int MaximumExtras = 10, MaximumLabel = 60;
+    public const int MaximumLabel = 60;
     public static readonly string[] ExtraTables = ["Tickete", "EvenimenteAgent"];
 
     public ActivityFieldMap(IReadOnlyDictionary<string, string>? columns = null, IEnumerable<string>? off = null, IReadOnlyDictionary<string, string>? targets = null, IEnumerable<ActivityExtraField>? extras = null,
@@ -80,6 +80,20 @@ public sealed class ActivityFieldMap
 
     /// <summary>The name in front of a piece of information in the notes of an intervention before names could be chosen.</summary>
     public static string DefaultNoteLabel(string key) => key switch { Problem => "Problemă", Resolution => "Rezolvare", Report => "Raport original", Executor => "Executant", _ => ItemOf(key)?.Label ?? key };
+
+    /// <summary>How the windows name the table of a column: "Tichet" (the ticket as opened) or "Eveniment" (the event that closed it).</summary>
+    public static string TablePrefix(string table) => table.Equals("EvenimenteAgent", StringComparison.OrdinalIgnoreCase) ? "Eveniment" : "Tichet";
+
+    /// <summary>"Tichet – Subject": a column as the windows name it.</summary>
+    public static string ColumnName(string table, string column) => $"{TablePrefix(table)} – {column}";
+
+    /// <summary>The column a piece of information is read from, "Tichet – Subject" (null: derived, or not read from a column).</summary>
+    public string? SourceOf(string key)
+    {
+        if (ExtraOf(key) is { } extra) return ColumnName(extra.Table, extra.Column);
+        var field = Fields.FirstOrDefault(item => item.Key == ItemOf(key)?.FieldKey);
+        return field is null ? null : ColumnName(field.Table, ColumnOf(field));
+    }
 
     public static string Key(string table, string column) => $"{table}.{column}";
     public static string ExtraKey(string table, string column) => $"x:{table}.{column}";
@@ -179,11 +193,9 @@ public sealed class ActivityFieldMap
             if (label.Length == 0 || label.Length > MaximumLabel || label.Any(char.IsControl)) { error = $"Numele unui câmp suplimentar are între 1 și {MaximumLabel} de caractere."; return null; }
             if (!IsTarget(extra.Target)) { error = "Destinația aleasă pentru „" + label + "” nu este validă."; return null; }
             if (list.Any(item => item.Table == table && item.Column.Equals(column, StringComparison.OrdinalIgnoreCase))) { error = "Coloana „" + column + "” a fost adăugată de două ori."; return null; }
-            if (list.Any(item => item.Label.Equals(label, StringComparison.OrdinalIgnoreCase)) || Info.Any(item => item.Label.Equals(label, StringComparison.OrdinalIgnoreCase)))
-            { error = "Numele „" + label + "” este deja folosit."; return null; }
+            // The name of an extra field is only a label: the field is told apart by its table and column, so a name may repeat (also a name of a piece of information).
             list.Add(new ActivityExtraField(table, column, label, extra.Target));
         }
-        if (list.Count > MaximumExtras) { error = $"Cel mult {MaximumExtras} câmpuri suplimentare."; return null; }
         // The names chosen for the optional pieces: 1 to 60 characters, none used twice (also not by the pieces that keep their usual name, nor by an extra field).
         var chosenLabels = new Dictionary<string, string>(StringComparer.Ordinal);
         foreach (var (key, value) in labels ?? new Dictionary<string, string>())
@@ -195,7 +207,7 @@ public sealed class ActivityFieldMap
             if (label.Length > MaximumLabel || label.Any(char.IsControl)) { error = $"Numele unei informații are între 1 și {MaximumLabel} de caractere."; return null; }
             chosenLabels[key] = label;
         }
-        var names = Info.Select(item => chosenLabels.TryGetValue(item.Key, out var custom) ? custom : item.Label).Concat(list.Select(extra => extra.Label)).ToList();
+        var names = Info.Select(item => chosenLabels.TryGetValue(item.Key, out var custom) ? custom : item.Label).ToList();
         if (names.GroupBy(name => name, StringComparer.OrdinalIgnoreCase).FirstOrDefault(group => group.Count() > 1) is { } twice) { error = "Numele „" + twice.Key + "” este folosit de două ori."; return null; }
         return new ActivityFieldMap(result, disabled, chosenTargets, list, chosenLabels);
     }

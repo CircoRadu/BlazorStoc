@@ -276,3 +276,19 @@ Pasi: Notificari -> Tichete de validat -> Arata tichetele discardate -> iconita 
 | 5 | Cu Mentenanta pornita valideaza un tichet | Interventia apare imediat, ca inainte | |
 | 6 | Setari -> Preluare ActivityApp -> Tichet exemplu | Fiecare coloana cu text are butonul "Alege..."; la clic apare lista doar pe acel rand; dupa alegere revine butonul; derularea e fluida si de pe alt calculator | |
 
+
+## Modificari de testat - corespondenta tichet cu mutare, camp nou, sumar si suspendarea importului (10.11.2026, ActivityImport 0.15.0)
+
+**Ce s-a adaugat:** in Tichet exemplu alegerea se face cu "Tichet - nume" / "Eveniment - nume"; o informatie are o singura coloana si alegerea unei coloane deja asignate o muta; "Camp suplimentar nou" are fereastra proprie (nume repetabil, fara limita de campuri); sumarul din finalul ferestrei arata coloana sursa; importul se suspenda cand structura tichetelor se schimba.
+**Ce face acum:** corespondenta se modifica direct din fereastra cu mesaj despre ce s-a mutat; dupa o schimbare in ActivityApp (coloana noua, dispareuta sau cu alt tip) preluarea tichetelor se opreste, apare notificarea cu lista schimbarilor si se reia dupa "Corespondenta verificata".
+
+| Nr | Pasi | Asteptat | Rezultat |
+|---|---|---|---|
+| 1 | Setari -> Preluare ActivityApp -> Deschide un tichet exemplu; la o coloana apasa Alege... | Lista: "Tichet - Titlul tichetului", ..., campurile suplimentare existente, "+ Camp suplimentar nou..."; pentru EvenimenteAgent apare "Eveniment - ..." | |
+| 2 | Alege pentru "Numarul tichetului" coloana pe care o citeste titlul | Mesaj: titlul a trecut pe coloana numarului; sumarul de la final arata noile coloane sursa | |
+| 3 | La o coloana alege "+ Camp suplimentar nou...", scrie un nume deja folosit | Fereastra cere nume si destinatie; campul se adauga; apar doua campuri cu acelasi nume | |
+| 4 | Adauga peste 10 campuri suplimentare | Nu exista limita; lista are paginare | |
+| 5 | Alege un camp suplimentar existent pentru alta coloana | Campul se muta pe coloana aleasa, cu mesaj | |
+| 6 | Deruleaza la sfarsitul ferestrei | Sumar: informatie, citita din, valoare, merge in; apoi observatiile intervenției | |
+| 7 | In ActivityApp (test) adauga o coloana in Tickete, apoi ruleaza sincronizarea | Preluarea tichetelor nu mai preia nimic; Notificari: "Structura tichetelor..." cu coloanele noi; Jurnal: "Suspendare preluare ActivityApp: structura schimbata" o singura data | |
+| 8 | Setari -> Preluare ActivityApp -> "Corespondenta verificata", apoi sincronizare | Preluarea se reia, tichetele ramase se preiau in ordinea datelor, notificarea dispare | |

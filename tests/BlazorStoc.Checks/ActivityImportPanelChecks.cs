@@ -313,8 +313,41 @@ public static class ActivityImportPanelChecks
         cut.Find("select[aria-label='Folosește coloana Detalii pentru']").Change("problem");
         cut.Find("button[aria-label='Alege pentru ce folosești coloana Observatii']").Click();
         cut.Find("select[aria-label='Folosește coloana Observatii pentru']").Change("extra");
-        check(cut.Find("#ticket-sample-preview").TextContent.Contains("Detalii 30", StringComparison.Ordinal) && cut.Find("#ticket-sample-preview").TextContent.Contains("Obs 30", StringComparison.Ordinal) && cut.FindAll("#ai-extras tbody tr").Count == 1,
-            "Activity import panel: a column chosen in the window becomes the column of the piece (or an extra field) and the preview follows at once");
+        cut.Find("#ticket-sample-extra-name").Input("Observații client");
+        cut.Find("#ticket-sample-extra-add").Click();
+        check(cut.Find("#ticket-sample-preview").TextContent.Contains("Detalii 30", StringComparison.Ordinal) && cut.Find("#ticket-sample-preview").TextContent.Contains("Obs 30", StringComparison.Ordinal) && cut.FindAll("#ai-extras tbody tr").Count == 1
+              && cut.FindAll("#ticket-sample-extra").Count == 0 && cut.Find("#ticket-sample-note").TextContent.Contains("Observații client", StringComparison.Ordinal),
+            "Activity import panel: a column chosen in the window becomes the column of the piece, or a new extra field named in the window");
+        cut.Find("button[aria-label='Alege pentru ce folosești coloana Observatii']").Click();
+        cut.Find("select[aria-label='Folosește coloana Observatii pentru']").Change("extra");
+        cut.Find("#ticket-sample-extra-add").Click();
+        check(cut.Find(".ticket-sample .error-banner").TextContent.Contains("Observații client", StringComparison.Ordinal) && cut.FindAll("#ai-extras tbody tr").Count == 1,
+            "Activity import panel: a column that is already an extra field is not made one twice (with a message)");
+        // The options are named "Tichet – ..." / "Eveniment – ..." and the extra fields already there are listed (to move them).
+        cut.Find("button[aria-label='Alege pentru ce folosești coloana Detalii']").Click();
+        check(cut.Find("select[aria-label='Folosește coloana Detalii pentru']").TextContent.Contains("Tichet – Problema", StringComparison.Ordinal) && cut.Find("select[aria-label='Folosește coloana Detalii pentru']").TextContent.Contains("Tichet – Observații client (câmp suplimentar)", StringComparison.Ordinal)
+              && cut.Find("select[aria-label='Folosește coloana Detalii pentru']").TextContent.Contains("Câmp suplimentar nou", StringComparison.Ordinal),
+            "Activity import panel: the choices are named by the table (Tichet – ...) and list the extra fields already there");
+        // A new extra field on a column that already feeds a piece: a window asks for the name (it may repeat the name of another field).
+        cut.Find("select[aria-label='Folosește coloana Detalii pentru']").Change("extra");
+        check(cut.FindAll("#ticket-sample-extra").Count == 1 && cut.Find("#ticket-sample-extra-add").HasAttribute("disabled") == false, "Activity import panel: \"Câmp suplimentar nou\" opens a window for the name and the destination");
+        cut.Find("#ticket-sample-extra-name").Input("Observații client");
+        cut.Find("#ticket-sample-extra-add").Click();
+        check(cut.FindAll("#ticket-sample-extra").Count == 0 && cut.FindAll("#ai-extras tbody tr").Count == 2 && cut.FindAll("#ai-extras input").Count(input => input.GetAttribute("value") == "Observații client") == 2
+              && cut.Find("#ticket-sample-preview").TextContent.Contains("Tichet – Detalii", StringComparison.Ordinal),
+            "Activity import panel: a new extra field may repeat a name, and a column can feed a piece and an extra field at once");
+        // One column per piece, moved on a new choice: the title takes the column of the number and the number takes the title's (the obligatory pieces never stay without a column).
+        cut.Find("button[aria-label='Alege pentru ce folosești coloana Subject']").Click();
+        cut.Find("select[aria-label='Folosește coloana Subject pentru']").Change("number");
+        check(cut.Find("#ticket-sample-note").TextContent.Contains("a trecut pe coloana Tichet – NumeTicket", StringComparison.Ordinal)
+              && cut.Find("#ticket-sample-preview").TextContent.Contains("Tichet – Subject", StringComparison.Ordinal) && cut.Find("#ticket-sample-preview").TextContent.Contains("Tichet – NumeTicket", StringComparison.Ordinal),
+            "Activity import panel: choosing for a piece a column another piece holds moves the correspondence (the obligatory piece takes the column left free) and says so");
+        // An extra field already there moves to another column.
+        cut.Find("button[aria-label='Alege pentru ce folosești coloana Detalii']").Click();
+        var moveKey = ActivityFieldMap.ExtraKey("Tickete", "Observatii");
+        cut.Find("select[aria-label='Folosește coloana Detalii pentru']").Change("x:" + moveKey);
+        check(cut.Find("#ticket-sample-note").TextContent.Contains("se citește acum din Tichet – Detalii", StringComparison.Ordinal) && cut.FindAll("#ai-extras tbody tr").Count == 1,
+            "Activity import panel: an extra field already there is moved to the column chosen (the extra field that had that column is taken out, with a message)");
         cut.Find("#ticket-sample-older").Click();
         cut.Find("#ticket-sample-older").Click();
         cut.WaitForAssertion(() => { if (!cut.Find("#ticket-sample-info").TextContent.Contains("Tichet 10", StringComparison.Ordinal)) throw new Exception("pending"); }, TimeSpan.FromSeconds(5));

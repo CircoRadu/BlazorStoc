@@ -16,7 +16,7 @@ public sealed record TicketSample(long TicketId, string Number, string Title, Da
 public sealed record ActivityTicketSampleView(TicketSample? Sample, string? Error);
 
 /// <summary>What one piece of information gets from the ticket shown, with the settings given.</summary>
-public sealed record SamplePreviewItem(string Key, string Label, string Value, string Target);
+public sealed record SamplePreviewItem(string Key, string Label, string Value, string Target, string Source = "");
 
 public sealed record SamplePreview(IReadOnlyList<SamplePreviewItem> Items, string Notes);
 
@@ -47,17 +47,20 @@ public static class ActivityTicketSampleRules
         var source = ActivityTicketPlanner.SourceOf(ToTicket(sample, map), map);
         var items = new List<SamplePreviewItem>
         {
-            new(ActivityFieldMap.Title, map.LabelOf(ActivityFieldMap.Title), source.Title, ActivityFieldMap.Notes),
-            new(ActivityFieldMap.Number, map.LabelOf(ActivityFieldMap.Number), source.Number, ActivityFieldMap.Notes)
+            new(ActivityFieldMap.Title, map.LabelOf(ActivityFieldMap.Title), source.Title, ActivityFieldMap.Notes, map.SourceOf(ActivityFieldMap.Title) ?? ""),
+            new(ActivityFieldMap.Number, map.LabelOf(ActivityFieldMap.Number), source.Number, ActivityFieldMap.Notes, map.SourceOf(ActivityFieldMap.Number) ?? "")
         };
+        string From(string key) => key == ActivityFieldMap.Resolution
+            ? ActivityFieldMap.ColumnName("EvenimenteAgent", map.ColumnOf(ActivityFieldMap.Fields.First(field => field.Table == "EvenimenteAgent"))) + " fără textul problemei"
+            : map.SourceOf(key) ?? "";
         string Value(string key) => key switch
         {
             ActivityFieldMap.Problem => source.Problem, ActivityFieldMap.Resolution => source.Resolution, ActivityFieldMap.Report => source.Report, ActivityFieldMap.Executor => source.Executor,
             _ => source.Extras is not null && source.Extras.TryGetValue(key, out var value) ? value : ""
         };
         foreach (var item in ActivityFieldMap.Info.Where(item => !item.Mandatory))
-            items.Add(new(item.Key, map.LabelOf(item.Key), map.IsEnabled(item.Key) ? Value(item.Key) : "", map.IsEnabled(item.Key) ? map.TargetOf(item.Key) : "oprit"));
-        foreach (var extra in map.Extras) items.Add(new(extra.Key, extra.Label, Value(extra.Key), extra.Target));
+            items.Add(new(item.Key, map.LabelOf(item.Key), map.IsEnabled(item.Key) ? Value(item.Key) : "", map.IsEnabled(item.Key) ? map.TargetOf(item.Key) : "oprit", map.IsEnabled(item.Key) ? From(item.Key) : ""));
+        foreach (var extra in map.Extras) items.Add(new(extra.Key, extra.Label, Value(extra.Key), extra.Target, From(extra.Key)));
         return new SamplePreview(items, ActivityTicketPlanner.Notes(source, map));
     }
 

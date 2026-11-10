@@ -1,8 +1,8 @@
 {
     "modules":  {
                     "ActivityImport":  {
-                                           "version":  "0.14.1",
-                                           "hash":  "040cd5376822548f4fb7492f060824e6e6cb92ae1758738e4660bf27adef620c",
+                                           "version":  "0.15.0",
+                                           "hash":  "0775b94d956d2b8c2aacec9eef4ad0dd6e278f2bb2b5cc3aa95748bf004b414d",
                                            "history":  [
                                                            {
                                                                "version":  "0.1.0",
@@ -98,6 +98,11 @@
                                                                "version":  "0.14.1",
                                                                "date":  "10.11.2026",
                                                                "note":  "Procesorul rezultatelor de tichete (ITicketOutcomeProcessor) lucreaza si cand modulul de preluare e oprit"
+                                                           },
+                                                           {
+                                                               "version":  "0.15.0",
+                                                               "date":  "10.11.2026",
+                                                               "note":  "Corespondenta tichet: alegere Tichet/Eveniment cu mutare la realocare, camp suplimentar nou cu fereastra proprie, fara limita si cu nume repetabile, sumar cu coloana sursa; importul se suspenda cand structura tichetelor se schimba pana la confirmarea corespondentei"
                                                            }
                                                        ]
                                        },
@@ -181,8 +186,8 @@
                                                  ]
                                  },
                     "Journal":  {
-                                    "version":  "1.4.21",
-                                    "hash":  "bee74efcb7a59f6a04ddeb063a02e71231cc35caf9ef6321141fb270894e7fe8",
+                                    "version":  "1.4.22",
+                                    "hash":  "5dfabfd2750476616cd086958531b5c984b93606df019f7c3595038882a866de",
                                     "history":  [
                                                     {
                                                         "version":  "1.0.0",
@@ -328,6 +333,11 @@
                                                         "version":  "1.4.21",
                                                         "date":  "10.11.2026",
                                                         "note":  "Filtrul de actiuni cuprinde actiunile noi ale taskurilor (stadiu, reordonare)"
+                                                    },
+                                                    {
+                                                        "version":  "1.4.22",
+                                                        "date":  "10.11.2026",
+                                                        "note":  "Actiune noua in filtru: Suspendare preluare ActivityApp: structura schimbata"
                                                     }
                                                 ]
                                 },

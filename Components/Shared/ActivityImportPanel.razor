@@ -232,7 +232,7 @@
             @if (structureChange is { Any: true } change)
             {
                 <div class="error-banner" role="status" id="ai-structure-change">
-                    Structura tichetelor din ActivityApp s-a modificat față de cea pentru care ai verificat corespondența: @change.Describe(). Preluarea continuă cu corespondența actuală. Verific-o mai jos (poți deschide un tichet exemplu), adapteaz-o noii scheme, apoi apasă „Corespondența verificată”.
+                    Structura tichetelor din ActivityApp s-a modificat față de cea pentru care ai verificat corespondența: @change.Describe(). <strong>Preluarea tichetelor este suspendată</strong> până verifici corespondența: tichetele rămân în ActivityApp și se preiau, în ordinea datelor, după ce o confirmi. Verific-o mai jos (poți deschide un tichet exemplu), adapteaz-o noii scheme, apoi apasă „Corespondența verificată”; preluarea se reia la următoarea sincronizare.
                     <div class="editor-actions"><button type="button" class="refresh act-confirm" id="ai-structure-confirm" disabled="@busy" @onclick="ConfirmStructureAsync">Corespondența verificată</button></div>
                 </div>
             }
@@ -291,18 +291,18 @@
                     </tbody>
                 </table></div>
                 <h3>Câmpuri suplimentare</h3>
-                <p class="muted"><small>Orice coloană cu text din tabelul Tickete sau EvenimenteAgent, cu numele ales de tine; apare în ferestrele tichetului și, după destinație, în observații. Cel mult @ActivityFieldMap.MaximumExtras câmpuri.</small></p>
+                <p class="muted"><small>Orice coloană cu text din tabelul Tickete sau EvenimenteAgent, cu numele ales de tine; apare în ferestrele tichetului și, după destinație, în observații. Numărul câmpurilor nu este limitat, iar numele lor nu trebuie să fie unice.</small></p>
                 @if (extras.Count > 0)
                 {
+                    <Paged Items="extras" Id="ai-extras-page-size" Context="pageRows">
                     <div class="table-scroll"><table class="catalog-table" id="ai-extras">
-                        <thead><tr><th>Nume</th><th>Tabel</th><th>Coloana</th><th>Se atașează ca</th><th>Operații</th></tr></thead>
+                        <thead><tr><th>Nume</th><th>Citit din</th><th>Se atașează ca</th><th>Operații</th></tr></thead>
                         <tbody>
-                        @foreach (var extra in extras)
+                        @foreach (var extra in pageRows)
                         {
                             <tr @key="extra">
                                 <td><input aria-label="@($"Numele câmpului {extra.Column}")" maxlength="@ActivityFieldMap.MaximumLabel" @bind="extra.Label" /></td>
-                                <td>@extra.Table</td>
-                                <td>@extra.Column</td>
+                                <td>@ActivityFieldMap.ColumnName(extra.Table, extra.Column)</td>
                                 <td>
                                     <select aria-label="@($"Se atașează ca: {extra.Label}")" @bind="extra.Target">
                                         <option value="@ActivityFieldMap.Notes">În observații</option>
@@ -315,6 +315,7 @@
                         }
                         </tbody>
                     </table></div>
+                    </Paged>
                 }
                 <div class="anaf-grid" id="ai-extra-add">
                     <label>Tabel
@@ -332,7 +333,7 @@
                 </div>
                 @if (textColumns is null) { <p class="muted"><small>Apasă „Citește coloanele din ActivityApp” ca să vezi coloanele din care poți alege.</small></p> }
                 <div class="editor-actions">
-                    <button type="button" class="refresh act-confirm" disabled="@(busy || newColumn.Length == 0 || newLabel.Trim().Length == 0 || extras.Count >= ActivityFieldMap.MaximumExtras)" @onclick="AddExtra">Adaugă câmp</button>
+                    <button type="button" class="refresh act-confirm" disabled="@(busy || newColumn.Length == 0 || newLabel.Trim().Length == 0)" @onclick="AddExtra">Adaugă câmp</button>
                 </div>
             }
         </fieldset>
@@ -342,7 +343,7 @@
 @if (sample is { } shownSample)
 {
     var shownMap = Settings(out var shownProblem);
-    <TicketSampleDialog Sample="shownSample" Map="shownMap" Problem="@shownProblem" Targets="SampleTargets" HasNewer="@(sampleIndex > 0)" Busy="sampleBusy" Error="@sampleError"
+    <TicketSampleDialog Sample="shownSample" Map="shownMap" Problem="@shownProblem" Targets="SampleTargets" HasNewer="@(sampleIndex > 0)" Busy="sampleBusy" Error="@sampleError" Note="@sampleNote"
                         Older="OlderSampleAsync" Newer="NewerSample" Close="CloseSample" Assign="AssignFromSample" />
 }
 
@@ -598,6 +599,7 @@
         public string Column { get; } = column;
         public string Label { get; set; } = label;
         public string Target { get; set; } = target;
+        public string Key => ActivityFieldMap.ExtraKey(Table, Column);
     }
 
     private List<FieldRow>? fields;
@@ -685,10 +687,6 @@
     {
         var label = newLabel.Trim();
         if (newColumn.Length == 0 || label.Length == 0) return;
-        if (extras.Any(extra => extra.Label.Equals(label, StringComparison.OrdinalIgnoreCase)) || ActivityFieldMap.Info.Any(item => item.Label.Equals(label, StringComparison.OrdinalIgnoreCase)))
-        {
-            fieldsError = $"Numele „{label}” este deja folosit."; return;
-        }
         fieldsError = null;
         extras.Add(new ExtraRow(newTable, newColumn, label, ActivityFieldMap.Both));
         newColumn = ""; newLabel = "";
@@ -739,25 +737,68 @@
 
     private void NewerSample() { if (sampleIndex > 0) { sampleIndex--; sampleError = null; } }
 
-    private void CloseSample() { samples.Clear(); sampleIndex = 0; sampleError = null; }
+    private void CloseSample() { samples.Clear(); sampleIndex = 0; sampleError = null; sampleNote = null; }
 
-    // A column chosen in the window: it becomes the column of the information (a column of the same table), or a new extra field named after it.
+    // A column chosen in the window. A piece of information has one column: choosing a column for it moves the correspondence there (the column it had before is free; the piece that had the
+    // chosen column gives it up: one that can be switched off is switched off, title and number take the column the chosen piece had). A new extra field is named in the window (the name may repeat),
+    // and an extra field already there moves to the column. A column may feed an extra field and a piece of information at once.
+    private string? sampleNote;
+
     private void AssignFromSample(TicketSampleDialog.SampleAssignment choice)
     {
-        sampleError = null;
+        sampleError = null; sampleNote = null;
+        bool Same(string table, string column) => choice.Table.Equals(table, StringComparison.OrdinalIgnoreCase) && choice.Column.Equals(column, StringComparison.OrdinalIgnoreCase);
+        var name = ActivityFieldMap.ColumnName(choice.Table, choice.Column);
         if (choice.For == "extra")
         {
-            if (extras.Count >= ActivityFieldMap.MaximumExtras) { sampleError = $"Cel mult {ActivityFieldMap.MaximumExtras} câmpuri suplimentare."; return; }
-            if (extras.Any(extra => extra.Table == choice.Table && extra.Column.Equals(choice.Column, StringComparison.OrdinalIgnoreCase))) { sampleError = "Coloana este deja câmp suplimentar."; return; }
-            var label = choice.Column;
-            for (var number = 2; extras.Any(extra => extra.Label.Equals(label, StringComparison.OrdinalIgnoreCase)) || ActivityFieldMap.Info.Any(item => item.Label.Equals(label, StringComparison.OrdinalIgnoreCase)); number++) label = $"{choice.Column} ({number})";
-            extras.Add(new ExtraRow(choice.Table, choice.Column, label, ActivityFieldMap.Both));
+            if (extras.FirstOrDefault(extra => Same(extra.Table, extra.Column)) is { } existing) { sampleError = $"{name} este deja câmpul suplimentar „{existing.Label}”; alege-l din listă ca să-l muți sau scoate-l mai întâi."; return; }
+            var label = choice.Name.Trim().Length > 0 ? choice.Name.Trim() : choice.Column;
+            extras.Add(new ExtraRow(choice.Table, choice.Column, label.Length > ActivityFieldMap.MaximumLabel ? label[..ActivityFieldMap.MaximumLabel] : label, ActivityFieldMap.IsTarget(choice.Target) ? choice.Target : ActivityFieldMap.Both));
+            sampleNote = $"Câmp suplimentar nou „{label}”, citit din {name}.";
+            return;
+        }
+        if (choice.For.StartsWith("x:", StringComparison.Ordinal))
+        {
+            var moving = extras.FirstOrDefault(extra => extra.Key == choice.For[2..]);
+            if (moving is null) return;
+            if (Same(moving.Table, moving.Column)) return;
+            var from = ActivityFieldMap.ColumnName(moving.Table, moving.Column);
+            var parts = new List<string> { $"Câmpul suplimentar „{moving.Label}” se citește acum din {name} (înainte din {from})." };
+            if (extras.FirstOrDefault(extra => extra != moving && Same(extra.Table, extra.Column)) is { } displaced)
+            {
+                extras.Remove(displaced);
+                parts.Add($"Câmpul suplimentar „{displaced.Label}”, care citea {name}, a fost scos.");
+            }
+            extras[extras.IndexOf(moving)] = new ExtraRow(choice.Table, choice.Column, moving.Label, moving.Target);
+            sampleNote = string.Join(" ", parts);
             return;
         }
         if (fields?.FirstOrDefault(row => row.Item.Key == choice.For) is not { Column: not null } target) return;
+        var previous = target.Column;
+        var notes = new List<string>();
+        if (!previous.Equals(choice.Column, StringComparison.OrdinalIgnoreCase))
+        {
+            foreach (var other in fields.Where(row => row != target && row.Column is not null && row.FieldKey is not null && row.FieldKey.StartsWith(choice.Table + ".", StringComparison.Ordinal)
+                         && row.Column.Equals(choice.Column, StringComparison.OrdinalIgnoreCase) && (row.Enabled || row.Item.Mandatory)).ToList())
+            {
+                if (other.Item.Mandatory)
+                {
+                    if (!other.Choices.Contains(previous, StringComparer.OrdinalIgnoreCase)) other.Choices.Add(previous);
+                    other.Column = previous;
+                    notes.Add($"„{other.Label}” a trecut pe coloana {ActivityFieldMap.ColumnName(choice.Table, previous)} (o informație obligatorie nu rămâne fără coloană).");
+                }
+                else
+                {
+                    other.Enabled = false;
+                    notes.Add($"„{other.Label}” a rămas fără coloană și a fost oprită.");
+                }
+            }
+        }
         if (!target.Choices.Contains(choice.Column, StringComparer.OrdinalIgnoreCase)) target.Choices.Add(choice.Column);
         target.Column = choice.Column;
         target.Enabled = true;
+        notes.Insert(0, previous.Equals(choice.Column, StringComparison.OrdinalIgnoreCase) ? $"„{target.Label}” se citește din {name}." : $"„{target.Label}”: {ActivityFieldMap.ColumnName(choice.Table, previous)} → {name}.");
+        sampleNote = string.Join(" ", notes);
     }
 
     private void ResetFields()

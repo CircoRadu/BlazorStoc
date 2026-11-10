@@ -902,3 +902,10 @@ Cerut de utilizator la 06.10.2026 (verificarea fluxului, apoi deciziile: facturi
 - Cauza: moveHeadingClose scria din nou clasa popup-close-moved pe butonul de inchidere la fiecare trecere (classList.add pe o clasa existenta tot scrie atributul), iar MutationObserver-ul barei popup-ului relua place() fara sfarsit cat era un popup deschis: 237.000 de mutatii in 3 secunde, blocari de pana la 6 secunde, selectii care se deschid greu, inchidere lenta, pierderea conexiunii (pachetele 0.5.60-0.5.62).
 - Corectie: clasa se scrie doar daca butonul nu o are (wwwroot/bug-report.js); masurat pe instanta separata (baza de test): 0 mutatii in 3 secunde cu popup deschis, fara sarcini lungi, popup-ul se inchide imediat. Test nou: grupul popupscript.
 - Nepachetata: necesita pachet nou (0.5.63).
+
+## Finalizat la 10.11.2026 12:40 - Corespondenta tichet ActivityApp: mutare, camp nou, sumar, suspendarea importului
+
+- Tichet exemplu: optiuni "Tichet - nume" / "Eveniment - nume"; o informatie are o singura coloana, alegerea unei coloane deja asignate o muta (informatia obligatorie care o avea o preia pe cea ramasa libera, cea optionala se opreste) cu mesaj; "Camp suplimentar nou" deschide fereastra de nume si destinatie; campurile suplimentare nu mai au limita si numele lor se pot repeta; un camp existent se poate muta pe alta coloana; lista lor are paginare.
+- Sumar la finalul ferestrei: informatie, coloana sursa, valoare, destinatie + observatiile intervenției.
+- Importul tichetelor se suspenda la orice schimbare a structurii (coloana noua, disparuta, alt tip): nimic nu se preia, rularea e "suspended", fara numaratoare de esecuri; notificarea ceruta existenta spune ca preluarea e suspendata; "Corespondenta verificata" o reia (ordinea datelor). Actiune noua in jurnal: Suspendare preluare ActivityApp: structura schimbata (o data).
+- Module: ActivityImport 0.15.0, Journal 1.4.22; versiune 0.5.64 (fara migrare). Teste: grup activityimport 253 PASS, MariaDB sectiunea tichete 52 PASS.

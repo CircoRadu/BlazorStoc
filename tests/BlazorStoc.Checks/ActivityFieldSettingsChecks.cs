@@ -49,7 +49,7 @@ public static class ActivityFieldSettingsChecks
         Make(new() { [ActivityFieldMap.Problem] = "Nume", [ActivityFieldMap.Report] = "nume" }, out var twice);
         Make(new() { [ActivityFieldMap.Problem] = new string('a', 61) }, out var longName);
         Make(new() { [ActivityFieldMap.Problem] = "Observații" }, out var withExtra, [new ActivityExtraField("Tickete", "Observatii", "observații", "both")]);
-        check(new[] { clash, twice, longName, withExtra }.All(text => text is not null), "Ticket fields: a name used by another piece or extra field (capitals do not matter) or longer than 60 characters is refused");
+        check(new[] { clash, twice, longName }.All(text => text is not null) && withExtra is null, "Ticket fields: a name used by another piece (capitals do not matter) or longer than 60 characters is refused; an extra field may repeat a name");
         var ticket = Ticket();
         var text = ActivityTicketPlanner.Notes(ActivityTicketPlanner.SourceOf(ticket, map), map);
         check(text.Contains("Defect: Nu merge aerul", StringComparison.Ordinal) && text.Contains("Tehnician: Ion Pop", StringComparison.Ordinal) && text.Contains("Rezolvare: Am schimbat filtrul", StringComparison.Ordinal) && !text.Contains("Problema:", StringComparison.Ordinal),
@@ -121,7 +121,11 @@ public static class ActivityFieldSettingsChecks
         check(older == 1 && chosen is { Table: "Tickete", Column: "Detalii", For: "problem" }, "Example ticket window: the previous ticket button and the choice of a column for a piece are passed on");
         cut.Find("button[aria-label='Alege pentru ce folosești coloana DescriptionInternal']").Click();
         cut.Find("select[aria-label='Folosește coloana DescriptionInternal pentru']").Change("extra");
-        check(chosen is { For: "extra" } && cut.FindAll("[aria-label*='coloana ID ']").Count == 0, "Example ticket window: a column can become an extra field, and a column without text cannot be chosen");
+        check(chosen is { For: "problem" } && cut.FindAll("#ticket-sample-extra").Count == 1, "Example ticket window: a new extra field asks first for its name and destination");
+        cut.Find("#ticket-sample-extra-name").Input("Descriere veche");
+        cut.Find("#ticket-sample-extra-add").Click();
+        check(chosen is { For: "extra", Name: "Descriere veche", Target: "both", Column: "DescriptionInternal" } && cut.FindAll("#ticket-sample-extra").Count == 0 && cut.FindAll("[aria-label*='coloana ID ']").Count == 0,
+            "Example ticket window: a column can become an extra field with the name typed, and a column without text cannot be chosen");
     }
 
     private static void Map(Action<bool, string> check)
@@ -149,7 +153,11 @@ public static class ActivityFieldSettingsChecks
         Make([new("Tickete", "A;B", "Nume", "both")], out var column);
         Make([new("Tickete", "A", "Nume", "altundeva")], out var target);
         Make(Enumerable.Range(0, 11).Select(index => new ActivityExtraField("Tickete", "C" + index, "Nume " + index, "both")), out var many);
-        check(new[] { duplicate, clash, table, column, target, many }.All(text => text is not null), "Ticket fields: a duplicate column, a name already used, another table, a bad column name, another destination or too many extra fields are refused");
+        check(new[] { duplicate, table, column, target }.All(text => text is not null) && clash is null && many is null,
+            "Ticket fields: a duplicate column, another table, a bad column name or another destination are refused; extra field names may repeat and their number is not limited");
+        var repeated = Make(Enumerable.Range(0, 30).Select(index => new ActivityExtraField(index % 2 == 0 ? "Tickete" : "EvenimenteAgent", "C" + index, "Observații", "both")), out var repeatedError);
+        check(repeatedError is null && repeated!.Extras.Count == 30 && ActivityFieldMap.FromJson(repeated.ToJson()).Extras.Count == 30 && repeated.SourceOf("x:EvenimenteAgent.C1") == "Eveniment – C1" && repeated.SourceOf(ActivityFieldMap.Title) == "Tichet – Subject",
+            "Ticket fields: thirty extra fields with the same name are kept, written and read back, and each tells its column (Tichet – / Eveniment –)");
         check(ActivityFieldMap.Create(new Dictionary<string, string>(), ["altceva"], null, null, out var unknown) is null && unknown is not null, "Ticket fields: a piece of information that does not exist is refused");
     }
 

@@ -924,3 +924,6 @@ Modulul Propuneri (0.5.61) (09.11.2026): Notificari pentru rapoartele de erori; 
 Bara popup-ului ancorata de popup (BUG-0006) (09.11.2026): Pachet cu corectia (0.5.62), la cerere; verificare in aplicatie pe telefon.
 
 Taskuri: taburi pe utilizator, ordine proprie, stadiu si jurnal al taskului (10.11.2026): Taskuri: tragerea cu mouse-ul a randurilor (task-order.js) verificata doar sintactic si prin tastatura in teste; de incercat in browser real
+
+### 10.11.2026 - Fereastra Tichet exemplu cu ActivityApp real (ActivityImport 0.15.0)
+- Motiv: baza de test nu are un ActivityApp real de unde sa se citeasca tichetul exemplu; fluxul (alegere, mutare, camp nou, sumar) este verificat cu teste de componenta, iar suspendarea importului cu MariaDB. Pasii sunt in Teste utilizator/18 (modificarile 10.11.2026).

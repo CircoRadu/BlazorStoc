@@ -65,6 +65,8 @@ public static class ActivityImportRules
     public const string StateSelected = "selectat";
     public const int DefaultSyncMinutes = 60;
     public const string NoTypesMessage = "Nu este ales niciun tip de tichet. Alege tipurile în secțiunea 2.";
+    /// <summary>The start of the message of an import stopped because the structure of the tickets changed (not a failure of the source: it ends when the correspondence is confirmed).</summary>
+    public const string SuspendedPrefix = "Preluarea tichetelor este suspendată";
 
     public static string? Validate(ActivityImportInput input)
     {

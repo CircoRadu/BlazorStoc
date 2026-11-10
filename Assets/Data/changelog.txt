@@ -1,3 +1,9 @@
+## 0.5.64 | 10.11.2026
+- Setări → Preluare ActivityApp → Tichet exemplu: alegerea corespondenței se face cu opțiuni „Tichet – nume” și „Eveniment – nume”; alegi o coloană pentru o informație deja asignată și corespondența se mută (informația obligatorie care avea coloana o preia pe cea rămasă liberă, cea opțională se oprește), cu mesaj despre ce s-a schimbat.
+- „Câmp suplimentar nou” deschide o fereastră pentru nume și destinație; numele nu trebuie să fie unic, numărul câmpurilor suplimentare nu mai este limitat, iar un câmp existent se poate muta pe altă coloană din aceeași listă. Lista câmpurilor suplimentare are paginare.
+- Sub tichetul exemplu: sumarul „Ce se preia din ActivityApp” (informație, coloana sursă, valoarea din tichet, unde ajunge) și observațiile așa cum ajung în aplicația de stoc.
+- Preluarea tichetelor se suspendă când structura tichetelor din ActivityApp se schimbă (coloană nouă, dispărută sau cu alt tip): tichetele rămân în ActivityApp, apare notificarea cu lista schimbărilor, iar preluarea se reia la următoarea sincronizare după „Corespondența verificată”, în ordinea datelor. Suspendarea intră în Jurnal.
+
 ## 0.5.63 | 10.11.2026
 - Corecție importantă: ferestrele (popup-urile) nu mai blochează aplicația. Scriptul barei de deasupra popup-urilor intra într-o buclă fără sfârșit cât un popup era deschis, ceea ce făcea listele derulante să se deschidă greu, închiderea ferestrelor lentă și ducea la pierderea conexiunii cu serverul (defectul era în versiunile 0.5.60–0.5.62).
 - Setări → Dezvoltare: insigne cu numărul de rapoarte de eroare nerezolvate și de propuneri active pe tile-ul „Dezvoltare” și pe sub-taburile „Erori” și „Propuneri”; se actualizează singure când se adaugă sau se schimbă un raport ori o propunere.

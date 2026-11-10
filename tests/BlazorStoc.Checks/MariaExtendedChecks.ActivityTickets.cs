@@ -175,8 +175,19 @@ public static partial class MariaExtendedChecks
             Check(sampleEvents.Count >= 2 && sampleEvents.Any(entry => entry.Details.Contains("T-" + newestId, StringComparison.Ordinal)), "Activity example ticket: every view is in the journal by the number of the ticket");
 
             // The structure of the tickets: a new column notifies, the confirmation of the correspondence ends the notification, a column that goes away notifies and the same structure again ends it.
+            async Task<bool> SuspendedAsync()
+            {
+                try { await tickets.ApplyAsync(); return false; }
+                catch (ActivityImportException exception) when (exception.Message.StartsWith(ActivityImportRules.SuspendedPrefix, StringComparison.Ordinal)) { return true; }
+            }
+            var queuedBefore = await Count("SELECT COUNT(*) FROM activity_import_tickets");
             fake.Columns = [.. fake.Columns, new ActivityColumn("Tickete", "Descriere2", "nvarchar")];
-            await tickets.ApplyAsync();
+            var suspendedNew = await SuspendedAsync();
+            var suspendedAgain = await SuspendedAsync();
+            Check(suspendedNew && suspendedAgain && await Count("SELECT COUNT(*) FROM activity_import_tickets") == queuedBefore
+                  && await Count("SELECT COUNT(*) FROM activity_import_runs WHERE status='suspended'") >= 2
+                  && (await audit.QueryAsync(new AuditQuery(Entity: AuditEntities.ActivityImport), 1, 200)).Events.Count(entry => entry.TimestampUtc >= started && entry.Action == AuditActions.SuspendActivityImport && entry.Details.Contains("Tickete.Descriere2", StringComparison.Ordinal)) == 1,
+                "Activity ticket structure: a changed structure suspends the import (nothing is taken, the run is kept as suspended) and the suspension is journaled once, with what changed");
             var pending = await ActivityTicketStructureStore.PendingAsync(configuration, CancellationToken.None);
             var alertState = await new MariaActivityImportAlertReader(configuration).GetAsync();
             var alertInstance = ActivityImportAlertSource.Instances(alertState).SingleOrDefault(instance => instance.ObjectId == ActivityImportAlertSource.TicketStructureId);
@@ -190,7 +201,7 @@ public static partial class MariaExtendedChecks
                 "Activity ticket structure: confirming the correspondence ends the notification (journaled) and the next application finds nothing new");
             var withoutColumn = fake.Columns;
             fake.Columns = [.. fake.Columns.Where(column => column.Column != "Descriere2")];
-            await tickets.ApplyAsync();
+            await SuspendedAsync();
             Check((await ActivityTicketStructureStore.PendingAsync(configuration, CancellationToken.None)).Removed.SequenceEqual(["Tickete.Descriere2"]) && (await new MariaActivityImportAlertReader(configuration).GetAsync()).TicketStructureSince is not null,
                 "Activity ticket structure: a column that is gone from the tickets starts the notification");
             fake.Columns = withoutColumn;

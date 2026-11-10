@@ -13,26 +13,7 @@
         </div>
         <p class="muted"><small>Dacă acest tichet are puține date, apasă „Tichet anterior”. Valorile sunt cele din ActivityApp; nimic din acest tichet nu se păstrează în BlazorStoc.</small></p>
 
-        <h3>Ce primește fiecare informație</h3>
-        @if (preview is null) { <p class="muted" role="status">Setările de pe ecran nu sunt valide: @Problem</p> }
-        else
-        {
-            <div class="table-scroll"><table class="catalog-table" id="ticket-sample-preview">
-                <thead><tr><th>Informație</th><th>Valoare din acest tichet</th><th>Merge în</th></tr></thead>
-                <tbody>
-                @foreach (var item in preview.Items)
-                {
-                    <tr>
-                        <td>@item.Label</td>
-                        <td class="review-text">@(item.Target == "oprit" ? "—" : item.Value.Length > 0 ? item.Value : "—")</td>
-                        <td>@TargetText(item.Target)</td>
-                    </tr>
-                }
-                </tbody>
-            </table></div>
-            <h3>Observațiile intervenției</h3>
-            <pre class="review-text" id="ticket-sample-notes">@preview.Notes</pre>
-        }
+        @if (Note is not null) { <div class="info-banner" role="status" id="ticket-sample-note">@Note</div> }
 
         @foreach (var table in Sample.Tables)
         {
@@ -54,8 +35,12 @@
                                 {
                                     <select aria-label="@($"Folosește coloana {column.Column} pentru")" value="" disabled="@Busy" @onchange="args => Choose(table.Table, column.Column, args.Value?.ToString())" @onblur="StopEditing">
                                         <option value="">— alege —</option>
-                                        @foreach (var target in TargetsOf(table.Table)) { <option value="@target.Key">@target.Label</option> }
-                                        <option value="extra">Câmp suplimentar nou</option>
+                                        @foreach (var target in TargetsOf(table.Table)) { <option value="@target.Key">@ActivityFieldMap.TablePrefix(table.Table) – @target.Label</option> }
+                                        @foreach (var extra in Extras)
+                                        {
+                                            <option value="@("x:" + extra.Key)">@ActivityFieldMap.TablePrefix(extra.Table) – @extra.Label (câmp suplimentar@(Extras.Count(other => other.Label == extra.Label) > 1 ? ", " + extra.Column : ""))</option>
+                                        }
+                                        <option value="extra">+ Câmp suplimentar nou…</option>
                                     </select>
                                 }
                                 else
@@ -70,17 +55,69 @@
                 </tbody>
             </table></div>
         }
+
+        <h3>Sumar: ce se preia din ActivityApp</h3>
+        @if (preview is null) { <p class="muted" role="status">Setările de pe ecran nu sunt valide: @Problem</p> }
+        else
+        {
+            <p class="muted"><small>Informațiile așa cum se preiau cu corespondența de pe ecran (chiar nesalvată), cu valorile acestui tichet.</small></p>
+            <div class="table-scroll"><table class="catalog-table" id="ticket-sample-preview">
+                <thead><tr><th>Informație</th><th>Citită din</th><th>Valoare din acest tichet</th><th>Merge în</th></tr></thead>
+                <tbody>
+                @foreach (var item in preview.Items)
+                {
+                    <tr>
+                        <td>@item.Label</td>
+                        <td>@(item.Source.Length > 0 ? item.Source : "—")</td>
+                        <td class="review-text">@(item.Target == "oprit" ? "—" : item.Value.Length > 0 ? item.Value : "—")</td>
+                        <td>@TargetText(item.Target)</td>
+                    </tr>
+                }
+                </tbody>
+            </table></div>
+            <h3>Observațiile intervenției, așa cum ajung în aplicația de stoc</h3>
+            <pre class="review-text" id="ticket-sample-notes">@preview.Notes</pre>
+        }
     </div>
 </div>
+
+@if (adding is { } add)
+{
+    <div class="delete-overlay" @onkeydown="AddKey">
+        <div class="delete-dialog template-popup" role="dialog" aria-modal="true" tabindex="-1" aria-labelledby="ticket-sample-extra-title" id="ticket-sample-extra">
+            <div class="catalog-heading"><h2 id="ticket-sample-extra-title">Câmp suplimentar nou</h2></div>
+            <div class="catalog-body">
+                <p class="muted"><small>Coloana <strong>@ActivityFieldMap.ColumnName(add.Table, add.Column)</strong> se preia ca un câmp separat, sub numele ales. Numele nu trebuie să fie unic.</small></p>
+                <div class="anaf-grid">
+                    <label>Nume afișat<input id="ticket-sample-extra-name" aria-label="Numele câmpului suplimentar" maxlength="@ActivityFieldMap.MaximumLabel" value="@addName" @oninput="TypeName" autocomplete="off" /></label>
+                    <label>Se atașează ca
+                        <select aria-label="Se atașează câmpul suplimentar ca" @bind="addTarget">
+                            <option value="@ActivityFieldMap.Notes">În observații</option>
+                            <option value="@ActivityFieldMap.Separate">Câmp separat</option>
+                            <option value="@ActivityFieldMap.Both">Observații și câmp separat</option>
+                        </select>
+                    </label>
+                </div>
+                <div class="editor-actions">
+                    <button type="button" class="refresh act-confirm" id="ticket-sample-extra-add" disabled="@(addName.Trim().Length == 0)" @onclick="ConfirmAdd">Adaugă câmpul</button>
+                    <button type="button" class="refresh act-close" @onclick="CancelAdd">Renunță</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
 
 @code {
     /// <summary>An information that is read from a column: its key, its name and the table the column is in.</summary>
     public sealed record SampleTarget(string Key, string Label, string Table);
 
-    /// <summary>The column chosen in the window: the table, the column and what it is chosen for (the key of an information, or "extra" for a new extra field).</summary>
-    public sealed record SampleAssignment(string Table, string Column, string For);
+    /// <summary>The column chosen in the window: the table, the column and what it is chosen for (the key of an information; "x:" and the key of an extra field already there, which moves to the column;
+    /// or "extra" for a new extra field, with its Name and Target).</summary>
+    public sealed record SampleAssignment(string Table, string Column, string For, string Name = "", string Target = "");
 
     [Parameter, EditorRequired] public TicketSample Sample { get; set; } = null!;
+    /// <summary>What the last choice changed besides the column itself (an information that gave its column up).</summary>
+    [Parameter] public string? Note { get; set; }
     [Parameter] public ActivityFieldMap? Map { get; set; }
     [Parameter] public string? Problem { get; set; }
     [Parameter] public IReadOnlyList<SampleTarget> Targets { get; set; } = [];
@@ -111,11 +148,13 @@
                 if (column.IsText) usedBy[table.Table + "\u0001" + column.Column] = UsedBy(table.Table, column.Column);
         var text = new System.Text.StringBuilder();
         text.Append(Busy).Append('|').Append(Error).Append('|').Append(Problem).Append('|').Append(HasNewer).Append('|').Append(Sample.Number).Append('|').Append(Sample.Title).Append('|').Append(Sample.TicketId);
+        text.Append('|').Append(Note);
+        foreach (var extra in Extras) text.Append('|').Append(extra.Key).Append(':').Append(extra.Label);
         foreach (var target in Targets) text.Append('|').Append(target.Key).Append(':').Append(target.Label);
         foreach (var pair in usedBy) text.Append('|').Append(pair.Key).Append('=').Append(pair.Value);
         if (preview is not null)
         {
-            foreach (var item in preview.Items) text.Append('|').Append(item.Label).Append('=').Append(item.Target).Append('=').Append(item.Value);
+            foreach (var item in preview.Items) text.Append('|').Append(item.Label).Append('=').Append(item.Target).Append('=').Append(item.Source).Append('=').Append(item.Value);
             text.Append('|').Append(preview.Notes);
         }
         var changed = !ReferenceEquals(lastSample, Sample) || text.ToString() != signature;
@@ -164,12 +203,39 @@
 
     private void StopEditing() { if (editing is null) return; editing = null; dirty = true; }
 
+    private IReadOnlyList<ActivityExtraField> Extras => Map?.Extras ?? [];
+
     private Task Choose(string table, string column, string? value)
     {
         editing = null;
         dirty = true;
-        return string.IsNullOrEmpty(value) ? Task.CompletedTask : Assign.InvokeAsync(new SampleAssignment(table, column, value));
+        if (string.IsNullOrEmpty(value)) return Task.CompletedTask;
+        if (value == "extra")
+        {
+            adding = (table, column);
+            addName = column; addTarget = ActivityFieldMap.Both;
+            return Task.CompletedTask;
+        }
+        return Assign.InvokeAsync(new SampleAssignment(table, column, value));
     }
 
-    private Task Key(KeyboardEventArgs args) => args.Key == "Escape" ? Close.InvokeAsync() : Task.CompletedTask;
+    // The window of a new extra field: the column is the one chosen, the name and the destination are typed here.
+    private (string Table, string Column)? adding;
+    private string addName = "", addTarget = ActivityFieldMap.Both;
+
+    private void TypeName(ChangeEventArgs args) { addName = args.Value?.ToString() ?? ""; dirty = true; }
+
+    private void CancelAdd() { adding = null; dirty = true; }
+
+    private Task ConfirmAdd()
+    {
+        if (adding is not { } add || addName.Trim().Length == 0) return Task.CompletedTask;
+        adding = null;
+        dirty = true;
+        return Assign.InvokeAsync(new SampleAssignment(add.Table, add.Column, "extra", addName.Trim(), addTarget));
+    }
+
+    private Task AddKey(KeyboardEventArgs args) { if (args.Key == "Escape") CancelAdd(); return Task.CompletedTask; }
+
+    private Task Key(KeyboardEventArgs args) => args.Key == "Escape" && adding is null ? Close.InvokeAsync() : Task.CompletedTask;
 }
