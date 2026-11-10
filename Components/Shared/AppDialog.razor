@@ -19,7 +19,7 @@
             }
 else
 {
-    <div class="app-dialog-backdrop delete-overlay @BackdropClass" data-app-dialog data-own-keys="@(OnKeyDown.HasDelegate ? "" : null)" @onkeydown="OnKeyDown" @onclick="OnBackdropClick" @onmousedown="OnBackdropMouseDown">
+    <div class="app-dialog-backdrop delete-overlay @BackdropClass" data-app-dialog data-locked="@(Locked ? "" : null)" data-own-keys="@(OnKeyDown.HasDelegate ? "" : null)" @onkeydown="OnKeyDown" @onclick="OnBackdropClick" @onmousedown="OnBackdropMouseDown">
         @Frame
         @Floating
     </div>
@@ -54,6 +54,10 @@ else
     /// <summary>Extra classes of the backdrop (front, unsaved-overlay: the layer over other windows).</summary>
     [Parameter] public string? BackdropClass { get; set; }
     [Parameter] public bool Alert { get; set; }
+    /// <summary>true = the window cannot be closed by Escape, by the backdrop or by the round button (the user must act in it first, e.g. take over new tasks); the code that owns it closes it.</summary>
+    [Parameter] public bool Locked { get; set; }
+    /// <summary>"alert" = red bar instead of the greenish one (a window the user must not miss).</summary>
+    [Parameter] public string? Tone { get; set; }
     /// <summary>Keys of the window (when it answers more than Escape): it handles Escape itself then.</summary>
     [Parameter] public EventCallback<KeyboardEventArgs> OnKeyDown { get; set; }
     [Parameter] public EventCallback<MouseEventArgs> OnBackdropClick { get; set; }
@@ -98,12 +102,12 @@ else
                 <button type="button" class="app-dialog-action" data-dialog-action="@current.Id" title="@current.Title" aria-label="@current.Title" @attributes="current.Attributes"
                         @onclick="() => RunAsync(current)"><span class="app-dialog-action-icon" aria-hidden="true">@current.Icon</span><span class="app-dialog-action-label">@current.Label</span></button>
             }
-            @if (ShowClose)
+            @if (ShowClose && !Locked)
             {
                 <button type="button" class="popup-close-icon" data-app-dialog-close data-app-dialog-proxy="@(OnClose.HasDelegate ? null : "")" aria-label="Închide fereastra" title="Închide fereastra" @onclick="OnClose"></button>
             }
         </div>
-        <div class="delete-dialog app-dialog-panel @SizeClass @PanelClass" role="@(Alert ? "alertdialog" : "dialog")" aria-modal="true" tabindex="-1" @ref="panel"
+        <div class="delete-dialog app-dialog-panel @SizeClass @(Tone == "alert" ? "app-dialog-tone-alert" : null) @PanelClass" role="@(Alert ? "alertdialog" : "dialog")" aria-modal="true" tabindex="-1" @ref="panel"
              aria-labelledby="@LabelId" aria-label="@(LabelId is null ? Label : null)" aria-describedby="@DescribedBy" @attributes="PanelAttributes">
             @if (HasTitle)
             {

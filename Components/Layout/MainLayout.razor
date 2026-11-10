@@ -113,7 +113,7 @@
                 Backup/restaurare in curs (@activeOperation.OperatorName) - datele pot fi temporar indisponibile. Reveniti mai tarziu.
             </div>
         }
-        <main class="workspace"><UpdateBanner @rendermode="@(new InteractiveServerRenderMode(prerender: false))" /><ModuleAlertBanner @rendermode="@(new InteractiveServerRenderMode(prerender: false))" /><SessionTracker @rendermode="@(new InteractiveServerRenderMode(prerender: false))" />@Body</main></div>
+        <main class="workspace"><UpdateBanner @rendermode="@(new InteractiveServerRenderMode(prerender: false))" /><ModuleAlertBanner @rendermode="@(new InteractiveServerRenderMode(prerender: false))" /><SessionTracker @rendermode="@(new InteractiveServerRenderMode(prerender: false))" /><BlazorStoc.Modules.Tasks.NewTasksGate @rendermode="@(new InteractiveServerRenderMode(prerender: false))" />@Body</main></div>
 </div>
 <AppDialog Native="true" Id="logout-dialog" PanelClass="logout-dialog" LabelledBy="logout-title" DescribedBy="logout-description" ShowModuleActions="false">
     <form method="post" action="/Account/Logout">

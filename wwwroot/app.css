@@ -1831,3 +1831,11 @@ html.app-dialog-adjusting, html.app-dialog-adjusting * { user-select:none !impor
 .app-dialog-panel.help-panel .help-search { padding:8px 24px 0; }
 .app-dialog-panel.help-panel { width:min(1100px, 100%); }
 .dialog-head:has(> .app-dialog-title-moved), .catalog-heading:has(> .app-dialog-title-moved) { justify-content:flex-end; }
+
+/* Window the user must not miss (Tone="alert"): red bar, same structure. */
+.app-dialog-panel.app-dialog-tone-alert > .app-dialog-head, .app-dialog-panel.app-dialog-tone-alert > .app-dialog-grip { background:var(--c-fff0eb); border-bottom-color:var(--c-a3241b); }
+.app-dialog-panel.app-dialog-tone-alert > .app-dialog-head::before, .app-dialog-panel.app-dialog-tone-alert > .app-dialog-grip::before { background:var(--c-a3241b); }
+.app-dialog-panel.app-dialog-tone-alert > .app-dialog-head > h2 { color:var(--c-a3241b); }
+.app-dialog-panel.app-dialog-tone-alert > .app-dialog-head:hover { border-bottom-color:var(--c-a3241b); }
+.new-tasks-gate-note { margin:0 0 12px; }
+.new-tasks-gate-error { margin:0 0 12px; }

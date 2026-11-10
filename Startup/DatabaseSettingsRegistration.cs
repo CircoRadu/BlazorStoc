@@ -14,6 +14,7 @@ public static class DatabaseSettingsRegistration
         services.AddSingleton<CircuitCounter>();
         services.AddSingleton<OpenSessionRegistry>();
         services.AddScoped<CircuitHolder>();
+        services.AddScoped<ForcedDialogGate>();
         services.AddScoped<CircuitHandler, CircuitCountHandler>();
         services.AddScoped<IDatabaseSettingsService>(provider => new DatabaseSettingsService(provider.GetRequiredService<IConfiguration>(),
             provider.GetRequiredService<IDataProtectionProvider>(), provider.GetRequiredService<IAccessControl>(), provider.GetRequiredService<IAuditTrail>(),

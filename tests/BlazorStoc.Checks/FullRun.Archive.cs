@@ -62,7 +62,7 @@ data = await new DemoProductRepository().GetProductsAsync();
             ["parameters"] = () => ParameterChecks.RunAsync(Check),
             ["moduleversions"] = () => ModuleVersionChecks.RunAsync(Check),
             ["activityimport"] = () => ActivityImportChecks.RunAsync(Check),
-            ["usertasks"] = () => UserTaskTabsChecks.RunAsync(Check),
+            ["usertasks"] = async () => { await UserTaskTabsChecks.RunAsync(Check); await NewTasksGateChecks.RunAsync(Check); },
             ["devbadge"] = () => DevelopmentBadgeChecks.RunAsync(Check),
             ["popupscript"] = () => PopupScriptChecks.RunAsync(Check),
             ["appdialog"] = () => PopupScriptChecks.RunAsync(Check),

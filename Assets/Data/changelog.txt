@@ -1,3 +1,9 @@
+## 0.5.71 | 10.11.2026
+- Taskuri: fereastra „Taskuri noi primite” (bară roșie) apare la autentificare dacă ai taskuri nepreluate și, cât timp sesiunea e deschisă, în momentul în care administratorul îți adaugă un task
+- Preluarea este obligatorie: fereastra nu se închide cu Escape, din fundal sau din buton, iar „Închide” devine activ abia după ce toate taskurile sunt preluate (preluare pe rând sau „Preia toate”)
+- Fereastra stă peste pagina curentă fără să o schimbe; cât timp e deschisă, aplicația nu te lasă să treci pe altă pagină
+- Orice fereastră poate fi blocată (parametrul Locked) și poate avea bara roșie (Tone="alert")
+
 ## 0.5.70 | 10.11.2026
 - Toate ferestrele (popup-urile) au aceeași bară de titlu: verzuie discretă, lipită de marginile ferestrei, cu pictograma de mutare în stânga-sus, denumirea ferestrei și ajutorul la dreapta; ferestrele care își scriau titlul în conținut îl au acum în bară
 - Pe telefon bara se vede, iar fereastra se mută cu degetul

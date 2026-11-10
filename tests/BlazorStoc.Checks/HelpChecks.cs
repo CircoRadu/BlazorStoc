@@ -215,7 +215,7 @@ public static class HelpChecks
     // The list only shrinks: a topic that gets a "Captura:" must be taken out, a new topic without capture must be added (or get one).
     private static readonly HashSet<string> WithoutCapture = new(StringComparer.OrdinalIgnoreCase)
     {
-        "propunere-modificare", "notificari-propuneri",
+        "propunere-modificare", "notificari-propuneri", "taskuri-noi",
         // The window was restructured on 27.10.2026 (three sections); the old picture was removed and is made again on request (docs/HELP_DE_REGENERAT.md), then the key leaves this list.
         "categorii-parametri", "schimbare-parola",
         // New 30.10.2026: the pictures are made on request (docs/HELP_DE_REGENERAT.md).

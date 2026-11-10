@@ -38,8 +38,16 @@
         let top = frames[0];
         frames.forEach((frame) => { if (layer(frame) >= layer(top)) top = frame; });
         const holder = top.closest("[data-app-dialog]");
+        if (holder.hasAttribute("data-locked")) { event.preventDefault(); return; }
         if (holder.hasAttribute("data-own-keys") && holder.contains(event.target)) return;
         if (top.querySelector("[data-app-dialog-close]")) { event.preventDefault(); press(top); }
+    });
+    // A locked window keeps the keyboard focus: Tab never leaves it for the page behind.
+    document.addEventListener("focusin", (event) => {
+        const holder = document.querySelector("[data-app-dialog][data-locked]");
+        if (!holder || !(event.target instanceof Element) || holder.contains(event.target) || event.target.closest("dialog[open]")) return;
+        const target = holder.querySelector(".app-dialog-panel button:not([disabled]), .app-dialog-panel");
+        if (target) target.focus();
     });
     // 3) Move and resize (PROP-0007): the head of a window is dragged to move it, the corner handle at the bottom right changes its size. Pointer events only, nothing is observed;
     //    the position and size live in inline styles of the frame / panel, so a window that is opened again starts at its default. Off on narrow screens (windows fill them).

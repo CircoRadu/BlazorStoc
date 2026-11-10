@@ -1,0 +1,16 @@
+# Taskuri noi primite
+Cautare: taskuri noi primite preluare preia toate nepreluate administrator
+
+Fereastra cu bara roșie apare când ai taskuri primite de la administrator pe care nu le-ai preluat încă: la autentificare sau, cât timp sesiunea e deschisă, în clipa în care administratorul îți adaugă un task. Stă peste pagina curentă, fără să o schimbe.
+
+## Elemente
+### Fereastra
+- Tabelul de taskuri | tabel | Taskurile nepreluate: beneficiarul, titlul și descrierea, prioritatea, termenul și cine ți l-a dat. | sel: #new-tasks-gate-table
+- Preia (bifa de pe rând) | buton | Preia taskul de pe rând; rândul dispare din listă.
+- Preia toate | buton | Preia, pe rând, toate taskurile din listă.
+- Închide | buton | Rămâne inactiv cât timp există taskuri nepreluate; după ce le preiei pe toate închide fereastra. Fereastra nu se închide cu Escape sau din fundal.
+
+## Flux: Cum preiau taskurile noi
+1. Citește taskurile din tabel.
+2. Preia-le pe rând cu bifa sau pe toate cu „Preia toate”.
+3. Apasă „Închide”; poți continua lucrul. Un task adăugat ulterior redeschide fereastra.

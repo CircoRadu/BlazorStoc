@@ -2,6 +2,11 @@
 
 ## Modificari de testat
 
+### 10.11.2026 - Fereastra "Taskuri noi primite" (preluare obligatorie)
+**Ce s-a adaugat:** fereastra cu bara rosie care listeaza taskurile primite de la administrator si nepreluate; apare la autentificare si, cu sesiunea deschisa, in momentul in care administratorul adauga un task; nu se inchide cu Escape, din fundal sau din buton, iar "Inchide" ramane inactiv pana cand toate taskurile sunt preluate (bifa de pe rand sau "Preia toate"); fereastra sta peste pagina curenta, iar cat timp e deschisa nu poti lucra pe alta pagina.
+**Ce face acum:** administratorul da un task unui utilizator; la urmatoarea autentificare a utilizatorului (sau imediat, daca e deja autentificat) apare fereastra; utilizatorul nu poate continua pana nu preia taskurile.
+Pasi: (1) ca administrator adauga un task pentru un utilizator in Taskuri utilizator; (2) autentifica-te cu utilizatorul: apare fereastra cu bara rosie si taskul; (3) incearca Escape si clic pe fundal: nu se inchide, "Inchide" e inactiv; (4) cu utilizatorul deja autentificat, adauga din alt browser un al doilea task: apare in fereastra fara reincarcare; (5) preia taskurile: "Inchide" devine activ si inchide fereastra; (6) intra pe o alta pagina prin adresa din browser cu taskuri nepreluate: fereastra apare si peste noua pagina.
+
 ### 10.11.2026 - Taburi pe utilizator, ordine proprie, stadiu si jurnal propriu al taskului (Tasks 1.2.1, migrarea 85)
 
 **Ce s-a adaugat:** pagina Taskuri utilizator are tab "Nepreluate" (global) si cate un tab pe fiecare utilizator care are taskuri; in tab, taskurile active sunt numerotate in ordinea stabilita de administrator (maner de tragere), cele finalizate urmeaza dedesubt, cu comutator care le ascunde; taskurile finalizate pot fi editate; camp nou "Stadiu / note de lucru"; sectiunea pliabila "Jurnalul taskului" in fereastra de detalii.
