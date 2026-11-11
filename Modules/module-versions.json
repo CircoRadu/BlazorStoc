@@ -221,8 +221,8 @@
                                                  ]
                                  },
                     "Journal":  {
-                                    "version":  "1.6.0",
-                                    "hash":  "4ab1734973497bd993562fd4082a7ea3335c191cb67e78d85363e901dc664fd0",
+                                    "version":  "1.6.1",
+                                    "hash":  "2715c2e7d189665ca4eabf04503c7277711e4cbef9483a67df835d3ec361695f",
                                     "history":  [
                                                     {
                                                         "version":  "1.0.0",
@@ -398,6 +398,11 @@
                                                         "version":  "1.6.0",
                                                         "date":  "11.11.2026",
                                                         "note":  "Actiune noua in filtrul jurnalului: Descarcare pachet backup (PROP-0020)"
+                                                    },
+                                                    {
+                                                        "version":  "1.6.1",
+                                                        "date":  "11.11.2026",
+                                                        "note":  "Filtrul jurnalului cunoaste entitatea Preluare stoc ESPStoc si operatiile punctului zero"
                                                     }
                                                 ]
                                 },
@@ -1066,6 +1071,27 @@
                                                           "version":  "1.4.1",
                                                           "date":  "11.11.2026",
                                                           "note":  "Listele se ordoneaza din antet si retin ordonarea in sesiune (BUG-0018)"
+                                                      }
+                                                  ]
+                                  },
+                    "EspImport":  {
+                                      "version":  "0.2.1",
+                                      "hash":  "36cba491a07b128b7ffb9d2d4f3e727fbecd330bd8b12abeaad9502a48e8e5f5",
+                                      "history":  [
+                                                      {
+                                                          "version":  "0.1.0",
+                                                          "date":  "11.11.2026",
+                                                          "note":  "Versiune de pornire (inceputul versionarii modulelor)"
+                                                      },
+                                                      {
+                                                          "version":  "0.2.0",
+                                                          "date":  "11.11.2026",
+                                                          "note":  "Produsele fara parametri alesi se pot prelua inghetate (create sau lasate fara parametri, primesc doar cantitatea initiala; nicio alta miscare pana sunt completate)"
+                                                      },
+                                                      {
+                                                          "version":  "0.2.1",
+                                                          "date":  "11.11.2026",
+                                                          "note":  "Insignele (cu probleme, de verificat, inghetate, omise) deschid lista produselor lor"
                                                       }
                                                   ]
                                   }

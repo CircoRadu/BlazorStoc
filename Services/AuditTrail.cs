@@ -20,6 +20,7 @@ public static class AuditEntities
     public const string DatabaseBackup = "CopieSiguranta";
     public const string ActivityImport = "PreluareActivityApp";
     public const string Elcomtur = "PreluareElcomtur";
+    public const string EspImport = "PreluareEspStoc";
     public const string JournalSettings = "SetariJurnal";
     public const string BugReport = "RaportareEroare";
     public const string Proposal = "Propunere";
@@ -301,6 +302,19 @@ public static class AuditActions
     public const string CheckElcomturAuto = "Verificare backup Elcomtur";
     public const string ImportElcomturAuto = "Preluare automată backup Elcomtur";
     public const string FailElcomturAuto = "Eșec preluare automată Elcomtur";
+    // The stock import from the old ESPStoc (Modules/EspImport): the point zero of the stock keeping. Each step is its own operation.
+    public const string EspAnalyze = "Analiză export ESPStoc";
+    public const string EspStart = "Punct zero gestiune: început";
+    public const string EspDeleteMovements = "Punct zero gestiune: ștergere mișcări de stoc";
+    public const string EspDeleteInvoices = "Punct zero gestiune: ștergere facturi preluate";
+    public const string EspDeleteOffers = "Punct zero gestiune: ștergere oferte";
+    public const string EspDeleteReservations = "Punct zero gestiune: ștergere rezervări";
+    public const string EspResetQuantities = "Punct zero gestiune: resetare cantități";
+    public const string EspImportStock = "Preluare ESPStoc: stoc inițial";
+    public const string EspDeleteBackups = "Punct zero gestiune: ștergere copii de siguranță";
+    public const string EspPurgeJournal = "Punct zero gestiune: golire jurnal";
+    public const string EspFinish = "Punct zero gestiune: terminat";
+    public const string EspFail = "Punct zero gestiune: eșec";
     public const string AddActivityKeyword = "Adăugare cuvânt cheie mentenanță ActivityApp";
     public const string EditActivityKeyword = "Modificare cuvânt cheie mentenanță ActivityApp";
     public const string DeleteActivityKeyword = "Ștergere cuvânt cheie mentenanță ActivityApp";

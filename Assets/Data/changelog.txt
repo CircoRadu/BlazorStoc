@@ -1,3 +1,9 @@
+## 0.5.74 | 11.11.2026
+### Funcționalități noi
+- Preluarea stocului din aplicația veche ESPStoc (Setări → Preluare stoc ESPStoc, doar administrator): analiza exportului (.sql sau .zip), lista pe categorii cu insigne clicabile (cu probleme, de verificat, înghețate, omise), alegerea parametrilor propusă din codul vechi, produse preluate înghețate (fără parametri, blocate până sunt completate) și punctul zero al gestiunii (șterge mișcările, facturile preluate, ofertele, rezervările, copiile de siguranță și jurnalul; preia stocul și imaginile din export).
+### Diverse
+- Jurnalul cunoaște entitatea „Preluare stoc ESPStoc” și operațiile punctului zero.
+
 ## 0.5.73 | 11.11.2026
 ### Funcționalități noi
 - PROP-0020

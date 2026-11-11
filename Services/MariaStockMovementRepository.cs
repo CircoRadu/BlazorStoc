@@ -757,7 +757,7 @@ public sealed class MariaStockMovementRepository(IConfiguration configuration, I
         StockMovementInput value, string operatorName, DateTime now, int? operationId, CancellationToken cancellationToken)
     {
         var nowText = MariaTimeText.Format(now);
-        var productCode = await LockProductAsync(connection, transaction, productId, cancellationToken).ConfigureAwait(false);
+        var productCode = await LockProductAsync(connection, transaction, productId, cancellationToken, requireComplete: !value.SkipParameterCheck).ConfigureAwait(false);
         var (beneficiaryName, projectName) = await ResolveRelationsAsync(connection, transaction, value, cancellationToken).ConfigureAwait(false);
         var (vehiclePlate, sourcePlate) = await ResolveVehiclesAsync(connection, transaction, value, cancellationToken).ConfigureAwait(false);
         // Moves between vehicles and returns are physical: they cannot take more than the vehicle holds. Using a product from a vehicle

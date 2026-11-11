@@ -37,6 +37,8 @@ Scop: sa gasesti fisierele unui modul fara cautari exploratorii. Directoare igno
 
 Import unic din baza veche ESP_Stoc: `tests/BlazorStoc.EspImport` (simulare implicit, `--apply` scrie; citeste `artifacts/esp-import/produse_import.csv`).
 
+Preluare stoc ESPStoc (11.11.2026, branch claude/import-espstoc; inlocuieste importul unic de mai sus): modulul `Modules/EspImport/` (id `import-espstoc`): `EspExport.cs` (cititor in flux al exportului .sql/.zip, doar categorie/subcategorie/produs/imagine), `EspPlanner.cs` (planul pur: subcategorii, potrivirea codurilor, parametri propusi din coada codului, produse existente incomplete, dubluri), `EspImportService.cs` (analiza, alegeri, aplicarea punctului zero), `EspPointZero.cs` (stergerile intr-o tranzactie, starea in `app_metadata` cheia `espstoc.point_zero`, golirea jurnalului), `EspImportPanel.razor` (tabul din Setari); stergerea fisierelor de pe NAS: `NasBackupCopier.DeleteFilesAsync` (`Services/NasBackup.cs`); permisiunea `setari-import-espstoc.*` (doar Administrator); verificari `EspImportChecks` (grupul `espimport`). Proiectul de design: `docs/PROPUNERE_IMPORT_ESPSTOC.md`.
+
 ## Module (Modules/)
 
 - Contractul: `Modules/Modules.cs` (`IModule`, `ModuleAttribute`, `ModuleStatus`); registrul si circuit breaker-ul: `Modules/ModuleRegistry.cs` (singleton; 3 erori consecutive scot modulul 30 s; raspunsurile modulului - `*OperationException`, acces refuzat, anulare, timeout, MySqlException - nu sunt erori). Inregistrarea: `ServiceRegistration.AddModules` (in `Program.cs`); sursele de notificari ale modulelor se adauga in `AddNotificationServices(modules)`.

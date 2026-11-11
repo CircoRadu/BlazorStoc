@@ -142,6 +142,7 @@ internal static class ServiceRegistration
         registry.Add(new MaintenanceModule(), services, configuration);
         registry.Add(new RiskAnalysesModule(), services, configuration);
         registry.Add(new ElcomturModule(), services, configuration);
+        registry.Add(new BlazorStoc.Modules.EspImport.EspImportModule(), services, configuration);
         registry.Add(new JournalModule(), services, configuration);
         registry.Add(new ProjectObservationsModule(), services, configuration);
         registry.Add(new BlazorStoc.Modules.BugReports.BugReportsModule(), services, configuration);

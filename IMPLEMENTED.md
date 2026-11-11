@@ -976,3 +976,9 @@ Cerut de utilizator la 06.10.2026 (verificarea fluxului, apoi deciziile: facturi
 ## Finalizat la 11.11.2026 - Descarcarea pachetelor de backup (PROP-0020)
 
 - Setari -> Backup: iconita de descarcare pe fiecare pachet; endpoint `GET /api/backup/{nume}` (dreptul `setari-backup.edit`): pachetul simplu se trimite ca atare, cu fisierul `.sha256` alaturi vine intr-o arhiva `<nume>-cu-suma-de-control.zip` (stocata, temporar sters la final); un pachet doar pe NAS este adus intai pe server (acelasi pas ca la restaurare). Jurnal: "Descarcare pachet backup" (Journal 1.6.0). Teste: grupul backupdownload (11 verificari); endpoint verificat in browser.
+
+## Finalizat la 11.11.2026 15:46 - Preluare stoc ESPStoc (modulul import-espstoc, punct zero)
+
+- Modulul Modules/EspImport: analiza exportului vechi .sql/.zip, lista pe categorii cu insigne clicabile, parametri propusi din codul vechi, produse preluate inghetate, aplicare ca punct zero (miscari, facturi, oferte, rezervari, copii de siguranta si jurnal sterse; stoc, produse si imagini preluate)
+- Fisiere: Modules/EspImport/*, NasBackup.cs (DeleteFilesAsync), ProductInput/StockMovements (AllowIncomplete, SkipParameterCheck), Settings.razor, Permissions.cs, AuditTrail.cs; teste EspImportChecks (grupul espimport)
+- Verificari: espimport/moduleversions/help/components/parameters, Maria Required parameters, browser pe baza de test cu exportul BStoc; versiunea 0.5.74

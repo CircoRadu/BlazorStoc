@@ -81,6 +81,9 @@ public sealed class StockMovementInput
     // Exits that would take pieces reserved by other projects: ReservationAck = continue without touching the reservations; or lower the reservation of a project
     // (quantity, default what is needed) with a short reason. Neither = the exit is refused with a warning (ReservationWarningException).
     public bool ReservationAck { get; set; }
+    // Only the stock import (Modules/EspImport) sets this, for the initial entry of a product taken frozen: a product of a subcategory with required parameters that lacks them is
+    // otherwise refused any movement. The product stays blocked for every other movement until it is completed.
+    public bool SkipParameterCheck { get; set; }
     public int? ReduceReservationProjectId { get; set; }
     public int? ReduceReservationQuantity { get; set; }
     public string ReduceReservationReason { get; set; } = "";
@@ -576,6 +579,7 @@ public static class StockMovementRules
             ProjectComponentId = kind == StockMovementKind.Exit ? (projectId is not null ? input.ProjectComponentId : null) : input.ProjectComponentId,
             OutsideOffer = kind == StockMovementKind.Exit && projectId is not null && input.OutsideOffer,
             ReservationAck = kind == StockMovementKind.Exit && input.ReservationAck,
+            SkipParameterCheck = kind == StockMovementKind.Entry && input.SkipParameterCheck,
             ReduceReservationProjectId = kind == StockMovementKind.Exit ? input.ReduceReservationProjectId : null,
             ReduceReservationQuantity = kind == StockMovementKind.Exit ? input.ReduceReservationQuantity : null,
             ReduceReservationReason = kind == StockMovementKind.Exit ? (input.ReduceReservationReason ?? "").Trim() : "",

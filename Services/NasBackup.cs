@@ -333,6 +333,49 @@ public sealed class NasBackupCopier(IConfiguration configuration, IDataProtectio
         return new(true, "", files);
     }
 
+    // The packages named (and their checksum files) are removed from the share, wherever they are (root or a subfolder); nothing else is touched. Used only by the point zero of the stock import
+    // (Modules/EspImport). Copied = files removed; a share that forbids deleting is reported, never an exception.
+    public async Task<NasCopyResult> DeleteFilesAsync(IReadOnlyList<string> packageNames, CancellationToken cancellationToken = default)
+    {
+        if (access is not null) await access.EnsureAdministratorAsync(cancellationToken).ConfigureAwait(false);
+        var names = packageNames.Where(name => name.Length > 0 && name == Path.GetFileName(name) && name.EndsWith(".zip", StringComparison.OrdinalIgnoreCase) && !name.StartsWith('.'))
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        if (names.Count == 0) return new(true, 0, 0, 0, "Nimic de șters pe NAS.");
+        var (settings, _) = await store.ReadAsync(cancellationToken).ConfigureAwait(false);
+        if (!settings.CopyEnabled) return new(false, 0, 0, 0, "Copierea pe NAS este oprită.");
+        var credentials = await store.CredentialsAsync(cancellationToken).ConfigureAwait(false);
+        if (credentials is null) return new(false, 0, 0, 0, NasBackupRules.NotConfiguredMessage);
+        int removed = 0, failed = 0;
+        string? firstError = null;
+        try
+        {
+            using var connection = await NetworkShareConnection.OpenAsync(credentials.Path, credentials.UserName, credentials.Password, cancellationToken).ConfigureAwait(false);
+            await connection.RunAsync(() =>
+            {
+                if (!Directory.Exists(credentials.Path)) return Task.CompletedTask;
+                var folders = new List<string> { credentials.Path };
+                folders.AddRange(Directory.EnumerateDirectories(credentials.Path));
+                foreach (var folder in folders)
+                    foreach (var file in Directory.EnumerateFiles(folder))
+                    {
+                        var name = Path.GetFileName(file);
+                        var package = name.EndsWith(".sha256", StringComparison.OrdinalIgnoreCase) ? name[..^7] : name;
+                        if (!names.Contains(package)) continue;
+                        try { File.Delete(file); removed++; }
+                        catch (Exception exception) when (exception is UnauthorizedAccessException or IOException) { failed++; firstError ??= NasBackupRules.IoMessage(exception); }
+                    }
+                return Task.CompletedTask;
+            });
+        }
+        catch (NasBackupException exception) { return new(false, removed, 0, failed, exception.Message); }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        {
+            logger.LogWarning("NAS delete failed ({ErrorType}).", exception.GetType().Name);
+            return new(false, removed, 0, failed, NasBackupRules.IoMessage(exception));
+        }
+        return new(failed == 0, removed, 0, failed, failed == 0 ? "" : firstError ?? "Unele fișiere nu au putut fi șterse.");
+    }
+
     public async Task<NasCopyResult> FetchAsync(string fileName, CancellationToken cancellationToken = default)
     {
         if (access is not null) await access.EnsureAsync("setari-backup.edit", cancellationToken).ConfigureAwait(false);
