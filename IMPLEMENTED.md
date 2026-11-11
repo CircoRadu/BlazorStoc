@@ -935,3 +935,11 @@ Cerut de utilizator la 06.10.2026 (verificarea fluxului, apoi deciziile: facturi
 ## Finalizat la 10.11.2026 18:09 - Bara ferestrelor template v2 pentru toate dialogurile (0.5.70)
 
 - Bara din margine in margine cu pictograma de mutare, denumirea ferestrei si ajutor; padding mutat din panou in corp (variabile --dlg-*), titlul din continut copiat in bara (appDialog.syncTitle); verificat pe 32 de clase de ferestre si pe ferestre reale
+
+## Finalizat la 11.11.2026 - Ferestre, marcare zone la editare, sablonarea tichetului, changelog pe categorii (0.5.72)
+
+- Ajutorul din bara ferestrelor este buton dreptunghiular "Ajutor"; titlul si ajutorul din continut trec in bara, randul gol de sus dispare (BUG-0016, PROP-0016); BUG-0015 retras de utilizator.
+- Editarea rapoartelor de eroare si a propunerilor permite marcarea de zone peste imaginile salvate si adaugate; fereastra de marcare are zoom (-, +, Potriveste, Ctrl + rotita).
+- Sablonarea preluarii tichetului ActivityApp (BUG-0017): liste pliabile Tichet / Eveniment / Client cu comutator "Folosit", lista "Folosite" (descriere, rol, destinatie, detasare), coloane de orice tip, CUI client mereu preluat, observatii "descriere: valoare"; baza permanenta de test ActivityApp_test (tools/load-activityapp-test-db.ps1).
+- Changelog pe categorii Functionalitati noi / Bugs / Diverse (PROP-0019): migrarea 87 (bug_reports.resolved_version), parser si dialog, release.ps1 pastreaza categoriile, tools/changelog-draft.ps1.
+- Teste: suita de componente 1883 PASS, MariaDB (rapoarte de eroare) 29 PASS.

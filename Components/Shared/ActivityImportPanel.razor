@@ -291,7 +291,7 @@
                     </tbody>
                 </table></div>
                 <h3>Câmpuri suplimentare</h3>
-                <p class="muted"><small>Orice coloană cu text din tabelul Tickete sau EvenimenteAgent, cu numele ales de tine; apare în ferestrele tichetului și, după destinație, în observații. Numărul câmpurilor nu este limitat, iar numele lor nu trebuie să fie unice.</small></p>
+                <p class="muted"><small>Orice coloană (text, număr, dată sau da/nu) din tabelul Tickete sau EvenimenteAgent, cu numele ales de tine; apare în ferestrele tichetului și, după destinație, în observații. Numărul câmpurilor nu este limitat, iar numele lor nu trebuie să fie unice.</small></p>
                 @if (extras.Count > 0)
                 {
                     <Paged Items="extras" Id="ai-extras-page-size" Context="pageRows">
@@ -344,7 +344,7 @@
 {
     var shownMap = Settings(out var shownProblem);
     <TicketSampleDialog Sample="shownSample" Map="shownMap" Problem="@shownProblem" Targets="SampleTargets" HasNewer="@(sampleIndex > 0)" Busy="sampleBusy" Error="@sampleError" Note="@sampleNote"
-                        Older="OlderSampleAsync" Newer="NewerSample" Close="CloseSample" Assign="AssignFromSample" />
+                        Older="OlderSampleAsync" Newer="NewerSample" Close="CloseSample" Used="UsedList()" Toggle="ToggleFromSample" Edit="EditFromSample" />
 }
 
 @code {
@@ -744,7 +744,97 @@
     // and an extra field already there moves to the column. A column may feed an extra field and a piece of information at once.
     private string? sampleNote;
 
-    private void AssignFromSample(TicketSampleDialog.SampleAssignment choice)
+    /// <summary>A column of the lists of the example ticket and what is done with it.</summary>
+    private sealed record SampleAssignment(string Table, string Column, string For, string Name = "", string Target = "");
+
+    // The list "Folosite" of the window: the pieces of information that are on (with their column) and the free fields, in the order they are saved; the client CUI is always there.
+    private IReadOnlyList<TicketSampleDialog.SampleUsed> UsedList()
+    {
+        var list = new List<TicketSampleDialog.SampleUsed>();
+        if (fields is null) return list;
+        foreach (var row in fields)
+        {
+            var table = row.Item.FieldKey?.Split('.')[0] ?? "";
+            var column = row.Column ?? "";
+            if (row.Item.Mandatory) list.Add(new(row.Item.Key, table, column, ActivityFieldMap.ColumnName(table, column), row.Item.Label, ActivityFieldMap.Notes, row.Item.Key, true, "Se preia mereu: în observații și titlu"));
+            else if (row.Enabled) list.Add(new(row.Item.Key, table, column, column.Length == 0 ? "" : ActivityFieldMap.ColumnName(table, column), row.Label, row.Target, row.Item.Key));
+        }
+        foreach (var extra in extras) list.Add(new(extra.Key, extra.Table, extra.Column, ActivityFieldMap.ColumnName(extra.Table, extra.Column), extra.Label, extra.Target, "extra"));
+        if (sample?.Tables.FirstOrDefault(table => table.Table == ClientTable)?.Columns.FirstOrDefault() is { } cui)
+            list.Add(new("client-cui", ClientTable, cui.Column, "Client – " + cui.Column, "CUI client", ActivityFieldMap.Notes, "client", true, "Se preia automat pentru persoane juridice; nu poate fi detașat"));
+        return list;
+    }
+
+    private const string ClientTable = "Client";
+
+    // A column switched on or off in the lists of the window. On: a piece of information that was switched off and reads this column comes back; otherwise the column becomes a free field named like the
+    // column. Off: the free field goes away and the pieces of information that read the column are switched off (title and number cannot).
+    private void ToggleFromSample(TicketSampleDialog.SampleToggle toggle)
+    {
+        sampleError = null; sampleNote = null;
+        if (toggle.Table == ClientTable) return;
+        bool Same(string table, string column) => toggle.Table.Equals(table, StringComparison.OrdinalIgnoreCase) && toggle.Column.Equals(column, StringComparison.OrdinalIgnoreCase);
+        var name = ActivityFieldMap.ColumnName(toggle.Table, toggle.Column);
+        var roles = fields?.Where(row => row.FieldKey is not null && row.Column is not null && Same(row.FieldKey.Split('.')[0], row.Column)).ToList() ?? [];
+        if (toggle.On)
+        {
+            if (roles.Any(row => row.Item.Mandatory || row.Enabled) || extras.Any(extra => Same(extra.Table, extra.Column))) return;
+            if (roles.FirstOrDefault(row => !row.Item.Mandatory) is { } back) { back.Enabled = true; sampleNote = $"„{back.Label}” se citește din {name}."; return; }
+            extras.Add(new ExtraRow(toggle.Table, toggle.Column, toggle.Column, ActivityFieldMap.Both));
+            sampleNote = $"{name} este acum folosită, cu descrierea „{toggle.Column}”; o poți schimba în lista „Folosite”.";
+            return;
+        }
+        if (roles.Any(row => row.Item.Mandatory)) { sampleError = $"{name} se preia mereu (titlul sau numărul tichetului) și nu poate fi detașată."; return; }
+        var gone = new List<string>();
+        foreach (var extra in extras.Where(extra => Same(extra.Table, extra.Column)).ToList()) { extras.Remove(extra); gone.Add(extra.Label); }
+        foreach (var row in roles.Where(row => row.Enabled)) { row.Enabled = false; gone.Add(row.Label); }
+        if (gone.Count > 0) sampleNote = $"{name} a fost detașată: {string.Join(", ", gone.Select(label => $"„{label}”"))} nu se mai preia.";
+    }
+
+    // A change in the list "Folosite": the description, the destination, the role (a free field becomes a piece of information and back) or the detaching.
+    private void EditFromSample(TicketSampleDialog.SampleEdit edit)
+    {
+        sampleError = null; sampleNote = null;
+        var row = fields?.FirstOrDefault(item => item.Item.Key == edit.Key && !item.Item.Mandatory);
+        var extra = extras.FirstOrDefault(item => item.Key == edit.Key);
+        if (row is null && extra is null) return;
+        if (edit.Detach)
+        {
+            if (extra is not null) { extras.Remove(extra); sampleNote = $"„{extra.Label}” a fost detașat."; }
+            else if (row is not null) { row.Enabled = false; sampleNote = $"„{row.Label}” a fost detașat."; }
+            return;
+        }
+        if (edit.Label is not null)
+        {
+            var label = edit.Label.Trim();
+            if (label.Length == 0) { sampleError = "Descrierea nu poate fi goală."; return; }
+            if (label.Length > ActivityFieldMap.MaximumLabel) label = label[..ActivityFieldMap.MaximumLabel];
+            if (extra is not null) extra.Label = label; else row!.Label = label;
+        }
+        if (edit.Target is not null && ActivityFieldMap.IsTarget(edit.Target))
+        {
+            if (extra is not null) extra.Target = edit.Target; else row!.Target = edit.Target;
+        }
+        if (edit.Role is not null)
+        {
+            if (extra is not null && edit.Role != "extra")
+            {
+                extras.Remove(extra);
+                AssignFromSample(new SampleAssignment(extra.Table, extra.Column, edit.Role));
+            }
+            else if (row is not null && row.Column is not null && row.FieldKey is not null && edit.Role == "extra")
+            {
+                var table = row.FieldKey.Split('.')[0];
+                row.Enabled = false;
+                extras.Add(new ExtraRow(table, row.Column, row.Label, row.Target));
+                sampleNote = $"{ActivityFieldMap.ColumnName(table, row.Column)} este acum câmp liber „{row.Label}”.";
+            }
+            else if (row is not null && row.Column is not null && row.FieldKey is not null && edit.Role != row.Item.Key)
+                AssignFromSample(new SampleAssignment(row.FieldKey.Split('.')[0], row.Column, edit.Role));
+        }
+    }
+
+    private void AssignFromSample(SampleAssignment choice)
     {
         sampleError = null; sampleNote = null;
         bool Same(string table, string column) => choice.Table.Equals(table, StringComparison.OrdinalIgnoreCase) && choice.Column.Equals(column, StringComparison.OrdinalIgnoreCase);

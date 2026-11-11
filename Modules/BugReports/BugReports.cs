@@ -326,10 +326,12 @@ public async Task<IReadOnlyList<BugReportAlert>> GetAlertsAsync(CancellationToke
         var now = DateTime.UtcNow;
         await using (var connection = await MariaDb.OpenAsync(configuration, cancellationToken).ConfigureAwait(false))
         await using (var command = new MySqlCommand("""
-            UPDATE bug_reports SET state=@state, admin_note=@note, updated_by=@by, updated_utc=@now,
+            UPDATE bug_reports SET resolved_version=CASE WHEN @state='Rezolvat' THEN IF(state='Rezolvat' AND resolved_version<>'', resolved_version, @version) ELSE '' END,
+              state=@state, admin_note=@note, updated_by=@by, updated_utc=@now,
               resolved_utc=CASE WHEN @state IN ('Rezolvat','Respins') THEN @now ELSE '' END WHERE id=@id
             """, connection))
         {
+            command.Parameters.AddWithValue("@version", AppVersion.Current);
             command.Parameters.AddWithValue("@state", state);
             command.Parameters.AddWithValue("@note", note);
             command.Parameters.AddWithValue("@by", user);

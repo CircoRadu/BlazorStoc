@@ -1,7 +1,17 @@
 namespace BlazorStoc.Services.Update;
 
 /// <summary>One version of Assets/Data/changelog.txt: what it brings, one line per change.</summary>
-public sealed record ChangelogVersion(string Version, string Date, IReadOnlyList<string> Items);
+public sealed record ChangelogVersion(string Version, string Date, IReadOnlyList<string> Items, IReadOnlyList<ChangelogSection>? Groups = null)
+{
+    /// <summary>The changes by category ("### Functionalitati noi", "### Bugs", "### Diverse"); a version written before the categories has one group without a name.</summary>
+    public IReadOnlyList<ChangelogSection> Sections => Groups ?? [new ChangelogSection("", Items)];
+
+    /// <summary>The version has categories (at least one group with a name).</summary>
+    public bool Grouped => Sections.Any(section => section.Name.Length > 0);
+}
+
+/// <summary>One category of a version: its name (empty for the lines written before the categories) and its lines.</summary>
+public sealed record ChangelogSection(string Name, IReadOnlyList<string> Items);
 
 /// <summary>
 /// The changelog of the update packages: Assets/Data/changelog.txt, embedded in the application ("## version | date", then one "- " line per change, newest
@@ -17,17 +27,22 @@ public static class UpdateChangelog
     public static IReadOnlyList<ChangelogVersion> Parse(string text)
     {
         var versions = new List<ChangelogVersion>();
-        string? version = null, date = "";
+        string? version = null, date = "", section = "";
         var items = new List<string>();
+        var groups = new List<(string Name, List<string> Items)>();
         void Close()
         {
-            if (version is not null) versions.Add(new ChangelogVersion(version, date ?? "", items.ToArray()));
+            if (version is not null)
+                versions.Add(new ChangelogVersion(version, date ?? "", items.ToArray(), groups.Any(group => group.Name.Length > 0) ? [.. groups.Where(group => group.Items.Count > 0).Select(group => new ChangelogSection(group.Name, group.Items.ToArray()))] : null));
             items = [];
+            groups = [];
+            section = "";
         }
         foreach (var raw in text.Split('\n'))
         {
             var line = raw.TrimEnd('\r').Trim();
             if (line.Length == 0 || line.StartsWith('#') && !line.StartsWith("##", StringComparison.Ordinal)) continue;
+            if (line.StartsWith("###", StringComparison.Ordinal) && version is not null) { section = line.TrimStart('#').Trim(); continue; }
             if (line.StartsWith("##", StringComparison.Ordinal))
             {
                 Close();
@@ -36,7 +51,13 @@ public static class UpdateChangelog
                 version = (bar < 0 ? heading : heading[..bar]).Trim();
                 date = bar < 0 ? "" : heading[(bar + 1)..].Trim();
             }
-            else if (version is not null && line.StartsWith('-')) items.Add(line.TrimStart('-').Trim());
+            else if (version is not null && line.StartsWith('-'))
+            {
+                var change = line.TrimStart('-').Trim();
+                items.Add(change);
+                if (groups.Count == 0 || groups[^1].Name != section) groups.Add((section, []));
+                groups[^1].Items.Add(change);
+            }
         }
         Close();
         return versions;
@@ -63,6 +84,10 @@ public static class UpdateChangelog
     public static string? NotesFor(IReadOnlyList<ChangelogVersion> versions, string version)
     {
         var entry = versions.FirstOrDefault(candidate => candidate.Version == version);
-        return entry is null || entry.Items.Count == 0 ? null : string.Join('\n', entry.Items.Select(item => "- " + item));
+        if (entry is null || entry.Items.Count == 0) return null;
+        // With categories the notes keep them: the name of the category on a line of its own, then its lines.
+        return entry.Grouped
+            ? string.Join('\n', entry.Sections.SelectMany(section => (section.Name.Length > 0 ? [section.Name + ":"] : Array.Empty<string>()).Concat(section.Items.Select(item => "- " + item))))
+            : string.Join('\n', entry.Items.Select(item => "- " + item));
     }
 }

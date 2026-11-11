@@ -53,16 +53,25 @@ function Run-Native([string]$What, [scriptblock]$Command) { & $Command; if ($LAS
 # A version without a section is refused before anything is built; the file is part of the published application, so it must be written first.
 $changelogFile = Join-Path $repo 'Assets\Data\changelog.txt'
 $changelogItems = @()
+$changelogLines = @()
 $inSection = $false
+$category = ''
+$writtenCategory = ''
 foreach ($line in [IO.File]::ReadAllLines($changelogFile, [Text.Encoding]::UTF8)) {
     if ($line -match '^##\s*([0-9]+\.[0-9]+\.[0-9]+)') { $inSection = ($Matches[1] -eq $Version); continue }
-    if ($inSection -and $line -match '^\s*-\s*(.+)$') { $changelogItems += ('- ' + $Matches[1].Trim()) }
+    # The categories of a version ("### Functionalitati noi", "### Bugs", "### Diverse") stay in the notes of the package as a line of their own before their changes.
+    if ($inSection -and $line -match '^###\s*(.+)$') { $category = $Matches[1].Trim(); continue }
+    if ($inSection -and $line -match '^\s*-\s*(.+)$') {
+        $changelogItems += ('- ' + $Matches[1].Trim())
+        if ($category -ne $writtenCategory) { $writtenCategory = $category; if ($category) { $changelogLines += ($category + ':') } }
+        $changelogLines += ('- ' + $Matches[1].Trim())
+    }
 }
 if ($changelogItems.Count -eq 0) { throw "Assets\Data\changelog.txt has no section '## $Version | date' with changes; write the changelog of this version first." }
 if (-not $NotesFile) {
     $NotesFile = Join-Path $repo "artifacts\release\notes-$Version.txt"
     New-Item -ItemType Directory -Force (Split-Path $NotesFile) | Out-Null
-    [IO.File]::WriteAllText($NotesFile, ($changelogItems -join "`n"), (New-Object Text.UTF8Encoding($false)))
+    [IO.File]::WriteAllText($NotesFile, ($changelogLines -join "`n"), (New-Object Text.UTF8Encoding($false)))
 }
 
 if (-not $SkipChecks) {

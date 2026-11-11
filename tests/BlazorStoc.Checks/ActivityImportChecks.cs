@@ -41,6 +41,37 @@ public static class ActivityImportChecks
         await BeneficiaryChecksSectionChecks.RunAsync(check);
         await PagedChecks.RunAsync(check);
         await LiveAsync(check);
+        await StructureLiveAsync(check);
+    }
+
+    // Against the permanent test database of the ActivityApp structure (tools\load-activityapp-test-db.ps1: every table of a real backup, Windows authentication), only when
+    // ACTIVITYAPP_STRUCTURE_SERVER names the server (ACTIVITYAPP_STRUCTURE_DATABASE, default ActivityApp_test): the real structure matches the contract, a column of any readable kind is read
+    // as a free field (the number, the date and the flag as the application writes them) and the example ticket comes with the CUI of the client. Skipped (no check) when the variable is absent.
+    private static async Task StructureLiveAsync(Action<bool, string> check)
+    {
+        var server = Environment.GetEnvironmentVariable("ACTIVITYAPP_STRUCTURE_SERVER");
+        if (string.IsNullOrWhiteSpace(server)) return;
+        var database = Environment.GetEnvironmentVariable("ACTIVITYAPP_STRUCTURE_DATABASE") ?? "ActivityApp_test";
+        var source = new SqlActivitySource();
+        var connection = new ActivityConnection(server, 1433, database, "", "", Integrated: true);
+        var ping = await source.PingAsync(connection, CancellationToken.None);
+        check(ping.Ok, "Activity structure (real copy): the test database opens");
+        var actual = await source.ReadStructureAsync(connection, CancellationToken.None);
+        var extras = new[] { new ActivityExtraField("Tickete", "ID", "ID Ticket", "both"), new ActivityExtraField("Tickete", "DataTicket", "Data tichet", "both"), new ActivityExtraField("Tickete", "Logat", "Logat", "both"), new ActivityExtraField("EvenimenteAgent", "EndTime", "Data inchidere", "notes") };
+        var map = ActivityFieldMap.Create(new Dictionary<string, string>(), null, null, extras, out _)!;
+        var report = ActivityStructureChecker.Check(actual, null, map);
+        check(report.Status != StructureStatus.Changed && report.Extras.Count == 4 && ActivityFieldMap.ReadableColumns(actual, "Tickete").Count > 20 && ActivityFieldMap.ReadableColumns(actual, "EvenimenteAgent").Count > 20,
+            "Activity structure (real copy): the structure of ActivityApp matches the contract and its number, date and flag columns can be free fields");
+        var types = await source.ReadTypesAsync(connection, report, CancellationToken.None);
+        var typeIds = types.Where(type => (type.Resolved ?? 0) > 0).Select(type => type.Id).ToList();
+        var tickets = await source.ReadTicketsAsync(connection, report, typeIds, new DateTime(2025, 1, 1), null, 50, CancellationToken.None);
+        var first = tickets.FirstOrDefault(ticket => ticket.Extras is not null);
+        check(first?.Extras is { } read && read["x:Tickete.ID"] == first.Id.ToString() && System.Text.RegularExpressions.Regex.IsMatch(read["x:Tickete.DataTicket"], @"^\d\d\.\d\d\.\d{4} \d\d:\d\d:\d\d$"),
+            "Activity structure (real copy): a free field on a number column and on a date column is read as the application writes it");
+        var view = await source.ReadTicketSampleAsync(connection, actual, report, typeIds, null, CancellationToken.None);
+        check(view is not null && view.Tables.Select(table => table.Table).SequenceEqual(["Tickete", "EvenimenteAgent", "Client"]) && view.Tables[2].Columns.Single().Column == "CodFiscal" && view.Tables[0].Columns.Any(column => column.OtherKind)
+            && ActivityTicketSampleRules.Preview(view, map).Notes.Contains("ID Ticket: " + view.TicketId, StringComparison.Ordinal),
+            "Activity structure (real copy): the example ticket has the lists of the ticket, of the event and of the client (its CUI), and the notes write description: value");
     }
 
     // Against a real SQL Server, only when ACTIVITYIMPORT_TEST_SERVER (and _DATABASE) name a database with the tables of the contract (the local SQLEXPRESS with a small copy):

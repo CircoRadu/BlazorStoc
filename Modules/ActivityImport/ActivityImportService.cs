@@ -510,7 +510,7 @@ public sealed class MariaActivityImportService(IConfiguration configuration, IDa
                 var available = ActivityFieldMap.TextColumns(actual, field.Table);
                 var current = map.ColumnOf(field);
                 return new ActivityFieldChoice(field, current, available, !available.Contains(current, StringComparer.OrdinalIgnoreCase));
-            })], null, map, ActivityFieldMap.ExtraTables.ToDictionary(table => table, table => ActivityFieldMap.TextColumns(actual, table)), pending);
+            })], null, map, ActivityFieldMap.ExtraTables.ToDictionary(table => table, table => ActivityFieldMap.ReadableColumns(actual, table)), pending);
         }
         catch (ActivitySourceException exception) { return new ActivityFieldMapView(Offline(), exception.Message, map, null, pending); }
     }

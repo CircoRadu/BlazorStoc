@@ -14,9 +14,13 @@
             {
                 <section class="changelog-version" aria-label="@($"Versiunea {entry.Version}")">
                     <h3>Versiunea @entry.Version @if (entry.Date.Length > 0) { <small class="muted">&nbsp;· @entry.Date</small> }</h3>
-                    <ul>
-                        @foreach (var item in entry.Items) { <li>@item</li> }
-                    </ul>
+                    @foreach (var group in entry.Sections)
+                    {
+                        @if (group.Name.Length > 0) { <h4 class="changelog-category">@group.Name</h4> }
+                        <ul>
+                            @foreach (var item in group.Items) { <li>@item</li> }
+                        </ul>
+                    }
                 </section>
             }
         }

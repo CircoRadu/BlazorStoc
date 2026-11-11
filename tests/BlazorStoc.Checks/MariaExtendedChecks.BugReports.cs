@@ -47,6 +47,20 @@ public static partial class MariaExtendedChecks
             Check(changed.State == BugReportRules.StateResolved && changed.ResolvedUtc is not null && changed.AdminNote == "Rezolvat in proba", "Bug report: the administrator changes the state with a note (Rezolvat records the time)");
 
             Check(await boss.CountOpenAsync() == openBefore - 1, "Bug report: a resolved report leaves the count of the badge");
+            async Task<string> ResolvedVersionAsync()
+            {
+                await using var read = new MySqlCommand("SELECT resolved_version FROM bug_reports WHERE id=@id", probe);
+                read.Parameters.AddWithValue("@id", report.Id);
+                return Convert.ToString(await read.ExecuteScalarAsync()) ?? "";
+            }
+            var firstVersion = await ResolvedVersionAsync();
+            await boss.ChangeStateAsync(report.Id, BugReportRules.StateResolved, "Rezolvat din nou");
+            var keptVersion = await ResolvedVersionAsync();
+            await boss.ChangeStateAsync(report.Id, BugReportRules.StateNew, "");
+            var clearedVersion = await ResolvedVersionAsync();
+            await boss.ChangeStateAsync(report.Id, BugReportRules.StateResolved, "Rezolvat si a treia oara");
+            Check(firstVersion == BlazorStoc.Services.AppVersion.Current && keptVersion == firstVersion && clearedVersion == "" && await ResolvedVersionAsync() == firstVersion,
+                "Bug report: a report that becomes Rezolvat records the version of the application (for the changelog), saving it again keeps it, and a report no longer resolved has none");
             var closedPage = await boss.QueryAsync(new BugReportQuery(User: "proba.rap", Closed: true), 1, 10);
             var openPage = await boss.QueryAsync(new BugReportQuery(User: "proba.rap", Closed: false), 1, 10);
             Check(closedPage.Items.Any(item => item.Id == report.Id) && openPage.Items.All(item => item.Id != report.Id), "Bug report: the tabs split resolved/rejected reports from the unresolved ones");

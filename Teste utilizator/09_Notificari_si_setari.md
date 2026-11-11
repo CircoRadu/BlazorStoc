@@ -481,3 +481,11 @@ Pasi:
 | 6 | Autentifica-te prin adresa https | Login reuseste, sesiunea se pastreaza, paginile se incarca fara reconectari | |
 | 7 | Deschide direct `http://ip-vm:port` din alt calculator | Autentificarea nu reuseste (cookie Secure): accesul se face doar prin proxy | |
 | 8 | Opreste comutatorul, salveaza, reporneste | Aplicatia functioneaza din nou pe HTTP direct | |
+
+## Modificari de testat - changelog pe categorii (11.11.2026, versiunea 0.5.72, PROP-0019)
+
+**Ce s-a adaugat:** versiunile noi din changelog se impart in Functionalitati noi, Bugs si Diverse; migrarea 87 adauga versiunea de rezolvare a rapoartelor de eroare; scriptul tools/changelog-draft.ps1 listeaza PROP/BUG-urile versiunii.
+**Ce face acum:** Setari -> Actualizare -> Istoric -> iconita changelog arata categoriile cu titlu pentru versiunea 0.5.72; versiunile vechi raman plate.
+
+1. Deschide Istoric -> "Vezi changelog" pentru 0.5.72: apar cele trei categorii. Pentru 0.5.71 lista ramane simpla.
+2. Treci un raport de eroare pe Rezolvat, apoi ruleaza tools/changelog-draft.ps1 -Version 0.5.72: raportul apare sub Bugs (BUG-xxxx).

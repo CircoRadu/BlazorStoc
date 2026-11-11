@@ -98,7 +98,7 @@
 
         @if (opened is not null)
         {
-            <AppDialog Size="AppDialogSize.L" Title="@($"{opened.Number} · {opened.Title}")" TitleId="bug-detail-title" HelpTopic="raportare-eroare" HelpAbout="Rapoarte de eroare" OnClose="RequestClose" PanelClass="bug-detail">
+            <AppDialog Size="AppDialogSize.L" Floating="AnnotatorView" Title="@($"{opened.Number} · {opened.Title}")" TitleId="bug-detail-title" HelpTopic="raportare-eroare" HelpAbout="Rapoarte de eroare" OnClose="RequestClose" PanelClass="bug-detail">
                 <div id="bug-detail" class="catalog-body">
                     <dl class="bug-facts">
                         <dt>Gravitate</dt><dd>@opened.Severity</dd>
@@ -113,7 +113,7 @@
                         @foreach (var picture in pictures)
                         {
                             var shown = picture;
-                            <figure class="bug-image"><button type="button" class="bug-image-zoom" aria-label="Mărește imaginea @shown.Name" title="Mărește imaginea @shown.Name" @onclick="() => zoomed = shown"><img src="@shown.Url" alt="@shown.Name" /><span class="bug-zoom-plus" aria-hidden="true">+</span></button><figcaption>@shown.Name</figcaption></figure>
+                            <figure class="bug-image"><button type="button" class="bug-image-zoom" aria-label="Mărește imaginea @shown.Name" title="@(editing ? "Marchează zone pe imaginea " + shown.Name : "Mărește imaginea " + shown.Name)" @onclick="() => OpenPicture(shown)"><img src="@shown.Url" alt="@shown.Name" /><span class="bug-zoom-plus" aria-hidden="true">+</span></button><figcaption>@shown.Name</figcaption></figure>
                         }
                     </div>
                     <CollapsibleSection Id="bug-detail-tech" RootClass="bug-help" HeaderRowClass="collapsible-header" ToggleClass="bug-help-toggle" ContentClass="bug-help-body" Expanded="false">
@@ -137,7 +137,7 @@
                             {
                                 var item = image;
                                 <figure class="bug-image">
-                                    <img src="@item.DataUrl" alt="@item.Name" />
+                                    <button type="button" class="bug-image-zoom" aria-label="Marchează zone pe imaginea @item.Name" title="Deschide imaginea mărită și marchează zone" @onclick="() => annotating = new Marking(item.Id, item.Name, item.DataUrl)"><img src="@item.DataUrl" alt="@item.Name" /><span class="bug-zoom-plus" aria-hidden="true">+</span></button>
                                     <figcaption>@item.Name</figcaption>
                                     <button type="button" class="row-icon delete" aria-label="Scoate imaginea @item.Name" title="Scoate imaginea @item.Name" disabled="@busy" @onclick="() => added.Remove(item)"></button>
                                 </figure>
@@ -243,12 +243,37 @@
     // Editing the content (BUG-0014): the title and the description can be corrected and more pictures added (the ones already there stay); saved with the state.
     private string editTitle = "", editDescription = "";
     private readonly List<NewImage> added = [];
-    private sealed record NewImage(string Name, byte[] Bytes, string ContentType)
+    private sealed class NewImage(string name, byte[] bytes, string contentType, string? source = null)
     {
+        public string Id { get; } = Guid.NewGuid().ToString("N");
+        public string Name { get; private set; } = name;
+        public byte[] Bytes { get; private set; } = bytes;
+        public string ContentType { get; private set; } = contentType;
+        /// <summary>Key of the saved picture this one is a marked copy of (null: a picture chosen from a file).</summary>
+        public string? Source { get; } = source;
         public string DataUrl => $"data:{ContentType};base64,{Convert.ToBase64String(Bytes)}";
+        public void Replace(byte[] marked, string type) { Bytes = marked; ContentType = type; Name = Path.ChangeExtension(Name, ".jpg"); }
     }
 
-    private void StartEditing(BugReport report) { editing = true; newState = report.State; note = report.AdminNote; editTitle = report.Title; editDescription = report.Description; added.Clear(); }
+    // Marking zones over a picture while editing (the picture of the report stays as it is: the marked copy is added as a new picture, saved with the rest).
+    private sealed record Marking(string Id, string Label, string Src);
+    private Marking? annotating;
+    private RenderFragment? AnnotatorView => annotating is not { } shown ? null : @<ImageAnnotator @key="shown.Id" ImageId="@shown.Id" Label="@shown.Label" Src="@shown.Src" MaxBytes="BugReportRules.MaxImageBytes" Applied="AppliedAsync" Closed="() => annotating = null" />;
+    private void OpenPicture(Picture picture)
+    {
+        if (!editing) { zoomed = picture; return; }
+        annotating = new Marking("saved-" + pictures.IndexOf(picture), picture.Name, picture.Url);
+    }
+    private Task AppliedAsync((string ImageId, byte[] Bytes, string ContentType) marked)
+    {
+        if (added.FirstOrDefault(item => item.Id == marked.ImageId || item.Source == marked.ImageId) is { } existing) { existing.Replace(marked.Bytes, marked.ContentType); return Task.CompletedTask; }
+        if (pictures.Count + added.Count >= BugReportRules.MaxImages) { error = $"Poți avea cel mult {BugReportRules.MaxImages} imagini."; return Task.CompletedTask; }
+        var name = annotating?.Label ?? "imagine";
+        added.Add(new NewImage("marcata-" + Path.GetFileNameWithoutExtension(name) + ".jpg", marked.Bytes, marked.ContentType, marked.ImageId));
+        return Task.CompletedTask;
+    }
+
+    private void StartEditing(BugReport report) { editing = true; newState = report.State; note = report.AdminNote; editTitle = report.Title; editDescription = report.Description; added.Clear(); annotating = null; }
     private bool ContentChanged => opened is not null && (editTitle.Trim() != opened.Title || editDescription.Trim() != opened.Description || added.Count > 0);
 
     private async Task OnAddFilesAsync(InputFileChangeEventArgs args)
@@ -295,11 +320,11 @@
         catch (Exception exception) when (exception is AccessDeniedException or ModuleUnavailableException) { error = exception.Message; }
     }
 
-    private void CloseDetail() { opened = null; pictures = []; zoomed = null; editing = false; confirmDiscard = false; added.Clear(); }
+    private void CloseDetail() { opened = null; pictures = []; zoomed = null; editing = false; confirmDiscard = false; added.Clear(); annotating = null; }
     private bool Dirty => editing && opened is not null && (newState != opened.State || note != opened.AdminNote || ContentChanged);
     private void RequestClose() { if (Dirty) confirmDiscard = true; else CloseDetail(); }
     private void BeginEdit() { if (!canEdit || opened is null) return; StartEditing(opened); }
-    private void CancelEdit() { if (Dirty && !confirmDiscard) { confirmDiscard = true; return; } editing = false; confirmDiscard = false; added.Clear(); if (opened is not null) { newState = opened.State; note = opened.AdminNote; } }
+    private void CancelEdit() { if (Dirty && !confirmDiscard) { confirmDiscard = true; return; } editing = false; confirmDiscard = false; added.Clear(); annotating = null; if (opened is not null) { newState = opened.State; note = opened.AdminNote; } }
     private Task ExportRowAsync(BugReport report) => RunAsync(() => ExportAsync([report.Id]), "Exportul nu a putut fi făcut.");
     private void AskDelete(BugReport report) { deleting = report; deletingAll = false; error = notice = null; }
 
@@ -325,7 +350,7 @@
         if (ContentChanged)
         {
             current = await Reports.UpdateContentAsync(current.Id, editTitle, editDescription, [.. added.Select(item => new BugReportImage(BugReportRules.KindFile, item.Name, item.Bytes))], lifetime.Token);
-            added.Clear();
+            added.Clear(); annotating = null;
             await LoadPicturesAsync(current);
             contentSaved = true;
         }

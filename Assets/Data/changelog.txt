@@ -1,3 +1,17 @@
+## 0.5.72 | 11.11.2026
+### Funcționalități noi
+- PROP-0016
+- PROP-0019
+- Șablonarea preluării tichetelor din ActivityApp (Setări → Preluare ActivityApp, „Tichet exemplu”): liste pliabile Tichet, Eveniment și Client cu toate coloanele și comutator „Folosit” (oprit implicit); lista „Folosite” cu descriere, rol, destinație și detașare; coloane de orice tip (număr, dată, da/nu) ca câmpuri libere; CUI-ul clientului se preia mereu; în observații apare „descriere: valoare”
+- Editarea unui raport de eroare sau a unei propuneri permite marcarea de zone peste imaginile salvate și adăugate; fereastra de marcare are zoom (−, +, Potrivește, Ctrl + rotița mouse-ului)
+- Changelog-ul versiunilor noi este împărțit în Funcționalități noi, Bugs și Diverse (versiunile vechi rămân neschimbate)
+### Bugs
+- BUG-0016
+- Butonul de ajutor din bara ferestrelor este un buton dreptunghiular „Ajutor”, nu o pictogramă mică; ferestrele cu titlul scris în conținut nu mai au rând gol sus (titlul și ajutorul stau în bară)
+### Diverse
+- Baza de date a rapoartelor de eroare păstrează versiunea aplicației în care a fost rezolvat un raport (migrarea 87)
+- Fereastra „Tichet exemplu”: lista coloanelor, valorile și sumarul se actualizează imediat la fiecare schimbare
+
 ## 0.5.71 | 10.11.2026
 - Taskuri: fereastra „Taskuri noi primite” (bară roșie) apare la autentificare dacă ai taskuri nepreluate și, cât timp sesiunea e deschisă, în momentul în care administratorul îți adaugă un task
 - Preluarea este obligatorie: fereastra nu se închide cu Escape, din fundal sau din buton, iar „Închide” devine activ abia după ce toate taskurile sunt preluate (preluare pe rând sau „Preia toate”)

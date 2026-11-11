@@ -98,34 +98,54 @@ public static class ActivityFieldSettingsChecks
     private static void SampleWindow(Action<bool, string> check)
     {
         using var context = new BunitContext();
+        context.JSInterop.Mode = JSRuntimeMode.Loose;
         context.Services.AddSingleton<IActivityTicketVisibility>(new Visibility(TicketVisibility.All));
-        TicketSampleDialog.SampleAssignment? chosen = null;
+        TicketSampleDialog.SampleToggle? toggled = null;
+        TicketSampleDialog.SampleEdit? edited = null;
         int older = 0, newer = 0;
         var map = ActivityFieldMap.Create(new Dictionary<string, string>(), null, null, [new ActivityExtraField("Tickete", "Observatii", "Observații client", "both")], new Dictionary<string, string> { [ActivityFieldMap.Problem] = "Defect" }, out _)!;
         var targets = ActivityFieldMap.Info.Where(item => item.FieldKey is not null).Select(item => new TicketSampleDialog.SampleTarget(item.Key, map.LabelOf(item.Key), item.FieldKey!.Split('.')[0])).ToList();
-        var cut = context.Render<TicketSampleDialog>(parameters => parameters.Add(p => p.Sample, Sample()).Add(p => p.Map, map).Add(p => p.Targets, targets).Add(p => p.HasNewer, false)
+        var sample = Sample();
+        sample = sample with { Tables = [.. sample.Tables, new SampleTable("Client", [new SampleColumn("CodFiscal", "nvarchar", "RO123", true)])] };
+        var used = new List<TicketSampleDialog.SampleUsed>
+        {
+            new(ActivityFieldMap.Title, "Tickete", "Subject", "Tichet – Subject", "Titlul tichetului", "notes", ActivityFieldMap.Title, true, "Se preia mereu"),
+            new(ActivityFieldMap.Problem, "Tickete", "DescriptionInternal", "Tichet – DescriptionInternal", "Defect", "both", ActivityFieldMap.Problem),
+            new("x:Tickete.Observatii", "Tickete", "Observatii", "Tichet – Observatii", "Observații client", "both", "extra"),
+            new("client-cui", "Client", "CodFiscal", "Client – CodFiscal", "CUI client", "notes", "client", true, "Se preia automat pentru persoane juridice")
+        };
+        var cut = context.Render<TicketSampleDialog>(parameters => parameters.Add(p => p.Sample, sample).Add(p => p.Map, map).Add(p => p.Targets, targets).Add(p => p.Used, used).Add(p => p.HasNewer, false)
             .Add(p => p.Older, EventCallback.Factory.Create(new object(), () => older++)).Add(p => p.Newer, EventCallback.Factory.Create(new object(), () => newer++))
-            .Add(p => p.Assign, EventCallback.Factory.Create<TicketSampleDialog.SampleAssignment>(new object(), value => chosen = value)));
+            .Add(p => p.Toggle, EventCallback.Factory.Create<TicketSampleDialog.SampleToggle>(new object(), value => toggled = value))
+            .Add(p => p.Edit, EventCallback.Factory.Create<TicketSampleDialog.SampleEdit>(new object(), value => edited = value)));
         check(cut.Find("#ticket-sample-info").TextContent.Contains("Tichet 9", StringComparison.Ordinal) && cut.FindAll("#ticket-sample-Tickete tbody tr").Count == 7 && cut.FindAll("#ticket-sample-EvenimenteAgent tbody tr").Count == 1
               && cut.Find("#ticket-sample-Tickete").TextContent.Contains("Poarta inchisa", StringComparison.Ordinal),
             "Example ticket window: every column of the ticket and of its event is listed with its value");
+        check(cut.FindAll("#ticket-sample-group-Tickete-content").Count == 1 && cut.FindAll("#ticket-sample-group-EvenimenteAgent-content").Count == 1 && cut.FindAll("#ticket-sample-group-Client-content").Count == 1 && cut.Find("#ticket-sample-Client").TextContent.Contains("RO123", StringComparison.Ordinal),
+            "Example ticket window: the columns are in collapsible lists, one for the ticket, one for the event and one for the client (its CUI)");
         var table = cut.Find("#ticket-sample-preview").TextContent;
-        check(table.Contains("Defect", StringComparison.Ordinal) && table.Contains("Nu merge aerul", StringComparison.Ordinal) && table.Contains("Observații client", StringComparison.Ordinal) && cut.Find("#ticket-sample-notes").TextContent.Contains("Defect: Nu merge aerul", StringComparison.Ordinal),
-            "Example ticket window: it shows what each piece gets (under the names chosen) and the notes that would be written");
+        check(table.Contains("Defect", StringComparison.Ordinal) && table.Contains("Nu merge aerul", StringComparison.Ordinal) && table.Contains("Observații client", StringComparison.Ordinal) && cut.Find("#ticket-sample-notes").TextContent.Contains("Defect: N", StringComparison.Ordinal),
+            "Example ticket window: it shows what each piece gets (under the names chosen) and the notes that would be written as description: value");
         check(cut.Find("#ticket-sample-Tickete").TextContent.Contains("Defect", StringComparison.Ordinal) && cut.Find("#ticket-sample-Tickete").TextContent.Contains("Observații client", StringComparison.Ordinal),
-            "Example ticket window: the column in use shows which piece (or extra field) reads it");
+            "Example ticket window: the column in use shows which piece (or free field) reads it");
         check(!cut.Find("#ticket-sample-older").HasAttribute("disabled") && cut.Find("#ticket-sample-newer").HasAttribute("disabled"), "Example ticket window: the previous ticket can be asked for, the newer one only after going back");
         cut.Find("#ticket-sample-older").Click();
-        cut.Find("button[aria-label='Alege pentru ce folosești coloana Detalii']").Click();
-        cut.Find("select[aria-label='Folosește coloana Detalii pentru']").Change("problem");
-        check(older == 1 && chosen is { Table: "Tickete", Column: "Detalii", For: "problem" }, "Example ticket window: the previous ticket button and the choice of a column for a piece are passed on");
-        cut.Find("button[aria-label='Alege pentru ce folosești coloana DescriptionInternal']").Click();
-        cut.Find("select[aria-label='Folosește coloana DescriptionInternal pentru']").Change("extra");
-        check(chosen is { For: "problem" } && cut.FindAll("#ticket-sample-extra").Count == 1, "Example ticket window: a new extra field asks first for its name and destination");
-        cut.Find("#ticket-sample-extra-name").Input("Descriere veche");
-        cut.Find("#ticket-sample-extra-add").Click();
-        check(chosen is { For: "extra", Name: "Descriere veche", Target: "both", Column: "DescriptionInternal" } && cut.FindAll("#ticket-sample-extra").Count == 0 && cut.FindAll("[aria-label*='coloana ID ']").Count == 0,
-            "Example ticket window: a column can become an extra field with the name typed, and a column without text cannot be chosen");
+        check(older == 1 && cut.Find("#ticket-sample-used-count").TextContent == "4" && cut.FindAll("#ticket-sample-used tbody tr").Count == 4, "Example ticket window: the used columns are listed, with the title and the client CUI always there");
+        // The list of the used ones: the description, the destination and the role are edited there, a column is detached from there, and the locked ones have nothing to press.
+        cut.Find("input[aria-label='Descrierea pentru Tichet – Observatii']").Change("Cerere client");
+        check(edited is { Key: "x:Tickete.Observatii", Label: "Cerere client" }, "Example ticket window: the description of a used column is edited in the list and passed on");
+        cut.Find("select[aria-label='Se atașează ca: Observații client']").Change("separate");
+        check(edited is { Key: "x:Tickete.Observatii", Target: "separate" }, "Example ticket window: the destination of a used column is changed in the list");
+        cut.Find("select[aria-label='Rolul coloanei Tichet – Observatii']").Change(ActivityFieldMap.Executor);
+        check(edited is { Key: "x:Tickete.Observatii", Role: "executor" }, "Example ticket window: a free field can take the role of a piece of information");
+        cut.Find("button[aria-label='Detașează Observații client']").Click();
+        check(edited is { Key: "x:Tickete.Observatii", Detach: true } && cut.FindAll("button[aria-label='Detașează Titlul tichetului']").Count == 0 && cut.FindAll("button[aria-label='Detașează CUI client']").Count == 0,
+            "Example ticket window: a used column is detached from the list, and the title and the client CUI cannot be");
+        // The lists: a column is switched on with its toggle (all are off by default); the title and the client CUI cannot be switched off.
+        cut.Find("#ticket-sample-Tickete [aria-label='Folosește coloana Detalii']").Change(true);
+        check(toggled is { Table: "Tickete", Column: "Detalii", On: true }, "Example ticket window: switching a column on is passed on");
+        check(cut.Find("#ticket-sample-Tickete [aria-label='Folosește coloana Subject']").HasAttribute("disabled") && cut.Find("#ticket-sample-Client [aria-label='Folosește coloana CodFiscal']").HasAttribute("disabled"),
+            "Example ticket window: the title and the client CUI cannot be switched off");
     }
 
     private static void Map(Action<bool, string> check)
@@ -243,9 +263,13 @@ public static class ActivityFieldSettingsChecks
         var report = ActivityStructureChecker.Check(actual, null, map);
         check(report.Extras.Select(extra => extra.Key).SequenceEqual(["x:Tickete.Observatii", "x:EvenimenteAgent.Rezumat"]) && report.Issues.Any(issue => issue.Problem.StartsWith("coloana aleasă pentru „Altceva” lipsește", StringComparison.Ordinal)),
             "Ticket fields: the extra fields whose column exists are read, one that is gone is reported like a chosen column that is gone");
-        var wrong = ActivityFieldMap.Create(new Dictionary<string, string>(), null, null, [new("Tickete", "NumarMasina", "Număr", "both")], out _)!;
-        check(ActivityStructureChecker.Check(actual, null, wrong).Issues.Any(issue => issue.Problem.Contains("nu are text", StringComparison.Ordinal)) && ActivityStructureChecker.Check(actual, null, wrong).Extras.Count == 0,
-            "Ticket fields: an extra field whose column holds no text is not read and is reported");
+        var number = ActivityFieldMap.Create(new Dictionary<string, string>(), null, null, [new("Tickete", "NumarMasina", "Număr", "both")], out _)!;
+        check(ActivityStructureChecker.Check(actual, null, number).Extras.Select(extra => extra.Key).SequenceEqual(["x:Tickete.NumarMasina"]) && ActivityStructureChecker.Check(actual, null, number).Issues.All(issue => !issue.Problem.Contains("Număr", StringComparison.Ordinal)),
+            "Ticket fields: an extra field may read a column of any readable kind (a number here), not only text");
+        IReadOnlyList<ActivityColumn> withBinary = [.. actual, new("Tickete", "Poza", "varbinary")];
+        var binary = ActivityFieldMap.Create(new Dictionary<string, string>(), null, null, [new("Tickete", "Poza", "Poza", "both")], out _)!;
+        check(ActivityStructureChecker.Check(withBinary, null, binary).Issues.Any(issue => issue.Problem.Contains("nu poate fi citit", StringComparison.Ordinal)) && ActivityStructureChecker.Check(withBinary, null, binary).Extras.Count == 0,
+            "Ticket fields: an extra field whose column is binary is not read and is reported");
     }
 
     private sealed class Visibility(TicketVisibility value) : IActivityTicketVisibility

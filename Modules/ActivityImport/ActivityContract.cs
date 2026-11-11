@@ -146,16 +146,16 @@ public static class ActivityStructureChecker
                 issues.Add(new(field.Table, field.Column, table.Entity, match is null ? "coloana aleasă pentru „" + field.Label + "” lipsește" : "coloana aleasă pentru „" + field.Label + "” nu are text",
                     "text", match?.DataType ?? "—", false));
         }
-        // The extra fields: a column of the tickets or of their events, read as text. One that is gone (or no longer text) stops the run like a chosen column does.
+        // The extra fields: a column of the tickets or of their events, of any readable kind (text, number, date, flag), read as text. One that is gone (or no longer text) stops the run like a chosen column does.
         var extras = new List<ResolvedExtra>();
         foreach (var extra in fields?.Extras ?? [])
         {
             var table = contract.FirstOrDefault(item => item.Name == extra.Table);
             var match = actual.FirstOrDefault(item => item.Table.Equals(extra.Table, StringComparison.OrdinalIgnoreCase) && item.Column.Equals(extra.Column, StringComparison.OrdinalIgnoreCase));
-            if (table is not null && match is not null && ActivityContract.KindOf(match.DataType) == ColumnKind.Text) extras.Add(new ResolvedExtra(extra.Key, extra.Table, match.Column));
+            if (table is not null && match is not null && ActivityContract.KindOf(match.DataType) is not null) extras.Add(new ResolvedExtra(extra.Key, extra.Table, match.Column));
             else if (table is not null)
-                issues.Add(new(extra.Table, extra.Column, table.Entity, match is null ? "coloana aleasă pentru „" + extra.Label + "” lipsește" : "coloana aleasă pentru „" + extra.Label + "” nu are text",
-                    "text", match?.DataType ?? "—", false));
+                issues.Add(new(extra.Table, extra.Column, table.Entity, match is null ? "coloana aleasă pentru „" + extra.Label + "” lipsește" : "coloana aleasă pentru „" + extra.Label + "” are un tip care nu poate fi citit",
+                    "text, număr, dată sau da/nu", match?.DataType ?? "—", false));
         }
         var blocked = issues.Where(issue => issue.Required).Select(issue => issue.Entity).ToHashSet(StringComparer.Ordinal);
         var status = blocked.Count > 0 ? StructureStatus.Changed : issues.Count > 0 ? StructureStatus.Partial : StructureStatus.Ok;

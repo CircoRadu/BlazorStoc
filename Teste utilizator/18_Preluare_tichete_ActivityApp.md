@@ -292,3 +292,14 @@ Pasi: Notificari -> Tichete de validat -> Arata tichetele discardate -> iconita 
 | 6 | Deruleaza la sfarsitul ferestrei | Sumar: informatie, citita din, valoare, merge in; apoi observatiile intervenției | |
 | 7 | In ActivityApp (test) adauga o coloana in Tickete, apoi ruleaza sincronizarea | Preluarea tichetelor nu mai preia nimic; Notificari: "Structura tichetelor..." cu coloanele noi; Jurnal: "Suspendare preluare ActivityApp: structura schimbata" o singura data | |
 | 8 | Setari -> Preluare ActivityApp -> "Corespondenta verificata", apoi sincronizare | Preluarea se reia, tichetele ramase se preiau in ordinea datelor, notificarea dispare | |
+
+## Modificari de testat - sablonarea preluarii tichetului (11.11.2026, versiunea 0.5.72, BUG-0017)
+
+**Ce s-a adaugat:** fereastra "Tichet exemplu" (Setari -> Preluare ActivityApp, sectiunea 6) are listele pliabile Tichet / Eveniment / Client cu toate coloanele, fiecare cu comutatorul "Folosit" (oprit implicit), lista "Folosite" cu descriere, rol, destinatie si detasare, coloane de orice tip (numar, data, da/nu) ca campuri libere si CUI-ul clientului mereu preluat.
+**Ce face acum:** o coloana pornita intra in lista "Folosite"; observatiile tichetului arata "descriere: valoare"; sumarul si observatiile se actualizeaza imediat; titlul, numarul si CUI-ul clientului nu pot fi detasate.
+
+1. Deschide Setari -> Preluare ActivityApp -> sectiunea 6 -> "Deschide tichetul exemplu". Verifica cele trei liste pliabile (Tichet, Eveniment, Client) si ca toate comutatoarele "Folosit" sunt oprite, in afara de titlu, numar si CUI.
+2. Porneste "Folosit" la o coloana numerica (ex. IDClient) si la una de data (ex. StartTime): apar in "Folosite" si in observatii ca "IDClient: ...", "StartTime: 02.11.2026 12:30:00".
+3. Schimba descrierea in lista "Folosite" (ex. "ID client"): observatiile arata "ID client: valoare".
+4. La o coloana text alege alt rol din lista "Rol" (ex. Problema): informatia se muta pe coloana, cu mesaj; "Detaseaza" (cosul) scoate coloana din folosite.
+5. Inchide fereastra, "Salveaza corespondenta", reincarca pagina: campurile libere si rolurile s-au pastrat.

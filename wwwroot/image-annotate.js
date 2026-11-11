@@ -138,6 +138,37 @@ window.imageAnnotate = (() => {
                 await apply(editor, state);
             }
         };
+        // Zoom (the picture was too small to see what is marked): 1 = fits the window; more = larger, the body of the window scrolls. The zones are fractions, so they follow the picture.
+        let zoom = 1;
+        const setZoom = (value) => {
+            zoom = Math.min(8, Math.max(1, Math.round(value * 100) / 100));
+            stage.style.width = zoom === 1 ? "" : `${zoom * 100}%`;
+            stage.style.maxWidth = zoom === 1 ? "" : "none";
+            image.style.width = zoom === 1 ? "" : "100%";
+            image.style.maxWidth = zoom === 1 ? "" : "none";
+            const label = root.querySelector("[data-annotator-zoom-label]");
+            if (label) label.textContent = `${Math.round(zoom * 100)}%`;
+            const out = root.querySelector("[data-annotator-zoom-out]"), fit = root.querySelector("[data-annotator-zoom-fit]"), inn = root.querySelector("[data-annotator-zoom-in]");
+            if (out) out.disabled = zoom <= 1;
+            if (fit) fit.disabled = zoom === 1;
+            if (inn) inn.disabled = zoom >= 8;
+        };
+        const zoomClick = (event) => {
+            const button = event.target instanceof Element ? event.target.closest("[data-annotator-zoom-in], [data-annotator-zoom-out], [data-annotator-zoom-fit]") : null;
+            if (!button) return;
+            if (button.hasAttribute("data-annotator-zoom-in")) setZoom(zoom * 1.5);
+            else if (button.hasAttribute("data-annotator-zoom-out")) setZoom(zoom / 1.5);
+            else setZoom(1);
+        };
+        const wheel = (event) => {
+            if (!event.ctrlKey) return;
+            event.preventDefault();
+            setZoom(event.deltaY < 0 ? zoom * 1.25 : zoom / 1.25);
+        };
+        const scroller = root.querySelector(".annotator-body");
+        root.addEventListener("click", zoomClick);
+        if (scroller) scroller.addEventListener("wheel", wheel, { passive: false });
+        setZoom(1);
         const keys = async (event) => {
             if (event.key === "Delete" && state.zones.length > 0 && !(event.target instanceof Element && event.target.closest("input, textarea, select, [contenteditable]"))) {
                 state.zones.pop();
@@ -153,7 +184,8 @@ window.imageAnnotate = (() => {
         root.addEventListener("keydown", keys);
         editor.cleanup = () => {
             stage.removeEventListener("pointerdown", down); stage.removeEventListener("pointermove", move); stage.removeEventListener("pointerup", up); stage.removeEventListener("pointercancel", up);
-            root.removeEventListener("click", click); root.removeEventListener("keydown", keys);
+            root.removeEventListener("click", click); root.removeEventListener("keydown", keys); root.removeEventListener("click", zoomClick);
+            if (scroller) scroller.removeEventListener("wheel", wheel);
         };
     };
 

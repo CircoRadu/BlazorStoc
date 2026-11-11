@@ -135,13 +135,30 @@
 // name in the same bar (BUG-0015). Called by AppDialog after each render; one call per window, no observer.
 window.appDialog = {
     syncTitle(panel, headingId) {
-        if (!panel || !headingId) return;
+        if (!panel) return;
         const bar = panel.querySelector(":scope > .app-dialog-grip");
-        const heading = document.getElementById(headingId);
+        // A window with no id for its title (BUG-0016): the first heading that sits in a head row inside the content.
+        const heading = headingId ? document.getElementById(headingId) : panel.querySelector(".app-dialog-body :is(.catalog-heading, .dialog-head, .map-panel-heading) > :is(h1, h2, h3, h4)");
         if (!bar || !heading || !panel.contains(heading)) return;
         const text = (heading.textContent || "").trim();
         let title = bar.querySelector(".app-dialog-grip-title");
         if (!title) { title = document.createElement("span"); title.className = "app-dialog-grip-title"; bar.appendChild(title); }
         if (text) { title.textContent = text; heading.classList.add("app-dialog-title-moved"); }
+        // The help icon written next to the heading goes into the bar too (PROP-0016): a copy in the bar (wwwroot/help.js listens for [data-help-topic] on the whole page), the original hidden.
+        const holder = heading.parentElement;
+        if (!holder) return;
+        for (const icon of holder.querySelectorAll(".help-icon[data-help-topic]")) {
+            const topic = icon.getAttribute("data-help-topic") || "";
+            if (!bar.querySelector(".help-icon[data-moved-for]")) {
+                const copy = icon.cloneNode(true);
+                copy.classList.remove("app-dialog-help-moved");
+                copy.setAttribute("data-moved-for", topic);
+                bar.appendChild(copy);
+            }
+            icon.classList.add("app-dialog-help-moved");
+        }
+        const spent = (node) => node === heading || node.classList.contains("app-dialog-help-moved") || getComputedStyle(node).display === "none"   // the closing button of the head is hidden by the round one in the bar
+            || (node.classList.contains("heading-actions") && node.children.length > 0 && Array.from(node.children).every(spent));
+        holder.classList.toggle("app-dialog-head-empty", Array.from(holder.children).every(spent));
     }
 };

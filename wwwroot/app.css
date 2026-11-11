@@ -1822,10 +1822,13 @@ html.app-dialog-adjusting, html.app-dialog-adjusting * { user-select:none !impor
 .app-dialog-panel > .app-dialog-head::before, .app-dialog-panel > .app-dialog-grip::before { content:""; flex:none; width:12px; height:12px; background:var(--green);
     -webkit-mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='5 9 2 12 5 15'/%3E%3Cpolyline points='9 5 12 2 15 5'/%3E%3Cpolyline points='15 19 12 22 9 19'/%3E%3Cpolyline points='19 9 22 12 19 15'/%3E%3Cline x1='2' y1='12' x2='22' y2='12'/%3E%3Cline x1='12' y1='2' x2='12' y2='22'/%3E%3C/svg%3E") center/contain no-repeat; mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='5 9 2 12 5 15'/%3E%3Cpolyline points='9 5 12 2 15 5'/%3E%3Cpolyline points='15 19 12 22 9 19'/%3E%3Cpolyline points='19 9 22 12 19 15'/%3E%3Cline x1='2' y1='12' x2='22' y2='12'/%3E%3Cline x1='12' y1='2' x2='12' y2='22'/%3E%3C/svg%3E") center/contain no-repeat; }
 .app-dialog-panel > .app-dialog-head > h2, .app-dialog-grip-title { margin:0; flex:1 1 auto; min-width:0; font-size:12.5px; font-weight:600; line-height:1; color:var(--ink); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-.app-dialog-panel > .app-dialog-head .help-icon { width:16px; height:16px; }
-.app-dialog-panel > .app-dialog-head .help-icon::before { width:10px; height:10px; }
 .app-dialog-panel > .app-dialog-head button.refresh { height:20px; min-height:0; padding:0 8px; font-size:11px; line-height:1; }
 .app-dialog-title-moved { display:none !important; }
+.app-dialog-help-moved, .app-dialog-head-empty { display:none !important; }
+/* The help in the bar of a window is a small rectangular button "Ajutor" (icon + word), not a bare icon. */
+.app-dialog-panel > :is(.app-dialog-head, .app-dialog-grip) .help-icon { width:auto; height:20px; min-height:0; padding:0 10px 0 24px; border-radius:6px; margin-left:auto; cursor:pointer; font-family:inherit; font-size:11.5px; font-weight:600; line-height:18px; white-space:nowrap; }
+.app-dialog-panel > :is(.app-dialog-head, .app-dialog-grip) .help-icon::before { inset:0 auto 0 7px; margin:auto 0; width:12px; height:12px; }
+.app-dialog-panel > :is(.app-dialog-head, .app-dialog-grip) .help-icon::after { content:"Ajutor"; }
 .dialog-head:has(> .app-dialog-title-moved):not(:has(> :not(.app-dialog-title-moved))), .catalog-heading:has(> .app-dialog-title-moved):not(:has(> :not(.app-dialog-title-moved))) { display:none; }
 .app-dialog-panel.help-panel .help-body { padding:8px 24px 28px; }
 .app-dialog-panel.help-panel .help-search { padding:8px 24px 0; }
@@ -1839,3 +1842,6 @@ html.app-dialog-adjusting, html.app-dialog-adjusting * { user-select:none !impor
 .app-dialog-panel.app-dialog-tone-alert > .app-dialog-head:hover { border-bottom-color:var(--c-a3241b); }
 .new-tasks-gate-note { margin:0 0 12px; }
 .new-tasks-gate-error { margin:0 0 12px; }
+.annotator-zoom { display:inline-flex; align-items:center; gap:6px; }
+.annotator-body { overflow:auto; }
+.changelog-category { margin:14px 0 4px; font-size:13px; font-weight:700; color:var(--green); }

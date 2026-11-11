@@ -5,7 +5,14 @@ namespace BlazorStoc.Modules.ActivityImport;
 // shown. The most recent finished ticket first; "the previous one" is the next older ticket.
 
 /// <summary>One column of a table of ActivityApp with its value for the ticket shown (null = empty). IsText: a column that can be chosen for a piece of information or an extra field.</summary>
-public sealed record SampleColumn(string Column, string DataType, string? Value, bool IsText);
+public sealed record SampleColumn(string Column, string DataType, string? Value, bool IsText)
+{
+    /// <summary>A column of another readable kind (number, date, flag): it can be a free field with a description, not one of the texts (problem, report ...).</summary>
+    public bool OtherKind { get; init; }
+
+    /// <summary>The column can be used: as a text or as a free field.</summary>
+    public bool Readable => IsText || OtherKind;
+}
 
 public sealed record SampleTable(string Table, IReadOnlyList<SampleColumn> Columns);
 

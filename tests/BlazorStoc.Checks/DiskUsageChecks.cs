@@ -37,6 +37,14 @@ public static class DiskUsageChecks
         check(dialogRazor.Contains("data-app-dialog-resize") && dialogJs.Contains("data-app-dialog-resize") && dialogJs.Contains(".app-dialog-head") && !dialogJs.Contains("MutationObserver"), "PROP-0007: windows move by the head and resize by the bottom-right handle only, without observers");
         var diskPanel = File.ReadAllText(Path.Combine(Root(), "Components", "Shared", "DiskUsagePanel.razor"));
         check(diskPanel.Contains("id=\"disk-total\"") && File.ReadAllText(Path.Combine(Root(), "Services", "DiskUsage.cs")).Contains("PathBytes"), "BUG-0013: the total of the application and the figure of the partition come from the same per-folder sizes");
+        var dialogScript = File.ReadAllText(Path.Combine(Root(), "wwwroot", "app-dialog.js"));
+        var appDialogRazor = File.ReadAllText(Path.Combine(Root(), "Components", "Shared", "AppDialog.razor"));
+        check(dialogScript.Contains("app-dialog-help-moved") && dialogScript.Contains("app-dialog-head-empty") && dialogScript.Contains(".app-dialog-body :is(.catalog-heading, .dialog-head, .map-panel-heading)") && appDialogRazor.Contains("string.IsNullOrEmpty(LabelledBy) ? null : LabelledBy"),
+            "BUG-0016 / PROP-0016: the heading row written inside a window disappears (title and help icon go into the bar), also for a window that has no id for its title");
+        var panelsText = File.ReadAllText(Path.Combine(Root(), "Components", "Shared", "BugReportsPanel.razor")) + File.ReadAllText(Path.Combine(Root(), "Modules", "Proposals", "ProposalsPanel.razor"));
+        var annotatorRazor = File.ReadAllText(Path.Combine(Root(), "Components", "Shared", "ImageAnnotator.razor"));
+        check(panelsText.Split("Floating=\"AnnotatorView\"").Length == 3 && panelsText.Contains("OpenPicture(shown)") && panelsText.Contains("new Marking(item.Id") && annotatorRazor.Contains("data-annotator-zoom-in") && File.ReadAllText(Path.Combine(Root(), "wwwroot", "image-annotate.js")).Contains("setZoom"),
+            "The editing of a report and of a proposal can mark zones over the saved and the added pictures, and the window of marking can zoom the picture");
         var annotateJs = File.ReadAllText(Path.Combine(Root(), "wwwroot", "image-annotate.js"));
         check(annotateJs.Contains("MAX_ZONES = 10") && annotateJs.Contains("annotator-remove") && !annotateJs.Contains("MutationObserver") && File.ReadAllText(Path.Combine(Root(), "Components", "Shared", "BugReportDialog.razor")).Contains("<ImageAnnotator") && File.ReadAllText(Path.Combine(Root(), "Modules", "Proposals", "ProposalDialog.razor")).Contains("<ImageAnnotator"), "PROP-0009: both forms mark zones (at most 10, deletable only) in the floating window of the picture");
         foreach (var panel in new[] { Path.Combine("Modules", "Proposals", "ProposalsPanel.razor"), Path.Combine("Components", "Shared", "BugReportsPanel.razor") })

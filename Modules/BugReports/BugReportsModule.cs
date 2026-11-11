@@ -10,7 +10,7 @@ public sealed class BugReportsModule : IModule
 
     public string Id => ModuleId;
     public string Name => "Raportare erori";
-    public Version Version { get; } = new(1, 4, 1);
+    public Version Version { get; } = new(1, 4, 2);
     // The entry above "Ajutor" is written in MainLayout (it opens a popup, it is not a page), so the module has no NavItems.
     public IReadOnlyList<ModuleNavItem> Nav { get; } = [];
 

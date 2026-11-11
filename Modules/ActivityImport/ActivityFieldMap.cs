@@ -250,6 +250,10 @@ public sealed class ActivityFieldMap
     public static IReadOnlyList<string> TextColumns(IReadOnlyList<ActivityColumn> actual, string table) =>
         [.. actual.Where(column => column.Table.Equals(table, StringComparison.OrdinalIgnoreCase) && ActivityContract.KindOf(column.DataType) == ColumnKind.Text).Select(column => column.Column).Order(StringComparer.OrdinalIgnoreCase)];
 
+    /// <summary>The columns of a table that can be a free field (text, number, date or flag), as the structure read found them.</summary>
+    public static IReadOnlyList<string> ReadableColumns(IReadOnlyList<ActivityColumn> actual, string table) =>
+        [.. actual.Where(column => column.Table.Equals(table, StringComparison.OrdinalIgnoreCase) && ActivityContract.KindOf(column.DataType) is not null).Select(column => column.Column).Order(StringComparer.OrdinalIgnoreCase)];
+
     /// <summary>A short text for the journal: what differs from the default, or "—" (all default).</summary>
     public string Describe()
     {

@@ -84,8 +84,8 @@ else
     // The title of a window that writes it in its content goes into the bar of the window (wwwroot/app-dialog.js).
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        if (HasTitle || !ShowGrip || string.IsNullOrEmpty(LabelledBy)) return;
-        try { await JS.InvokeVoidAsync("appDialog.syncTitle", panel, LabelledBy); }
+        if (HasTitle || !ShowGrip) return;   // without LabelledBy the script looks for the heading of the head written inside the content
+        try { await JS.InvokeVoidAsync("appDialog.syncTitle", panel, string.IsNullOrEmpty(LabelledBy) ? null : LabelledBy); }
         catch (Exception exception) when (exception is JSException or InvalidOperationException or TaskCanceledException or JSDisconnectedException) { }
     }
 

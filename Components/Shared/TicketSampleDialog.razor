@@ -1,7 +1,8 @@
 @using BlazorStoc.Modules.ActivityImport
-@* Setari -> Preluare ActivityApp, secțiunea 6: un tichet real din ActivityApp cu toate coloanele lui și valorile, ca să se vadă ce conține fiecare coloană. Deasupra: ce primește fiecare informație
-   (și cum ar arăta observațiile) cu setările de pe ecran, chiar nesalvate. Fiecare coloană cu text se poate alege direct pentru o informație sau ca nou câmp suplimentar. Nimic din tichet nu se
-   păstrează: se citește la cerere și se arată. *@
+@* Setari -> Preluare ActivityApp, secțiunea 6: șablonarea preluării tichetului. Un tichet real din ActivityApp cu toate coloanele lui și valorile (listele pliabile Tichet, Eveniment și Client);
+   fiecare coloană are un comutator „Folosit” (implicit oprit). O coloană pornită intră în lista „Folosite”, unde primește o descriere (în observații apare „descriere: valoare”), o destinație
+   și, pentru text, un rol (problemă, raport, executant sau câmp liber). Dedesubt: ce primește fiecare informație și cum ar arăta observațiile cu setările de pe ecran, chiar nesalvate.
+   Nimic din tichet nu se păstrează: se citește la cerere și se arată. *@
 <AppDialog OnClose="() => Close.InvokeAsync()" PanelClass="template-popup review-popup ticket-sample" OnKeyDown="Key" LabelledBy="ticket-sample-title">
         <div class="catalog-heading"><h2 id="ticket-sample-title">Tichet exemplu @Sample.Number @Sample.Title</h2><span class="heading-actions"><HelpButton Topic="setari-tichet-exemplu" About="Tichetul exemplu" /><button type="button" class="danger" @onclick="() => Close.InvokeAsync()">Închide</button></span></div>
         @if (Error is not null) { <div class="error-banner" role="alert">@Error</div> }
@@ -10,49 +11,91 @@
             <button type="button" class="refresh act-nav" id="ticket-sample-newer" disabled="@(Busy || !HasNewer)" title="Înapoi la tichetul afișat înainte" @onclick="() => Newer.InvokeAsync()">Tichet mai nou</button>
             <span class="muted" id="ticket-sample-info">Tichet @Sample.TicketId@(Sample.TicketDate is { } date ? " din " + date.ToString("dd.MM.yyyy HH:mm") : "")@(Busy ? " · se încarcă…" : "")</span>
         </div>
-        <p class="muted"><small>Dacă acest tichet are puține date, apasă „Tichet anterior”. Valorile sunt cele din ActivityApp; nimic din acest tichet nu se păstrează în BlazorStoc.</small></p>
+        <p class="muted"><small>Dacă acest tichet are puține date, apasă „Tichet anterior”. Valorile sunt cele din ActivityApp; nimic din acest tichet nu se păstrează în BlazorStoc. Pornește comutatorul „Folosit” al unei coloane ca să o preiei; oprește-l ca să o detașezi.</small></p>
 
         @if (Note is not null) { <div class="info-banner" role="status" id="ticket-sample-note">@Note</div> }
 
-        @foreach (var table in Sample.Tables)
+        <h3>Folosite <span class="count-badge" id="ticket-sample-used-count">@Used.Count</span></h3>
+        <p class="muted"><small>Ce se preia din tichet, cu descrierea cu care apare în observații („descriere: valoare”), destinația și, pentru text, rolul în BlazorStoc. Titlul, numărul și CUI-ul clientului se preiau mereu.</small></p>
+        @if (Used.Count == 0) { <p class="muted" id="ticket-sample-used-empty">Nu este folosită nicio coloană.</p> }
+        else
         {
-            <h3>@table.Table</h3>
-            <div class="table-scroll"><table class="catalog-table" id="@($"ticket-sample-{table.Table}")">
-                <thead><tr><th>Coloana</th><th>Tip</th><th>Valoare</th><th>Folosit pentru</th><th>Folosește pentru</th></tr></thead>
+            <div class="table-scroll"><table class="catalog-table" id="ticket-sample-used">
+                <thead><tr><th>Descriere</th><th>Citit din</th><th>Valoare din acest tichet</th><th>Rol</th><th>Se atașează ca</th><th>Operații</th></tr></thead>
                 <tbody>
-                @foreach (var column in table.Columns)
+                @foreach (var item in Used)
                 {
-                    <tr>
-                        <td>@column.Column</td>
-                        <td>@column.DataType</td>
-                        <td class="review-text">@(column.Value is { Length: > 0 } value ? value : "—")</td>
-                        <td>@UsedByCached(table.Table, column.Column)</td>
+                    var used = item;
+                    <tr @key="used.Key">
                         <td>
-                            @if (column.IsText)
+                            @if (used.Locked) { <span>@used.Label</span> }
+                            else { <input aria-label="@($"Descrierea pentru {used.Source}")" maxlength="@ActivityFieldMap.MaximumLabel" value="@used.Label" disabled="@Busy" @onchange="args => Edit.InvokeAsync(new SampleEdit(used.Key, Label: args.Value?.ToString() ?? string.Empty))" autocomplete="off" /> }
+                        </td>
+                        <td>@(used.Source.Length > 0 ? used.Source : "din raport și problemă")</td>
+                        <td class="review-text">@ValueOfUsed(used)</td>
+                        <td>
+                            @if (used.Locked) { <span>@RoleText(used.Role)</span> }
+                            else if (RoleChoices(used).Count > 0)
                             {
-                                @if (editing == (table.Table, column.Column))
-                                {
-                                    <select aria-label="@($"Folosește coloana {column.Column} pentru")" value="" disabled="@Busy" @onchange="args => Choose(table.Table, column.Column, args.Value?.ToString())" @onblur="StopEditing">
-                                        <option value="">— alege —</option>
-                                        @foreach (var target in TargetsOf(table.Table)) { <option value="@target.Key">@ActivityFieldMap.TablePrefix(table.Table) – @target.Label</option> }
-                                        @foreach (var extra in Extras)
-                                        {
-                                            <option value="@("x:" + extra.Key)">@ActivityFieldMap.TablePrefix(extra.Table) – @extra.Label (câmp suplimentar@(Extras.Count(other => other.Label == extra.Label) > 1 ? ", " + extra.Column : ""))</option>
-                                        }
-                                        <option value="extra">+ Câmp suplimentar nou…</option>
-                                    </select>
-                                }
-                                else
-                                {
-                                    <button type="button" class="refresh act-confirm" disabled="@Busy" aria-label="@($"Alege pentru ce folosești coloana {column.Column}")" @onclick="() => StartEditing(table.Table, column.Column)">Alege…</button>
-                                }
+                                <select aria-label="@($"Rolul coloanei {used.Source}")" disabled="@Busy" value="@used.Role" @onchange="args => Edit.InvokeAsync(new SampleEdit(used.Key, Role: args.Value?.ToString()))">
+                                    <option value="extra">Câmp liber</option>
+                                    @foreach (var target in RoleChoices(used)) { <option value="@target.Key">@target.Label</option> }
+                                </select>
                             }
-                            else { <span class="muted">nu are text</span> }
+                            else { <span>@RoleText(used.Role)</span> }
+                        </td>
+                        <td>
+                            @if (used.Locked) { <span>@(used.Why.Length > 0 ? used.Why : "În observații și titlu")</span> }
+                            else
+                            {
+                                <select aria-label="@($"Se atașează ca: {used.Label}")" disabled="@Busy" value="@used.Target" @onchange="args => Edit.InvokeAsync(new SampleEdit(used.Key, Target: args.Value?.ToString()))">
+                                    <option value="@ActivityFieldMap.Notes">În observații</option>
+                                    <option value="@ActivityFieldMap.Separate">Câmp separat</option>
+                                    <option value="@ActivityFieldMap.Both">Observații și câmp separat</option>
+                                </select>
+                            }
+                        </td>
+                        <td>
+                            @if (used.Locked) { <span class="muted" title="@used.Why">mereu</span> }
+                            else { <button type="button" class="row-icon delete" aria-label="@($"Detașează {used.Label}")" title="@($"Detașează {used.Label}: coloana nu se mai folosește")" disabled="@Busy" @onclick="() => Edit.InvokeAsync(new SampleEdit(used.Key, Detach: true))"></button> }
                         </td>
                     </tr>
                 }
                 </tbody>
             </table></div>
+        }
+
+        @foreach (var table in Sample.Tables)
+        {
+            var current = table;
+            <CollapsibleSection Id="@($"ticket-sample-group-{current.Table}")" Expanded="true" RootClass="bug-help" HeaderRowClass="collapsible-header" ToggleClass="bug-help-toggle" ContentClass="bug-help-body">
+                <Header>@GroupName(current.Table) <span class="count-badge">@current.Columns.Count</span></Header>
+                <ChildContent>
+                    <div class="table-scroll"><table class="catalog-table" id="@($"ticket-sample-{current.Table}")">
+                        <thead><tr><th>Coloana</th><th>Tip</th><th>Valoare</th><th>Folosit pentru</th><th>Folosit</th></tr></thead>
+                        <tbody>
+                        @foreach (var column in current.Columns)
+                        {
+                            <tr>
+                                <td>@column.Column</td>
+                                <td>@column.DataType</td>
+                                <td class="review-text">@(column.Value is { Length: > 0 } value ? value : "—")</td>
+                                <td>@UsedByCached(current.Table, column.Column)</td>
+                                <td>
+                                    @if (column.Readable)
+                                    {
+                                        <ToggleSwitch Compact Value="IsUsed(current.Table, column.Column)" Disabled="@(Busy || IsLocked(current.Table, column.Column))" OnText="Pornit" OffText="Oprit"
+                                                      AriaLabel="@($"Folosește coloana {column.Column}")" Title="@(IsLocked(current.Table, column.Column) ? "Se preia mereu: nu poate fi detașată" : null)"
+                                                      ValueChanged="on => Toggle.InvokeAsync(new SampleToggle(current.Table, column.Column, on))" />
+                                    }
+                                    else { <span class="muted">nu poate fi citită</span> }
+                                </td>
+                            </tr>
+                        }
+                        </tbody>
+                    </table></div>
+                </ChildContent>
+            </CollapsibleSection>
         }
 
         <h3>Sumar: ce se preia din ActivityApp</h3>
@@ -79,58 +122,45 @@
         }
 </AppDialog>
 
-@if (adding is { } add)
-{
-    <AppDialog PanelClass="template-popup" OnKeyDown="AddKey" LabelledBy="ticket-sample-extra-title" OnClose="CancelAdd">
-            <div class="catalog-heading"><h2 id="ticket-sample-extra-title">Câmp suplimentar nou</h2></div>
-            <div class="catalog-body">
-                <p class="muted"><small>Coloana <strong>@ActivityFieldMap.ColumnName(add.Table, add.Column)</strong> se preia ca un câmp separat, sub numele ales. Numele nu trebuie să fie unic.</small></p>
-                <div class="anaf-grid">
-                    <label>Nume afișat<input id="ticket-sample-extra-name" aria-label="Numele câmpului suplimentar" maxlength="@ActivityFieldMap.MaximumLabel" value="@addName" @oninput="TypeName" autocomplete="off" /></label>
-                    <label>Se atașează ca
-                        <select aria-label="Se atașează câmpul suplimentar ca" @bind="addTarget">
-                            <option value="@ActivityFieldMap.Notes">În observații</option>
-                            <option value="@ActivityFieldMap.Separate">Câmp separat</option>
-                            <option value="@ActivityFieldMap.Both">Observații și câmp separat</option>
-                        </select>
-                    </label>
-                </div>
-                <div class="editor-actions">
-                    <button type="button" class="refresh act-confirm" id="ticket-sample-extra-add" disabled="@(addName.Trim().Length == 0)" @onclick="ConfirmAdd">Adaugă câmpul</button>
-                    <button type="button" class="refresh act-close" @onclick="CancelAdd">Renunță</button>
-                </div>
-            </div>
-    </AppDialog>
-}
-
 @code {
     /// <summary>An information that is read from a column: its key, its name and the table the column is in.</summary>
     public sealed record SampleTarget(string Key, string Label, string Table);
 
-    /// <summary>The column chosen in the window: the table, the column and what it is chosen for (the key of an information; "x:" and the key of an extra field already there, which moves to the column;
-    /// or "extra" for a new extra field, with its Name and Target).</summary>
-    public sealed record SampleAssignment(string Table, string Column, string For, string Name = "", string Target = "");
+    /// <summary>A column that is used: the key (a role of BlazorStoc or "x:" and the key of a free field), the column, the description shown in the notes, the destination and the role ("extra", a role, or
+    /// "title", "number", "client"). Locked: taken always, it cannot be detached (Why says why).</summary>
+    public sealed record SampleUsed(string Key, string Table, string Column, string Source, string Label, string Target, string Role, bool Locked = false, string Why = "");
+
+    /// <summary>A column switched on or off in its list.</summary>
+    public sealed record SampleToggle(string Table, string Column, bool On);
+
+    /// <summary>A change of a used element: its description, its destination, its role, or its detaching.</summary>
+    public sealed record SampleEdit(string Key, string? Label = null, string? Target = null, string? Role = null, bool Detach = false);
 
     [Parameter, EditorRequired] public TicketSample Sample { get; set; } = null!;
-    /// <summary>What the last choice changed besides the column itself (an information that gave its column up).</summary>
+    /// <summary>What the last change did besides the change itself (an information that gave its column up).</summary>
     [Parameter] public string? Note { get; set; }
     [Parameter] public ActivityFieldMap? Map { get; set; }
     [Parameter] public string? Problem { get; set; }
     [Parameter] public IReadOnlyList<SampleTarget> Targets { get; set; } = [];
+    [Parameter] public IReadOnlyList<SampleUsed> Used { get; set; } = [];
     [Parameter] public bool HasNewer { get; set; }
     [Parameter] public bool Busy { get; set; }
     [Parameter] public string? Error { get; set; }
     [Parameter] public EventCallback Older { get; set; }
     [Parameter] public EventCallback Newer { get; set; }
     [Parameter] public EventCallback Close { get; set; }
-    [Parameter] public EventCallback<SampleAssignment> Assign { get; set; }
+    [Parameter] public EventCallback<SampleToggle> Toggle { get; set; }
+    [Parameter] public EventCallback<SampleEdit> Edit { get; set; }
 
     private SamplePreview? preview;
     private Dictionary<string, string> usedBy = [];
     private Dictionary<string, List<SampleTarget>> targetsByTable = [];
+    private HashSet<string> usedColumns = [], lockedColumns = [];
     private string signature = "";
     private TicketSample? lastSample;
     private bool dirty = true;
+
+    private static string ColumnKey(string table, string column) => table.ToLowerInvariant() + "\u0001" + column.ToLowerInvariant();
 
     // The parent rebuilds Map and Targets on every one of its renders, which would re-send this whole window
     // (hundreds of rows with a list each) over the connection each time; it is drawn again only when what it shows changed.
@@ -138,14 +168,16 @@
     {
         preview = Map is null ? null : ActivityTicketSampleRules.Preview(Sample, Map);
         targetsByTable = Targets.GroupBy(item => item.Table).ToDictionary(group => group.Key, group => group.ToList());
+        usedColumns = [.. Used.Where(item => item.Column.Length > 0).Select(item => ColumnKey(item.Table, item.Column))];
+        lockedColumns = [.. Used.Where(item => item.Locked && item.Column.Length > 0).Select(item => ColumnKey(item.Table, item.Column))];
         usedBy = [];
         foreach (var table in Sample.Tables)
             foreach (var column in table.Columns)
-                if (column.IsText) usedBy[table.Table + "\u0001" + column.Column] = UsedBy(table.Table, column.Column);
+                if (column.Readable) usedBy[table.Table + "\u0001" + column.Column] = UsedBy(table.Table, column.Column);
         var text = new System.Text.StringBuilder();
         text.Append(Busy).Append('|').Append(Error).Append('|').Append(Problem).Append('|').Append(HasNewer).Append('|').Append(Sample.Number).Append('|').Append(Sample.Title).Append('|').Append(Sample.TicketId);
         text.Append('|').Append(Note);
-        foreach (var extra in Extras) text.Append('|').Append(extra.Key).Append(':').Append(extra.Label);
+        foreach (var item in Used) text.Append('|').Append(item.Key).Append('=').Append(item.Column).Append('=').Append(item.Label).Append('=').Append(item.Target).Append('=').Append(item.Role);
         foreach (var target in Targets) text.Append('|').Append(target.Key).Append(':').Append(target.Label);
         foreach (var pair in usedBy) text.Append('|').Append(pair.Key).Append('=').Append(pair.Value);
         if (preview is not null)
@@ -166,9 +198,31 @@
         return true;
     }
 
-    private IReadOnlyList<SampleTarget> TargetsOf(string table) => targetsByTable.TryGetValue(table, out var list) ? list : [];
+    private bool IsUsed(string table, string column) => usedColumns.Contains(ColumnKey(table, column));
+
+    private bool IsLocked(string table, string column) => lockedColumns.Contains(ColumnKey(table, column));
+
+    private static string GroupName(string table) => table switch { "Tickete" => "Tichet", "EvenimenteAgent" => "Eveniment", "Client" => "Client", _ => table };
 
     private string UsedByCached(string table, string column) => usedBy.TryGetValue(table + "\u0001" + column, out var text) ? text : "—";
+
+    // The roles a text column of a table can have besides a free field (the pieces of information read from a column of that table).
+    private IReadOnlyList<SampleTarget> RoleChoices(SampleUsed used) =>
+        used.Column.Length > 0 && Sample.Tables.FirstOrDefault(table => table.Table == used.Table)?.Columns.FirstOrDefault(column => column.Column.Equals(used.Column, StringComparison.OrdinalIgnoreCase)) is { IsText: true }
+            && targetsByTable.TryGetValue(used.Table, out var list) ? [.. list.Where(item => ActivityFieldMap.ItemOf(item.Key)?.Mandatory != true)] : [];
+
+    private static string RoleText(string role) => role switch
+    {
+        "extra" => "Câmp liber", "title" => "Titlul tichetului", "number" => "Numărul tichetului", "client" => "CUI client", ActivityFieldMap.Problem => "Problema", ActivityFieldMap.Resolution => "Rezolvarea",
+        ActivityFieldMap.Report => "Raportul original", ActivityFieldMap.Executor => "Executantul", _ => role
+    };
+
+    private string ValueOfUsed(SampleUsed used)
+    {
+        if (preview?.Items.FirstOrDefault(item => item.Key == used.Key) is { } item && item.Target != "oprit") return item.Value.Length > 0 ? item.Value : "—";
+        var value = Sample.Tables.FirstOrDefault(table => table.Table == used.Table)?.Columns.FirstOrDefault(column => column.Column.Equals(used.Column, StringComparison.OrdinalIgnoreCase))?.Value;
+        return string.IsNullOrEmpty(value) ? "—" : value;
+    }
 
     private static string TargetText(string target) => target switch
     {
@@ -192,46 +246,5 @@
         return names.Count == 0 ? "—" : string.Join(", ", names);
     }
 
-    // Only the row being chosen for draws its list; the other rows show a button, so the window stays light.
-    private (string Table, string Column)? editing;
-
-    private void StartEditing(string table, string column) { editing = (table, column); dirty = true; }
-
-    private void StopEditing() { if (editing is null) return; editing = null; dirty = true; }
-
-    private IReadOnlyList<ActivityExtraField> Extras => Map?.Extras ?? [];
-
-    private Task Choose(string table, string column, string? value)
-    {
-        editing = null;
-        dirty = true;
-        if (string.IsNullOrEmpty(value)) return Task.CompletedTask;
-        if (value == "extra")
-        {
-            adding = (table, column);
-            addName = column; addTarget = ActivityFieldMap.Both;
-            return Task.CompletedTask;
-        }
-        return Assign.InvokeAsync(new SampleAssignment(table, column, value));
-    }
-
-    // The window of a new extra field: the column is the one chosen, the name and the destination are typed here.
-    private (string Table, string Column)? adding;
-    private string addName = "", addTarget = ActivityFieldMap.Both;
-
-    private void TypeName(ChangeEventArgs args) { addName = args.Value?.ToString() ?? ""; dirty = true; }
-
-    private void CancelAdd() { adding = null; dirty = true; }
-
-    private Task ConfirmAdd()
-    {
-        if (adding is not { } add || addName.Trim().Length == 0) return Task.CompletedTask;
-        adding = null;
-        dirty = true;
-        return Assign.InvokeAsync(new SampleAssignment(add.Table, add.Column, "extra", addName.Trim(), addTarget));
-    }
-
-    private Task AddKey(KeyboardEventArgs args) { if (args.Key == "Escape") CancelAdd(); return Task.CompletedTask; }
-
-    private Task Key(KeyboardEventArgs args) => args.Key == "Escape" && adding is null ? Close.InvokeAsync() : Task.CompletedTask;
+    private Task Key(KeyboardEventArgs args) => args.Key == "Escape" ? Close.InvokeAsync() : Task.CompletedTask;
 }
