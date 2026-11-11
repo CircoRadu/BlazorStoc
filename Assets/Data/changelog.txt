@@ -1,3 +1,15 @@
+## 0.5.73 | 11.11.2026
+### Funcționalități noi
+- PROP-0020
+- Descărcarea pachetelor de backup din Setări → Backup: iconiță pe fiecare pachet; un pachet cu fișierul de sumă de control vine într-o arhivă, unul aflat doar pe NAS este adus întâi pe server; fiecare descărcare apare în jurnal.
+- Listele paginate se pot ordona din antet (Beneficiari, Utilizatori, Notificări, Balanțe Elcomtur, Analize de risc, Facturi, Contracte și intervenții de mentenanță, Rapoarte, Propuneri, Puncte de lucru și altele); mărimea paginii și ordonarea se rețin cât rămâne deschis tabul browserului.
+### Bugs
+- BUG-0018 · Antetul tuturor tabelelor are același aspect, iar listele (Beneficiari, Utilizatori, Notificări, Balanțe Elcomtur, Analize de risc, Facturi, Contracte și intervenții de mentenanță, Rapoarte, Propuneri și altele) se pot ordona din antet; mărimea paginii și ordonarea se rețin cât rămâne deschis tabul browserului.
+- BUG-0019 · În fereastra „Tichet exemplu”, titlul și numărul tichetului se pot citi din orice coloană text a tichetului (alegere în lista „Folosite” și rolurile „Titlul/Numărul tichetului”).
+- BUG-0020 · Butonul „+” de lângă „Analizor de risc” este centrat pe linia câmpului, iar fereastra „Raportează o eroare” nu mai are taburi („Rapoartele mele” este un buton).
+### Diverse
+- Antetul tuturor tabelelor are același font și aceeași culoare (reguli globale în loc de reguli pe fiecare tabel).
+
 ## 0.5.72 | 11.11.2026
 ### Funcționalități noi
 - PROP-0016
@@ -5,6 +17,7 @@
 - Șablonarea preluării tichetelor din ActivityApp (Setări → Preluare ActivityApp, „Tichet exemplu”): liste pliabile Tichet, Eveniment și Client cu toate coloanele și comutator „Folosit” (oprit implicit); lista „Folosite” cu descriere, rol, destinație și detașare; coloane de orice tip (număr, dată, da/nu) ca câmpuri libere; CUI-ul clientului se preia mereu; în observații apare „descriere: valoare”
 - Editarea unui raport de eroare sau a unei propuneri permite marcarea de zone peste imaginile salvate și adăugate; fereastra de marcare are zoom (−, +, Potrivește, Ctrl + rotița mouse-ului)
 - Changelog-ul versiunilor noi este împărțit în Funcționalități noi, Bugs și Diverse (versiunile vechi rămân neschimbate)
+- Puncte de lucru arondate (componente ale unui punct de lucru, de exemplu clădirile unei școli): popup cu nume și iconițe + pentru coordonate GPS, adresă, telefon și persoană de contact, fiecare editabilă și ștergibilă (ultima locație rămâne); căutarea extinsă a beneficiarilor le caută; pin separat pe harta mentenanței; notificare de verificare la importul ActivityApp pentru puncte cu nume asemănător; nota „Preluat din ActivityApp” pe beneficiar (migrarea 88)
 ### Bugs
 - BUG-0016
 - Butonul de ajutor din bara ferestrelor este un buton dreptunghiular „Ajutor”, nu o pictogramă mică; ferestrele cu titlul scris în conținut nu mai au rând gol sus (titlul și ajutorul stau în bară)

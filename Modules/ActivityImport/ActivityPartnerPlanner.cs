@@ -216,6 +216,29 @@ public static class ActivityPartnerPlanner
         return plans;
     }
 
+    /// <summary>The "entity" of the open problem that tells the administrator a work point of ActivityApp looks like an attached work point added by hand (see <see cref="PlanAttachedChecks"/>).</summary>
+    public const string AttachedSimilarEntity = "attached-similar";
+
+    /// <summary>
+    /// A verification notice, never a refusal: for each work point of ActivityApp whose beneficiary is known, the attached work points (components added by hand to the work points of
+    /// that beneficiary) whose name looks like its name (<see cref="AttachedWorkPointRules.Similar"/>). The import goes on whatever this finds; the administrator decides if it is the same place.
+    /// </summary>
+    /// <param name="beneficiaryOf">ActivityApp partner id → beneficiary id in BlazorStoc.</param>
+    /// <param name="attachedOf">Beneficiary id → its attached work points (name, name of the work point they belong to).</param>
+    public static IReadOnlyList<(string Entity, long SourceId, string Name, string Message)> PlanAttachedChecks(IReadOnlyList<PointPlan> points, IReadOnlyDictionary<long, int> beneficiaryOf,
+        IReadOnlyDictionary<int, IReadOnlyList<(string Name, string WorkPointName)>> attachedOf)
+    {
+        var found = new List<(string Entity, long SourceId, string Name, string Message)>();
+        foreach (var point in points.OrderBy(item => item.SourceId))
+        {
+            if (!beneficiaryOf.TryGetValue(point.PartnerId, out var beneficiary) || !attachedOf.TryGetValue(beneficiary, out var attached)) continue;
+            foreach (var item in attached.Where(candidate => AttachedWorkPointRules.Similar(point.Name, candidate.Name)))
+                found.Add((AttachedSimilarEntity, point.SourceId, point.Name,
+                    $"Punctul de lucru «{point.Name}» din ActivityApp seamănă cu punctul arondat «{item.Name}» al punctului de lucru «{item.WorkPointName}» (beneficiar nr. {beneficiary}). Verifică dacă este aceeași locație; importul nu a fost oprit."));
+        }
+        return found;
+    }
+
     // The name of the point: the objective when it has one, else the place and the street.
     internal static string ActivityPointName(ActivityWorkPointRow point)
     {

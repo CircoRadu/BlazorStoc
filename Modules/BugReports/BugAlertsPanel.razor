@@ -15,8 +15,8 @@
     }
     else
     {
-        <Paged Items="alerts" Id="bug-alerts-size" Context="pageRows" DefaultSize="10">
-            <div class="table-scroll"><table id="bug-alerts-table"><thead><tr><th>NUMĂR</th><th>TITLU</th><th>GRAVITATE</th><th>MOTIV</th><th>AUTOR</th><th>TRIMIS</th><th><span class="sr-only">Acțiuni</span></th></tr></thead><tbody>
+        <Paged Items="alerts" Id="bug-alerts-size" Context="pageRows" DefaultSize="10" Sorts="Sorts">
+            <div class="table-scroll"><table id="bug-alerts-table"><thead><tr><SortTh Key="number">NUMĂR</SortTh><SortTh Key="title">TITLU</SortTh><SortTh Key="severity">GRAVITATE</SortTh><SortTh Key="reason">MOTIV</SortTh><SortTh Key="author">AUTOR</SortTh><SortTh Key="sent">TRIMIS</SortTh><th><span class="sr-only">Acțiuni</span></th></tr></thead><tbody>
             @foreach (var alert in pageRows)
             {
                 var report = alert.Report;
@@ -38,6 +38,7 @@
 
 @code {
     private IReadOnlyList<BugReportAlert> alerts = [];
+    private static readonly IReadOnlyDictionary<string, Func<BugReportAlert, IComparable?>> Sorts = new Dictionary<string, Func<BugReportAlert, IComparable?>> { ["number"] = item => item.Report.Number, ["title"] = item => item.Report.Title, ["severity"] = item => item.Report.Severity, ["reason"] = item => item.Reason, ["author"] = item => item.Report.UserName, ["sent"] = item => item.Report.CreatedUtc };
     private bool loading = true;
     private string? error;
 

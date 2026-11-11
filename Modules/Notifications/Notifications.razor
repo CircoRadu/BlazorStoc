@@ -112,8 +112,8 @@ else if (loaded)
         @if (resolved.Count == 0) { <div class="empty-state"><span class="empty-icon">✓</span><h3>Nu există notificări rezolvate</h3><p>O notificare devine rezolvată când o marchezi tu sau când data obiectului se schimbă ori obiectul dispare.</p></div> }
         else
         {
-            <Paged Items="resolved" Id="notif-resolved-size" Context="pageRows">
-            <div class="table-scroll"><table class="notification-table"><thead><tr><th>TITLU</th><th>OBIECT</th><th>SCADENȚĂ</th><th>REZOLVATĂ LA</th><th>REZOLVATĂ DE</th><th>MOTIV</th></tr></thead><tbody>
+            <Paged Items="resolved" Id="notif-resolved-size" Context="pageRows" Sorts="ResolvedSorts">
+            <div class="table-scroll"><table class="notification-table"><thead><tr><SortTh Key="subject">TITLU</SortTh><SortTh Key="object">OBIECT</SortTh><SortTh Key="expiry">SCADENȚĂ</SortTh><SortTh Key="at">REZOLVATĂ LA</SortTh><SortTh Key="by">REZOLVATĂ DE</SortTh><SortTh Key="reason">MOTIV</SortTh></tr></thead><tbody>
             @foreach (var item in pageRows)
             {
                 <tr @key="item.Notification.Id" class="notification-row" tabindex="0" role="button" aria-label="Deschide notificarea rezolvată @item.Subject"
@@ -246,7 +246,9 @@ else if (loaded)
         RefreshPeriodicallyAsync().FireAndForget(Logger, "periodic refresh");
     }
 
-    private RenderFragment NotificationTable(IReadOnlyList<NotificationView> items, bool overdue) => @<Paged Items="items" Id="@(overdue ? "notif-overdue-size" : "notif-upcoming-size")" Context="pageRows"><div class="table-scroll"><table class="notification-table"><thead><tr><th>STARE</th><th>TITLU</th><th>OBIECT</th><th>@(overdue ? "SCADENȚĂ" : "EXPIRĂ LA")</th><th class="number">@(overdue ? "DEPĂȘIT CU (ZILE)" : "ZILE RĂMASE")</th></tr></thead><tbody>
+    private static readonly IReadOnlyDictionary<string, Func<NotificationView, IComparable?>> NotificationSorts = new Dictionary<string, Func<NotificationView, IComparable?>> { ["state"] = item => item.IsAlert ? 0 : 1, ["subject"] = item => item.Subject, ["object"] = item => item.ObjectLabel, ["expiry"] = item => item.Notification.ExpiryDate, ["days"] = item => item.DaysLeft };
+    private static readonly IReadOnlyDictionary<string, Func<ResolvedNotificationView, IComparable?>> ResolvedSorts = new Dictionary<string, Func<ResolvedNotificationView, IComparable?>> { ["subject"] = item => item.Subject, ["object"] = item => item.ObjectLabel, ["expiry"] = item => item.Notification.ExpiryDate, ["at"] = item => item.Notification.ResolvedUtc, ["by"] = item => item.Notification.ResolvedAutomatically ? "sistem (automat)" : item.Notification.ResolvedBy, ["reason"] = item => item.Notification.ResolvedReason };
+    private RenderFragment NotificationTable(IReadOnlyList<NotificationView> items, bool overdue) => @<Paged Items="items" Id="@(overdue ? "notif-overdue-size" : "notif-upcoming-size")" Context="pageRows" Sorts="NotificationSorts"><div class="table-scroll"><table class="notification-table"><thead><tr><SortTh Key="state">STARE</SortTh><SortTh Key="subject">TITLU</SortTh><SortTh Key="object">OBIECT</SortTh><SortTh Key="expiry">@(overdue ? "SCADENȚĂ" : "EXPIRĂ LA")</SortTh><SortTh Key="days" Class="number">@(overdue ? "DEPĂȘIT CU (ZILE)" : "ZILE RĂMASE")</SortTh></tr></thead><tbody>
         @foreach (var view in pageRows)
         {
             <tr @key="view.Notification.Id" class="notification-row @(view.IsAlert ? "notification-unread" : "") @(overdue ? "notification-overdue" : "")" tabindex="0" role="button"

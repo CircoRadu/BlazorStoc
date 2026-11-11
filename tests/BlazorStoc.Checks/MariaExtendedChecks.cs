@@ -34,6 +34,7 @@ public static partial class MariaExtendedChecks
             await Section("Vehicles: concurrency, expiry journal, archive", () => VehiclesAsync(configuration, admin, audit, probe));
             await Section("Product locks: contention, takeover, forced release", () => LocksAsync(configuration, admin, audit, probe));
             await Section("Work points: main point, description, coordinates, photos, archive, backfill", () => WorkPointsAsync(configuration, admin, audit, probe, assets));
+            await Section("Attached work points: name and address or GPS, last location kept, unique name, archive with the work point and the beneficiary, search data, journal", () => AttachedWorkPointsAsync(configuration, admin, audit, probe));
             await Section("Maintenance contracts: coverage, one active contract per point, On/Off, moves, archive", () => ServiceContractsAsync(configuration, admin, audit, probe));
             await Section("Maintenance components nomenclator: families, components, alternative names, order, administrators only, journal", () => MaintenanceComponentsAsync(configuration, admin, audit, probe));
             await Section("Maintenance contract units: reference date, families and components On/Off, frozen contracts, notifications tab, archive", () => ContractUnitsAsync(configuration, admin, audit, probe));

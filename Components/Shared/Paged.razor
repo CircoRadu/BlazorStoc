@@ -1,18 +1,24 @@
 @typeparam TItem
+@using System.Globalization
+@using System.Text.Json
+@implements IPagedSort
+@inject IJSRuntime JS
+@inject NavigationManager Navigation
 
 @* Pages a list under its table: the rows of the current page go to the child content, the page size and page buttons (AuditPager) under it. Rule: every table is paged with a choice of the number
-   of rows per page (CLAUDE.md). The pager is shown when the list is longer than the smallest page size; the page and the size are kept while the component lives. *@
+   of rows per page (CLAUDE.md). The pager is shown when the list is longer than the smallest page size. The page size and the order chosen from the headers (SortTh, with Sorts) are kept for the
+   table (page + Id) while the browser tab stays open (sessionStorage, wwwroot/table-state.js); the page number is not kept. *@
 @{
-    var all = Items as IReadOnlyList<TItem> ?? Items.ToList();
+    var all = Ordered();
     var pages = size == 0 ? 1 : Math.Max(1, (all.Count + size - 1) / size);
     var current = Math.Clamp(page, 1, pages);
     var visible = size == 0 ? all : all.Skip((current - 1) * size).Take(size).ToList();
 }
-@ChildContent(visible)
+<CascadingValue Value="(IPagedSort)this" IsFixed="false">@ChildContent(visible)</CascadingValue>
 @if (all.Count > Sizes.Where(item => item > 0).DefaultIfEmpty(10).Min())
 {
     <AuditPager Id="@Id" Label="@Label" PageSizes="Sizes" PageSize="size" Page="current" Total="all.Count"
-                PageChanged="value => page = value" PageSizeChanged="value => { size = value; page = 1; }" />
+                PageChanged="value => page = value" PageSizeChanged="SizeChangedAsync" />
 }
 
 @code {
@@ -22,7 +28,92 @@
     [Parameter] public string Label { get; set; } = "Rânduri pe pagină";
     [Parameter] public int DefaultSize { get; set; } = 25;
     [Parameter] public IReadOnlyList<int> Sizes { get; set; } = [10, 25, 50, 100, 0];
+    /// <summary>The columns that can be ordered from their header: the Key of the SortTh to what the rows are compared by (text, number, date...).</summary>
+    [Parameter] public IReadOnlyDictionary<string, Func<TItem, IComparable?>>? Sorts { get; set; }
+    /// <summary>The order the table starts with (a key of Sorts and the direction), used until a header is clicked and again when the order is cleared.</summary>
+    [Parameter] public string? DefaultSortKey { get; set; }
+    [Parameter] public bool DefaultDescending { get; set; }
 
     private int size, page = 1;
-    protected override void OnInitialized() => size = DefaultSize;
+    private string? sortKey;
+    private bool descending;
+    private bool restored;
+
+    private string StateKey => Navigation.ToBaseRelativePath(Navigation.Uri).Split('?', '#')[0] + "|" + Id;
+
+    protected override void OnInitialized() { size = DefaultSize; sortKey = DefaultSortKey; descending = DefaultDescending; }
+
+    // The state of the table in this browser tab is read after the first render (the script cannot be reached earlier).
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender || restored) return;
+        restored = true;
+        try
+        {
+            var text = await JS.InvokeAsync<string?>("blazorTableState.get", StateKey);
+            if (string.IsNullOrEmpty(text)) return;
+            var saved = JsonSerializer.Deserialize<Saved>(text);
+            if (saved is null) return;
+            if (Sizes.Contains(saved.Size)) size = saved.Size;
+            if (saved.Sort is null) { sortKey = null; descending = false; }
+            else if (CanSort(saved.Sort)) { sortKey = saved.Sort; descending = saved.Descending; }
+            page = 1;
+            StateHasChanged();
+        }
+        catch (Exception) { // the memory of a table is a convenience: when it cannot be read the table shows its defaults
+        }
+    }
+
+    private async Task SaveAsync()
+    {
+        try { await JS.InvokeVoidAsync("blazorTableState.set", StateKey, JsonSerializer.Serialize(new Saved(size, sortKey, descending))); }
+        catch (Exception) { // nothing is kept when the browser storage is not reachable
+        }
+    }
+
+    private async Task SizeChangedAsync(int value) { size = value; page = 1; await SaveAsync(); }
+
+    private sealed record Saved(int Size, string? Sort, bool Descending);
+
+    public bool CanSort(string key) => Sorts is not null && Sorts.ContainsKey(key);
+
+    public string? DirectionOf(string key) => sortKey == key ? (descending ? "descending" : "ascending") : null;
+
+    // ascending, then descending, then back to the original order.
+    public async Task ToggleAsync(string key)
+    {
+        if (!CanSort(key)) return;
+        if (sortKey != key) { sortKey = key; descending = false; }
+        else if (!descending) descending = true;
+        else { sortKey = null; descending = false; }
+        page = 1;
+        StateHasChanged();
+        await SaveAsync();
+    }
+
+    private static readonly CompareInfo TextCompare = CultureInfo.InvariantCulture.CompareInfo;
+
+    private static bool Empty(IComparable? value) => value is null || (value is string text && text.Length == 0);
+
+    /// <summary>Texts compare without regard to case and diacritics, numbers and dates by value.</summary>
+    public static int CompareValues(IComparable left, IComparable right) =>
+        left is string x && right is string y ? TextCompare.Compare(x, y, CompareOptions.IgnoreCase | CompareOptions.IgnoreNonSpace) : left.CompareTo(right);
+
+    private IReadOnlyList<TItem> Ordered()
+    {
+        var list = Items as IReadOnlyList<TItem> ?? Items.ToList();
+        if (sortKey is null || Sorts is null || !Sorts.TryGetValue(sortKey, out var by)) return list;
+        // Rows without a value stay last in both directions; equal rows keep their order.
+        var rows = list.Select((item, index) => (item, index, value: by(item))).ToList();
+        rows.Sort((p, q) =>
+        {
+            var emptyP = Empty(p.value);
+            var emptyQ = Empty(q.value);
+            if (emptyP || emptyQ) return emptyP == emptyQ ? p.index.CompareTo(q.index) : emptyP ? 1 : -1;
+            var result = CompareValues(p.value!, q.value!);
+            if (descending) result = -result;
+            return result != 0 ? result : p.index.CompareTo(q.index);
+        });
+        return rows.Select(entry => entry.item).ToList();
+    }
 }

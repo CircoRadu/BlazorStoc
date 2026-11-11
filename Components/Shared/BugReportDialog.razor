@@ -9,9 +9,9 @@
 @* Raportare eroare: the popup opened by the menu entry above "Ajutor" (wwwroot/bug-report.js). The script photographs the page BEFORE the popup shows and hands the picture to Opened;
    Ctrl+V pictures arrive through AddPasted; a file can also be chosen. The flow is described at the top in sections that stay closed until opened. *@
 <AppDialog Floating="AnnotatorView" Native="true" Id="bug-dialog" PanelClass="bug-dialog" Title="Raportează o eroare" TitleId="bug-title" HelpTopic="raportare-eroare" HelpAbout="Raportare eroare" ShowModuleActions="false" OnClose="CloseAsync">
-    <div class="bug-tabs" role="tablist" aria-label="Raportare erori">
-        <button type="button" role="tab" id="bug-tab-new" class="settings-tab @(tab == "new" ? "active" : "")" aria-selected="@(tab == "new")" @onclick="@(() => SelectTab("new"))">Raport nou</button>
-        <button type="button" role="tab" id="bug-tab-mine" class="settings-tab @(tab == "mine" ? "active" : "")" aria-selected="@(tab == "mine")" @onclick="@(() => SelectTab("mine"))">Rapoartele mele @if (mine is not null) { <span class="count-badge">@mine.Count</span> }</button>
+    <div class="editor-actions bug-switch">
+        @if (tab == "new") { <button type="button" id="bug-tab-mine" class="refresh act-nav" @onclick="@(() => SelectTab("mine"))">Rapoartele mele @if (mine is not null) { <span class="count-badge">@mine.Count</span> }</button> }
+        else { <button type="button" id="bug-tab-new" class="refresh act-nav" @onclick="@(() => SelectTab("new"))">‹ Raport nou</button> }
     </div>
     @if (error is not null) { <div class="error-banner" role="alert" id="bug-error">@error</div> }
 
@@ -37,7 +37,7 @@
                         <li><strong>Verifici imaginile.</strong> Captura paginii apare ca prima imagine; o poți scoate dacă arată date pe care nu vrei să le trimiți. Poți adăuga imagini cu <kbd>Ctrl</kbd>+<kbd>V</kbd> sau alegând un fișier.</li>
                         <li><strong>Alegi detaliile tehnice.</strong> Comutatorul „Atașez detaliile tehnice” este pornit; poți vedea exact ce se atașează și îl poți opri.</li>
                         <li><strong>Trimiți.</strong> Apeși „Trimite raportul”. Primești un număr (de exemplu BUG-0042) care identifică raportul.</li>
-                        <li><strong>Urmărești.</strong> Administratorul analizează raportul și îi schimbă starea (Nou, În analiză, Rezolvat, Respins), eventual cu o notă. Le vezi în fila „Rapoartele mele”.</li>
+                        <li><strong>Urmărești.</strong> Administratorul analizează raportul și îi schimbă starea (Nou, În analiză, Rezolvat, Respins), eventual cu o notă. Le vezi cu butonul „Rapoartele mele” din această fereastră.</li>
                     </ol>
                 </ChildContent>
             </CollapsibleSection>
@@ -146,10 +146,10 @@
         else if (mine.Count == 0) { <p class="muted" id="bug-mine-empty">Nu ai trimis niciun raport.</p> }
         else
         {
-            <Paged Items="mine" Id="bug-mine-size" Context="pageRows" DefaultSize="10">
+            <Paged Items="mine" Id="bug-mine-size" Context="pageRows" DefaultSize="10" Sorts="MineSorts">
                 <div class="table-scroll">
                     <table class="bug-mine" id="bug-mine-table">
-                        <thead><tr><th>Număr</th><th>Titlu</th><th>Gravitate</th><th>Stare</th><th>Trimis</th><th>Nota administratorului</th></tr></thead>
+                        <thead><tr><SortTh Key="number">Număr</SortTh><SortTh Key="title">Titlu</SortTh><SortTh Key="severity">Gravitate</SortTh><SortTh Key="state">Stare</SortTh><SortTh Key="sent">Trimis</SortTh><th>Nota administratorului</th></tr></thead>
                         <tbody>
                             @foreach (var report in pageRows)
                             {
@@ -199,6 +199,7 @@
     private string? error;
     private BugReport? sent;
     private IReadOnlyList<BugReport>? mine;
+    private static readonly IReadOnlyDictionary<string, Func<BugReport, IComparable?>> MineSorts = new Dictionary<string, Func<BugReport, IComparable?>> { ["number"] = item => item.Number, ["title"] = item => item.Title, ["severity"] = item => item.Severity, ["state"] = item => item.State, ["sent"] = item => item.CreatedUtc };
     private readonly CancellationTokenSource lifetime = new();
 
     protected override async Task OnAfterRenderAsync(bool firstRender)

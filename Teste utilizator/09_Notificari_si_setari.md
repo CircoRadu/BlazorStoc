@@ -489,3 +489,15 @@ Pasi:
 
 1. Deschide Istoric -> "Vezi changelog" pentru 0.5.72: apar cele trei categorii. Pentru 0.5.71 lista ramane simpla.
 2. Treci un raport de eroare pe Rezolvat, apoi ruleaza tools/changelog-draft.ps1 -Version 0.5.72: raportul apare sub Bugs (BUG-xxxx).
+
+## Modificari de testat - descarcare pachet backup (11.11.2026, PROP-0020)
+
+**Ce s-a adaugat:** in Setari -> Backup, pe fiecare pachet din tabel, iconita de descarcare (sageata in jos). Un pachet care are alaturi fisierul de suma de control vine intr-o arhiva cu ambele fisiere; unul singur vine asa cum este.
+**Ce face acum:** pachetul se descarca de pe server; unul aflat doar pe NAS este adus mai intai pe server (verificat prin suma de control, ca la restaurare) si apoi descarcat. Fiecare descarcare apare in jurnal ca "Descarcare pachet backup".
+
+| Pas | Ce faci | Ce trebuie sa vezi | OK |
+|---|---|---|---|
+| 1 | Setari -> Backup, iconita de descarcare pe un pachet de pe server | Browserul salveaza arhiva `<nume>-cu-suma-de-control.zip` (pachet + .sha256) sau pachetul simplu | |
+| 2 | Pe un pachet doar pe NAS, iconita de descarcare | Mesaj "Se aduce pachetul de pe NAS...", apoi descarcarea; pachetul apare si pe server | |
+| 3 | Jurnal activitate | Intrare "Descarcare pachet backup" cu pachetul si daca a fost arhiva | |
+| 4 | Cu un cont fara dreptul de a modifica setarile de backup, deschide adresa /api/backup/<nume> | Acces refuzat | |

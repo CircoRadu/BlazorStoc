@@ -57,3 +57,13 @@
 1. Deschide un raport, apasa Editeaza, apoi un clic pe o imagine: se deschide marcarea. Deseneaza o zona: apare in lista "Imagini adaugate acum" ca marcata-...jpg.
 2. In fereastra de marcare apasa + de cateva ori sau Ctrl + rotita: imaginea se mareste, se deruleaza; "Potriveste" revine; zonele raman pe loc.
 3. Deschide mai multe ferestre (Adauga beneficiar, Adauga analiza de risc, Adauga produs): sus este doar bara cu titlul si butonul "Ajutor"; formularul incepe imediat sub ea.
+
+## Modificari de testat - fara taburi in fereastra de raport (11.11.2026, BUG-0020)
+
+**Ce s-a adaugat:** fereastra "Raporteaza o eroare" nu mai are bara de taburi; are butonul "Rapoartele mele" (cu numar) si, in lista, butonul "Raport nou".
+**Ce face acum:** fereastra se deschide direct pe formular.
+
+| Pas | Ce faci | Ce trebuie sa vezi | OK |
+|---|---|---|---|
+| 1 | Raporteaza o eroare | Formular direct, fara taburi; sus butonul "Rapoartele mele" | |
+| 2 | Apasa "Rapoartele mele", apoi "Raport nou" | Lista rapoartelor tale, apoi inapoi la formular cu ciorna pastrata | |

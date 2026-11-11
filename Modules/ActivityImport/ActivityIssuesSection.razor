@@ -42,7 +42,7 @@
 
     protected override Task OnInitializedAsync() => LoadAsync();
 
-    private static string EntityLabel(string entity) => entity switch { "partner" => "Partener", "ticket" => "Tichet", "partner-deleted" => "Partener șters în ActivityApp", "workpoint-deleted" => "Punct de lucru șters în ActivityApp", "ticket-deleted" => "Tichet șters în ActivityApp", _ => "Punct de lucru" };
+    private static string EntityLabel(string entity) => entity switch { "partner" => "Partener", "ticket" => "Tichet", "partner-deleted" => "Partener șters în ActivityApp", "workpoint-deleted" => "Punct de lucru șters în ActivityApp", "ticket-deleted" => "Tichet șters în ActivityApp", "attached-similar" => "De verificat: punct asemănător cu un punct arondat", _ => "Punct de lucru" };
 
     private async Task LoadAsync() => await RunAsync(async () => issues = await Partners.GetOpenIssuesAsync(lifetime.Token));
 

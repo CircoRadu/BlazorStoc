@@ -410,3 +410,7 @@ Actualizare 04.11.2026 (branch Elcomtur): versiunea 0.5.38, schema 62. Modul nou
 
 ## Ultimul lucru facut (11.11.2026): sablonarea preluarii tichetului (BUG-0017)
 - Setari -> Preluare ActivityApp, fereastra "Tichet exemplu": liste pliabile Tichet / Eveniment / Client cu comutator "Folosit" (implicit oprit), lista "Folosite" (descriere, rol, destinatie, detasare), coloane de orice tip ca campuri libere, CUI client mereu preluat; observatiile scriu "descriere: valoare". Modulul ActivityImport 0.16.0. Verificat pe baza permanenta `ActivityApp_test` (vezi docs/SETUP_DEZVOLTARE.md).
+
+## Ultimul lucru facut (11.11.2026): versiunea 0.5.73
+
+- Antete unitare si ordonare din antet cu memorare pe sesiune (BUG-0018, `SortTh` + `Paged`), titlul/numarul tichetului din orice coloana (BUG-0019), fara taburi in raportul de eroare (BUG-0020), descarcarea pachetelor de backup (PROP-0020). Puncte de lucru arondate (migrarea 88) intrate in 0.5.72/0.5.73. Ramas: Sorts pe celelalte liste paginate, mutarea ordonarii vechi (miscari, taskuri) pe SortTh; help si capturi in docs/HELP_DE_REGENERAT.md.

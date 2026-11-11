@@ -553,7 +553,7 @@
         _ => "Ignorat"
     };
 
-    private static string EntityLabel(string entity) => entity switch { "partner" => "Partener", "ticket" => "Tichet", "partner-deleted" => "Partener șters în ActivityApp", "workpoint-deleted" => "Punct de lucru șters în ActivityApp", "ticket-deleted" => "Tichet șters în ActivityApp", _ => "Punct de lucru" };
+    private static string EntityLabel(string entity) => entity switch { "partner" => "Partener", "ticket" => "Tichet", "partner-deleted" => "Partener șters în ActivityApp", "workpoint-deleted" => "Punct de lucru șters în ActivityApp", "ticket-deleted" => "Tichet șters în ActivityApp", "attached-similar" => "De verificat: punct asemănător cu un punct arondat", _ => "Punct de lucru" };
 
     private static string KindLabel(string kind) => kind switch
     {
@@ -795,6 +795,13 @@
     private void EditFromSample(TicketSampleDialog.SampleEdit edit)
     {
         sampleError = null; sampleNote = null;
+        // The column of the title or of the number: any text column of the ticket (the one it leaves is free, a piece that read the new one gives it up or takes the old one).
+        if (edit.Column is not null)
+        {
+            if (fields?.FirstOrDefault(item => item.Item.Key == edit.Key && item.Item.Mandatory && item.FieldKey is not null) is { } mandatory && edit.Column.Length > 0)
+                AssignFromSample(new SampleAssignment(mandatory.FieldKey!.Split('.')[0], edit.Column, edit.Key));
+            return;
+        }
         var row = fields?.FirstOrDefault(item => item.Item.Key == edit.Key && !item.Item.Mandatory);
         var extra = extras.FirstOrDefault(item => item.Key == edit.Key);
         if (row is null && extra is null) return;
@@ -883,6 +890,11 @@
                     notes.Add($"„{other.Label}” a rămas fără coloană și a fost oprită.");
                 }
             }
+        }
+        foreach (var freed in extras.Where(extra => !previous.Equals(choice.Column, StringComparison.OrdinalIgnoreCase) && Same(extra.Table, extra.Column)).ToList())
+        {
+            extras.Remove(freed);
+            notes.Add($"Câmpul suplimentar „{freed.Label}”, care citea {name}, a fost scos.");
         }
         if (!target.Choices.Contains(choice.Column, StringComparer.OrdinalIgnoreCase)) target.Choices.Add(choice.Column);
         target.Column = choice.Column;

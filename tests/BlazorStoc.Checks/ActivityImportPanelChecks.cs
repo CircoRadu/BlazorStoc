@@ -329,6 +329,17 @@ public static class ActivityImportPanelChecks
         cut.Find("#ticket-sample-Tickete [aria-label='Folosește coloana Observatii']").Change(false);
         check(cut.FindAll("#ai-extras tbody tr").Count == 0 && cut.Find("#ticket-sample-note").TextContent.Contains("a fost detașată", StringComparison.Ordinal),
             "Activity import panel: switching a column off detaches the free field that read it");
+        // The number (and the title) can be read from any text column of the ticket, chosen in the list of the used columns.
+        cut.Find("#ticket-sample-used [aria-label='Coloana pentru Numărul tichetului']").Change("Detalii");
+        check(cut.Find("#ticket-sample-note").TextContent.Contains("Tichet – NumeTicket → Tichet – Detalii", StringComparison.Ordinal) && cut.Find("#ticket-sample-preview").TextContent.Contains("Detalii 30", StringComparison.Ordinal)
+              && cut.FindAll("#ticket-sample-used button[aria-label^='Detașează Numărul']").Count == 0,
+            "Activity import panel: the number of the ticket can be read from another column of the used list, and it still cannot be detached");
+        cut.Find("#ticket-sample-used [aria-label='Coloana pentru Titlul tichetului']").Change("Detalii");
+        check(cut.Find("#ticket-sample-note").TextContent.Contains("a trecut pe coloana", StringComparison.Ordinal)
+              && cut.Find("#ticket-sample-used [aria-label='Coloana pentru Titlul tichetului']").GetAttribute("value") == "Detalii",
+            "Activity import panel: giving the title the column of the number moves the number to the column the title left");
+        cut.Find("#ticket-sample-used [aria-label='Coloana pentru Titlul tichetului']").Change("Subject");
+        cut.Find("#ticket-sample-used [aria-label='Coloana pentru Numărul tichetului']").Change("NumeTicket");
         cut.Find("#ticket-sample-older").Click();
         cut.Find("#ticket-sample-older").Click();
         cut.WaitForAssertion(() => { if (!cut.Find("#ticket-sample-info").TextContent.Contains("Tichet 10", StringComparison.Ordinal)) throw new Exception("pending"); }, TimeSpan.FromSeconds(5));

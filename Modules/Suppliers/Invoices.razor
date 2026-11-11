@@ -63,8 +63,9 @@ else
     else if (Filtered.Count == 0) { <div class="empty-state"><span class="empty-icon">▤</span><h3>Nu există facturi pentru filtrele curente</h3><p>Facturile apar aici după „Preluare factură” din Produse.</p></div> }
     else
     {
-        <div class="table-scroll"><table><thead><tr><th>NR. FACTURĂ</th><th>FURNIZOR</th><th>DATA EMITERII</th><th class="number">INTRĂRI ÎN STOC</th><th>PRELUATĂ DE</th><th>LA DATA</th><th><span class="sr-only">Acțiuni</span></th></tr></thead><tbody>
-        @foreach (var invoice in Filtered)
+        <Paged Items="Filtered" Id="supplier-invoices-size" Context="pageRows" Sorts="Sorts">
+        <div class="table-scroll"><table><thead><tr><SortTh Key="number">NR. FACTURĂ</SortTh><SortTh Key="supplier">FURNIZOR</SortTh><SortTh Key="date">DATA EMITERII</SortTh><SortTh Key="entries" Class="number">INTRĂRI ÎN STOC</SortTh><SortTh Key="by">PRELUATĂ DE</SortTh><SortTh Key="at">LA DATA</SortTh><th><span class="sr-only">Acțiuni</span></th></tr></thead><tbody>
+        @foreach (var invoice in pageRows)
         {
             <tr @key="invoice.Id">
                 <td><button type="button" class="category-table-link link-like" title="Arată produsele preluate din factură" @onclick="() => OpenAsync(invoice)"><strong>@invoice.Number</strong></button></td>
@@ -82,6 +83,7 @@ else
             </tr>
         }
         </tbody></table></div>
+        </Paged>
     }
 </section>
 }
@@ -212,6 +214,7 @@ else
         finally { deleteBusy = false; }
     }
 
+    private static readonly IReadOnlyDictionary<string, Func<SupplierInvoice, IComparable?>> Sorts = new Dictionary<string, Func<SupplierInvoice, IComparable?>> { ["number"] = item => item.Number, ["supplier"] = item => item.SupplierName, ["date"] = item => item.Date, ["entries"] = item => item.MovementCount, ["by"] = item => item.CreatedBy, ["at"] = item => item.CreatedUtc };
     private List<SupplierInvoice> Filtered => SupplierInvoiceSearch.Filter(invoices, query, supplierId, fromDate, toDate, withoutEntries).ToList();
 
     protected override async Task OnInitializedAsync()

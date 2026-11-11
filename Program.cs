@@ -187,6 +187,16 @@ app.MapPost("/api/elcomtur/incarcare", async (HttpContext context, BlazorStoc.Mo
     catch (BlazorStoc.Modules.ModuleUnavailableException) { return Results.StatusCode(StatusCodes.Status503ServiceUnavailable); }
     catch (AccessDeniedException) { return Results.Forbid(); }
 }).RequireAuthorization(PermissionPolicy.For(BlazorStoc.Modules.Elcomtur.ElcomturImportService.ImportKey));
+app.MapGet("/api/backup/{fileName}", async (string fileName, IBackupDownloadService downloads, CancellationToken token) =>
+{
+    try
+    {
+        var file = await downloads.OpenAsync(fileName, token);
+        return Results.File(file.Content, file.ContentType, file.DownloadName, enableRangeProcessing: !file.Archived);
+    }
+    catch (BackupDownloadException) { return Results.NotFound(); }
+    catch (AccessDeniedException) { return Results.Forbid(); }
+}).RequireAuthorization(PermissionPolicy.For("setari-backup.edit"));
 app.MapGet("/api/consum.csv", async (int? beneficiar, int? proiect, string? de, string? pana, IConsumptionReader reader, CancellationToken token) =>
 {
     try

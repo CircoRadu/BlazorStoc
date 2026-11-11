@@ -12,6 +12,12 @@ public sealed record MapMarker(int Id, double Lat, double Lng, string Fill, stri
 
 public static class MaintenanceMapRules
 {
+    // The pin of an attached work point (a component of a work point): built in, with its own colour; its id on the map is the negative id of the row.
+    public const string AttachedFill = "attached", AttachedColor = "#5b6b8c", AttachedForeground = "#ffffff", AttachedGlyph = "▣";
+
+    public static MapMarker AttachedMarker(AttachedWorkPointPlace place) =>
+        new(-place.Point.Id, (double)place.Point.Latitude!.Value, (double)place.Point.Longitude!.Value, AttachedFill, "", place.Title);
+
     public const string FillOverdue = "overdue";
     public const string FillSoon = "soon";
     public const string FillOk = "ok";

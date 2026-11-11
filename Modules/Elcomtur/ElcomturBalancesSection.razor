@@ -20,9 +20,9 @@
     @if (owed is { Count: > 0 })
     {
         var today = Today;
-        <Paged Items="Sorted" Id="elcomtur-balances-size" Context="pageRows">
+        <Paged Items="owed" Id="elcomtur-balances-size" Context="pageRows" Sorts="Sorts" DefaultSortKey="balance" DefaultDescending="true">
             <div class="table-scroll"><table class="catalog-table notification-table" id="elcomtur-balances-table">
-                <thead><tr><th>BENEFICIAR</th><th aria-sort="@(descending ? "descending" : "ascending")"><button type="button" class="sort-header" id="elcomtur-sort" @onclick="ToggleSort" aria-label="Sortează după balanță @(descending ? "crescător" : "descrescător")">BALANȚĂ <span aria-hidden="true">@(descending ? "▼" : "▲")</span></button></th><th>FACTURI DEPĂȘITE</th><th>FACTURI ÎN TERMEN</th><th>DATE LA</th><th><span class="sr-only">Operații</span></th></tr></thead>
+                <thead><tr><SortTh Key="name">BENEFICIAR</SortTh><SortTh Key="balance">BALANȚĂ</SortTh><SortTh Key="overdue">FACTURI DEPĂȘITE</SortTh><SortTh Key="interm">FACTURI ÎN TERMEN</SortTh><SortTh Key="date">DATE LA</SortTh><th><span class="sr-only">Operații</span></th></tr></thead>
                 <tbody>
                 @foreach (var item in pageRows)
                 {
@@ -45,10 +45,11 @@
     private IReadOnlyList<BeneficiaryBalance>? owed;
     private ElcomturImportInfo? info;
     private string? error;
-    // Largest balance first by default; the header of the balance column reverses it.
-    private bool descending = true;
-    private IReadOnlyList<BeneficiaryBalance> Sorted => owed is null ? [] : [.. (descending ? owed.OrderByDescending(item => item.Balance) : owed.OrderBy(item => item.Balance)).ThenBy(item => item.BeneficiaryName, StringComparer.CurrentCultureIgnoreCase)];
-    private void ToggleSort() => descending = !descending;
+    // Largest balance first by default; the headers order the table (and are kept while the browser tab stays open).
+    private IReadOnlyDictionary<string, Func<BeneficiaryBalance, IComparable?>> Sorts => new Dictionary<string, Func<BeneficiaryBalance, IComparable?>>
+    {
+        ["name"] = item => item.BeneficiaryName, ["balance"] = item => item.Balance, ["overdue"] = item => item.Overdue(Today).Count, ["interm"] = item => item.InTerm(Today).Count, ["date"] = item => item.DataDate
+    };
 
     private DateOnly Today => DateOnly.FromDateTime(Clock.GetLocalNow().DateTime);
 

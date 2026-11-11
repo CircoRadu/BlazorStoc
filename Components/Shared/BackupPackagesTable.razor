@@ -5,6 +5,7 @@
 @inject INasBackupSettingsRepository NasSettings
 @inject INasBackupCopier Copier
 @inject IAccessControl Access
+@inject NavigationManager Navigation
 @inject ILogger<BackupPackagesTable> Logger
 @implements IDisposable
 @* Setari -> Backup: the backup packages available on the server and on the NAS (matched by name), the backup made on request, and the restore.
@@ -76,6 +77,7 @@
                                 <td>@LocationText(row)</td>
                             }
                             <td class="row-actions">
+                                <button type="button" class="row-icon download" disabled="@Busy" aria-label="@($"Descarcă {row.FileName}")" title="@(row.NasOnly ? $"Descarcă {row.FileName}: pachetul este adus mai întâi de pe NAS pe server" : $"Descarcă {row.FileName}")" @onclick="() => DownloadAsync(row)"></button>
                                 @if (nasEnabled && nasRead && row.OnLocal && !row.OnNas)
                                 {
                                     <button type="button" class="row-icon nas" disabled="@Busy" aria-label="@($"Copiază {row.FileName} pe NAS")" title="@($"Copiază {row.FileName} pe NAS")" @onclick="() => CopyToNasAsync(row)"></button>
@@ -199,6 +201,20 @@
         notice = nasEnabled ? $"Backup făcut: {result.PackageFileName}. Copierea pe NAS s-a încercat automat." : $"Backup făcut: {result.PackageFileName}.";
         await LoadAsync();
         if (nasEnabled) await LoadNasAsync();
+    });
+
+    // The package is downloaded from the server; one only on the NAS is first brought to the server (checked by checksum, as for a restore). A package with its checksum file beside it comes as one archive.
+    private Task DownloadAsync(BackupCatalogRow row) => RunAsync(row.NasOnly ? "Se aduce pachetul de pe NAS…" : "Se pregătește descărcarea…", async () =>
+    {
+        if (row.NasOnly)
+        {
+            var fetched = await Copier.FetchAsync(row.FileName, lifetime.Token);
+            if (!fetched.Ok) { noticeOk = false; notice = fetched.Message; return; }
+            await LoadAsync();
+            if (nasEnabled) await LoadNasAsync();
+        }
+        Navigation.NavigateTo(BackupDownloadRules.Url(row.FileName), forceLoad: true);
+        noticeOk = true; notice = $"Descărcarea pachetului {row.FileName} a început.";
     });
 
     private Task CopyToNasAsync(BackupCatalogRow row) => RunAsync("Se copiază pe NAS…", async () =>

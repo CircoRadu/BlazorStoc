@@ -31,7 +31,15 @@
                             @if (used.Locked) { <span>@used.Label</span> }
                             else { <input aria-label="@($"Descrierea pentru {used.Source}")" maxlength="@ActivityFieldMap.MaximumLabel" value="@used.Label" disabled="@Busy" @onchange="args => Edit.InvokeAsync(new SampleEdit(used.Key, Label: args.Value?.ToString() ?? string.Empty))" autocomplete="off" /> }
                         </td>
-                        <td>@(used.Source.Length > 0 ? used.Source : "din raport și problemă")</td>
+                        <td>
+                            @if (used.Locked && used.Role is "title" or "number" && TextColumnsOf(used.Table) is { Count: > 0 } choices)
+                            {
+                                <select aria-label="@($"Coloana pentru {used.Label}")" disabled="@Busy" value="@used.Column" @onchange="args => Edit.InvokeAsync(new SampleEdit(used.Key, Column: args.Value?.ToString()))">
+                                    @foreach (var name in choices) { <option value="@name">@ActivityFieldMap.ColumnName(used.Table, name)</option> }
+                                </select>
+                            }
+                            else { @(used.Source.Length > 0 ? used.Source : "din raport și problemă") }
+                        </td>
                         <td class="review-text">@ValueOfUsed(used)</td>
                         <td>
                             @if (used.Locked) { <span>@RoleText(used.Role)</span> }
@@ -134,7 +142,7 @@
     public sealed record SampleToggle(string Table, string Column, bool On);
 
     /// <summary>A change of a used element: its description, its destination, its role, or its detaching.</summary>
-    public sealed record SampleEdit(string Key, string? Label = null, string? Target = null, string? Role = null, bool Detach = false);
+    public sealed record SampleEdit(string Key, string? Label = null, string? Target = null, string? Role = null, bool Detach = false, string? Column = null);
 
     [Parameter, EditorRequired] public TicketSample Sample { get; set; } = null!;
     /// <summary>What the last change did besides the change itself (an information that gave its column up).</summary>
@@ -209,7 +217,11 @@
     // The roles a text column of a table can have besides a free field (the pieces of information read from a column of that table).
     private IReadOnlyList<SampleTarget> RoleChoices(SampleUsed used) =>
         used.Column.Length > 0 && Sample.Tables.FirstOrDefault(table => table.Table == used.Table)?.Columns.FirstOrDefault(column => column.Column.Equals(used.Column, StringComparison.OrdinalIgnoreCase)) is { IsText: true }
-            && targetsByTable.TryGetValue(used.Table, out var list) ? [.. list.Where(item => ActivityFieldMap.ItemOf(item.Key)?.Mandatory != true)] : [];
+            && targetsByTable.TryGetValue(used.Table, out var list) ? list : [];
+
+    // The text columns of a table of the example ticket: what the title and the number can be read from.
+    private IReadOnlyList<string> TextColumnsOf(string table) =>
+        [.. Sample.Tables.FirstOrDefault(item => item.Table == table)?.Columns.Where(column => column.IsText && column.Readable).Select(column => column.Column) ?? []];
 
     private static string RoleText(string role) => role switch
     {

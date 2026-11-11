@@ -2,6 +2,7 @@
 @namespace BlazorStoc.Components.Shared
 @using Microsoft.Extensions.Options
 @inject IServiceContractRepository Contracts
+@inject IAttachedWorkPointRepository AttachedStore
 @inject IExpiryNotificationService NotificationService
 @inject IMapConfigurationService MapConfig
 @inject TimeProvider Clock
@@ -70,6 +71,7 @@ else
             {
                 <span><i class="mm-key-badge" style="background:@type.Color;color:@type.Foreground">@type.Glyph</i> @type.Name</span>
             }
+            <span><i class="mm-key" style="background:@MaintenanceMapRules.AttachedColor;color:@MaintenanceMapRules.AttachedForeground">@MaintenanceMapRules.AttachedGlyph</i> Puncte de lucru arondate</span>
             <button type="button" class="refresh act-reload" disabled="@(Markers.Count == 0)" @onclick="FitAsync">Încadrează rezultatele</button>
         </div>
         @if (tilesFailed)
@@ -121,6 +123,24 @@ else
                         }
                     </ul>
                 }
+    </AppDialog>
+}
+
+@if (SelectedAttached is { } place)
+{
+    <AppDialog PanelClass="map-dialog" OnBackdropClick="ClearSelectionAsync" OnKeyDown="MapDialogKeyAsync" LabelledBy="map-dialog-title" OnClose="ClearSelectionAsync">
+                <div class="map-panel-heading"><h2 id="map-dialog-title">@place.Point.Name</h2><span class="heading-actions"><HelpButton Topic="mentenanta-harta-punct" About="Detaliile punctului de pe hartă" /><button type="button" class="link-button" data-popup-close aria-label="Închide detaliile" autofocus @onclick="ClearSelectionAsync" title="Închide detaliile">×</button></span></div>
+                <p class="muted" id="map-attached-parent">Punct de lucru arondat la <strong>@place.WorkPointName</strong></p>
+                <p><a class="category-table-link" href="@($"/beneficiari/{place.BeneficiaryId}")"><strong>@place.BeneficiaryName</strong></a></p>
+                <p class="muted">@(place.Point.HasAddress ? place.Point.Address : "fără adresă")<br />Coordonate: @WorkPointCoordinates.Format(place.Point.Latitude, place.Point.Longitude)</p>
+                @if (place.Point.Phone.Length > 0 || place.Point.ContactPerson.Length > 0)
+                {
+                    <dl class="map-facts">
+                        @if (place.Point.Phone.Length > 0) { <dt>Telefon</dt><dd>@place.Point.Phone</dd> }
+                        @if (place.Point.ContactPerson.Length > 0) { <dt>Persoană de contact</dt><dd>@place.Point.ContactPerson</dd> }
+                    </dl>
+                }
+                <div class="map-panel-actions"><a class="refresh act-nav" href="@($"/beneficiari/{place.BeneficiaryId}")">Fișa beneficiarului</a></div>
     </AppDialog>
 }
 
@@ -194,14 +214,42 @@ else
 
     private MapView view = new(new MapOptions().Normalized(), MapPinRules.Effective(null), 0);
 
-    private IReadOnlyList<MapMarker> Markers => Filtered.Select(row => MaintenanceMapRules.Marker(row, Today, dueThreshold, expiryThreshold, view.PinTypes)).OfType<MapMarker>().ToList();
+    // The attached work points (components of the work points) have no contract and no due date: they are shown, as pins of their own, while no filter of the due date, the contract or the period is set.
+    private IReadOnlyList<AttachedWorkPointPlace> attachedPlaces = [];
+    private IReadOnlyList<AttachedWorkPointPlace> FilteredAttached
+    {
+        get
+        {
+            if (dueFilter.Length > 0 || contractFilter.Length > 0 || from is not null || to is not null) return [];
+            var query = text.Trim();
+            return attachedPlaces.Where(place => place.Point.HasCoordinates && (query.Length == 0 || Contains(place.BeneficiaryName, query) || Contains(place.WorkPointName, query)
+                || Contains(place.Point.Name, query) || Contains(place.Point.Address, query))).ToList();
+        }
+    }
+    private AttachedWorkPointPlace? SelectedAttached => selectedId is < 0 ? FilteredAttached.FirstOrDefault(place => -place.Point.Id == selectedId) : null;
+
+    private async Task LoadAttachedAsync()
+    {
+        try { attachedPlaces = await AttachedStore.GetAllPlacesAsync(lifetime.Token); }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (Exception exception) { attachedPlaces = []; Logger.LogWarning("Attached work points loading failed ({ErrorType}).", exception.GetType().Name); }
+    }
+
+    private IReadOnlyList<MapMarker> Markers => Filtered.Select(row => MaintenanceMapRules.Marker(row, Today, dueThreshold, expiryThreshold, view.PinTypes)).OfType<MapMarker>()
+        .Concat(FilteredAttached.Select(MaintenanceMapRules.AttachedMarker)).ToList();
 
     // What the script needs to draw the pins and the background: the types that are on (inactive badges are not drawn) and the engine.
-    private static object Styles(MapView current) => new
+    private static object Styles(MapView current)
     {
-        fills = current.ActiveTypes.Where(type => type.IsFill).ToDictionary(type => type.Key, type => new { color = type.Color, fg = type.Foreground, glyph = type.Glyph, name = type.Name }),
-        badges = current.ActiveTypes.Where(type => !type.IsFill).ToDictionary(type => type.Key, type => new { color = type.Color, fg = type.Foreground, glyph = type.Glyph, name = type.Name })
-    };
+        var fills = current.ActiveTypes.Where(type => type.IsFill).ToDictionary(type => type.Key, type => (object)new { color = type.Color, fg = type.Foreground, glyph = type.Glyph, name = type.Name });
+        // The pin of an attached work point is built in (it is not a type of Setări → Hartă).
+        fills[MaintenanceMapRules.AttachedFill] = new { color = MaintenanceMapRules.AttachedColor, fg = MaintenanceMapRules.AttachedForeground, glyph = MaintenanceMapRules.AttachedGlyph, name = "Punct de lucru arondat" };
+        return new
+        {
+            fills,
+            badges = current.ActiveTypes.Where(type => !type.IsFill).ToDictionary(type => type.Key, type => new { color = type.Color, fg = type.Foreground, glyph = type.Glyph, name = type.Name })
+        };
+    }
 
     private static object EngineOptions(MapOptions options) => new
     {
@@ -251,6 +299,7 @@ else
             var all = await Contracts.GetDueListAsync(true, lifetime.Token);
             offCount = all.Count(row => !row.Contract.IsActive);
             rows = showOff ? all : all.Where(row => row.Contract.IsActive).ToList();
+            await LoadAttachedAsync();
             loaded = true;
             shownDay = Today;
             lastUpdate = Clock.GetLocalNow();
@@ -281,10 +330,12 @@ else
             var expiry = await NotificationService.GetThresholdDaysAsync(ExpirySourceKeys.ContractExpiry, ServiceDueRules.DefaultThresholdDays, lifetime.Token);
             var all = await Contracts.GetDueListAsync(true, lifetime.Token);
             var fresh = showOff ? all : all.Where(row => row.Contract.IsActive).ToList();
+            var freshAttached = await AttachedStore.GetAllPlacesAsync(lifetime.Token);
+            var attachedChanged = !freshAttached.SequenceEqual(attachedPlaces);
             var today = Today;
             var changed = MaintenanceMapRules.ChangedRows(rows, fresh);
             var settingsChanged = freshView.Version != view.Version;
-            var different = settingsChanged || changed > 0 || fresh.Count != rows.Count || due != dueThreshold || expiry != expiryThreshold || today != shownDay;
+            var different = settingsChanged || attachedChanged || changed > 0 || fresh.Count != rows.Count || due != dueThreshold || expiry != expiryThreshold || today != shownDay;
             lastUpdate = Clock.GetLocalNow();
             refreshFailed = false;
             error = null;
@@ -294,6 +345,7 @@ else
             // The map settings (tile provider, pin types) were changed in Setări: the background and the pins are redrawn now.
             if (settingsChanged && mapReady && module is not null)
                 await module.InvokeVoidAsync("configure", mapElement, EngineOptions(view.Engine), Styles(view));
+            attachedPlaces = freshAttached;
             rows = fresh; dueThreshold = due; expiryThreshold = expiry; shownDay = today;
             changedCount = changed;
             sameLocation = Selected is { } current ? MaintenanceMapRules.SameLocation(Filtered, current) : [];
@@ -327,7 +379,7 @@ else
 
     private async Task FiltersChangedAsync(bool announce)
     {
-        if (selectedId is not null && Selected is null) { selectedId = null; sameLocation = []; }
+        if (selectedId is not null && Selected is null && SelectedAttached is null) { selectedId = null; sameLocation = []; }
         await PushMarkersAsync(fit: false, announce);
     }
 

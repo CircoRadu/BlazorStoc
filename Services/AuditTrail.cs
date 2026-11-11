@@ -30,6 +30,8 @@ public static class AuditEntities
     // edits are recorded under the beneficiary the work point belongs to.
     public const string WorkPoint = "PunctLucru";
     public const string ServicePhoto = "FotografiePunctLucru";
+    // Only the deletion of an attached work point is recorded under this type (it is archived); its creation and edits go under the beneficiary.
+    public const string AttachedWorkPoint = "PunctArondat";
     // Only the deletion of a maintenance contract is recorded under this type (it is archived); the other operations on contracts
     // are recorded under the beneficiary the contract belongs to.
     public const string ServiceContract = "ContractMentenanta";
@@ -116,6 +118,9 @@ public static class AuditActions
     public const string EditWorkPointDescription = "Modificare descriere punct de lucru";
     public const string EditWorkPointCoordinates = "Modificare coordonate punct de lucru";
     public const string AddWorkPointPhoto = "Adăugare fotografie punct de lucru";
+    // Attached work points (components of a work point): adding and editing are named; deleting one is the archived "Ștergere".
+    public const string CreateAttachedWorkPoint = "Adăugare punct arondat";
+    public const string EditAttachedWorkPoint = "Modificare punct arondat";
     // Files attached to a work point, maintenance contract, intervention or risk analysis (entity_files).
     public const string AddAttachedFile = "Adăugare fișier atașat";
     public const string DeleteAttachedFile = "Ștergere fișier atașat";
@@ -265,6 +270,7 @@ public static class AuditActions
     public const string SetBackupSettings = "Modificare setări backup";
     public const string RetentionDelete = "Ștergere automată pachet backup vechi";
     public const string FetchBackupFromNas = "Aducere pachet backup de pe NAS";
+    public const string DownloadBackup = "Descărcare pachet backup";
     public const string TestNasBackup = "Testare conexiune NAS";
     public const string SetActivityImport = "Modificare setări preluare ActivityApp";
     public const string SetJournalDisplay = "Modificare evenimente afișate în jurnal";
@@ -429,7 +435,7 @@ public static class AuditActions
         action is Create or Edit or EditProductTags or ExpiryItp or ExpiryInsurance or ExpiryRovinieta or MoveEquipment or ReturnEquipment
             or CreateNotificationTemplate or EditNotificationTemplate or NotificationCreated or AcknowledgeNotification or SnoozeNotification
             or ResolveNotification or AutoResolveNotification or ReopenNotification or EditNotificationSettings
-            or CreateWorkPoint or EditWorkPoint or EditWorkPointDescription or EditWorkPointCoordinates or AddWorkPointPhoto or AddAttachedFile or DeleteAttachedFile or RenameAttachedFile
+            or CreateWorkPoint or EditWorkPoint or EditWorkPointDescription or EditWorkPointCoordinates or AddWorkPointPhoto or CreateAttachedWorkPoint or EditAttachedWorkPoint or AddAttachedFile or DeleteAttachedFile or RenameAttachedFile
             or CreateServiceContract or EditServiceContract or CreateServiceContractAddendum or EditServiceContractAddendum or CancelServiceContractAddendum or EditServiceContractExpiry or ActivateServiceContract or DeactivateServiceContract
             or AddContractPoint or RemoveContractPoint or EditMaintenanceCycle or RescheduleMaintenance or MoveContractPoint
             or EditContractReferenceDate or EditContractComponents or FreezeServiceContract or UnfreezeServiceContract

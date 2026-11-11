@@ -35,7 +35,8 @@ public static partial class FullRun
                 @"\b\w*Message\s*(?:=|=>)\s*\$?""([^""]*)""",
                 @"\b[eE]rrors\.Add\(\s*\$?""([^""]*)""",
             };
-            var english = new HashSet<string>(["the", "is", "must", "cannot", "failed", "invalid", "required", "please", "error", "already",
+            // "invalid" is also a Romanian word, so it is not counted as English.
+            var english = new HashSet<string>(["the", "is", "must", "cannot", "failed", "required", "please", "error", "already",
                 "exists", "found", "unable", "could", "should", "will", "your", "been", "denied", "missing", "expected", "value", "field", "not"],
                 StringComparer.OrdinalIgnoreCase);
             var scanned = 0; var offenders = new List<string>();

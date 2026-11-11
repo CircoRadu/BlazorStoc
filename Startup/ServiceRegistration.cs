@@ -154,6 +154,7 @@ internal static class ServiceRegistration
     public static IServiceCollection AddMaintenanceServices(this IServiceCollection services, IConfiguration configuration)
     {
         services.AddScoped<IWorkPointRepository, MariaWorkPointRepository>();
+        services.AddScoped<IAttachedWorkPointRepository, MariaAttachedWorkPointRepository>();
         services.AddScoped<IServicePhotoStore, MariaServicePhotoStore>();
         services.AddScoped<IEntityFileStore, MariaEntityFileStore>();
         return services;
@@ -194,6 +195,7 @@ internal static class ServiceRegistration
         // application when Backup:Mode is InProcess. Here stay the lock, the settings of the schedule and of the share, the retention and the daily schedule.
         services.AddScoped<INasBackupSettingsRepository, MariaNasBackupStore>();
         services.AddScoped<IBackupSettingsRepository, MariaBackupSettingsStore>();
+        services.AddScoped<IBackupDownloadService, BackupDownloadService>();
         services.AddScoped<IBackupRetentionService, BackupRetentionService>();
         services.AddHostedService<BackupScheduler>();
         return services;

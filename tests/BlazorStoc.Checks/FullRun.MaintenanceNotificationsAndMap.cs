@@ -129,6 +129,8 @@ public static partial class FullRun
         await RunTrackingChecks.RunAsync(Check);
         await RobustnessChecks.RunAsync(Check);
         await NasBackupChecks.RunAsync(Check);
+        await BackupDownloadChecks.RunAsync(Check);
+        BackupDownloadTableChecks.Run(Check);
         await BackupAssetsChecks.RunAsync(Check);
         await DatabaseSettingsChecks.RunAsync(Check);
         BlazorStoc.Checks.OfferChecks.Run(Check);

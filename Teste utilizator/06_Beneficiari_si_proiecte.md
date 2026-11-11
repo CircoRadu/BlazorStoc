@@ -281,3 +281,44 @@ Cunoscut: daca adaugarea componentelor alese la creare esueaza (de ex. tipul a f
 | 2 | Scrie ceva si apasa "Inchide" | Intrebarea "Parasesti editarea?" | |
 | 3 | Salveaza | beneficiar apare in lista | |
 | 4 | Creion pe un rand existent | Editarea se deschide in pagina (nu in popup) | |
+
+## Modificari de testat - puncte de lucru arondate (11.11.2026)
+
+**Ce s-a adaugat:** un punct de lucru poate avea puncte de lucru arondate (de exemplu o scoala cu cladirea de invatamant primar si gradinita), fiecare cu nume si cel putin adresa sau coordonate GPS; telefon si persoana de contact sunt optionale. Cautarea extinsa a beneficiarilor le cauta. Beneficiarii preluati din ActivityApp au nota "Preluat din ActivityApp".
+**Ce face acum:** in tabelul punctelor de lucru, coloana "Arondate" deschide fereastra listei; adaugarea si editarea se fac in popup, cu iconite + pentru Coordonate GPS, Adresa, Telefon, Persoana de contact.
+
+| Nr | Pas | Rezultat asteptat | Rezultat |
+|----|-----|-------------------|----------|
+| 1 | Fisa beneficiar -> Puncte de lucru -> "+ Arondate" pe un punct -> "+ Adauga punct arondat" | Popup cu nume si 4 iconite + (GPS, Adresa, Telefon, Persoana de contact) | |
+| 2 | Scrie doar numele si salveaza | Refuz: "Completeaza cel putin adresa sau coordonatele GPS" | |
+| 3 | Adauga Adresa, apasa Aplica | Adresa apare cu iconite de editare si stergere; stergerea ei e dezactivata (e singura locatie) | |
+| 4 | Adauga si Coordonate GPS (de ex. 45.7489, 21.2087), Aplica | Pin pe harta din popup; acum adresa se poate sterge, apoi GPS-ul ramane blocat | |
+| 5 | Adauga Telefon "abc" | Mesaj: numarul trebuie sa aiba 7-15 cifre; cu 0744123456 se accepta | |
+| 6 | Salveaza; adauga alt punct cu acelasi nume | Refuz: exista deja un punct arondat cu acest nume | |
+| 7 | Editeaza un punct arondat din lista, modifica o informatie, salveaza | Lista se actualizeaza; Jurnal: "Modificare punct arondat" | |
+| 8 | Sterge un punct arondat din lista | Dispare dintr-un pas; Jurnal: Stergere (Puncte arondate) | |
+| 9 | Beneficiari -> Cautare extinsa -> scrie numele unui punct arondat | Beneficiarul apare cu nota "punct arondat: X (la Y)"; in cautarea simpla nu apare | |
+| 10 | Stergerea unui punct de lucru sau a unui beneficiar care are puncte arondate | Se sterg (arhivate) odata cu el | |
+| 11 | Beneficiar preluat din ActivityApp (lista si fisa) | Nota "Preluat din ActivityApp"; cele doar legate: "Legat cu ActivityApp" | |
+
+## Modificari de testat - antete unitare si ordonare (11.11.2026, BUG-0018)
+
+
+
+**Ce s-a adaugat:** acelasi font la antetul tuturor tabelelor; clic pe antetul unei coloane ordoneaza lista (crescator, descrescator, ordinea initiala).
+
+**Ce face acum:** ordonarea si numarul de randuri pe pagina se pastreaza cat ramane deschis tabul browserului.
+
+
+
+| Pas | Ce faci | Ce trebuie sa vezi | OK |
+
+|---|---|---|---|
+
+| 1 | Beneficiari -> clic pe BENEFICIAR de doua ori | Lista in ordine descrescatoare, sageata in jos | |
+
+| 2 | Treci in alta pagina si revino la Beneficiari | Aceeasi ordonare si acelasi numar de randuri pe pagina | |
+
+| 3 | Inchide tabul si redeschide aplicatia | Ordonarea nu s-a pastrat (valorile initiale) | |
+
+| 4 | Notificari (active), Utilizatori, Balante restante: compara antetele | Acelasi font si aceeasi culoare peste tot | |

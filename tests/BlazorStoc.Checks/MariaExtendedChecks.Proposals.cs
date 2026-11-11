@@ -13,7 +13,9 @@ public static partial class MariaExtendedChecks
     {
         var started = DateTime.UtcNow.AddSeconds(-1);
         var png = Convert.FromBase64String("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==");
+        // The alerts of the tab Propuneri are for developers only (PROP-0013): the same author, as a developer account, reads them.
         var author = new MariaProposalService(configuration, new TestAccessControl(false, "proba.propune"), audit);
+        var authorAlerts = new MariaProposalService(configuration, new TaskTestAccess(null, "proba.propune", false, "setari-propuneri.view"), audit);
         var other = new MariaProposalService(configuration, new TestAccessControl(false, "proba.altul.p"), audit);
         var boss = new MariaProposalService(configuration, admin, audit);
         try
@@ -51,13 +53,13 @@ public static partial class MariaExtendedChecks
             Check(openBefore >= 1 && await author.CountOpenAsync() == 0, "Proposal: the badge of the tab counts the proposals not closed, for who may see them all (an ordinary user gets 0)");
             var changed = await boss.ChangeStateAsync(proposal.Id, ProposalRules.StateAccepted, "", "Ne place, o punem la plan");
             Check(changed.State == ProposalRules.StateAccepted && changed.NoteCount == 1 && changed.DecidedUtc is null, "Proposal: the administrator changes the state and the answer goes into the thread");
-            Check((await author.GetAlertsAsync()).Any(alert => alert.Proposal.Id == proposal.Id && alert.Reason.StartsWith("Stare", StringComparison.Ordinal)), "Proposal: the author is told about the change of state");
+            Check((await authorAlerts.GetAlertsAsync()).Any(alert => alert.Proposal.Id == proposal.Id && alert.Reason.StartsWith("Stare", StringComparison.Ordinal)), "Proposal: the author is told about the change of state");
             await author.MarkSeenAsync(proposal.Id);
-            Check((await author.GetAlertsAsync()).All(alert => alert.Proposal.Id != proposal.Id), "Proposal: opening the proposal clears the alert of the author");
+            Check((await authorAlerts.GetAlertsAsync()).All(alert => alert.Proposal.Id != proposal.Id), "Proposal: opening the proposal clears the alert of the author");
             await author.AddNoteAsync(proposal.Id, "Multumesc!");
             await boss.AddNoteAsync(proposal.Id, "Cu placere");
             var notes = await other.GetNotesAsync(proposal.Id);
-            Check(notes.Count == 3 && notes[1].Author == "proba.propune" && (await author.GetAlertsAsync()).Any(alert => alert.Proposal.Id == proposal.Id), "Proposal: the author and the administrator answer in one thread, visible to all; an answer of the administrator is an alert again");
+            Check(notes.Count == 3 && notes[1].Author == "proba.propune" && (await authorAlerts.GetAlertsAsync()).Any(alert => alert.Proposal.Id == proposal.Id), "Proposal: the author and the administrator answer in one thread, visible to all; an answer of the administrator is an alert again");
 
             var implemented = await boss.ChangeStateAsync(proposal.Id, ProposalRules.StateImplemented, "0.5.99", "");
             Check(implemented.ImplementedVersion == "0.5.99" && implemented.DecidedUtc is not null, "Proposal: Implementată records the version and the time of the decision");

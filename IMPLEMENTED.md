@@ -943,3 +943,36 @@ Cerut de utilizator la 06.10.2026 (verificarea fluxului, apoi deciziile: facturi
 - Sablonarea preluarii tichetului ActivityApp (BUG-0017): liste pliabile Tichet / Eveniment / Client cu comutator "Folosit", lista "Folosite" (descriere, rol, destinatie, detasare), coloane de orice tip, CUI client mereu preluat, observatii "descriere: valoare"; baza permanenta de test ActivityApp_test (tools/load-activityapp-test-db.ps1).
 - Changelog pe categorii Functionalitati noi / Bugs / Diverse (PROP-0019): migrarea 87 (bug_reports.resolved_version), parser si dialog, release.ps1 pastreaza categoriile, tools/changelog-draft.ps1.
 - Teste: suita de componente 1883 PASS, MariaDB (rapoarte de eroare) 29 PASS.
+
+## Finalizat la 11.11.2026 - Puncte de lucru arondate (componente ale punctului de lucru)
+
+- **Date:** migrarea 88 - `work_point_attached` (nume unic per punct de lucru, adresa si/sau coordonate GPS, telefon, persoana de contact; CHECK: cel putin adresa sau coordonatele, coordonate ambele sau niciuna; adresa NU se mosteneste de la punct) si `archive_work_point_attached`. Stergerea unui punct arondat, a unui punct de lucru sau a unui beneficiar le arhiveaza (la punct/beneficiar ca relatii ale arhivei).
+- **Interfata (totul in popup):** coloana "ARONDATE" in tabelul punctelor de lucru; popup-ul listei (adaugare, editare, stergere intr-un pas) si popup-ul de editare cu nume + iconite "+" pentru Coordonate GPS, Adresa, Telefon, Persoana de contact; fiecare informatie are iconite de editare si stergere; ultima informatie de locatie (adresa sau GPS) nu se poate sterge singura.
+- **Jurnal:** "Adaugare punct arondat", "Modificare punct arondat", stergerea arhivata (entitate PunctArondat).
+- **Cautare extinsa beneficiari:** cauta si in numele, adresa, telefonul si contactul punctelor de lucru si ale punctelor arondate (fara diacritice, fara majuscule); rezultatul spune de ce apare ("punct arondat: X (la Y)"). Cautarea simpla ramane neschimbata.
+- **Harta:** pin separat pentru fiecare punct arondat cu coordonate (culoare proprie, legenda, titlu Beneficiar / Punct de lucru / Punct arondat); apar cat timp nu e setat filtru de scadenta, contract sau perioada.
+- **Preluare ActivityApp:** la o rulare completa, un punct de lucru din ActivityApp cu nume asemanator unui punct arondat al aceluiasi beneficiar da o notificare de verificare in lista problemelor deschise (entitate attached-similar), fara a opri importul sau a invalida ceva; cele marcate rezolvate nu se mai ridica.
+- **Nota "Preluat din ActivityApp" / "Legat cu ActivityApp" pe beneficiar:** calculata din legaturile importului (`activity_import_map`), fara coloana noua; in lista si in fisa beneficiarului (punctele de lucru aveau deja nota in descriere).
+- Module: ActivityImport 0.17.0, Maintenance 1.12.0, Journal 1.5.1.
+- Teste: grupul attachedpoints (39 verificari), sectiunea MariaDB "Attached work points" (20), suita de componente 1922 PASS. Verificat in aplicatie pe baza de test (adaugare, editare, stergere, cautare extinsa, pin si panou pe harta).
+
+## Finalizat la 11.11.2026 - Antete unitare, ordonare din antet si memorare pe sesiune (BUG-0018)
+
+- **Antet unic:** regula globala pentru `th` in `wwwroot/app.css` cu tokenurile `--th-size`, `--th-weight`, `--th-spacing`, `--th-color` (majuscule); regulile locale de font ale tabelelor `save-summary`, `help-table`, `database-accounts-table` scoase; celulele-antet de rand (`tbody th`, `scope=row`) raman text normal. Regula permanenta in CLAUDE.md.
+- **Ordonare:** componenta `SortTh` (in `Paged`, interfata `IPagedSort`): clic = crescator, descrescator, ordinea initiala; text fara diferenta de majuscule/diacritice, golurile la sfarsit; `DefaultSortKey`/`DefaultDescending` pentru ordinea de pornire.
+- **Memorare:** `Paged` retine marimea paginii si ordonarea fiecarui tabel (adresa paginii + Id) numai cat ramane deschis tabul browserului (sessionStorage, `wwwroot/table-state.js`); nu retine pagina curenta, nimic pe server.
+- **Liste cu ordonare:** Beneficiari, Utilizatori, Notificari (active si rezolvate), Balante Elcomtur (si facturile unui beneficiar), Analize de risc, facturi furnizori, sabloane de facturi, contracte si interventii de mentenanta, rapoarte si propuneri (administrare si "Rapoartele mele"), puncte de lucru, analizori de risc, tipuri de utilizatori, module. Facturile, contractele, interventiile, analizele si sabloanele de facturi au primit si paginare (25 implicit).
+- **Raman fara ordonare:** jurnalul de activitate (paginat pe server), inventarul, ofertele (previzualizari), cateva liste mici paginate (sesiuni deschise, pachete backup, fisiere beneficiar, importul ActivityApp); mutarea ordonarii vechi (miscari, taskuri, pagina principala) pe `SortTh` nu s-a facut.
+- Module: Elcomtur 1.3.3, Notifications 1.6.2, BugReports 1.4.3, Proposals 1.4.1, RiskAnalyses 1.3.4, Suppliers 1.0.3, Invoices 1.1.6, Maintenance 1.12.1. Teste: 7 verificari noi in PagedChecks; verificat in browser (Beneficiari).
+
+## Finalizat la 11.11.2026 - Titlul si numarul tichetului din orice coloana (BUG-0019)
+
+- Fereastra "Tichet exemplu": randurile Titlu si Numar din lista "Folosite" au lista de coloane (orice coloana text din Tichet); rolurile "Titlul/Numarul tichetului" apar in lista "Rol" a coloanelor text; la coliziune informatia obligatorie trece pe coloana lasata libera, iar un camp liber care citea coloana este scos, cu mesaj. Salvarea si jurnalul neschimbate. Teste: 2 verificari in ActivityImportPanelChecks.
+
+## Finalizat la 11.11.2026 - Fara taburi in raportul de eroare si "+" aliniat (BUG-0020)
+
+- "Raporteaza o eroare": bara de taburi inlocuita cu butonul "Rapoartele mele" / "Raport nou" (formularul de propunere nu avea taburi). Analize de risc: butonul "+" de langa analizor centrat pe linia select-ului. RiskAnalyses 1.3.3.
+
+## Finalizat la 11.11.2026 - Descarcarea pachetelor de backup (PROP-0020)
+
+- Setari -> Backup: iconita de descarcare pe fiecare pachet; endpoint `GET /api/backup/{nume}` (dreptul `setari-backup.edit`): pachetul simplu se trimite ca atare, cu fisierul `.sha256` alaturi vine intr-o arhiva `<nume>-cu-suma-de-control.zip` (stocata, temporar sters la final); un pachet doar pe NAS este adus intai pe server (acelasi pas ca la restaurare). Jurnal: "Descarcare pachet backup" (Journal 1.6.0). Teste: grupul backupdownload (11 verificari); endpoint verificat in browser.

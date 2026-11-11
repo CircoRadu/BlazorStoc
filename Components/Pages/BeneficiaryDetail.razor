@@ -6,6 +6,8 @@
 @inject IBeneficiaryRepository Beneficiaries
 @inject IProjectRepository Projects
 @inject IWorkPointRepository WorkPointStore
+@inject IAttachedWorkPointRepository AttachedStore
+@inject IBeneficiaryCheckService OriginChecks
 @inject IServicePhotoStore PhotoStore
 @inject IServiceContractRepository ContractStore
 @inject IRiskAnalysisRepository RiskStore
@@ -39,7 +41,7 @@ else if (error is not null)
 else if (beneficiary is not null)
 {
     <div class="page-heading">
-        <div><p class="eyebrow">BENEFICIAR</p><h1>@beneficiary.Name</h1><p class="muted">@(beneficiary.IsIndividual ? "Persoană fizică" : $"CUI {beneficiary.Cui}")@(beneficiary.Address.Length > 0 ? $" · {beneficiary.Address}" : "")@(beneficiary.Phone.Length > 0 ? $" · tel. {beneficiary.Phone}" : "")</p>
+        <div><p class="eyebrow">BENEFICIAR</p><h1>@beneficiary.Name</h1><p class="muted">@(beneficiary.IsIndividual ? "Persoană fizică" : $"CUI {beneficiary.Cui}")@(beneficiary.Address.Length > 0 ? $" · {beneficiary.Address}" : "")@(beneficiary.Phone.Length > 0 ? $" · tel. {beneficiary.Phone}" : "")</p>@if (origin is not null) { <p class="muted origin-note" id="beneficiary-origin">@origin.Text</p> }
             @if (!beneficiary.IsIndividual && (beneficiary.RegistryNumber.Length > 0 || beneficiary.PostalCode.Length > 0 || beneficiary.CaenCode.Length > 0))
             {
                 <p class="muted">@string.Join(" · ", new[] { beneficiary.RegistryNumber.Length > 0 ? $"Reg. Com. {beneficiary.RegistryNumber}" : null, beneficiary.PostalCode.Length > 0 ? $"Cod poștal {beneficiary.PostalCode}" : null, beneficiary.CaenCode.Length > 0 ? $"CAEN {beneficiary.CaenCode}" : null }.Where(part => part is not null))</p>
@@ -75,18 +77,33 @@ else if (beneficiary is not null)
         </AppDialog>
     }
 
+    @if (attachedListFor is { } attachedParent)
+    {
+        <AppDialog PanelClass="template-popup" LabelledBy="attached-list-title">
+            <AttachedWorkPointsList @key="attachedParent.Id" Parent="attachedParent" Items="AttachedOf(attachedParent.Id)" CanManage="permEdit" AddRequested="OpenAddAttached" EditRequested="OpenEditAttached"
+                                    Changed="ReloadAttachedAsync" Closed="CloseAttachedList" />
+        </AppDialog>
+    }
+    @if (attachedListFor is { } editorParent && (attachedAdding || attachedEditing is not null))
+    {
+        <AppDialog PanelClass="template-popup" BackdropClass="front" LabelledBy="attached-editor-title">
+            <AttachedWorkPointEditor @key="attachedEditorKey" Parent="editorParent" Original="attachedEditing" Saved="AttachedSavedAsync" Closed="CloseAttachedEditor" />
+        </AppDialog>
+    }
+
     <section class="catalog">
         <details class="catalog-collapse"><summary class="catalog-heading"><h2>Puncte de lucru <span>@workPoints.Count</span></h2>
             @if (canManage) { <button class="refresh act-confirm" disabled="@(addingWorkPoint || editingWorkPoint is not null || editingBeneficiary)" @onclick="OpenAddWorkPoint">+ Adaugă punct de lucru</button> }
         </summary>
         @if (workPointError is not null) { <div class="error-banner" role="alert">@workPointError</div> }
-        <Paged Items="workPoints" Id="work-points-page-size" Context="pageRows">
-        <div class="table-scroll"><table><thead><tr><th>NUME</th><th>ADRESĂ</th><th>TELEFON</th><th>PERSOANĂ DE CONTACT</th><th>DESCRIERE</th><th>COORDONATE</th><th class="number">FOTO</th><th>MENTENANȚĂ</th><th>ANALIZĂ DE RISC</th>@if (canManage) { <th></th> }</tr></thead><tbody>
+        <Paged Items="workPoints" Id="work-points-page-size" Context="pageRows" Sorts="WorkPointSorts">
+        <div class="table-scroll"><table><thead><tr><SortTh Key="name">NUME</SortTh><SortTh Key="address">ADRESĂ</SortTh><SortTh Key="phone">TELEFON</SortTh><SortTh Key="contact">PERSOANĂ DE CONTACT</SortTh><SortTh Key="description">DESCRIERE</SortTh><th>COORDONATE</th><th>ARONDATE</th><th class="number">FOTO</th><th>MENTENANȚĂ</th><th>ANALIZĂ DE RISC</th>@if (canManage) { <th></th> }</tr></thead><tbody>
             @foreach (var workPoint in pageRows)
             {
                 <tr @key="workPoint.Id"><td><strong>@workPoint.Name</strong>@if (workPoint.IsPrimary) { <span class="anaf-source ok work-point-badge">Principal</span> }</td><td>@workPoint.Address</td><td>@workPoint.Phone</td><td>@workPoint.ContactPerson</td>
                     <td class="work-point-description" title="@workPoint.Description">@workPoint.Description</td>
                     <td>@(workPoint.HasCoordinates ? WorkPointCoordinates.Format(workPoint.Latitude, workPoint.Longitude) : "")</td>
+                    <td class="attached-cell">@if (workPoint.Id > 0) { var attachedCount = AttachedOf(workPoint.Id).Count; <button type="button" class="attached-open" id="attached-open-@workPoint.Id" disabled="@(addingWorkPoint || editingWorkPoint is not null || editingBeneficiary)" title="Puncte de lucru arondate la @workPoint.Name" aria-label="Puncte de lucru arondate la @workPoint.Name: @attachedCount" @onclick="() => OpenAttachedList(workPoint)">@(attachedCount == 0 ? (canManage ? "+ Arondate" : "") : $"Arondate ({attachedCount})")</button> }</td>
                     <td class="number">@(photoCounts.TryGetValue(workPoint.Id, out var photoCount) ? photoCount.ToString() : "")</td>
                     <td>@{ var coverage = ActiveCoverage(workPoint.Id); }@if (coverage is { } covered) { <span>@covered.Contract.Label</span><text> </text><span class="due-chip @ServiceDueRules.CssClass(ServiceDueRules.State(covered.Point.NextDue, Today, thresholdDays))">@StockMovementRules.DisplayDate(covered.Point.NextDue)</span> } else if (InOffContract(workPoint.Id)) { <span class="contract-state off">Contract Off</span> }</td>
                     <td>@RiskAnalysisCell(workPoint)</td>
@@ -186,6 +203,7 @@ else if (beneficiary is not null)
     private bool loading = true, projectsLoading, addingProject, editingBeneficiary, canManage, canMaintenance, canRisk;
     private string? error, notice, workPointError;
     // The additional work points; the main one is derived from the beneficiary itself (WorkPointRules.Primary).
+    private static readonly IReadOnlyDictionary<string, Func<WorkPoint, IComparable?>> WorkPointSorts = new Dictionary<string, Func<WorkPoint, IComparable?>> { ["name"] = item => item.Name, ["address"] = item => item.Address, ["phone"] = item => item.Phone, ["contact"] = item => item.ContactPerson, ["description"] = item => item.Description };
     private IReadOnlyList<WorkPoint> workPoints = Array.Empty<WorkPoint>();
     // Number of photos per work point id (points without photos are absent).
     private IReadOnlyDictionary<int, int> photoCounts = new Dictionary<int, int>();
@@ -312,6 +330,8 @@ else if (beneficiary is not null)
             if (beneficiary is null) { error = "Beneficiarul solicitat nu mai există."; return; }
             workPoints = await WorkPointStore.GetAsync(Id, lifetime.Token);
             photoCounts = await PhotoStore.CountsForBeneficiaryAsync(Id, lifetime.Token);
+            attachedAll = await AttachedStore.GetForBeneficiaryAsync(Id, lifetime.Token);
+            await LoadOriginAsync();
             // The contracts and the risk analyses are other modules: if one fails, the file of the beneficiary still opens (the section and the column say so).
             contracts = await Modules.TryRunAsync(BlazorStoc.Modules.Maintenance.MaintenanceModule.ModuleId, () => ContractStore.GetForBeneficiaryAsync(Id, lifetime.Token), Array.Empty<ServiceContractDetails>());
             // The risk analyses are another module: if it fails, the file of the beneficiary still opens (the section and the column say so).
@@ -473,12 +493,47 @@ else if (beneficiary is not null)
         }
     }
 
+    // "Preluat din ActivityApp" / "Legat cu ActivityApp", calculated from the ties of the import (null: the beneficiary did not come from there).
+    private BeneficiaryOrigin? origin;
+    private async Task LoadOriginAsync()
+    {
+        try { origin = (await OriginChecks.GetOriginsAsync(lifetime.Token)).TryGetValue(Id, out var found) ? found : null; }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (Exception exception) { origin = null; Logger.LogWarning("Beneficiary origin loading failed ({ErrorType}).", exception.GetType().Name); }
+    }
+
+    // The attached work points (components of the work points) of the beneficiary, one query; the popups below work on them.
+    private IReadOnlyList<AttachedWorkPoint> attachedAll = [];
+    private WorkPoint? attachedListFor;
+    private bool attachedAdding;
+    private AttachedWorkPoint? attachedEditing;
+    private Guid attachedEditorKey;
+    private IReadOnlyList<AttachedWorkPoint> AttachedOf(int workPointId) => attachedAll.Where(point => point.WorkPointId == workPointId).ToArray();
+    private void OpenAttachedList(WorkPoint workPoint) { attachedListFor = workPoint; attachedAdding = false; attachedEditing = null; }
+    private void CloseAttachedList() { attachedListFor = null; attachedAdding = false; attachedEditing = null; }
+    private void OpenAddAttached() { attachedAdding = true; attachedEditing = null; attachedEditorKey = Guid.NewGuid(); }
+    private void OpenEditAttached(AttachedWorkPoint point) { attachedAdding = false; attachedEditing = point; attachedEditorKey = Guid.NewGuid(); }
+    private void CloseAttachedEditor() { attachedAdding = false; attachedEditing = null; }
+    private async Task AttachedSavedAsync(AttachedWorkPoint saved) { CloseAttachedEditor(); await ReloadAttachedAsync(); }
+
+    private async Task ReloadAttachedAsync()
+    {
+        try { attachedAll = await AttachedStore.GetForBeneficiaryAsync(Id, lifetime.Token); }
+        catch (OperationCanceledException) { }
+        catch (Exception exception)
+        {
+            Logger.LogWarning("Attached work points refresh failed ({ErrorType}).", exception.GetType().Name);
+            workPointError = "Lista punctelor arondate nu a putut fi actualizată.";
+        }
+    }
+
     private async Task ReloadWorkPointsAsync()
     {
         try
         {
             workPoints = await WorkPointStore.GetAsync(Id, lifetime.Token);
             photoCounts = await PhotoStore.CountsForBeneficiaryAsync(Id, lifetime.Token);
+            attachedAll = await AttachedStore.GetForBeneficiaryAsync(Id, lifetime.Token);
         }
         catch (OperationCanceledException) { }
         catch (Exception exception)

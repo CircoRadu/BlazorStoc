@@ -28,8 +28,9 @@ else
     else if (templates.Count == 0) { <div class="empty-state"><div class="empty-icon" aria-hidden="true">▤</div><h3>Nu există șabloane salvate</h3><p>Încarcă o factură (PDF sau XML) în pagina „Generare șablon factură” și salvează șablonul creat.</p></div> }
     else
     {
-        <div class="table-scroll"><table><thead><tr><th>ACTIV</th><th>ȘABLON</th><th>FURNIZOR</th><th>CUI</th><th>FORMAT</th><th>CONȚINUT</th><th>ACTUALIZAT</th><th><span class="sr-only">Acțiuni</span></th></tr></thead><tbody>
-        @foreach (var template in templates)
+        <Paged Items="templates" Id="invoice-templates-size" Context="pageRows" Sorts="Sorts">
+        <div class="table-scroll"><table><thead><tr><SortTh Key="active">ACTIV</SortTh><SortTh Key="name">ȘABLON</SortTh><SortTh Key="supplier">FURNIZOR</SortTh><SortTh Key="cui">CUI</SortTh><SortTh Key="format">FORMAT</SortTh><th>CONȚINUT</th><SortTh Key="updated">ACTUALIZAT</SortTh><th><span class="sr-only">Acțiuni</span></th></tr></thead><tbody>
+        @foreach (var template in pageRows)
         {
             var info = template.Info;
             var focused = info.Id == FocusTemplateId;
@@ -78,6 +79,7 @@ else
             }
         }
         </tbody></table></div>
+        </Paged>
     }
 </section>
 }
@@ -103,6 +105,7 @@ else
 
     private readonly CancellationTokenSource lifetime = new();
     private IReadOnlyList<InvoiceTemplateRecord> templates = [];
+    private static readonly IReadOnlyDictionary<string, Func<InvoiceTemplateRecord, IComparable?>> Sorts = new Dictionary<string, Func<InvoiceTemplateRecord, IComparable?>> { ["active"] = item => item.Info.Active ? 0 : 1, ["name"] = item => item.Info.Name, ["supplier"] = item => item.Info.SupplierName, ["cui"] = item => item.Info.SupplierCui, ["format"] = item => item.Definition.IsXml ? "XML" : "PDF", ["updated"] = item => item.Info.UpdatedUtc };
     private InvoiceTemplateInfo? deleting;
     private string? error, notice, deleteError;
     private int? expanded, scrolledTo;

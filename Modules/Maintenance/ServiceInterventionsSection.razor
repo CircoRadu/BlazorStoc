@@ -67,8 +67,9 @@
     }
     else
     {
-        <div class="table-scroll"><table><thead><tr><th>EFECTUATĂ LA</th><th>FEL</th><th>PUNCT DE LUCRU</th><th>CONTRACT</th><th>SCADENȚĂ</th><th>OBSERVAȚII</th><th class="number">FOTO</th><th></th></tr></thead><tbody>
-        @foreach (var item in Visible)
+        <Paged Items="Visible" Id="service-interventions-size" Context="pageRows" Sorts="Sorts">
+        <div class="table-scroll"><table><thead><tr><SortTh Key="on">EFECTUATĂ LA</SortTh><SortTh Key="kind">FEL</SortTh><SortTh Key="point">PUNCT DE LUCRU</SortTh><SortTh Key="contract">CONTRACT</SortTh><SortTh Key="due">SCADENȚĂ</SortTh><th>OBSERVAȚII</th><th class="number">FOTO</th><th></th></tr></thead><tbody>
+        @foreach (var item in pageRows)
         {
             <tr @key="item.Id">
                 <td>@StockMovementRules.DisplayDate(item.PerformedOn)</td>
@@ -93,6 +94,7 @@
             </tr>
         }
         </tbody></table></div>
+        </Paged>
     }
 </details>
 </section>
@@ -127,6 +129,7 @@
     private readonly CancellationTokenSource lifetime = new();
 
     private bool Locked => busy || adding || editing is not null;
+    private static readonly IReadOnlyDictionary<string, Func<ServiceIntervention, IComparable?>> Sorts = new Dictionary<string, Func<ServiceIntervention, IComparable?>> { ["on"] = item => item.PerformedOn, ["kind"] = item => item.Kind.ToString(), ["point"] = item => item.WorkPointName, ["contract"] = item => item.ContractLabel, ["due"] = item => item.PlannedDue };
     private IReadOnlyList<ServiceIntervention> Visible => kindFilter.Length == 0 ? interventions : interventions.Where(item => ServiceInterventionRules.KindCode(item.Kind).ToString() == kindFilter).ToList();
 
     private string DeleteDescription => deleting is { MovesDue: true }

@@ -44,8 +44,9 @@
     }
     else
     {
-        <div class="table-scroll"><table><thead><tr><th>NR. ÎNREGISTRARE</th>@if (ShowBeneficiary) { <th>BENEFICIAR</th> }<th>PUNCT DE LUCRU</th><th>ÎNTOCMITĂ</th><th>ULTIMA REÎNNOIRE</th><th>VALABILITATE</th><th>EXPIRĂ</th><th>STARE</th>@if (CanManage) { <th></th> }</tr></thead><tbody>
-        @foreach (var view in Visible)
+        <Paged Items="Visible" Id="risk-analyses-size" Context="pageRows" Sorts="Sorts">
+        <div class="table-scroll"><table><thead><tr><SortTh Key="number">NR. ÎNREGISTRARE</SortTh>@if (ShowBeneficiary) { <SortTh Key="beneficiary">BENEFICIAR</SortTh> }<SortTh Key="point">PUNCT DE LUCRU</SortTh><SortTh Key="initial">ÎNTOCMITĂ</SortTh><SortTh Key="renewal">ULTIMA REÎNNOIRE</SortTh><SortTh Key="validity">VALABILITATE</SortTh><SortTh Key="expiry">EXPIRĂ</SortTh><SortTh Key="state">STARE</SortTh>@if (CanManage) { <th></th> }</tr></thead><tbody>
+        @foreach (var view in pageRows)
         {
             var analysis = view.Analysis;
             var state = RiskAnalysisRules.State(analysis, Today, ThresholdDays);
@@ -88,6 +89,7 @@
             }
         }
         </tbody></table></div>
+        </Paged>
     }
 </details>
 </section>
@@ -125,6 +127,11 @@
     private int ColumnCount => 8 + (ShowBeneficiary ? 1 : 0) + (CanManage ? 1 : 0);
     private DateOnly Today => DateOnly.FromDateTime(Clock.GetLocalNow().DateTime);
     private int OffCount => Views.Count(item => !item.Analysis.IsActive);
+    private IReadOnlyDictionary<string, Func<RiskAnalysisView, IComparable?>> Sorts => new Dictionary<string, Func<RiskAnalysisView, IComparable?>>
+    {
+        ["number"] = item => item.Analysis.Number, ["beneficiary"] = item => item.BeneficiaryName, ["point"] = item => item.WorkPointName, ["initial"] = item => item.Analysis.InitialDate, ["renewal"] = item => item.Analysis.LastRenewalDate,
+        ["validity"] = item => item.Analysis.ValidityMonths, ["expiry"] = item => item.Analysis.ExpiryDate, ["state"] = item => (int)RiskAnalysisRules.State(item.Analysis, Today, ThresholdDays)
+    };
     private IReadOnlyList<RiskAnalysisView> Visible => Views.Where(item => item.Analysis.IsActive || showOff).ToList();
     private bool Locked => busy || adding || editing is not null || renewing is not null;
     private IReadOnlyList<WorkPoint> WithoutAnalysis => BeneficiaryId == 0 ? Array.Empty<WorkPoint>()

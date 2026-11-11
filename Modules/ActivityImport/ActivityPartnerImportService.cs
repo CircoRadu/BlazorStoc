@@ -341,6 +341,8 @@ public sealed class MariaActivityPartnerImportService(IConfiguration configurati
                     break;
             }
         }
+        // Only a full run (runId > 0) replaces the open notices; a run for a few partners leaves them as they are.
+        if (runId > 0) await RecordAttachedChecksAsync(loaded, partnerLocal, runId, cancellationToken).ConfigureAwait(false);
         var report = Report("apply", started, actor, true,
             partnerResults.Select(result => (result.Action, new ImportReportItem(ActivityPartnerPlanner.PartnerEntity, result.Plan.SourceId, result.Plan.Name, result.Action.ToString(), result.Message))),
             pointResults.Select(result => (result.Action, new ImportReportItem(ActivityPartnerPlanner.PointEntity, result.Plan.SourceId, result.Plan.Name, result.Action.ToString(), result.Message))), null);
@@ -354,6 +356,38 @@ public sealed class MariaActivityPartnerImportService(IConfiguration configurati
         if (runId > 0) await ImportStore.RecordIssuesAsync(configuration, runId, [ActivityPartnerPlanner.PartnerEntity, ActivityPartnerPlanner.PointEntity], partnerResults.Where(result => result.Action == PlanAction.Problem && result.Plan.Check.Length == 0).Select(result => (ActivityPartnerPlanner.PartnerEntity, result.Plan.SourceId, result.Plan.Name, result.Message))
             .Concat(pointResults.Where(result => result.Action == PlanAction.Problem).Select(result => (ActivityPartnerPlanner.PointEntity, result.Plan.SourceId, result.Plan.Name, result.Message))), cancellationToken).ConfigureAwait(false);
         return report;
+    }
+
+    // The verification notices: a work point of ActivityApp whose name looks like an attached work point added by hand to a work point of the same beneficiary. It is a notice in the list of the
+    // open problems (resolved ones are not raised again); it never refuses or stops anything, and a failure here (the notice is a help, not part of the import) is swallowed.
+    private async Task RecordAttachedChecksAsync(Loaded loaded, IReadOnlyDictionary<long, int> createdLocal, long runId, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var beneficiaryOf = loaded.Partners.Where(plan => plan.LocalId is not null).ToDictionary(plan => plan.SourceId, plan => plan.LocalId!.Value);
+            foreach (var (partner, local) in createdLocal) beneficiaryOf[partner] = local;
+            var attachedOf = new Dictionary<int, List<(string Name, string WorkPointName)>>();
+            await using var connection = await MariaDb.OpenAsync(configuration, cancellationToken).ConfigureAwait(false);
+            await using (var read = new MySqlCommand("SELECT w.beneficiary_id, a.name, w.name FROM work_point_attached a JOIN beneficiary_work_points w ON w.id = a.work_point_id", connection))
+            await using (var reader = await read.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false))
+                while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
+                {
+                    var beneficiary = checked((int)reader.GetInt64(0));
+                    if (!attachedOf.TryGetValue(beneficiary, out var list)) attachedOf[beneficiary] = list = [];
+                    list.Add((reader.GetString(1), reader.GetString(2)));
+                }
+            var resolved = new HashSet<(long, string)>();
+            await using (var read = new MySqlCommand("SELECT source_id, message FROM activity_import_issues WHERE resolved = 1 AND entity = @entity", connection))
+            {
+                read.Parameters.AddWithValue("@entity", ActivityPartnerPlanner.AttachedSimilarEntity);
+                await using var reader = await read.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
+                while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false)) resolved.Add((reader.GetInt64(0), reader.GetString(1)));
+            }
+            var notices = ActivityPartnerPlanner.PlanAttachedChecks(loaded.Points, beneficiaryOf, attachedOf.ToDictionary(pair => pair.Key, pair => (IReadOnlyList<(string Name, string WorkPointName)>)pair.Value))
+                .Where(notice => !resolved.Contains((notice.SourceId, notice.Message.Length > 500 ? notice.Message[..500] : notice.Message))).ToList();
+            await ImportStore.RecordIssuesAsync(configuration, runId, [ActivityPartnerPlanner.AttachedSimilarEntity], notices, cancellationToken).ConfigureAwait(false);
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException) { }
     }
 
     public async Task<ImportRunInfo?> GetLastRunAsync(CancellationToken cancellationToken = default)

@@ -103,3 +103,12 @@ Pasi:
 ## Fluxul de baza
 
 1. Punct nou -> contract activ -> interventie -> apare pe harta si in notificari.
+
+## Modificari de testat - pini pentru puncte arondate pe harta (11.11.2026)
+
+| Pas | Ce faci | Ce trebuie sa vezi | Rezultat |
+|---|---|---|---|
+| 1 | Adauga un punct arondat cu coordonate la un punct de lucru, deschide Harta mentenantei | Pin separat (patrat albastru-gri), legenda "Puncte de lucru arondate" | |
+| 2 | Pozitioneaza mouse-ul / apasa pe pin | Titlu "Beneficiar · Punct de lucru · Punct arondat"; panou cu adresa, coordonate, telefon, contact si link la fisa beneficiarului | |
+| 3 | Seteaza filtrul de scadenta / contract / perioada | Pinii punctelor arondate dispar (nu au scadenta sau contract) | |
+| 4 | Importul ActivityApp cu un punct al carui nume seamana cu un punct arondat | In Setari -> Preluare ActivityApp, lista problemelor deschise: "De verificat: punct asemanator cu un punct arondat"; importul continua | |

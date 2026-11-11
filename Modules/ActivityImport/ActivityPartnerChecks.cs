@@ -95,6 +95,24 @@ public sealed class MariaBeneficiaryCheckService(IConfiguration configuration, I
         return await ReadPendingAsync(configuration, cancellationToken).ConfigureAwait(false);
     }
 
+    public async Task<IReadOnlyDictionary<int, BeneficiaryOrigin>> GetOriginsAsync(CancellationToken cancellationToken = default)
+    {
+        await access.EnsureAnyPermissionAsync(cancellationToken).ConfigureAwait(false);
+        var result = new Dictionary<int, BeneficiaryOrigin>();
+        await using var connection = await MariaDb.OpenAsync(configuration, cancellationToken).ConfigureAwait(false);
+        await using var command = new MySqlCommand("SELECT local_id, origin, source_deleted FROM activity_import_map WHERE entity = 'partner' AND local_id > 0 AND origin IN ('created', 'linked') ORDER BY source_id", connection);
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
+        while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
+        {
+            var id = checked((int)reader.GetInt64(0));
+            var created = reader.GetString(1) == "created";
+            var deleted = reader.GetInt32(2) != 0;
+            // Several partners can be tied to one beneficiary: "created" wins, and it is shown as deleted only when all the partners tied to it are.
+            result[id] = result.TryGetValue(id, out var before) ? new BeneficiaryOrigin(before.Created || created, before.SourceDeleted && deleted) : new BeneficiaryOrigin(created, deleted);
+        }
+        return result;
+    }
+
     internal static async Task<IReadOnlyList<BeneficiaryCheck>> ReadPendingAsync(IConfiguration configuration, CancellationToken cancellationToken)
     {
         var rows = await ActivityPartnerCheckStore.ReadAsync(configuration, PartnerCheckStatus.Pending, cancellationToken).ConfigureAwait(false);
@@ -232,6 +250,7 @@ internal sealed class GuardedBeneficiaryCheckService(IBeneficiaryCheckService in
 {
     private const string Id = ActivityImportModule.ModuleId;
     public Task<IReadOnlyList<BeneficiaryCheck>> GetPendingAsync(CancellationToken cancellationToken = default) => modules.RunAsync(Id, () => inner.GetPendingAsync(cancellationToken));
+    public Task<IReadOnlyDictionary<int, BeneficiaryOrigin>> GetOriginsAsync(CancellationToken cancellationToken = default) => modules.RunAsync(Id, () => inner.GetOriginsAsync(cancellationToken));
     public Task<string> RetryAsync(long id, CancellationToken cancellationToken = default) => modules.RunAsync(Id, () => inner.RetryAsync(id, cancellationToken));
     public Task AcceptAsync(long id, CancellationToken cancellationToken = default) => modules.RunAsync(Id, () => inner.AcceptAsync(id, cancellationToken));
     public Task DiscardAsync(long id, CancellationToken cancellationToken = default) => modules.RunAsync(Id, () => inner.DiscardAsync(id, cancellationToken));

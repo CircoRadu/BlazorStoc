@@ -303,3 +303,25 @@ Pasi: Notificari -> Tichete de validat -> Arata tichetele discardate -> iconita 
 3. Schimba descrierea in lista "Folosite" (ex. "ID client"): observatiile arata "ID client: valoare".
 4. La o coloana text alege alt rol din lista "Rol" (ex. Problema): informatia se muta pe coloana, cu mesaj; "Detaseaza" (cosul) scoate coloana din folosite.
 5. Inchide fereastra, "Salveaza corespondenta", reincarca pagina: campurile libere si rolurile s-au pastrat.
+
+## Modificari de testat - titlul si numarul tichetului din orice coloana (11.11.2026, BUG-0019)
+
+
+
+**Ce s-a adaugat:** in fereastra "Tichet exemplu", pe randurile "Titlul tichetului" si "Numarul tichetului" din lista "Folosite", coloana din care se citesc se alege dintr-o lista; rolurile "Titlul/Numarul tichetului" apar si in lista "Rol" a coloanelor text.
+
+**Ce face acum:** titlul si numarul se pot citi din orice coloana text a tichetului (nu doar Subject si NumeTicket).
+
+
+
+| Pas | Ce faci | Ce trebuie sa vezi | OK |
+
+|---|---|---|---|
+
+| 1 | "Tichet exemplu" -> lista "Folosite", randul "Numarul tichetului" -> alege alta coloana in "Citit din" | Mesajul "Tichet – NumeTicket → ...", valoarea din coloana noua apare in sumar si in observatii; randul ramane fara cos (nedetasabil) | |
+
+| 2 | La "Titlul tichetului" alege coloana folosita acum de numar | Numarul trece pe coloana lasata libera de titlu, cu mesaj | |
+
+| 3 | La o coloana text, in "Rol", alege "Numarul tichetului" | Coloana devine numarul; coloana veche se elibereaza | |
+
+| 4 | Salveaza corespondenta si reincarca pagina | Alegerile pentru titlu si numar s-au pastrat | |

@@ -37,10 +37,10 @@
         </div>
     }
     <div class="table-scroll">
-        <Paged Items="modules" Id="modules-page-size" Context="pageRows">
+        <Paged Items="modules" Id="modules-page-size" Context="pageRows" Sorts="Sorts">
         <div class="table-scroll">
         <table class="catalog-table">
-            <thead><tr><th>Modul</th><th>Versiune</th><th>Stare</th><th>De când</th><th>Cauză</th><th>Erori la rând</th><th>Pornit</th><th><span class="sr-only">Operații</span></th></tr></thead>
+            <thead><tr><SortTh Key="name">Modul</SortTh><SortTh Key="version">Versiune</SortTh><SortTh Key="state">Stare</SortTh><SortTh Key="since">De când</SortTh><th>Cauză</th><th>Erori la rând</th><th>Pornit</th><th><span class="sr-only">Operații</span></th></tr></thead>
             <tbody>
             @foreach (var module in pageRows)
             {
@@ -72,6 +72,7 @@
 
 @code {
     private IReadOnlyList<ModuleInfo> modules = [];
+    private static readonly IReadOnlyDictionary<string, Func<ModuleInfo, IComparable?>> Sorts = new Dictionary<string, Func<ModuleInfo, IComparable?>> { ["name"] = item => item.Name, ["version"] = item => item.Version, ["state"] = item => item.Status.ToString(), ["since"] = item => item.SinceUtc == default ? null : item.SinceUtc };
     private bool canRetry, canToggle, busy, disposed;
     private string? error, notice, reason = "", reasonError;
     private ModuleInfo? pending;

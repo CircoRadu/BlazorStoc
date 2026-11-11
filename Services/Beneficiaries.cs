@@ -124,8 +124,48 @@ public interface IBeneficiaryRepository
 /// <summary>Simple: name and CUI. Extended: name, CUI, address and phone.</summary>
 public enum BeneficiarySearchMode { Simple, Extended }
 
+/// <summary>A place of a beneficiary the extended search looks in: one of its work points (Attached = false) or an attached work point of one of them (ParentName = that work point).</summary>
+public sealed record PlaceSearchEntry(int BeneficiaryId, bool Attached, string Name, string ParentName, string Address, string Phone, string Contact);
+
+/// <summary>A beneficiary found by the search and why a work point or an attached work point made it a result (empty when it matched on its own data).</summary>
+public sealed record BeneficiaryMatch(Beneficiary Beneficiary, IReadOnlyList<string> Reasons);
+
 public static class BeneficiarySearch
 {
+    private const int MaximumReasons = 3;
+
+    /// <summary>
+    /// The extended search with the places: the beneficiaries that match by their own data (<see cref="Filter(IEnumerable{Beneficiary}, string, BeneficiarySearchMode)"/>) and the ones
+    /// that have a work point or an attached work point whose name, address, phone or contact person matches (diacritics and case ignored), each once, with the reason.
+    /// The simple search never looks in the places.
+    /// </summary>
+    public static IReadOnlyList<BeneficiaryMatch> Match(IEnumerable<Beneficiary> beneficiaries, string query, BeneficiarySearchMode mode, IEnumerable<PlaceSearchEntry>? places)
+    {
+        var all = beneficiaries as IReadOnlyList<Beneficiary> ?? beneficiaries.ToList();
+        var own = Filter(all, query, mode).Select(beneficiary => beneficiary.Id).ToHashSet();
+        var text = TextNormalization.ForStorage(query.Trim());
+        var reasons = new Dictionary<int, List<string>>();
+        if (mode == BeneficiarySearchMode.Extended && text.Length > 0 && places is not null)
+        {
+            var phone = BeneficiaryRules.NormalizePhone(query);
+            foreach (var place in places)
+            {
+                var found = Contains(place.Name, text) || Contains(place.Address, text) || Contains(place.Contact, text)
+                    || (phone.Length >= 3 && place.Phone.Length > 0 && place.Phone.Contains(phone, StringComparison.Ordinal));
+                if (!found) continue;
+                if (!reasons.TryGetValue(place.BeneficiaryId, out var list)) reasons[place.BeneficiaryId] = list = [];
+                var reason = place.Attached ? $"punct arondat: {place.Name} (la {place.ParentName})" : $"punct de lucru: {place.Name}";
+                if (list.Count < MaximumReasons && !list.Contains(reason)) list.Add(reason);
+            }
+        }
+        return all.Where(beneficiary => own.Contains(beneficiary.Id) || reasons.ContainsKey(beneficiary.Id))
+            .Select(beneficiary => new BeneficiaryMatch(beneficiary, reasons.TryGetValue(beneficiary.Id, out var list) ? list : []))
+            .ToList();
+    }
+
+    private static bool Contains(string? value, string text) =>
+        !string.IsNullOrEmpty(value) && TextNormalization.ForStorage(value).Contains(text, StringComparison.OrdinalIgnoreCase);
+
     public static IEnumerable<Beneficiary> Filter(IEnumerable<Beneficiary> beneficiaries, string query) =>
         Filter(beneficiaries, query, BeneficiarySearchMode.Extended);
 
