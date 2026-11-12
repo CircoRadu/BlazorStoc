@@ -288,7 +288,9 @@ public static partial class UpdateEngineChecks
         var changes = 0;
         page.Coordinator.Changed += () => changes++;
         var toRun = await page.UploadAsync(newer);
-        var confirmed = await page.Service.ConfirmAsync(toRun.Id, "functie noua");
+        var confirmed = await page.Service.ConfirmAsync(toRun.Id, "functie noua", true);
+        check(confirmed.Immediate && confirmed.StartsUtc <= DateTime.UtcNow.AddSeconds(1) && page.Audit.Entries.Any(entry => entry.Action == AuditActions.ApplicationUpdate && entry.Details.Contains("imediat")),
+            "Update page: an immediate update has no notice time (no banner for the users) and the journal says so");
         check(confirmed.To == "3.1.0" && page.Audit.Entries.Any(entry => entry.Action == AuditActions.ApplicationUpdate && entry.Details.Contains("3.0.0") && entry.Details.Contains("3.1.0") && entry.Details.Contains(toRun.Sha256)),
             "Update page: the journal entry of the confirmation has the versions and the hash of the package");
         check(await page.WaitAsync(() => page.Coordinator.Current is null) && world.Layout.Current == "3.1.0" && world.Host.Running == "3.1.0" && page.Launcher.Starts >= 2 && changes >= 2,

@@ -209,6 +209,8 @@ public sealed class MariaBeneficiaryCheckService(IConfiguration configuration, I
 public sealed class ActivityPartnerCheckSource(IConfiguration configuration) : IExpirySource
 {
     public const string SourceKey = "sistem.beneficiari-activityapp-de-verificat";
+    /// <summary>The tab of the beneficiaries to validate in the notifications page (BUG-0028).</summary>
+    public const string Url = "/notificari?tab=beneficiari";
     public const string NameKey = "beneficiar de verificat";
     public const string DetailsKey = "detalii verificare";
     public string Key => SourceKey;
@@ -239,7 +241,7 @@ public sealed class ActivityPartnerCheckSource(IConfiguration configuration) : I
         var tickets = waiting == 0 ? "niciun tichet nu așteaptă" : waiting == 1 ? "un tichet așteaptă" : $"{waiting} tichete așteaptă";
         var count = items.Count == 1 ? "un beneficiar" : $"{items.Count} beneficiari";
         return [new ExpiryInstance(AggregateId, "Beneficiari din ActivityApp de verificat", DateOnly.FromDateTime(items.Min(item => item.CreatedUtc).ToLocalTime()),
-            new Dictionary<string, string> { [NameKey] = count, [DetailsKey] = $"{char.ToUpperInvariant(reasons[0])}{reasons[1..]}; {tickets} clarificarea." }, "/beneficiari?tab=de-verificat")];
+            new Dictionary<string, string> { [NameKey] = count, [DetailsKey] = $"{char.ToUpperInvariant(reasons[0])}{reasons[1..]}; {tickets} clarificarea." }, Url)];
     }
 
     public async Task<IReadOnlyList<ExpiryInstance>> GetInstancesAsync(CancellationToken cancellationToken = default) =>

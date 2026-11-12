@@ -1,5 +1,7 @@
 @using BlazorStoc.Modules.ActivityImport
 @using BlazorStoc.Services
+@implements IAsyncDisposable
+@inject IJSRuntime JS
 @* Setari -> Preluare ActivityApp, secțiunea 6: șablonarea preluării tichetului. Un tichet real din ActivityApp cu toate coloanele lui și valorile (listele pliabile Tichet, Eveniment și Client);
    fiecare coloană are un comutator „Folosit” (implicit oprit). O coloană pornită intră în lista „Folosite”, unde primește o descriere (în observații apare „descriere: valoare”), o destinație
    și, pentru text, un rol (problemă, raport, executant sau câmp liber). Dedesubt: ce primește fiecare informație și cum ar arăta observațiile cu setările de pe ecran, chiar nesalvate.
@@ -70,9 +72,7 @@
                 {
                     var used = item;
                     var movable = !used.Locked;
-                    <tr @key="used.Key" class="@(movable ? "notes-order-row" : "notes-order-fixed")" draggable="@(movable ? "true" : null)" data-notes-key="@used.Key"
-                        @ondragstart="() => dragKey = movable ? used.Key : null" @ondragover="() => { }" @ondragover:preventDefault="movable && dragKey is not null"
-                        @ondrop="() => DropOnAsync(used.Key, movable)" @ondrop:preventDefault="true" @ondragend="() => dragKey = null">
+                    <tr @key="used.Key" class="@(movable ? "notes-order-row" : "notes-order-fixed")" draggable="@(movable ? "true" : null)" data-notes-key="@used.Key">
                         <td class="notes-order-handle" title="@(movable ? "Trage rândul ca să schimbi ordinea în observații" : "Rând obligatoriu: mereu printre primele în observații")" aria-hidden="true">@(movable ? "⋮⋮" : "")</td>
                         <td>
                             @if (used.Locked) { <span>@used.Label</span> }
@@ -152,15 +152,30 @@
 
 @code {
     private bool previewShown = true;
-    // The row being dragged in "Folosite" (the order of the lines in the notes of the intervention); dropped on another movable row it takes that row's place.
-    private string? dragKey;
+    // The rows of "Folosite" are dragged by wwwroot/notes-order.js (BUG-0031); a row dropped on another movable row takes that row's place. The script calls MoveNotes with the two keys.
+    private DotNetObjectReference<TicketSampleDialog>? reference;
 
-    private async Task DropOnAsync(string targetKey, bool movable)
+    protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        var moved = dragKey;
-        dragKey = null;
-        if (moved is null || !movable || moved == targetKey) return;
-        await Edit.InvokeAsync(new SampleEdit(moved, MoveBefore: targetKey));
+        if (!firstRender) return;
+        reference = DotNetObjectReference.Create(this);
+        try { await JS.InvokeVoidAsync("blazorStocNotesOrder.register", reference); }
+        catch (Exception exception) when (exception is JSException or InvalidOperationException or TaskCanceledException) { }
+    }
+
+    [JSInvokable]
+    public Task MoveNotes(string key, string targetKey) =>
+        InvokeAsync(async () =>
+        {
+            var movable = Used.Any(item => item.Key == key && !item.Locked) && Used.Any(item => item.Key == targetKey && !item.Locked);
+            if (movable && key != targetKey) await Edit.InvokeAsync(new SampleEdit(key, MoveBefore: targetKey));
+        });
+
+    public async ValueTask DisposeAsync()
+    {
+        try { await JS.InvokeVoidAsync("blazorStocNotesOrder.unregister"); }
+        catch (Exception exception) when (exception is JSException or InvalidOperationException or TaskCanceledException or JSDisconnectedException) { }
+        reference?.Dispose();
     }
 
     // The window that floats beside the main one (BUG-0023): what is taken from the ticket and how the notes read, redrawn on every change of the settings of the main window.

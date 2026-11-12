@@ -501,3 +501,16 @@ Pasi:
 | 2 | Pe un pachet doar pe NAS, iconita de descarcare | Mesaj "Se aduce pachetul de pe NAS...", apoi descarcarea; pachetul apare si pe server | |
 | 3 | Jurnal activitate | Intrare "Descarcare pachet backup" cu pachetul si daca a fost arhiva | |
 | 4 | Cu un cont fara dreptul de a modifica setarile de backup, deschide adresa /api/backup/<nume> | Acces refuzat | |
+
+## Modificari de testat - actualizare cu notificare sau imediata (12.11.2026, versiunea 0.5.77)
+
+**Ce s-a adaugat:** in Setari -> Actualizare, dupa verificarea unui pachet, butonul "Aplica actualizarea" se numeste "Actualizeaza cu notificare utilizatori" si are acelasi efect; butonul nou "Actualizare imediata".
+
+**Ce face acum:** "Actualizeaza cu notificare utilizatori" anunta utilizatorii in banner si porneste dupa 60 de secunde (poate fi anulata); "Actualizare imediata" porneste actualizarea acum, fara banner si fara intarziere. Ambele cer motivul si intra in jurnal ("Actualizare aplicatie"; la cea imediata "Porneste in: imediat, fara anunt").
+
+| Pas | Ce faci | Ce trebuie sa vezi | OK |
+|---|---|---|---|
+| 1 | Incarca un pachet valid si scrie motivul | Apar doua butoane: "Actualizeaza cu notificare utilizatori" si "Actualizare imediata", cu explicatia lor | |
+| 2 | Apasa "Actualizeaza cu notificare utilizatori" | Bannerul cu numaratoare apare pentru toti, butonul "Anuleaza actualizarea" merge, la sfarsit aplicatia se actualizeaza | |
+| 3 | Pe alt pachet apasa "Actualizare imediata" | Nu apare banner la alti utilizatori, nu exista numaratoare; actualizarea porneste pe loc | |
+| 4 | Deschide Jurnal activitate | Intrarea "Actualizare aplicatie" cu motivul; la cea imediata, "Porneste in: imediat, fara anunt" | |

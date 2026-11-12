@@ -35,7 +35,7 @@ public sealed class ScheduledTaskLauncher(UpdateInstallation installation) : IUp
 }
 
 /// <summary>An update that was confirmed and is waiting for its hour (Launched = false) or is running (the application is about to stop, or already did).</summary>
-public sealed record UpdateAnnouncement(string Id, string From, string To, DateTime StartsUtc, string RequestedBy, bool Launched);
+public sealed record UpdateAnnouncement(string Id, string From, string To, DateTime StartsUtc, string RequestedBy, bool Launched, bool Immediate = false);
 
 /// <summary>
 /// The one update of the application that may be waiting or running (a singleton shared by every session). Confirming an update does not stop the application at once: every user is told
@@ -58,13 +58,14 @@ public sealed class UpdateCoordinator(UpdateInstallation installation, IUpdateLa
     public event Action? Changed;
 
     /// <summary>Takes the update if none is waiting or running. The request file is written only when the notice time has passed.</summary>
-    public bool TrySchedule(UpdateRequestDocument request, string from, string to, TimeSpan notice)
+    public bool TrySchedule(UpdateRequestDocument request, string from, string to, TimeSpan notice, bool immediate = false)
     {
         lock (sync)
         {
             if (Current is not null) return false;
+            if (immediate) notice = TimeSpan.Zero;   // "Actualizare imediata": no notice and no wait; the banner of the users stays hidden
             var startsUtc = clock.GetUtcNow().UtcDateTime + notice;
-            var announcement = new UpdateAnnouncement(request.Id, from, to, startsUtc, request.Actor, false);
+            var announcement = new UpdateAnnouncement(request.Id, from, to, startsUtc, request.Actor, false, immediate);
             Current = announcement;
             LastError = null;
             var source = new CancellationTokenSource();

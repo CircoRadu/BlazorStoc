@@ -1,3 +1,39 @@
+## 0.5.81 | 12.11.2026
+### Funcționalități noi
+- PROP-0022 · În fișa beneficiarului, coloana „Descriere” a unui punct de lucru arată, câte o linie „Arondat: nume”, punctele arondate lui.
+### Bugs
+- BUG-0031 · În „Tichet exemplu”, ordonarea prin tragere a rândurilor din „Folosite” acceptă acum corect lăsarea rândului (drop-ul se face în browser, nu mai depinde de server la fiecare mișcare).
+
+## 0.5.80 | 12.11.2026
+### Bugs
+- BUG-0030 · „Deschide obiectul” din notificarea de tichete de validat nu mai rămâne fără efect când ești deja în Notificări: fereastra se închide și se deschide tab-ul „Tichete de validat” (la fel pentru „Beneficiari de validat” și „Probleme import”).
+### Diverse
+- Modulul Notificări trece la 1.6.3.
+
+## 0.5.79 | 12.11.2026
+### Bugs
+- BUG-0028 · „Deschide obiectul” din notificările „evenimente ActivityApp de validat” și „beneficiari de verificat” duce în Notificări, la tab-ul de validare, nu în Mentenanță sau Beneficiari; merge și cu modulul Mentenanță oprit.
+- BUG-0029 · Containerul „Tichete discardate” are titlul ca celelalte carduri (același font), cu numărul de tichete vizibil și când e închis.
+### Diverse
+- Modulul Preluare ActivityApp trece la 0.19.5.
+
+## 0.5.78 | 12.11.2026
+### Funcționalități noi
+- PROP-0018 · Lista „Tichete discardate” (Notificări → Tichete de validat) este un container care se deschide și se închide, închis implicit.
+### Bugs
+- BUG-0027 · Butoanele din bara ferestrelor (Raportează o eroare, Propune, Închide) nu mai ies din fereastră la editarea produsului și la celelalte ferestre cu lățime fixă; bara are mereu lățimea ferestrei.
+### Diverse
+- Tichete de validat, „Vizualizează tichetul”: se arată și numărul, ID ticket, ID eveniment, data finalizării, câmpurile extra alese în setări și observațiile pe care le va avea intervenția.
+- Modulul Preluare ActivityApp trece la 0.19.3.
+
+## 0.5.77 | 12.11.2026
+### Bugs
+- BUG-0025 · Fereastra „Tichet exemplu” este mai lată (până la 1700 px, în limita ecranului), ca să se vadă conținutul fără bară de derulare când rezoluția permite.
+- BUG-0026 · Observațiile tichetului preluat nu mai au spații goale mari: în valorile câmpurilor se elimină rândurile goale și spațiile din jurul rândurilor, iar între câmpuri rămâne un singur rând liber.
+### Diverse
+- Actualizare aplicație (Setări → Actualizare): butonul „Aplică actualizarea” se numește „Actualizează cu notificare utilizatori” și păstrează funcționarea (anunț în banner și întârziere); butonul nou „Actualizare imediată” pornește actualizarea acum, fără anunț și fără întârziere.
+- Modulul Preluare ActivityApp trece la 0.19.1.
+
 ## 0.5.76 | 12.11.2026
 ### Bugs
 - BUG-0024 · În fereastra „Tichet exemplu”, fiecare dintre cele două ferestre (alegerea coloanelor și „Cum arată tichetul preluat”) are propria bară de butoane; butoanele ferestrei principale nu mai sar în dreapta când se deschide cea flotantă.

@@ -167,7 +167,7 @@ else if (loaded)
                 <div class="editor-actions">
                     @if (selected.IsAlert) { <button type="button" class="primary" disabled="@busy" @onclick="AcknowledgeAsync">@(busy ? "Se salvează…" : "Preiau notificarea")</button> }
                     <button type="button" class="refresh act-confirm" disabled="@busy" @onclick="() => confirmingResolve = true">Marchează ca rezolvată</button>
-                    @if (selected.Url is { Length: > 0 } url) { <a class="refresh act-nav" href="@url">Deschide obiectul</a> }
+                    @if (selected.Url is { Length: > 0 } url) { <a class="refresh act-nav" href="@url" @onclick="() => OpenObject(url)" @onclick:preventDefault="@IsOnThisPage(url)">Deschide obiectul</a> }
                     <button type="button" class="danger" disabled="@busy" @onclick="Close">Închide</button>
                 </div>
             }
@@ -200,6 +200,22 @@ else if (loaded)
     [SupplyParameterFromQuery(Name = "tab")] public string? TabQuery { get; set; }
 
     private void OpenTab(string? validation, bool resolvedTab) { validationTab = validation ?? ""; showResolved = resolvedTab; }
+    // BUG-0030: the object of a notification can be a tab of this same page; a link to the address already open does nothing, so the window closes and the tab opens here.
+    private static string? PageTab(string url) => url switch
+    {
+        "/notificari?tab=tichete" => "tickets",
+        "/notificari?tab=beneficiari" => "beneficiaries",
+        "/notificari?tab=probleme" => "issues",
+        _ => null
+    };
+    private bool IsOnThisPage(string url) => PageTab(url) is not null;
+    private void OpenObject(string url)
+    {
+        if (PageTab(url) is not { } tab) return;   // another page: the link navigates by itself
+        Close();
+        OpenTab(tab, false);
+    }
+
     private void OpenTickets() => OpenTab("tickets", false);
     private void OpenBeneficiaries() => OpenTab("beneficiaries", false);
     private void OpenIssues() => OpenTab("issues", false);

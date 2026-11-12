@@ -88,7 +88,10 @@ public sealed class ApplicationUpdateService(UpdateInstallation installation, IU
     /// <summary>
     /// The administrator confirms, with a reason. The journal gets "Actualizare aplicație X -> Y" under his name now; the users are told; the updater is asked after the notice time.
     /// </summary>
-    public async Task<UpdateAnnouncement> ConfirmAsync(string checkId, string reason, CancellationToken cancellationToken = default)
+    public async Task<UpdateAnnouncement> ConfirmAsync(string checkId, string reason, CancellationToken cancellationToken = default) => await ConfirmAsync(checkId, reason, false, cancellationToken).ConfigureAwait(false);
+
+    /// <summary>With <paramref name="immediate"/> the updater is asked at once: no banner for the users and no notice time (the journal says so).</summary>
+    public async Task<UpdateAnnouncement> ConfirmAsync(string checkId, string reason, bool immediate, CancellationToken cancellationToken = default)
     {
         await access.EnsureAsync(ApplyPermission, cancellationToken).ConfigureAwait(false);
         EnsureManaged();
@@ -103,11 +106,11 @@ public sealed class ApplicationUpdateService(UpdateInstallation installation, IU
         var actor = await access.GetUsernameAsync(cancellationToken).ConfigureAwait(false) ?? "necunoscut";
         var from = report.Running ?? AppVersion.Current;
         var details = AuditDetails.Identification(("De la", from), ("La", report.Version), ("Pachet SHA-256", report.Sha256), ("Semnat de", Short(report.Signer)),
-            ("Migrări noi ale bazei de date", report.NewMigrations?.ToString() ?? "necunoscut"), ("Pornește în", $"{(int)Notice.TotalSeconds} s"));
+            ("Migrări noi ale bazei de date", report.NewMigrations?.ToString() ?? "necunoscut"), ("Pornește în", immediate ? "imediat, fără anunț" : $"{(int)Notice.TotalSeconds} s"));
         await AuditRecorder.RecordActionAsync(audit, access, AuditEntities.Application, AuditActions.ApplicationUpdate, string.Empty, EntityName, details, reason, cancellationToken).ConfigureAwait(false);
 
         var request = new UpdateRequestDocument(report.Id, UpdateRequestKinds.Apply, report.Package, report.Sha256, actor, reason, clock.GetUtcNow().UtcDateTime);
-        if (!coordinator.TrySchedule(request, from, report.Version, Notice))
+        if (!coordinator.TrySchedule(request, from, report.Version, Notice, immediate))
         {
             await AuditRecorder.RecordActionAsync(audit, access, AuditEntities.Application, AuditActions.ApplicationUpdateCancelled, string.Empty, EntityName,
                 AuditDetails.Identification(("De la", from), ("La", report.Version), ("Motiv anulare", "altă actualizare era deja programată")), reason, CancellationToken.None).ConfigureAwait(false);

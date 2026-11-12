@@ -1,8 +1,8 @@
 {
     "modules":  {
                     "ActivityImport":  {
-                                           "version":  "0.19.0",
-                                           "hash":  "598f5f31bf71770235644b5ee754ceba7ca0700f631d32611a82d9945b47fa19",
+                                           "version":  "0.19.5",
+                                           "hash":  "0d87d9787500c51ccd65f22d43765322dbc81dd7a2a96bd7fb330116d478b2de",
                                            "history":  [
                                                            {
                                                                "version":  "0.1.0",
@@ -128,6 +128,31 @@
                                                                "version":  "0.19.0",
                                                                "date":  "12.11.2026",
                                                                "note":  "BUG-0023/0024: informatii obligatorii ID ticket, ID eveniment si data finalizarii evenimentului (alegere din coloane de tip data), observatii in format eticheta bold: valoare cu rand liber intre campuri, ordine prin drag and drop, obligatoriile primele; butoane proprii pentru fereastra flotanta"
+                                                           },
+                                                           {
+                                                               "version":  "0.19.1",
+                                                               "date":  "12.11.2026",
+                                                               "note":  "BUG-0026: fara randuri goale in valorile din observatii"
+                                                           },
+                                                           {
+                                                               "version":  "0.19.2",
+                                                               "date":  "12.11.2026",
+                                                               "note":  "Vizualizare tichet de validat: ID-uri, data finalizarii, campuri extra si observatiile intervenitiei"
+                                                           },
+                                                           {
+                                                               "version":  "0.19.3",
+                                                               "date":  "12.11.2026",
+                                                               "note":  "PROP-0018: lista de tichete discardate in container colapsabil, inchis implicit"
+                                                           },
+                                                           {
+                                                               "version":  "0.19.4",
+                                                               "date":  "12.11.2026",
+                                                               "note":  "BUG-0029: titlul containerului Tichete discardate ca celelalte carduri, cu numarul vizibil si la inchis"
+                                                           },
+                                                           {
+                                                               "version":  "0.19.5",
+                                                               "date":  "12.11.2026",
+                                                               "note":  "BUG-0028: notificarile de tichete si beneficiari de validat duc la Notificari, nu la Mentenanta/Beneficiari"
                                                            }
                                                        ]
                                        },
@@ -573,8 +598,8 @@
                                                     ]
                                     },
                     "Notifications":  {
-                                          "version":  "1.6.2",
-                                          "hash":  "7944ec03e133b006cb27f2933ce26bb2eb873ac4ebec34f492a6e6ab7aa781b8",
+                                          "version":  "1.6.3",
+                                          "hash":  "a67854c66b0f73b0280345c6c01d77b8f9d0f4e0ebcb866c5d1be516fba83135",
                                           "history":  [
                                                           {
                                                               "version":  "1.0.0",
@@ -645,6 +670,11 @@
                                                               "version":  "1.6.2",
                                                               "date":  "11.11.2026",
                                                               "note":  "Listele se ordoneaza din antet si retin ordonarea in sesiune (BUG-0018)"
+                                                          },
+                                                          {
+                                                              "version":  "1.6.3",
+                                                              "date":  "12.11.2026",
+                                                              "note":  "BUG-0030: Deschide obiectul deschide tab-ul de validare chiar daca adresa e cea deschisa"
                                                           }
                                                       ]
                                       },

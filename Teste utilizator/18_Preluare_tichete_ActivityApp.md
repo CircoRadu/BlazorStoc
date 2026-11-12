@@ -356,3 +356,49 @@ Pasi: Notificari -> Tichete de validat -> Arata tichetele discardate -> iconita 
 | 5 | In fereastra flotanta priveste observatiile | Fiecare camp: eticheta aldina, doua puncte, valoare; rand liber intre campuri | |
 | 6 | Salveaza corespondenta, preia un tichet, deschide intervenția in Mentenanta | Observatiile au aceeasi ordine; etichetele sunt aldine in detaliu, iar in tabel apar fara asteriscuri | |
 | 7 | Deschide din nou "Tichet exemplu" | Butoanele Raporteaza/Propune/inchide stau deasupra ferestrei principale, iar fereastra flotanta are propriul buton de inchidere | |
+
+## Modificari de testat - vizualizarea tichetului de validat (12.11.2026, ActivityImport 0.19.2)
+
+**Ce s-a adaugat:** fereastra "Vizualizeaza tichetul" din "Evenimente de validat" arata si numarul, ID ticket, ID eveniment, data finalizarii, campurile extra alese in setari si observatiile intervenitiei.
+
+**Ce face acum:** fereastra foloseste corespondentele din setari (campurile oprite ramin ascunse); observatiile sunt cele care se vor scrie la preluare.
+
+| Pas | Ce faci | Ce trebuie sa vezi | OK |
+|---|---|---|---|
+| 1 | Evenimente de validat -> iconita "Vizualizeaza tichetul" | Beneficiar, punct, data, numar, ID-uri, data finalizarii, campurile din setari si "Observatiile intervenitiei" cu etichete aldine | |
+| 2 | Opreste un camp in setari si redeschide fereastra | Campul oprit nu mai apare | |
+
+## Modificari de testat - lista de tichete discardate colapsabila (12.11.2026, ActivityImport 0.19.3, PROP-0018)
+
+**Ce s-a adaugat:** "Tichete discardate" din Notificari -> Tichete de validat este un container care se deschide si se inchide.
+
+**Ce face acum:** la intrarea pe pagina este inchis; apasa pe titlu ca sa-l deschizi si "Arata tichetele discardate" ca sa incarci lista.
+
+| Pas | Ce faci | Ce trebuie sa vezi | OK |
+|---|---|---|---|
+| 1 | Notificari -> Tichete de validat | "Tichete discardate" apare inchis, doar cu titlul | |
+| 2 | Apasa pe titlu | Se deschide: butonul de incarcare si lista | |
+| 3 | Apasa din nou pe titlu | Se inchide | |
+
+## Modificari de testat - notificarile de validat duc la pagina de preluare (12.11.2026, ActivityImport 0.19.5, BUG-0028)
+
+**Ce s-a adaugat:** "Deschide obiectul" din notificarile "evenimente ActivityApp de validat" si "beneficiari de verificat" duce in Notificari, la tab-ul coresunzator.
+
+**Ce face acum:** merge si cu modulul Mentenanta oprit.
+
+| Pas | Ce faci | Ce trebuie sa vezi | OK |
+|---|---|---|---|
+| 1 | Opreste modulul Mentenanta; in Notificari -> Active deschide notificarea de tichete de validat si apasa "Deschide obiectul" | Esti dus la Notificari, tab "Tichete de validat"; fara eroare de modul oprit | |
+| 2 | Aceeasi operatie pentru notificarea beneficiarilor de verificat | Tab-ul "Beneficiari de validat" | |
+
+## Modificari de testat - ordonarea prin tragere a campurilor din observatii (12.11.2026, BUG-0031)
+
+**Ce s-a adaugat:** tragerea unui rand din "Folosite" (Tichet exemplu) peste altul schimba ordinea; mutarea se face in browser, nu mai depinde de serverul aplicatiei la fiecare miscare.
+
+**Ce face acum:** randul tras se pune inaintea randului pe care il lasi; peste un rand obligatoriu nu se poate lasa.
+
+| Pas | Ce faci | Ce trebuie sa vezi | OK |
+|---|---|---|---|
+| 1 | In "Folosite" trage un rand optional peste altul | Linie verde deasupra randului tinta cat tragi; la lasare randul isi schimba locul | |
+| 2 | Priveste observatiile din fereastra flotanta | Urmeaza noua ordine | |
+| 3 | Incearca sa lasi randul peste unul obligatoriu | Nu se intampla nimic | |

@@ -322,3 +322,14 @@ Cunoscut: daca adaugarea componentelor alese la creare esueaza (de ex. tipul a f
 | 3 | Inchide tabul si redeschide aplicatia | Ordonarea nu s-a pastrat (valorile initiale) | |
 
 | 4 | Notificari (active), Utilizatori, Balante restante: compara antetele | Acelasi font si aceeasi culoare peste tot | |
+
+## Modificari de testat - punctele arondate in descrierea punctului de lucru (12.11.2026, PROP-0022)
+
+**Ce s-a adaugat:** in fisa beneficiarului, coloana Descriere a unui punct de lucru arata si punctele arondate lui.
+
+**Ce face acum:** sub descriere apare cate o linie "Arondat: nume" pentru fiecare punct arondat (si in tooltip).
+
+| Pas | Ce faci | Ce trebuie sa vezi | OK |
+|---|---|---|---|
+| 1 | Deschide un beneficiar cu un punct de lucru care are puncte arondate | In coloana Descriere, cate o linie "Arondat: nume" pentru fiecare | |
+| 2 | Adauga sau sterge un punct arondat | Liniile se actualizeaza | |

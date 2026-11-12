@@ -995,3 +995,10 @@ Cerut de utilizator la 06.10.2026 (verificarea fluxului, apoi deciziile: facturi
 - BUG-0024: marginea ferestrei flotante pe cadru, bara proprie pentru fiecare fereastra.
 - Coloane obligatorii: ID ticket, ID eveniment, Data finalizarii evenimentului (coloana de tip data); observatii **eticheta**: valoare cu rand liber, obligatoriile primele, ordine prin drag and drop (ActivityFieldMap.Order, NotesMarkup); ActivityImport 0.19.0, Maintenance 1.12.2.
 - Verificari: activityimport, MariaDB Activity, moduleversions, help; pozitiile butoanelor pe macheta in browser.
+
+## 12.11.2026 - versiunile 0.5.77-0.5.81: ferestre, preluare ActivityApp, actualizare imediata
+- 0.5.77: BUG-0025 (fereastra Tichet exemplu mai lata), BUG-0026 (fara randuri goale in valorile din observatii), buton "Actualizare imediata" (fara banner si intarziere) + "Actualizeaza cu notificare utilizatori".
+- 0.5.78: vizualizarea tichetului de validat completa (ID-uri, data finalizarii, campuri extra, observatii), BUG-0027 (bara de butoane a ferestrelor cu latime in %), PROP-0018 (tichete discardate colapsabile).
+- 0.5.79: BUG-0028 (notificarile de validat duc in Notificari), BUG-0029 (titlul containerului de discardate cu badge).
+- 0.5.80: BUG-0030 ("Deschide obiectul" deschide tab-ul de validare in aceeasi pagina).
+- 0.5.81: BUG-0031 (drag and drop al randurilor din Folosite, `notes-order.js`), PROP-0022 (linii "Arondat: nume" in descrierea punctului de lucru).

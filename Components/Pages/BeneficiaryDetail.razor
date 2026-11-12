@@ -101,7 +101,7 @@ else if (beneficiary is not null)
             @foreach (var workPoint in pageRows)
             {
                 <tr @key="workPoint.Id"><td><strong>@workPoint.Name</strong>@if (workPoint.IsPrimary) { <span class="anaf-source ok work-point-badge">Principal</span> }</td><td>@workPoint.Address</td><td>@workPoint.Phone</td><td>@workPoint.ContactPerson</td>
-                    <td class="work-point-description" title="@workPoint.Description">@workPoint.Description</td>
+                    <td class="work-point-description" title="@DescriptionTitle(workPoint)">@workPoint.Description@foreach (var attachedName in AttachedNames(workPoint)) { <div class="work-point-attached-line">Arondat: @attachedName</div> }</td>
                     <td>@(workPoint.HasCoordinates ? WorkPointCoordinates.Format(workPoint.Latitude, workPoint.Longitude) : "")</td>
                     <td class="attached-cell">@if (workPoint.Id > 0) { var attachedCount = AttachedOf(workPoint.Id).Count; <button type="button" class="attached-open" id="attached-open-@workPoint.Id" disabled="@(addingWorkPoint || editingWorkPoint is not null || editingBeneficiary)" title="Puncte de lucru arondate la @workPoint.Name" aria-label="Puncte de lucru arondate la @workPoint.Name: @attachedCount" @onclick="() => OpenAttachedList(workPoint)">@(attachedCount == 0 ? (canManage ? "+ Arondate" : "") : $"Arondate ({attachedCount})")</button> }</td>
                     <td class="number">@(photoCounts.TryGetValue(workPoint.Id, out var photoCount) ? photoCount.ToString() : "")</td>
@@ -508,6 +508,16 @@ else if (beneficiary is not null)
     private bool attachedAdding;
     private AttachedWorkPoint? attachedEditing;
     private Guid attachedEditorKey;
+    // PROP-0022: the attached points of a work point are listed in its description, one on each line, as "Arondat: name".
+    private IEnumerable<string> AttachedNames(WorkPoint workPoint) => workPoint.Id > 0 ? AttachedOf(workPoint.Id).Select(point => point.Name) : [];
+    private string DescriptionTitle(WorkPoint workPoint)
+    {
+        var lines = new List<string>();
+        if (workPoint.Description.Length > 0) lines.Add(workPoint.Description);
+        lines.AddRange(AttachedNames(workPoint).Select(name => "Arondat: " + name));
+        return string.Join('\n', lines);
+    }
+
     private IReadOnlyList<AttachedWorkPoint> AttachedOf(int workPointId) => attachedAll.Where(point => point.WorkPointId == workPointId).ToArray();
     private void OpenAttachedList(WorkPoint workPoint) { attachedListFor = workPoint; attachedAdding = false; attachedEditing = null; }
     private void CloseAttachedList() { attachedListFor = null; attachedAdding = false; attachedEditing = null; }

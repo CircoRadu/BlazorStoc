@@ -137,9 +137,13 @@ public static class ActivityTicketPlanner
     {
         var text = new StringBuilder();
         text.Append("Preluat din ActivityApp");
-        foreach (var (label, value) in RequiredLines(source).Concat(lines)) text.Append("\n\n").Append(NotesMarkup.Bold(label)).Append(": ").Append(value);
+        foreach (var (label, value) in RequiredLines(source).Concat(lines)) text.Append("\n\n").Append(NotesMarkup.Bold(label)).Append(": ").Append(Compact(value));
         return text.ToString();
     }
+
+    /// <summary>A value without the empty lines and the spaces around lines that the source keeps (BUG-0026): only the blank line between two fields stays.</summary>
+    public static string Compact(string value) =>
+        string.Join("\n", value.Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries).Select(line => line.Trim()).Where(line => line.Length > 0));
 
     /// <summary>The notes of an intervention taken from the ticket with the settings of the fields.</summary>
     public static string Notes(TicketSource source, ActivityFieldMap map, string keyword = "", bool maintenance = false, bool uncovered = false) =>

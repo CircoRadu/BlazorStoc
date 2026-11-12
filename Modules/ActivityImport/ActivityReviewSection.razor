@@ -57,7 +57,12 @@
                 <dt>Punct de lucru</dt><dd>@view.Item.WorkPoint</dd>
                 <dt>Data efectuării</dt><dd>@StockMovementRules.DisplayDate(view.Item.PerformedOn)</dd>
                 <dt>Propus ca</dt><dd>@CategoryText(view.Item) · @Why(view.Item)</dd>
+                @if (view.Source.Number.Length > 0) { <dt>Numărul tichetului</dt><dd>@view.Source.Number</dd> }
+                @if (view.Source.TicketId > 0) { <dt>ID ticket</dt><dd>@view.Source.TicketId</dd> }
+                @if (view.Source.EventId > 0) { <dt>ID eveniment</dt><dd>@view.Source.EventId</dd> }
+                @if (view.Source.Finished is { } finished) { <dt>Data finalizării evenimentului</dt><dd>@finished.ToString("dd.MM.yyyy HH:mm")</dd> }
                 <TicketInfoRows ShowEmpty Problem="@view.Source.Problem" Resolution="@view.Source.Resolution" Report="@view.Source.Report" Executor="@view.Source.Executor" Extras="@view.Source.Extras" />
+                <dt>Observațiile intervenției</dt><dd class="review-text" id="review-view-notes">@NotesMarkup.Html(view.Proposed == ReviewCategory.Service ? view.NotesService : view.NotesMaintenance)</dd>
             </dl>
             <div class="editor-actions">
                 <button type="button" class="primary" disabled="@busy" @onclick="() => TakeAsProposedAsync(view.Item)">Preia ca @CategoryText(view.Item).ToLowerInvariant()</button>

@@ -9,6 +9,28 @@ Actualizat: 09.11.2026, Europe/Bucharest (Claude, agent unic, mod `claude_only`)
 - Motorul de facturi este geometric (`Services/Invoices`); utilizatorii obisnuiti creeaza/modifica sabloane, stergerea ramane administratorului.
 - Harta codului: `docs/HARTA_COD.md`. Reguli permanente: `CLAUDE.md`.
 
+## Versiunea 0.5.81 (12.11.2026): BUG-0031 + PROP-0022
+- BUG-0031: ordonarea prin tragere a randurilor din Folosite (Tichet exemplu) nu primea drop-ul (evenimente la server la fiecare dragover); acum wwwroot/notes-order.js (ca category-order.js) accepta drop-ul in browser si cheama TicketSampleDialog.MoveNotes(key, targetKey) (JSInvokable). Verificat: logica JS pe un tabel de proba (dragstart/dragover/drop sintetice) si testul bUnit (MoveNotes); nu in fereastra reala (cere ActivityApp).
+- PROP-0022: in fisa beneficiarului, coloana Descriere a punctelor de lucru arata cate o linie Arondat: nume pentru fiecare punct arondat (BeneficiaryDetail.razor, AttachedNames); neverificat in browser (salvarea unui punct arondat de proba nu a reusit din UI-ul automatizat).
+
+## Versiunea 0.5.80 (12.11.2026): BUG-0030
+- BUG-0030: "Deschide obiectul" dintr-o notificare al carei obiect e un tab al paginii Notificari (`/notificari?tab=tichete|beneficiari|probleme`) nu facea nimic (aceeasi adresa); acum inchide fereastra si deschide tab-ul (`Notifications.razor`: `PageTab`, `OpenObject`). Notifications patch. Neverificat in browser: baza de test nu are notificare de tichete.
+
+## Versiunea 0.5.79 (12.11.2026): BUG-0028 + BUG-0029 (0.5.78 = BUG-0027 + PROP-0018 + vizualizare tichet)
+- BUG-0027: panourile cu latime in % (`.product-editor-modal`, `.quick-exit-modal`, `.invoice-modal`, `.help-panel`) aveau cadrul mai lat decat panoul, iar butoanele barii pluteau in afara lui; acum latime definita `min(Npx, calc(100vw - 16px))`, fara `margin:auto`, plus `.app-dialog-frame > .app-dialog-panel { margin-left:0; margin-right:0 }` (app.css). Verificat in browser: cadru = panou = bara (editare produs, adaugare produs, administrare categorii).
+- BUG-0028: "Deschide obiectul" din notificarile de tichete/beneficiari de validat duce la `/notificari?tab=tichete` / `?tab=beneficiari` (nu la Mentenanta, care poate fi oprita); `ActivityReviewSource.Url`, `ActivityPartnerCheckSource.Url`; ActivityImport 0.19.5.
+- BUG-0029: titlul containerului de discardate e `h2` + badge ca "Evenimente de validat" (`.catalog-disclosure`), lista se citeste la deschiderea paginii ca numarul sa se vada si inchis; ActivityImport 0.19.4; changelog de scris.
+- PROP-0018: `ActivityDiscardedSection.razor` in `CollapsibleSection` (`Expanded="false"`); ActivityImport 0.19.3 (changelog de scris la versiunea care le include).
+
+## Versiunea 0.5.78 (12.11.2026, include si BUG-0027 + PROP-0018): vizualizarea tichetului de validat completata (ActivityImport 0.19.2), vezi mai jos; 0.5.77 = BUG-0025/0026 + actualizare imediata
+
+## Ultimul lucru facut (12.11.2026, seara): BUG-0025 + BUG-0026 (versiunea 0.5.77, ActivityImport 0.19.1)
+- BUG-0025: `.delete-dialog.ticket-sample` are latimea min(1700px, 96vw), iar cand fereastra flotanta e deschisa (ecran >= 1500px) min(1700px, 96vw - 580px) (app.css).
+- BUG-0026: `ActivityTicketPlanner.Compact` scoate randurile goale si spatiile din valorile din observatii; doar intre campuri ramane un rand liber. Observatiile generate cu formatul 0.5.76 sunt tratate ca editate la reimprospatare.
+- Actualizare aplicatie: butonul "Aplica actualizarea" a devenit "Actualizeaza cu notificare utilizatori"; nou "Actualizare imediata" (`ApplicationUpdateService.ConfirmAsync(.., immediate)`, `UpdateAnnouncement.Immediate`: fara anunt in `UpdateBanner`, fara intarziere; jurnalul spune "imediat, fara anunt").
+- Vizualizare tichet de validat (`ActivityReviewSection.razor`): ID-uri, data finalizarii, campuri extra (sursa citita cu corespondenta), observatiile ce se vor scrie; `GetDetailAsync` foloseste `SourceOf(ticket, map)`. ActivityImport 0.19.2.
+- Verificat: grupul activityimport (285), package (216, inclusiv actualizarea imediata); butoanele nu au fost vazute in browser. Neverificat in browser (fereastra reala cere ActivityApp cu autentificare Windows).
+
 ## Ultimul lucru facut (12.11.2026, dupa-amiaza): BUG-0024 + informatii obligatorii + format observatii (versiunea 0.5.76, ActivityImport 0.19.0, Maintenance 1.12.2)
 - BUG-0024: marginea ferestrei flotante e pe cadrul ferestrei principale (nu pe panou), iar fereastra "Cum arata tichetul preluat" are bara proprie cu buton de inchidere.
 - "Coloane obligatorii": ID ticket si ID eveniment (afisate), "Data finalizarii evenimentului" (`ActivityFieldMap.Finished`, coloana de tip data din EvenimenteAgent, `ReadsDate`/`ChoiceColumns`/`AcceptsType`; `ActivityTicketFields.Missing` reciteste doar la alegere sau la revenire).

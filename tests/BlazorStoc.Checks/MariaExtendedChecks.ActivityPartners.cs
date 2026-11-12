@@ -242,6 +242,8 @@ public static partial class MariaExtendedChecks
                   && await Count("SELECT COUNT(*) FROM activity_import_partner_checks WHERE partner_id=9401 AND status='pending' AND reason='awaiting_acceptance' AND beneficiary_id IS NULL") == 1 && await Count("SELECT COUNT(*) FROM activity_import_map WHERE entity='workpoint' AND source_id=9411") == 0,
                 "Activity partners: with the automatic import off a new partner waits in the queue (no beneficiary, no work point) until it is accepted");
             var awaiting = (await new MariaBeneficiaryCheckService(configuration, admin, audit, beneficiaries, null, partners).GetPendingAsync()).Single(item => item.PartnerId == 9401);
+            Check(ActivityPartnerCheckSource.Instances([awaiting]).Single().Url == "/notificari?tab=beneficiari" && ActivityReviewSource.Url == "/notificari?tab=tichete",
+                "Activity notifications: \"Open object\" goes to the tabs of the validation queues in the notifications page, not to pages of modules that may be stopped (BUG-0028)");
             Check(awaiting.ReasonText.Contains("acceptarea manuală", StringComparison.Ordinal) && ActivityPartnerCheckSource.Instances([awaiting]).Single().Values[ActivityPartnerCheckSource.NameKey] == "un beneficiar", "Activity partners: the queue says the partner waits for the manual acceptance and the notification counts it");
             await new MariaBeneficiaryCheckService(configuration, admin, audit, beneficiaries, null, partners).AcceptAsync(awaiting.Id);
             var accepted = (await beneficiaries.GetBeneficiariesAsync()).Single(item => item.Name == "Ext Import Manual " + suffix);

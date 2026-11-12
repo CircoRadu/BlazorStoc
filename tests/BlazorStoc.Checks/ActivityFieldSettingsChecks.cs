@@ -254,6 +254,8 @@ public static class ActivityFieldSettingsChecks
 
     private static void Rebuild(Action<bool, string> check)
     {
+        check(ActivityTicketPlanner.Compact("Simeria  \r\n\r\n\r\n   \r\nCam77 - Slavici\n\n") == "Simeria\nCam77 - Slavici" && ActivityTicketPlanner.Compact("   ") == "",
+            "Ticket notes: empty lines and spaces inside a field value are dropped (BUG-0026), only the blank line between fields stays");
         var ticket = Ticket();
         var before = ActivityTicketPlanner.SourceOf(ticket);
         var oldMap = ActivityFieldMap.Empty;

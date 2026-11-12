@@ -7,12 +7,15 @@
 
 @* The tickets an operator discarded from the queue (never read again unless reactivated). The list is read when asked for and renewed after every decision taken in the queue above it. *@
 <section class="catalog" id="activity-discarded">
-    <div class="catalog-heading"><h2>Tichete discardate @if (items is not null) { <span class="count-badge">@items.Count</span> }</h2></div>
+    @* PROP-0018: the list is a container that opens and closes, closed when the page opens. *@
+    <CollapsibleSection Id="ai-discarded-section" Expanded="false" RootClass="catalog-collapsible" HeaderRowClass="catalog-heading collapsible-header" ToggleClass="catalog-disclosure">
+    <Header><h2>Tichete discardate @if (items is not null) { <span class="count-badge">@items.Count</span> }</h2></Header>
+    <ChildContent>
     <div class="catalog-body">
         @if (error is not null) { <div class="error-banner" role="alert">@error</div> }
         @if (notice is not null) { <div class="notice" role="status">@notice</div> }
         <div class="editor-actions">
-            <button type="button" class="refresh act-reload" disabled="@busy" @onclick="LoadAsync">@(items is null ? "Arată tichetele discardate" : "Actualizează lista")</button>
+            <button type="button" class="refresh act-reload" disabled="@busy" @onclick="LoadAsync">Actualizează lista</button>
         </div>
         @if (items is not null && items.Count == 0) { <p class="muted" id="ai-discarded-empty">Nu sunt tichete discardate.</p> }
     </div>
@@ -35,6 +38,8 @@
         </table></div>
         </Paged>
     }
+    </ChildContent>
+    </CollapsibleSection>
 </section>
 
 @if (viewed is { } shown && viewedSource is { } source)
@@ -77,6 +82,9 @@
     }
 
     private async Task ReadAsync() => items = await Reviews.GetDiscardedAsync(lifetime.Token);
+
+    // Read when the page opens, so that the number of tickets shows on the closed container (BUG-0029).
+    protected override Task OnInitializedAsync() => RunAsync(ReadAsync);
 
     private Task LoadAsync() => RunAsync(ReadAsync);
 

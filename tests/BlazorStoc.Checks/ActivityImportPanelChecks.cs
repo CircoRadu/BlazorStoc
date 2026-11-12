@@ -223,6 +223,8 @@ public static class ActivityImportPanelChecks
         cut.WaitForAssertion(() => { if (cut.FindAll("#review-view-title").Count == 0) throw new Exception("pending"); }, TimeSpan.FromSeconds(5));
         check(cut.Find("[role=dialog]").TextContent.Contains("Raportul original", StringComparison.Ordinal) && cut.Find("[role=dialog]").TextContent.Contains("Ion Popescu", StringComparison.Ordinal) && cut.Find("[role=dialog]").TextContent.Contains("Nu merge centrala", StringComparison.Ordinal),
             "Activity import panel: a ticket is viewed in a popup with the problem, the resolution, the report and the executor");
+        check(cut.FindAll("#review-view-notes").Count == 1 && cut.Find("[role=dialog]").TextContent.Contains("Observațiile intervenției", StringComparison.Ordinal),
+            "Activity import panel: the view of a ticket to validate also shows the notes the intervention would get");
         cut.FindAll("[role=dialog] button").Single(button => button.TextContent.Trim() == "Modifică și preia").Click();
         cut.WaitForAssertion(() => { if (cut.FindAll("#review-edit-title").Count == 0) throw new Exception("pending"); }, TimeSpan.FromSeconds(5));
         cut.Find("#review-point").Change("51");
@@ -239,7 +241,8 @@ public static class ActivityImportPanelChecks
         cut.FindAll("[role=alertdialog] button").Single(button => button.TextContent.Trim() == "Discard").Click();
         cut.WaitForAssertion(() => { if (cut.FindAll("#ai-review-empty").Count == 0) throw new Exception("pending"); }, TimeSpan.FromSeconds(5));
         check(reviewService.Decisions.Last() == (4L, ReviewDecision.Discard) && cut.Markup.Contains("a fost discardat", StringComparison.Ordinal), "Activity import panel: after the confirmation the ticket is discarded and the list is empty");
-        cut.FindAll("button").Single(button => button.TextContent.Trim() == "Arată tichetele discardate").Click();
+        check(cut.Find("#activity-discarded details[data-collapsible-section]").GetAttribute("data-expanded") == "false", "Activity import panel: the list of discarded tickets is a container closed when the page opens (PROP-0018)");
+        cut.FindAll("#activity-discarded button").Single(button => button.TextContent.Trim() == "Actualizează lista").Click();
         cut.WaitForAssertion(() => { if (cut.FindAll("#ai-discarded tbody tr").Count == 0) throw new Exception("pending"); }, TimeSpan.FromSeconds(5));
         cut.Find("#ai-discarded button[aria-label^='Vizualizează tichetul T-80']").Click();
         cut.WaitForAssertion(() => { if (cut.FindAll("#discarded-view-title").Count == 0) throw new Exception("pending"); }, TimeSpan.FromSeconds(5));
@@ -390,14 +393,14 @@ public static class ActivityImportPanelChecks
         check(Keys().SequenceEqual(["title", "number", "finished", "problem", "resolution", "report", "executor"]) && cut.FindAll("#ticket-sample-used tr.notes-order-fixed").Count == 3 && cut.Find("tr[data-notes-key='problem']").GetAttribute("draggable") == "true"
               && cut.Find("tr[data-notes-key='title']").GetAttribute("draggable") is null,
             "Activity import panel: the required rows come first and only the others can be dragged");
-        cut.Find("tr[data-notes-key='problem']").DragStart();
-        cut.Find("tr[data-notes-key='executor']").Drop();
+        // BUG-0031: the drag and drop is done by notes-order.js in the browser; the component gets the two keys (MoveNotes), which is what is checked here.
+        void Drop(string key, string target) => cut.InvokeAsync(() => cut.FindComponent<BlazorStoc.Components.Shared.TicketSampleDialog>().Instance.MoveNotes(key, target)).GetAwaiter().GetResult();
+        Drop("problem", "executor");
         cut.WaitForAssertion(() => { if (!Keys().SequenceEqual(["title", "number", "finished", "resolution", "report", "executor", "problem"])) throw new Exception("pending"); }, TimeSpan.FromSeconds(5));
         var notesText = cut.Find("#ticket-sample-notes").TextContent;
         check(notesText.IndexOf("Executant", StringComparison.Ordinal) < notesText.IndexOf("Problema", StringComparison.Ordinal) && cut.FindAll("#ticket-sample-notes strong").Count >= 4 && cut.Find("#ticket-sample-note").TextContent.Contains("Ordinea în observații", StringComparison.Ordinal),
             "Activity import panel: dropping a row on another moves it there, the preview of the notes follows at once with the labels bold");
-        cut.Find("tr[data-notes-key='report']").DragStart();
-        cut.Find("tr[data-notes-key='title']").Drop();
+        Drop("report", "title");
         check(Keys().SequenceEqual(["title", "number", "finished", "resolution", "report", "executor", "problem"]), "Activity import panel: a required row is not a place to drop on");
         cut.Find(".ticket-sample .heading-actions button.danger").Click();
         settingsService.SavedSettings = null;

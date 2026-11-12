@@ -159,8 +159,9 @@ public sealed class MariaActivityReviewService(IConfiguration configuration, IAc
         var stored = await ActivityTicketStore.FindAsync(configuration, row.TicketId, cancellationToken).ConfigureAwait(false);
         var map = await ActivityFieldSettingsStore.ReadAsync(configuration, cancellationToken).ConfigureAwait(false);
         // The window shows what the ticket holds (hiding what the settings switch off); the notes are made with the settings.
-        var source = stored is null ? new TicketSource(row.TicketId, 0, 0, item.TicketNumber, item.Title, "", item.Resolution, item.Resolution, "") : ActivityTicketPlanner.SourceOf(stored.Ticket);
-        var forNotes = stored is null ? source : ActivityTicketPlanner.SourceOf(stored.Ticket, map);
+        var forNotes = stored is null ? new TicketSource(row.TicketId, 0, 0, item.TicketNumber, item.Title, "", item.Resolution, item.Resolution, "") : ActivityTicketPlanner.SourceOf(stored.Ticket, map);
+        // The window shows every piece the ticket holds under the settings: the extra fields chosen there too (they only exist in a source read with the map).
+        var source = forNotes;
         var points = new List<ReviewWorkPoint>();
         await using (var connection = await MariaDb.OpenAsync(configuration, cancellationToken).ConfigureAwait(false))
         await using (var command = new MySqlCommand("SELECT id, name, address FROM beneficiary_work_points WHERE beneficiary_id=@id ORDER BY is_primary DESC, name", connection))
@@ -422,8 +423,8 @@ public sealed class ActivityReviewSource(IConfiguration configuration, string ke
     public string DateChangedReason(DateOnly from, DateOnly to, ExpiryInstance current) =>
         $"Cel mai vechi eveniment de validat s-a mutat de la {StockMovementRules.DisplayDate(from)} la {StockMovementRules.DisplayDate(to)}.";
 
-    /// <summary>The URL of the notification: the validation list in the maintenance page (an operator with the permission to validate tickets has no access to the settings).</summary>
-    public const string Url = "/mentenanta?tab=validare";
+    /// <summary>The URL of the notification: the tab of the tickets to validate in the notifications page (BUG-0028: it works with the maintenance module stopped; the page checks the permission to validate).</summary>
+    public const string Url = "/notificari?tab=tichete";
     public const int AggregateId = 1;
 
     /// <summary>One notification for every event waiting (not one per ticket): it keeps the day of the oldest one and goes away when the last is decided.</summary>

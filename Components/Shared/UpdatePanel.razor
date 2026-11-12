@@ -92,10 +92,11 @@
                     <div class="catalog-body">
                         <fieldset class="module-stop-confirm" aria-labelledby="update-confirm-title">
                             <legend id="update-confirm-title">Aplici actualizarea la versiunea @report.Version?</legend>
-                            <p>Utilizatorii sunt anunțați și, după @((int)Updates.Notice.TotalSeconds) de secunde, aplicația se oprește pentru actualizare. Până atunci poți anula.</p>
+                            <p>„Actualizează cu notificare utilizatori”: utilizatorii sunt anunțați și, după @((int)Updates.Notice.TotalSeconds) de secunde, aplicația se oprește pentru actualizare; până atunci poți anula. „Actualizare imediată”: actualizarea pornește acum, fără anunț și fără întârziere.</p>
                             <div class="editor-grid"><ChangeReasonField Id="update-reason" @bind-Value="reason" Error="@reasonError" Disabled="busy" Hint="Scrie de ce actualizezi (de exemplu corecție de erori, funcție nouă cerută). Motivul este păstrat în jurnalul de activitate." /></div>
                             <div class="editor-actions">
-                                <button class="danger" type="button" disabled="@busy" @onclick="ConfirmAsync">@(busy ? "Se programează…" : "Aplică actualizarea")</button>
+                                <button class="danger" type="button" disabled="@busy" @onclick="() => ConfirmAsync(false)">@(busy ? "Se programează…" : "Actualizează cu notificare utilizatori")</button>
+                                <button class="danger" type="button" id="update-immediate" disabled="@busy" title="Pornește actualizarea acum, fără anunț în banner și fără întârziere." @onclick="() => ConfirmAsync(true)">Actualizare imediată</button>
                                 <button class="refresh act-close" type="button" disabled="@busy" @onclick="DiscardAsync">Renunță</button>
                             </div>
                         </fieldset>
@@ -249,7 +250,7 @@
         StateHasChanged();
     });
 
-    private async Task ConfirmAsync()
+    private async Task ConfirmAsync(bool immediate)
     {
         if (report is null) return;
         reasonError = ChangeReasonRules.ValidationError(reason);
@@ -258,8 +259,8 @@
         busy = true;
         try
         {
-            var scheduled = await Updates.ConfirmAsync(report.Id, reason);
-            notice = $"Actualizarea la versiunea {scheduled.To} este programată; utilizatorii au fost anunțați.";
+            var scheduled = await Updates.ConfirmAsync(report.Id, reason, immediate);
+            notice = immediate ? $"Actualizarea la versiunea {scheduled.To} pornește acum, fără anunț." : $"Actualizarea la versiunea {scheduled.To} este programată; utilizatorii au fost anunțați.";
             report = null;
         }
         catch (Exception exception) when (exception is not OperationCanceledException) { error = ErrorText(exception); }
