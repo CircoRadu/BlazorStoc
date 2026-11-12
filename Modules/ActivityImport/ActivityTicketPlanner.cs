@@ -9,7 +9,7 @@ namespace BlazorStoc.Modules.ActivityImport;
 // ticket looks like: a type taken as maintenance, or a keyword in what was done (exact, or one that only resembles it), mean "maintenance"; the rest mean "service". The problem and the
 // resolution are told apart from the report of the event (see SplitReport). Tickets whose client was not imported are not errors: they wait, and are taken after the partner is.
 
-public sealed record TicketSource(long TicketId, long TypeId, long EventId, string Number, string Title, string Problem, string Resolution, string Report, string Executor, IReadOnlyDictionary<string, string>? Extras = null);
+public sealed record TicketSource(long TicketId, long TypeId, long EventId, string Number, string Title, string Problem, string Resolution, string Report, string Executor, IReadOnlyDictionary<string, string>? Extras = null, DateTime? Finished = null);
 
 public sealed record TicketPlan(long SourceId, string Title, PlanAction Action, int? BeneficiaryId, int? WorkPointId, DateOnly? PerformedOn, string Notes, TicketSource? Source, string Message, string Hash,
     string Keyword = "", string Approximate = "", string Found = "", bool NeedsValidation = false, string MatchKind = "")
@@ -79,7 +79,7 @@ public static class ActivityTicketPlanner
             if (!map.IsEnabled(ActivityFieldMap.Executor)) executor = "";
             extras = ticket.Extras is null ? null : map.Extras.Where(extra => ticket.Extras.ContainsKey(extra.Key)).ToDictionary(extra => extra.Key, extra => ticket.Extras[extra.Key]);
         }
-        return new TicketSource(ticket.Id, ticket.TypeId, ticket.EventId, TextNormalization.ForObjectNameOrCode(ticket.Number), title, problem, resolution, report, executor, extras is { Count: > 0 } ? extras : null);
+        return new TicketSource(ticket.Id, ticket.TypeId, ticket.EventId, TextNormalization.ForObjectNameOrCode(ticket.Number), title, problem, resolution, report, executor, extras is { Count: > 0 } ? extras : null, ticket.EventEnd);
     }
 
     public static string HashOf(ActivityTicket ticket, ActivityFieldMap? map = null)
@@ -95,7 +95,7 @@ public static class ActivityTicketPlanner
     /// <summary>The lines of the notes that come from the ticket, in order: problem, resolution, report, executor (the pieces that are on and go to the notes) and the extra fields that go to the notes.</summary>
     public static IReadOnlyList<(string Key, string Label, string Value)> NoteLines(TicketSource source, ActivityFieldMap map)
     {
-        var lines = new List<(string, string, string)>();
+        var lines = new List<(string Key, string Label, string Value)>();
         void Add(string key, string label, string value) { if (map.IsEnabled(key) && map.InNotes(key) && value.Length > 0) lines.Add((key, label, value)); }
         Add(ActivityFieldMap.Problem, map.NoteLabelOf(ActivityFieldMap.Problem), source.Problem);
         Add(ActivityFieldMap.Resolution, map.NoteLabelOf(ActivityFieldMap.Resolution), source.Resolution);
@@ -103,6 +103,22 @@ public static class ActivityTicketPlanner
         Add(ActivityFieldMap.Executor, map.NoteLabelOf(ActivityFieldMap.Executor), source.Executor);
         foreach (var extra in map.Extras)
             if (extra.Target is ActivityFieldMap.Notes or ActivityFieldMap.Both && source.Extras is not null && source.Extras.TryGetValue(extra.Key, out var value) && value.Length > 0) lines.Add((extra.Key, extra.Label, value));
+        // The order chosen by dragging (a stable sort: lines with the same place keep the order above).
+        return [.. lines.OrderBy(line => map.PlaceOf(line.Key))];
+    }
+
+    /// <summary>The label of the end of the event in the notes, and the format of its date.</summary>
+    public const string FinishedFormat = "dd.MM.yyyy HH:mm";
+
+    /// <summary>The required lines of the notes, always first and in this order: title, number, id of the ticket, id of the event, end of the event (what the ticket does not hold is left out).</summary>
+    public static IReadOnlyList<(string Label, string Value)> RequiredLines(TicketSource source)
+    {
+        var lines = new List<(string, string)>();
+        if (source.Title.Length > 0) lines.Add(("Titlul tichetului", source.Title));
+        if (source.Number.Length > 0) lines.Add(("Numărul tichetului", source.Number));
+        if (source.TicketId > 0) lines.Add(("ID ticket", source.TicketId.ToString(System.Globalization.CultureInfo.InvariantCulture)));
+        if (source.EventId > 0) lines.Add(("ID eveniment", source.EventId.ToString(System.Globalization.CultureInfo.InvariantCulture)));
+        if (source.Finished is { } finished) lines.Add(("Data finalizării evenimentului", finished.ToString(FinishedFormat, System.Globalization.CultureInfo.InvariantCulture)));
         return lines;
     }
 
@@ -110,19 +126,24 @@ public static class ActivityTicketPlanner
     public static string NotesItems(TicketSource source, ActivityFieldMap map) => string.Join(',', NoteLines(source, map).Select(line => line.Key));
 
     /// <summary>The generated start of the notes: the header and the lines of the ticket, without the remarks about maintenance and without any cut.</summary>
-    public static string NotesPrefix(string number, string title, IEnumerable<(string Label, string Value)> lines)
+    public static string NotesPrefix(string number, string title, IEnumerable<(string Label, string Value)> lines) =>
+        NotesPrefix(new TicketSource(0, 0, 0, number, title, "", "", "", "", null), lines);
+
+    /// <summary>
+    /// The generated start of the notes (BUG-0023): "Preluat din ActivityApp", then each line as "**Label**: value" with a blank line between lines: first the required ones (title, number, ids, end of the
+    /// event), then the ones of the settings in the order chosen. The labels are written between ** so that the windows that show the notes draw them bold (<see cref="NotesMarkup"/>).
+    /// </summary>
+    public static string NotesPrefix(TicketSource source, IEnumerable<(string Label, string Value)> lines)
     {
         var text = new StringBuilder();
         text.Append("Preluat din ActivityApp");
-        if (number.Length > 0) text.Append($", tichet {number}");
-        if (title.Length > 0) text.Append($": {title}");
-        foreach (var (label, value) in lines) text.Append('\n').Append(label).Append(": ").Append(value);
+        foreach (var (label, value) in RequiredLines(source).Concat(lines)) text.Append("\n\n").Append(NotesMarkup.Bold(label)).Append(": ").Append(value);
         return text.ToString();
     }
 
     /// <summary>The notes of an intervention taken from the ticket with the settings of the fields.</summary>
     public static string Notes(TicketSource source, ActivityFieldMap map, string keyword = "", bool maintenance = false, bool uncovered = false) =>
-        Finish(NotesPrefix(source.Number, source.Title, NoteLines(source, map).Select(line => (line.Label, line.Value))), keyword, maintenance, uncovered);
+        Finish(NotesPrefix(source, NoteLines(source, map).Select(line => (line.Label, line.Value))), keyword, maintenance, uncovered);
 
     public static string Notes(string number, string title, string problem, string resolution, string executor, string keyword = "", bool maintenance = false, bool uncovered = false) =>
         Finish(NotesPrefix(number, title, new[] { ("Problemă", problem), ("Rezolvare", resolution), ("Executant", executor) }.Where(line => line.Item2.Length > 0)), keyword, maintenance, uncovered);

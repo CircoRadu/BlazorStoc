@@ -605,6 +605,8 @@
     private List<FieldRow>? fields;
     // The column of the ticket number has no default: until the administrator chooses it the settings cannot be saved (BUG-0023).
     private bool numberChosen;
+    // The order chosen by dragging for the optional lines of the notes (empty = the usual one); see Sequence().
+    private List<string> orderKeys = [];
     private readonly List<ExtraRow> extras = [];
     private IReadOnlyDictionary<string, IReadOnlyList<string>>? textColumns;
     private string newTable = ActivityFieldMap.ExtraTables[0], newColumn = "", newLabel = "";
@@ -623,6 +625,7 @@
         structureChange = view.StructureChange;
         var map = view.Map ?? ActivityFieldMap.Empty;
         numberChosen = map.NumberChosen;
+        orderKeys = [.. map.Order];
         fields = [.. ActivityFieldMap.Info.Select(item => new FieldRow(item, item.FieldKey is null ? null : view.Fields.FirstOrDefault(choice => choice.Field.Key == item.FieldKey), map.IsEnabled(item.Key), item.Mandatory ? ActivityFieldMap.Notes : map.TargetOf(item.Key)) { Label = map.LabelOf(item.Key) })];
         extras.Clear();
         extras.AddRange(map.Extras.Select(extra => new ExtraRow(extra.Table, extra.Column, extra.Label, extra.Target)));
@@ -651,7 +654,7 @@
         var off = fields!.Where(row => !row.Item.Mandatory && !row.Enabled).Select(row => row.Item.Key);
         var targets = fields!.Where(row => !row.Item.Mandatory).ToDictionary(row => row.Item.Key, row => row.Target);
         var labels = fields!.Where(row => !row.Item.Mandatory).ToDictionary(row => row.Item.Key, row => row.Label);
-        return ActivityFieldMap.Create(columns, off, targets, extras.Select(extra => new ActivityExtraField(extra.Table, extra.Column, extra.Label, extra.Target)), labels, numberChosen, out problem);
+        return ActivityFieldMap.Create(columns, off, targets, extras.Select(extra => new ActivityExtraField(extra.Table, extra.Column, extra.Label, extra.Target)), labels, numberChosen, out problem)?.WithOrder(orderKeys);
     }
 
     private Task SaveFieldsAsync() => RunAsync("Se salvează corespondența…", async () =>
@@ -751,22 +754,46 @@
     /// <summary>A column of the lists of the example ticket and what is done with it.</summary>
     private sealed record SampleAssignment(string Table, string Column, string For, string Name = "", string Target = "");
 
-    // The list "Folosite" of the window: the pieces of information that are on (with their column) and the free fields, in the order they are saved; the client CUI is always there.
+    // The list "Folosite" of the window: first the required ones (they are always first in the notes, and the client CUI), then the pieces of information that are on and the free fields in the order
+    // of the notes (the one chosen by dragging, see Sequence()).
     private IReadOnlyList<TicketSampleDialog.SampleUsed> UsedList()
     {
         var list = new List<TicketSampleDialog.SampleUsed>();
         if (fields is null) return list;
+        var optional = new Dictionary<string, TicketSampleDialog.SampleUsed>(StringComparer.Ordinal);
         foreach (var row in fields)
         {
             var table = row.Item.FieldKey?.Split('.')[0] ?? "";
             var column = row.Column ?? "";
-            if (row.Item.Mandatory) list.Add(new(row.Item.Key, table, column, row.Item.Key == ActivityFieldMap.Number && !numberChosen ? "" : ActivityFieldMap.ColumnName(table, column), row.Item.Label, ActivityFieldMap.Notes, row.Item.Key, true, "Se preia mereu: în observații și titlu"));
-            else if (row.Enabled) list.Add(new(row.Item.Key, table, column, column.Length == 0 ? "" : ActivityFieldMap.ColumnName(table, column), row.Label, row.Target, row.Item.Key));
+            if (row.Item.Mandatory) list.Add(new(row.Item.Key, table, column, row.Item.Key == ActivityFieldMap.Number && !numberChosen ? "" : ActivityFieldMap.ColumnName(table, column), row.Item.Label, ActivityFieldMap.Notes, row.Item.Key, true, row.Item.Key == ActivityFieldMap.Finished ? "Se preia mereu: data intervenției" : "Se preia mereu: în observații și titlu"));
+            else if (row.Enabled) optional[row.Item.Key] = new(row.Item.Key, table, column, column.Length == 0 ? "" : ActivityFieldMap.ColumnName(table, column), row.Label, row.Target, row.Item.Key);
         }
-        foreach (var extra in extras) list.Add(new(extra.Key, extra.Table, extra.Column, ActivityFieldMap.ColumnName(extra.Table, extra.Column), extra.Label, extra.Target, "extra"));
+        foreach (var extra in extras) optional[extra.Key] = new(extra.Key, extra.Table, extra.Column, ActivityFieldMap.ColumnName(extra.Table, extra.Column), extra.Label, extra.Target, "extra");
         if (sample?.Tables.FirstOrDefault(table => table.Table == ClientTable)?.Columns.FirstOrDefault() is { } cui)
             list.Add(new("client-cui", ClientTable, cui.Column, "Client – " + cui.Column, "CUI client", ActivityFieldMap.Notes, "client", true, "Se preia automat pentru persoane juridice; nu poate fi detașat"));
+        foreach (var key in Sequence()) if (optional.TryGetValue(key, out var used)) list.Add(used);
         return list;
+    }
+
+    // The order of the optional lines of the notes: the keys chosen by dragging first, the others in the usual order after them.
+    private List<string> Sequence()
+    {
+        var usual = ActivityFieldMap.DefaultOrder(extras.Select(extra => new ActivityExtraField(extra.Table, extra.Column, extra.Label, extra.Target)));
+        var named = orderKeys.Where(usual.Contains).Distinct(StringComparer.Ordinal).ToList();
+        return [.. named, .. usual.Where(key => !named.Contains(key))];
+    }
+
+    // A row dropped on another takes its place (before it when it comes from below, after it when it comes from above).
+    private void MoveInNotes(string key, string targetKey)
+    {
+        var order = Sequence();
+        var from = order.IndexOf(key);
+        var to = order.IndexOf(targetKey);
+        if (from < 0 || to < 0 || from == to) return;
+        order.RemoveAt(from);
+        order.Insert(to, key);
+        orderKeys = order;
+        sampleNote = "Ordinea în observații s-a schimbat; cele obligatorii rămân primele.";
     }
 
     private const string ClientTable = "Client";
@@ -799,6 +826,7 @@
     private void EditFromSample(TicketSampleDialog.SampleEdit edit)
     {
         sampleError = null; sampleNote = null;
+        if (edit.MoveBefore is not null) { MoveInNotes(edit.Key, edit.MoveBefore); return; }
         // The column of the title or of the number: any text column of the ticket (the one it leaves is free, a piece that read the new one gives it up or takes the old one).
         if (edit.Column is not null)
         {
@@ -919,6 +947,7 @@
         }
         extras.Clear();
         numberChosen = false;
+        orderKeys.Clear();
     }
 
 

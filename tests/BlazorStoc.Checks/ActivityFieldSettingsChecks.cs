@@ -33,7 +33,7 @@ public static class ActivityFieldSettingsChecks
         new(id, "T-" + id, "Aer conditionat", new DateTime(2026, 10, 1, 8, 30, 0), [
             new("Tickete", [new("ID", "bigint", id.ToString(), false), new("NumeTicket", "nvarchar", "T-" + id, true), new("Subject", "nvarchar", "Aer conditionat", true), new("DescriptionInternal", "nvarchar", problem, true),
                 new("Detalii", "nvarchar", "Alt text", true), new("ProcesatDe", "nvarchar", "Birou", true), new("Observatii", "nvarchar", "Poarta inchisa", true)]),
-            new("EvenimenteAgent", [new("DescriptionInternal", "nvarchar", report, true)])], executor, older);
+            new("EvenimenteAgent", [new("ID", "bigint", "77", false), new("DescriptionInternal", "nvarchar", report, true), new("EndTime", "datetime", "02.11.2026 15:16:00", false) { OtherKind = true }, new("DataModificareEveniment", "datetime", "03.11.2026 09:00:00", false) { OtherKind = true }])], executor, older);
 
     private static void Labels(Action<bool, string> check)
     {
@@ -52,7 +52,7 @@ public static class ActivityFieldSettingsChecks
         check(new[] { clash, twice, longName }.All(text => text is not null) && withExtra is null, "Ticket fields: a name used by another piece (capitals do not matter) or longer than 60 characters is refused; an extra field may repeat a name");
         var ticket = Ticket();
         var text = ActivityTicketPlanner.Notes(ActivityTicketPlanner.SourceOf(ticket, map), map);
-        check(text.Contains("Defect: Nu merge aerul", StringComparison.Ordinal) && text.Contains("Tehnician: Ion Pop", StringComparison.Ordinal) && text.Contains("Rezolvare: Am schimbat filtrul", StringComparison.Ordinal) && !text.Contains("Problema:", StringComparison.Ordinal),
+        check(text.Contains("**Defect**: Nu merge aerul", StringComparison.Ordinal) && text.Contains("**Tehnician**: Ion Pop", StringComparison.Ordinal) && text.Contains("**Rezolvare**: Am schimbat filtrul", StringComparison.Ordinal) && !text.Contains("Problema:", StringComparison.Ordinal),
             "Ticket fields: the notes carry the names chosen");
         check(map.Describe().Contains("numit „Defect”", StringComparison.Ordinal), "Ticket fields: the journal names the renamed pieces");
     }
@@ -61,17 +61,35 @@ public static class ActivityFieldSettingsChecks
     {
         var sample = Sample();
         var preview = ActivityTicketSampleRules.Preview(sample, ActivityFieldMap.Create(new Dictionary<string, string>(), null, null, null, null, true, out _)!);
+        var otherEnd = ActivityFieldMap.Create(new Dictionary<string, string> { ["EvenimenteAgent.EndTime"] = "DataModificareEveniment" }, null, null, null, null, true, out _)!;
+        check(ActivityTicketSampleRules.Preview(sample, otherEnd).Items.Single(item => item.Key == "finished").Value == "03.11.2026 09:00" && otherEnd.Required.Contains(ActivityFieldMap.Finished) && !ActivityFieldMap.Empty.Required.Contains(ActivityFieldMap.Finished)
+              && ActivityTicketFields.Missing(otherEnd, ActivityFieldMap.LegacyRead).Contains(ActivityFieldMap.Finished) && ActivityTicketFields.Missing(ActivityFieldMap.Empty, "executor,finished,number,problem,report,title").Contains(ActivityFieldMap.Finished)
+              && ActivityTicketFields.Missing(ActivityFieldMap.Empty, ActivityFieldMap.LegacyRead).Count == 0,
+            "Example ticket: the end of the event is read from the column chosen for it; tickets are read again only when that column was or is chosen (the default never refreshes existing tickets)");
+        // The order of the lines of the notes (drag and drop): the required lines are always first, the optional ones follow the order chosen, the usual order is kept as "empty".
+        var plain = ActivityFieldMap.Create(new Dictionary<string, string>(), null, null, null, null, true, out _)!;
+        var ordered = plain.WithOrder([ActivityFieldMap.Executor, "nu-exista", ActivityFieldMap.Problem, ActivityFieldMap.Executor]);
+        var orderedText = ActivityTicketPlanner.Notes(ActivityTicketPlanner.SourceOf(Ticket(), ordered), ordered);
+        var usualText = ActivityTicketPlanner.Notes(ActivityTicketPlanner.SourceOf(Ticket(), plain), plain);
+        check(ordered.Order.SequenceEqual([ActivityFieldMap.Executor, ActivityFieldMap.Problem, ActivityFieldMap.Resolution, ActivityFieldMap.Report]) && plain.WithOrder(ActivityFieldMap.DefaultOrder([])).Order.Count == 0
+              && orderedText.IndexOf("**Executant**", StringComparison.Ordinal) < orderedText.IndexOf("**Problema**", StringComparison.Ordinal) && usualText.IndexOf("**Problema**", StringComparison.Ordinal) < usualText.IndexOf("**Executant**", StringComparison.Ordinal)
+              && orderedText.IndexOf("**Data finalizarii evenimentului**", StringComparison.Ordinal) < orderedText.IndexOf("**Executant**", StringComparison.Ordinal) && orderedText.Contains("**Problema**: Nu merge aerul\n\n**Rezolvare**", StringComparison.Ordinal) is var spaced && spaced
+              && ActivityFieldMap.FromJson(ordered.ToJson()).Order.SequenceEqual(ordered.Order) && ordered.ToJson().Length > 0 && plain.WithOrder([]).Order.Count == 0,
+            "Ticket notes: each line is **label**: value with a blank line between lines, the required lines come first and the others follow the order chosen, which is saved with the settings");
+        check(NotesMarkup.Plain(orderedText).Contains("Executant: Ion Pop", StringComparison.Ordinal) && !NotesMarkup.Plain(orderedText).Contains("**", StringComparison.Ordinal)
+              && NotesMarkup.Html("**Defect**: <b>x</b>").Value == "<strong>Defect</strong>: &lt;b&gt;x&lt;/b&gt;" && NotesMarkup.Bold("a*b") == "**ab**",
+            "Ticket notes: the labels are drawn bold where the notes are shown, the rest of the text is encoded, and the tables show the notes without the asterisks");
         var unchosen = ActivityTicketSampleRules.Preview(sample, ActivityFieldMap.Empty);
         check(unchosen.Items.Single(item => item.Key == "number").Value.Length == 0 && unchosen.Items.Single(item => item.Key == "number").Source.Contains("nu este aleasă", StringComparison.Ordinal) && unchosen.Items.Single(item => item.Key == "title").Value == "Aer conditionat",
             "Example ticket: until the column of the number is chosen the number is empty in the preview (there is no default), the other pieces are unchanged");
         string Value(string key) => preview.Items.Single(item => item.Key == key).Value;
-        check(preview.Items.Count == 6 && Value("problem") == "Nu merge aerul" && Value("resolution") == "Am schimbat filtrul" && Value("executor") == "Ion Pop" && Value("title") == "Aer conditionat" && Value("number") == "T-9"
-              && preview.Notes.Contains("Executant: Ion Pop", StringComparison.Ordinal) && preview.Notes.StartsWith("Preluat din ActivityApp, tichet T-9: Aer conditionat", StringComparison.Ordinal),
+        check(preview.Items.Count == 7 && Value("finished") == "02.11.2026 15:16" && preview.Items.Single(item => item.Key == "finished").Source == "Eveniment – EndTime" && Value("problem") == "Nu merge aerul" && Value("resolution") == "Am schimbat filtrul" && Value("executor") == "Ion Pop" && Value("title") == "Aer conditionat" && Value("number") == "T-9"
+              && preview.Notes.Contains("**Executant**: Ion Pop", StringComparison.Ordinal) && preview.Notes.StartsWith("Preluat din ActivityApp\n\n**Titlul tichetului**: Aer conditionat\n\n**Numarul tichetului**: T-9\n\n**ID ticket**: 9\n\n**ID eveniment**: 77\n\n**Data finalizarii evenimentului**: 02.11.2026 15:16\n\n**Problema**: Nu merge aerul", StringComparison.Ordinal),
             "Example ticket: with the default settings each piece gets its usual column, the executor comes from the agents of the event, and the notes are the ones the import would write");
         var moved = ActivityFieldMap.Create(new Dictionary<string, string> { ["Tickete.DescriptionInternal"] = "Detalii" }, [ActivityFieldMap.Executor], null, [new ActivityExtraField("Tickete", "Observatii", "Observații client", "both")], out _)!;
         var other = ActivityTicketSampleRules.Preview(sample, moved);
         check(other.Items.Single(item => item.Key == "problem").Value == "Alt text" && other.Items.Single(item => item.Key == "executor").Target == "oprit" && other.Items.Single(item => item.Key == "executor").Value == ""
-              && other.Items.Single(item => item.Key == "x:Tickete.Observatii").Value == "Poarta inchisa" && !other.Notes.Contains("Executant", StringComparison.Ordinal) && other.Notes.Contains("Observatii client: Poarta inchisa", StringComparison.Ordinal),
+              && other.Items.Single(item => item.Key == "x:Tickete.Observatii").Value == "Poarta inchisa" && !other.Notes.Contains("Executant", StringComparison.Ordinal) && other.Notes.Contains("**Observatii client**: Poarta inchisa", StringComparison.Ordinal),
             "Example ticket: the preview follows the settings on the screen (another column, a piece switched off, an extra field)");
         check(ActivityTicketSampleRules.Format(null) is null && ActivityTicketSampleRules.Format(new DateTime(2026, 10, 1, 8, 30, 0)) == "01.10.2026 08:30:00" && ActivityTicketSampleRules.Format(true) == "da" && ActivityTicketSampleRules.Format(new byte[3]) == "(conținut binar, 3 octeți)"
               && ActivityTicketSampleRules.Format(12.5m) == "12.5" && ActivityTicketSampleRules.Format(new string('x', 5000))!.EndsWith("(text tăiat)", StringComparison.Ordinal),
@@ -121,7 +139,7 @@ public static class ActivityFieldSettingsChecks
             .Add(p => p.Older, EventCallback.Factory.Create(new object(), () => older++)).Add(p => p.Newer, EventCallback.Factory.Create(new object(), () => newer++))
             .Add(p => p.Toggle, EventCallback.Factory.Create<TicketSampleDialog.SampleToggle>(new object(), value => toggled = value))
             .Add(p => p.Edit, EventCallback.Factory.Create<TicketSampleDialog.SampleEdit>(new object(), value => edited = value)));
-        check(cut.Find("#ticket-sample-info").TextContent.Contains("Tichet 9", StringComparison.Ordinal) && cut.FindAll("#ticket-sample-Tickete tbody tr").Count == 7 && cut.FindAll("#ticket-sample-EvenimenteAgent tbody tr").Count == 1
+        check(cut.Find("#ticket-sample-info").TextContent.Contains("Tichet 9", StringComparison.Ordinal) && cut.FindAll("#ticket-sample-Tickete tbody tr").Count == 7 && cut.FindAll("#ticket-sample-EvenimenteAgent tbody tr").Count == 4
               && cut.Find("#ticket-sample-Tickete").TextContent.Contains("Poarta inchisa", StringComparison.Ordinal),
             "Example ticket window: every column of the ticket and of its event is listed with its value");
         check(cut.FindAll("#ticket-sample-group-Tickete-content").Count == 1 && cut.FindAll("#ticket-sample-group-EvenimenteAgent-content").Count == 1 && cut.FindAll("#ticket-sample-group-Client-content").Count == 1 && cut.Find("#ticket-sample-Client").TextContent.Contains("RO123", StringComparison.Ordinal),
@@ -212,23 +230,23 @@ public static class ActivityFieldSettingsChecks
         var ticket = Ticket();
         var source = ActivityTicketPlanner.SourceOf(ticket);
         var legacy = ActivityTicketPlanner.Notes(source.Number, source.Title, source.Problem, source.Resolution, source.Executor);
-        check(ActivityTicketPlanner.Notes(source, ActivityFieldMap.Empty) == legacy && legacy.Contains("Executant: Ion Pop", StringComparison.Ordinal) && !legacy.Contains("Raport original", StringComparison.Ordinal),
-            "Ticket notes: with the default settings the notes are exactly what they were before the settings existed");
+        check(ActivityTicketPlanner.Notes(source with { TicketId = 0, EventId = 0, Finished = null }, ActivityFieldMap.Empty) == legacy && ActivityTicketPlanner.Notes(source, ActivityFieldMap.Empty).Contains("**ID ticket**:", StringComparison.Ordinal) && legacy.Contains("**Executant**: Ion Pop", StringComparison.Ordinal) && !legacy.Contains("Raport original", StringComparison.Ordinal),
+            "Ticket notes: with the default settings the lines are the usual ones (the ids and the end of the event are added as required lines, first)");
         check(ActivityTicketPlanner.HashOf(ticket) == ActivityTicketPlanner.HashOf(ticket, ActivityFieldMap.Empty), "Ticket notes: the default settings do not change the value that detects a change of the ticket (no ticket in the queue is renewed for nothing)");
         ActivityFieldMap Make(string[]? off = null, Dictionary<string, string>? targets = null, ActivityExtraField[]? extras = null) => ActivityFieldMap.Create(new Dictionary<string, string>(), off, targets, extras, out _)!;
         var separate = Make(targets: new() { [ActivityFieldMap.Executor] = ActivityFieldMap.Separate });
         var textSeparate = ActivityTicketPlanner.Notes(ActivityTicketPlanner.SourceOf(ticket, separate), separate);
-        check(!textSeparate.Contains("Executant", StringComparison.Ordinal) && textSeparate.Contains("Problema: Nu merge aerul", StringComparison.Ordinal) && textSeparate.Contains("Rezolvare: Am schimbat filtrul", StringComparison.Ordinal),
+        check(!textSeparate.Contains("Executant", StringComparison.Ordinal) && textSeparate.Contains("**Problema**: Nu merge aerul", StringComparison.Ordinal) && textSeparate.Contains("**Rezolvare**: Am schimbat filtrul", StringComparison.Ordinal),
             "Ticket notes: a piece that goes to the separate record only is not in the notes");
         var off = Make(off: [ActivityFieldMap.Problem, ActivityFieldMap.Executor]);
         var offSource = ActivityTicketPlanner.SourceOf(ticket, off);
         var textOff = ActivityTicketPlanner.Notes(offSource, off);
-        check(offSource.Problem == "" && offSource.Executor == "" && offSource.Resolution == "Am schimbat filtrul" && !textOff.Contains("Problema", StringComparison.Ordinal) && !textOff.Contains("Executant", StringComparison.Ordinal) && textOff.Contains("Rezolvare: Am schimbat filtrul", StringComparison.Ordinal),
+        check(offSource.Problem == "" && offSource.Executor == "" && offSource.Resolution == "Am schimbat filtrul" && !textOff.Contains("Problema", StringComparison.Ordinal) && !textOff.Contains("Executant", StringComparison.Ordinal) && textOff.Contains("**Rezolvare**: Am schimbat filtrul", StringComparison.Ordinal),
             "Ticket notes: a piece that is switched off is not in the source nor in the notes, and the resolution is still told apart from the problem");
         var withExtra = Make(extras: [new("Tickete", "Observatii", "Observații client", ActivityFieldMap.Notes)], targets: new() { [ActivityFieldMap.Report] = ActivityFieldMap.Both });
         var extraTicket = Ticket(extras: new Dictionary<string, string> { ["x:Tickete.Observatii"] = "Poarta e închisă" });
         var textExtra = ActivityTicketPlanner.Notes(ActivityTicketPlanner.SourceOf(extraTicket, withExtra), withExtra, "mentenanță", true);
-        check(textExtra.Contains("Observatii client: Poarta e inchisa", StringComparison.Ordinal) && textExtra.Contains("Raport original:", StringComparison.Ordinal) && textExtra.Contains("Mentenanta: recunoscuta dupa „mentenanta”.", StringComparison.Ordinal),
+        check(textExtra.Contains("**Observatii client**: Poarta e inchisa", StringComparison.Ordinal) && textExtra.Contains("**Raport original**:", StringComparison.Ordinal) && textExtra.Contains("Mentenanta: recunoscuta dupa „mentenanta”.", StringComparison.Ordinal),
             "Ticket notes: an extra field and the report go to the notes when so chosen, followed by the remark about maintenance");
         check(ActivityTicketPlanner.HashOf(extraTicket, withExtra) != ActivityTicketPlanner.HashOf(extraTicket, ActivityFieldMap.Empty), "Ticket notes: an extra field changes the value that detects a change of the ticket");
         check(ActivityTicketPlanner.NotesItems(ActivityTicketPlanner.SourceOf(extraTicket, withExtra), withExtra) == "problem,resolution,report,executor,x:Tickete.Observatii", "Ticket notes: the pieces that went to the notes are listed in order, to know later what the generated text held");
@@ -239,14 +257,14 @@ public static class ActivityFieldSettingsChecks
         var ticket = Ticket();
         var before = ActivityTicketPlanner.SourceOf(ticket);
         var oldMap = ActivityFieldMap.Empty;
-        var oldPrefix = ActivityTicketPlanner.NotesPrefix(before.Number, before.Title, ActivityTicketPlanner.NoteLines(before, oldMap).Select(line => (line.Label, line.Value)));
+        var oldPrefix = ActivityTicketPlanner.NotesPrefix(before, ActivityTicketPlanner.NoteLines(before, oldMap).Select(line => (line.Label, line.Value)));
         var withExtra = ActivityFieldMap.Create(new Dictionary<string, string>(), null, null, [new("Tickete", "Observatii", "Observații client", ActivityFieldMap.Notes)], out _)!;
         var newTicket = Ticket(extras: new Dictionary<string, string> { ["x:Tickete.Observatii"] = "Poarta e închisă" });
         var newSource = ActivityTicketPlanner.SourceOf(newTicket, withExtra);
-        var newPrefix = ActivityTicketPlanner.NotesPrefix(newSource.Number, newSource.Title, ActivityTicketPlanner.NoteLines(newSource, withExtra).Select(line => (line.Label, line.Value)));
+        var newPrefix = ActivityTicketPlanner.NotesPrefix(newSource, ActivityTicketPlanner.NoteLines(newSource, withExtra).Select(line => (line.Label, line.Value)));
         var generated = ActivityTicketPlanner.Notes(source: before, map: oldMap);
         var rebuilt = ActivityTicketPlanner.RebuildNotes(generated, oldPrefix, newPrefix);
-        check(rebuilt is not null && rebuilt.Contains("Observatii client: Poarta e inchisa", StringComparison.Ordinal) && rebuilt.StartsWith("Preluat din ActivityApp, tichet T-77: Aer conditionat", StringComparison.Ordinal),
+        check(rebuilt is not null && rebuilt.Contains("**Observatii client**: Poarta e inchisa", StringComparison.Ordinal) && rebuilt.StartsWith("Preluat din ActivityApp\n\n**Titlul tichetului**: Aer conditionat\n\n**Numarul tichetului**: T-77", StringComparison.Ordinal),
             "Ticket notes refresh: notes that are still what the import wrote get the new lines");
         var withRemark = ActivityTicketPlanner.Notes(before, oldMap, "mentenanță", true, uncovered: true);
         var keptRemark = ActivityTicketPlanner.RebuildNotes(withRemark, oldPrefix, newPrefix);

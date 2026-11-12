@@ -1,8 +1,8 @@
 {
     "modules":  {
                     "ActivityImport":  {
-                                           "version":  "0.18.0",
-                                           "hash":  "b57737c4932fb80ebb3cdd9915886de6bedb219c95c84bafd3733201d4c37e30",
+                                           "version":  "0.19.0",
+                                           "hash":  "598f5f31bf71770235644b5ee754ceba7ca0700f631d32611a82d9945b47fa19",
                                            "history":  [
                                                            {
                                                                "version":  "0.1.0",
@@ -123,6 +123,11 @@
                                                                "version":  "0.18.0",
                                                                "date":  "12.11.2026",
                                                                "note":  "BUG-0023: titlul si numarul tichetului se aleg din orice coloana citibila, numarul este obligatoriu si fara valoare implicita (corespondenta nu se salveaza fara el), fereastra flotanta Cum arata tichetul preluat"
+                                                           },
+                                                           {
+                                                               "version":  "0.19.0",
+                                                               "date":  "12.11.2026",
+                                                               "note":  "BUG-0023/0024: informatii obligatorii ID ticket, ID eveniment si data finalizarii evenimentului (alegere din coloane de tip data), observatii in format eticheta bold: valoare cu rand liber intre campuri, ordine prin drag and drop, obligatoriile primele; butoane proprii pentru fereastra flotanta"
                                                            }
                                                        ]
                                        },
@@ -412,8 +417,8 @@
                                                 ]
                                 },
                     "Maintenance":  {
-                                        "version":  "1.12.1",
-                                        "hash":  "3e29a0cd598bafdc042aa269fb4516e634e92855a89f82a8e123478335b91486",
+                                        "version":  "1.12.2",
+                                        "hash":  "6cd9508cb41817d5f4c8fa5bf63cadc20d3ccef14e03df1238cfbaf3892a1144",
                                         "history":  [
                                                         {
                                                             "version":  "1.0.0",
@@ -559,6 +564,11 @@
                                                             "version":  "1.12.1",
                                                             "date":  "11.11.2026",
                                                             "note":  "Listele se ordoneaza din antet si retin ordonarea in sesiune (BUG-0018)"
+                                                        },
+                                                        {
+                                                            "version":  "1.12.2",
+                                                            "date":  "12.11.2026",
+                                                            "note":  "Observatiile preluate din tichet se afiseaza cu etichetele aldine (fara asteriscuri in tabele)"
                                                         }
                                                     ]
                                     },

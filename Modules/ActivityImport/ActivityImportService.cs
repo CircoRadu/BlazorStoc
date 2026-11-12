@@ -507,7 +507,7 @@ public sealed class MariaActivityImportService(IConfiguration configuration, IDa
             var actual = await source.ReadStructureAsync(new ActivityConnection(settings.Server, settings.Port, settings.Database, settings.User, password), cancellationToken).ConfigureAwait(false);
             return new ActivityFieldMapView([.. ActivityFieldMap.Fields.Select(field =>
             {
-                var available = ActivityFieldMap.ReadsAnyKind(field) ? ActivityFieldMap.ReadableColumns(actual, field.Table) : ActivityFieldMap.TextColumns(actual, field.Table);
+                var available = ActivityFieldMap.ChoiceColumns(actual, field);
                 var current = map.ColumnOf(field);
                 return new ActivityFieldChoice(field, current, available, !available.Contains(current, StringComparer.OrdinalIgnoreCase));
             })], null, map, ActivityFieldMap.ExtraTables.ToDictionary(table => table, table => ActivityFieldMap.ReadableColumns(actual, table)), pending);
@@ -520,14 +520,14 @@ public sealed class MariaActivityImportService(IConfiguration configuration, IDa
         await access.EnsureAsync(Edit, cancellationToken).ConfigureAwait(false);
         // Only the columns change: what was switched off, the destinations and the extra fields stay as they are.
         var existing = await ReadFieldMapAsync(cancellationToken).ConfigureAwait(false);
-        var map = ActivityFieldMap.Create(chosen, existing.Off, existing.Targets, existing.Extras, existing.Labels, existing.NumberChosen, out var error) ?? throw new ActivityImportException(error ?? "Corespondența câmpurilor nu este validă.");
+        var map = ActivityFieldMap.Create(chosen, existing.Off, existing.Targets, existing.Extras, existing.Labels, existing.NumberChosen, out var error)?.WithOrder(existing.Order) ?? throw new ActivityImportException(error ?? "Corespondența câmpurilor nu este validă.");
         await SaveMapAsync(map, existing, cancellationToken).ConfigureAwait(false);
     }
 
     public async Task SaveFieldSettingsAsync(ActivityFieldMap settings, CancellationToken cancellationToken = default)
     {
         await access.EnsureAsync(Edit, cancellationToken).ConfigureAwait(false);
-        var map = ActivityFieldMap.Create(settings.Columns, settings.Off, settings.Targets, settings.Extras, settings.Labels, settings.NumberChosen, out var error) ?? throw new ActivityImportException(error ?? "Corespondența câmpurilor nu este validă.");
+        var map = ActivityFieldMap.Create(settings.Columns, settings.Off, settings.Targets, settings.Extras, settings.Labels, settings.NumberChosen, out var error)?.WithOrder(settings.Order) ?? throw new ActivityImportException(error ?? "Corespondența câmpurilor nu este validă.");
         // The ticket number has no default (BUG-0023): settings are not saved before its column is chosen (a return to the defaults, which saves nothing, is allowed).
         if (!map.NumberChosen && map.ToJson().Length > 0) throw new ActivityImportException(ActivityFieldMap.NumberRequiredMessage);
         await SaveMapAsync(map, await ReadFieldMapAsync(cancellationToken).ConfigureAwait(false), cancellationToken).ConfigureAwait(false);

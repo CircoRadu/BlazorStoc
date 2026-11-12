@@ -989,3 +989,9 @@ Cerut de utilizator la 06.10.2026 (verificarea fluxului, apoi deciziile: facturi
 - BUG-0022: apasarea pe numele unei intrari deschise din meniul de produse o inchide (collapsible.js, closedNodes in MainLayout.razor).
 - BUG-0023: titlul si numarul tichetului din orice coloana citibila, numar obligatoriu fara valoare implicita (NumberChosen), bloc Coloane obligatorii si fereastra flotanta Cum arata tichetul preluat; ActivityImport 0.18.0.
 - Verificari: grupurile activityimport, moduleversions, help, sectiunile MariaDB Activity; BUG-0021/0022 in browser; fereastra flotanta pe macheta.
+
+## Finalizat la 12.11.2026 10:49 - BUG-0024, informatii obligatorii si format observatii (versiunea 0.5.76)
+
+- BUG-0024: marginea ferestrei flotante pe cadru, bara proprie pentru fiecare fereastra.
+- Coloane obligatorii: ID ticket, ID eveniment, Data finalizarii evenimentului (coloana de tip data); observatii **eticheta**: valoare cu rand liber, obligatoriile primele, ordine prin drag and drop (ActivityFieldMap.Order, NotesMarkup); ActivityImport 0.19.0, Maintenance 1.12.2.
+- Verificari: activityimport, MariaDB Activity, moduleversions, help; pozitiile butoanelor pe macheta in browser.

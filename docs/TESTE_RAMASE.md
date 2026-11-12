@@ -937,3 +937,5 @@ Ferestre unitare: bara de prindere, redimensionare, Ajutor si marcare pe structu
 Bara ferestrelor template v2 pentru toate dialogurile (0.5.70) (10.11.2026): Verificare vizuala pe ferestrele reale din module cu date (Facturi, Mișcari): doar clasele au fost comparate in harness
 
 BUG-0021, BUG-0022, BUG-0023 (versiunea 0.5.75) (12.11.2026): Fereastra Tichet exemplu cu date reale ActivityApp (necesita autentificare Windows): de verificat de utilizator.
+
+BUG-0024, informatii obligatorii si format observatii (versiunea 0.5.76) (12.11.2026): Fereastra Tichet exemplu cu date reale ActivityApp (autentificare Windows) si observatiile aldine in Mentenanta: de verificat de utilizator.

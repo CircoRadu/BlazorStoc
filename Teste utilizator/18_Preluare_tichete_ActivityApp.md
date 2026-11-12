@@ -340,3 +340,19 @@ Pasi: Notificari -> Tichete de validat -> Arata tichetele discardate -> iconita 
 | 4 | Alege pentru titlu alta coloana | Titlul si observatiile din fereastra flotanta se actualizeaza imediat | |
 | 5 | Muta fereastra flotanta (trage de bara ei), redimensioneaz-o, apasa "Ascunde", apoi "Arata fereastra ..." din bloc | Fereastra se muta, se redimensioneaza, dispare si reapare | |
 | 6 | Inchide fereastra, apasa "Salveaza corespondenta", reincarca pagina | Alegerea numarului si a titlului s-a pastrat, iar butonul de salvare este activ | |
+
+## Modificari de testat - informatii obligatorii noi si observatii ordonate (12.11.2026, ActivityImport 0.19.0, BUG-0024)
+
+**Ce s-a adaugat:** in "Coloane obligatorii": ID ticket, ID eveniment si "Data finalizarii evenimentului" (data interventiei, aleasa dintr-o coloana de tip data); observatiile interventiei in format "eticheta (aldin): valoare" cu rand liber intre campuri; ordinea campurilor din observatii prin tragere; bara de butoane proprie pentru fiecare dintre cele doua ferestre.
+
+**Ce face acum:** campurile obligatorii (titlu, numar, ID ticket, ID eveniment, data finalizarii) sunt mereu primele in observatii; celelalte urmeaza ordinea din lista "Folosite", pe care o schimbi tragand randurile. Observatiile deja existente nu se schimba.
+
+| Pas | Ce faci | Ce trebuie sa vezi | OK |
+|---|---|---|---|
+| 1 | Deschide un tichet exemplu | In "Coloane obligatorii": Numar, Titlu, Data finalizarii (cu lista de coloane de tip data), ID ticket, ID eveniment si CUI | |
+| 2 | La "Data finalizarii" alege alta coloana de tip data | Valoarea si fereastra "Cum arata tichetul preluat" se schimba pe loc | |
+| 3 | In "Folosite" trage un rand optional peste altul | Randul isi schimba locul, mesajul "Ordinea in observatii s-a schimbat" apare, iar observatiile din fereastra flotanta urmeaza ordinea | |
+| 4 | Incearca sa tragi un rand obligatoriu sau sa lasi un rand pe unul obligatoriu | Nu se intampla nimic; obligatoriile raman primele | |
+| 5 | In fereastra flotanta priveste observatiile | Fiecare camp: eticheta aldina, doua puncte, valoare; rand liber intre campuri | |
+| 6 | Salveaza corespondenta, preia un tichet, deschide intervenția in Mentenanta | Observatiile au aceeasi ordine; etichetele sunt aldine in detaliu, iar in tabel apar fara asteriscuri | |
+| 7 | Deschide din nou "Tichet exemplu" | Butoanele Raporteaza/Propune/inchide stau deasupra ferestrei principale, iar fereastra flotanta are propriul buton de inchidere | |

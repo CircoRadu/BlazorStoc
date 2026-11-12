@@ -141,7 +141,7 @@ public static class ActivityStructureChecker
             var table = contract.FirstOrDefault(item => item.Name == field.Table);
             var chosen = fields.ColumnOf(field);
             var match = actual.FirstOrDefault(item => item.Table.Equals(field.Table, StringComparison.OrdinalIgnoreCase) && item.Column.Equals(chosen, StringComparison.OrdinalIgnoreCase));
-            if (table is not null && match is not null && (ActivityContract.KindOf(match.DataType) == ColumnKind.Text || (ActivityFieldMap.ReadsAnyKind(field) && ActivityContract.KindOf(match.DataType) is not null))) usable[StructureReport.Key(field.Table, field.Column)] = match.Column;
+            if (table is not null && match is not null && ActivityFieldMap.AcceptsType(field, match.DataType)) usable[StructureReport.Key(field.Table, field.Column)] = match.Column;
             else if (table is not null)
                 issues.Add(new(field.Table, field.Column, table.Entity, match is null ? "coloana aleasă pentru „" + field.Label + "” lipsește" : "coloana aleasă pentru „" + field.Label + "” nu poate fi citită ca text",
                     "text", match?.DataType ?? "—", false));

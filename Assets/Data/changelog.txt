@@ -1,3 +1,11 @@
+## 0.5.76 | 12.11.2026
+### Bugs
+- BUG-0024 · În fereastra „Tichet exemplu”, fiecare dintre cele două ferestre (alegerea coloanelor și „Cum arată tichetul preluat”) are propria bară de butoane; butoanele ferestrei principale nu mai sar în dreapta când se deschide cea flotantă.
+### Diverse
+- Preluare ActivityApp, „Coloane obligatorii”: s-au adăugat ID ticket, ID eveniment (afișate) și Data finalizării evenimentului (data intervenției), aleasă dintr-o coloană de tip dată.
+- Observațiile intervenției preluate din tichet: fiecare câmp apare ca „etichetă (aldin): valoare”, cu rând liber între câmpuri; câmpurile obligatorii sunt primele, iar ordinea celorlalte se schimbă prin tragerea rândurilor din „Folosite”.
+- Modulele Preluare ActivityApp (0.19.0) și Mentenanță (1.12.2).
+
 ## 0.5.75 | 12.11.2026
 ### Bugs
 - BUG-0021 · Previzualizarea PDF a situației de inventar se afișează din nou în dialog (era gol).

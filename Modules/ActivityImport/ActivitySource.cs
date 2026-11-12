@@ -285,7 +285,7 @@ public sealed class SqlActivitySource : IActivitySource
         var keys = structure.Extras.Select(extra => extra.Key).ToArray();
         return await ReadPagesAsync(connection, from, id, select, pageSize,
             reader => new ActivityTicket(Convert.ToInt64(reader.GetValue(0)), Convert.ToInt64(reader.GetValue(1)), reader.IsDBNull(2) ? 0 : Convert.ToInt64(reader.GetValue(2)), reader.IsDBNull(3) ? 0 : Convert.ToInt64(reader.GetValue(3)),
-                reader.IsDBNull(4) ? null : reader.GetDateTime(4), Str(reader, 5), Str(reader, 6), Str(reader, 7), Str(reader, 8), Convert.ToInt64(reader.GetValue(9)), reader.IsDBNull(10) ? null : reader.GetDateTime(10),
+                reader.IsDBNull(4) ? null : reader.GetDateTime(4), Str(reader, 5), Str(reader, 6), Str(reader, 7), Str(reader, 8), Convert.ToInt64(reader.GetValue(9)), DateAt(reader, 10),
                 reader.IsDBNull(11) ? null : Convert.ToInt64(reader.GetValue(11)), reader.IsDBNull(12) ? "" : reader.GetString(12).Trim(), reader.IsDBNull(13) ? null : reader.GetDateTime(13), Str(reader, 14), reader.IsDBNull(15) ? null : Convert.ToInt64(reader.GetValue(15)),
                 keys.Length == 0 ? null : keys.Select((key, index) => (key, value: ExtraValue(reader, fixedColumns + index))).ToDictionary(pair => pair.key, pair => pair.value)),
             ticket => ticket.Id, cancellationToken, where, bind).ConfigureAwait(false);
@@ -428,6 +428,9 @@ public sealed class SqlActivitySource : IActivitySource
 
     // An extra field of any kind as the application writes it: dates dd.MM.yyyy, flags da/nu, numbers as they are.
     private static string ExtraValue(SqlDataReader reader, int ordinal) => reader.IsDBNull(ordinal) ? "" : reader.GetValue(ordinal) is string text ? text.Trim() : (ActivityTicketSampleRules.Format(reader.GetValue(ordinal)) ?? "").Trim();
+
+    // A date column of the source as a date and time (date, datetime, datetime2, smalldatetime or datetimeoffset).
+    private static DateTime? DateAt(SqlDataReader reader, int ordinal) => reader.IsDBNull(ordinal) ? null : reader.GetValue(ordinal) switch { DateTime date => date, DateTimeOffset moment => moment.LocalDateTime, _ => null };
 
     private static string Str(SqlDataReader reader, int ordinal) => reader.IsDBNull(ordinal) ? "" : (reader.GetValue(ordinal).ToString() ?? "").Trim();
 

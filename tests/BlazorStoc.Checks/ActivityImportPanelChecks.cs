@@ -275,7 +275,7 @@ public static class ActivityImportPanelChecks
         // Title and number are always taken (no switch); the other four have a switch, and the destination can be chosen.
         check(cut.FindAll("#ai-fields input[role=switch]").Count == 4 && cut.Find("#ai-fields tbody tr:nth-child(1)").TextContent.Contains("Mereu", StringComparison.Ordinal) && cut.Find("#ai-fields tbody tr:nth-child(2)").TextContent.Contains("Mereu", StringComparison.Ordinal),
             "Activity import panel: the title and the number are always taken (no switch), the other pieces of information have a switch");
-        cut.FindAll("#ai-fields select")[2].Change("Detalii");
+        cut.FindAll("#ai-fields select")[3].Change("Detalii");
         cut.FindAll("button").Single(button => button.TextContent.Trim() == "Salvează corespondența").Click();
         cut.WaitForAssertion(() => { if (!cut.Markup.Contains("Corespondența câmpurilor a fost salvată", StringComparison.Ordinal)) throw new Exception("pending"); }, TimeSpan.FromSeconds(5));
         check(settingsService.SavedMap is { } saved && saved.Count == 1 && saved["Tickete.DescriptionInternal"] == "Detalii", "Activity import panel: saving sends the column chosen (only the ones that differ from the default are kept)");
@@ -293,7 +293,7 @@ public static class ActivityImportPanelChecks
               && savedSettings.Extras.Count == 1 && savedSettings.Extras[0].Column == "Observatii" && savedSettings.Extras[0].Label == "Observații client" && refresh.Refreshes == 1,
             "Activity import panel: the switch, the destination and the extra field are saved, and the tickets kept that lack something are read again after the save");
         cut.FindAll("button").Single(button => button.TextContent.Trim() == "Revino la valorile implicite").Click();
-        check(cut.FindAll("#ai-fields select").All(select => select.GetAttribute("aria-label") is not null) && cut.FindAll("#ai-fields select")[2].GetAttribute("aria-label")!.Contains("Problema", StringComparison.Ordinal),
+        check(cut.FindAll("#ai-fields select").All(select => select.GetAttribute("aria-label") is not null) && cut.FindAll("#ai-fields select")[3].GetAttribute("aria-label")!.Contains("Problema", StringComparison.Ordinal),
             "Activity import panel: the selects of the fields are named for the field");
         // The example ticket: the newest finished ticket opens, "Tichet anterior" loads the one before it, "Tichet mai nou" comes back to the one shown before; a column chosen in the window fills the table.
         TicketSample Example(long id, string problem) => new(id, "T-" + id, "Titlu " + id, new DateTime(2026, 10, 1), [
@@ -312,7 +312,7 @@ public static class ActivityImportPanelChecks
         check(cut.Find("#ticket-sample-info").TextContent.Contains("Tichet 30", StringComparison.Ordinal) && settingsService.SampleCalls.Count == 2, "Activity import panel: \"Tichet mai nou\" comes back to the ticket shown before without reading it again");
         // The lists of the window: every column is off at first; a column switched on becomes a free field named like the column and enters the list "Folosite", where its description, role and
         // destination are edited and from where it is detached.
-        check(cut.FindAll("#ticket-sample-used tbody tr").Count == 6 && cut.FindAll("#ai-extras tbody tr").Count == 0, "Activity import panel: the list of the used columns holds the pieces that are on, and no free field yet");
+        check(cut.FindAll("#ticket-sample-used tbody tr").Count == 7 && cut.FindAll("#ai-extras tbody tr").Count == 0, "Activity import panel: the list of the used columns holds the pieces that are on, and no free field yet");
         cut.Find("#ticket-sample-Tickete [aria-label='Folosește coloana Observatii']").Change(true);
         check(cut.FindAll("#ai-extras tbody tr").Count == 1 && cut.Find("#ticket-sample-used").TextContent.Contains("Tichet – Observatii", StringComparison.Ordinal) && cut.Find("#ticket-sample-preview").TextContent.Contains("Obs 30", StringComparison.Ordinal)
               && cut.Find("#ticket-sample-note").TextContent.Contains("este acum folosită", StringComparison.Ordinal),
@@ -383,6 +383,27 @@ public static class ActivityImportPanelChecks
         cut.Find("#ai-save-fields").Click();
         cut.WaitForAssertion(() => { if (settingsService.SavedSettings is null) throw new Exception("pending"); }, TimeSpan.FromSeconds(5));
         check(settingsService.SavedSettings!.NumberChosen && settingsService.SavedSettings.ToJson().Length > 0, "Activity import panel: the settings are saved with the chosen number, also when it is the usual column");
+        // BUG-0023: the rows of "Folosite" are dragged to order the lines of the notes; the required rows stay first and cannot be moved.
+        cut.Find("#ai-open-sample").Click();
+        cut.WaitForAssertion(() => { if (cut.FindAll("#ticket-sample-used").Count == 0) throw new Exception("pending"); }, TimeSpan.FromSeconds(5));
+        string[] Keys() => [.. cut.FindAll("#ticket-sample-used tbody tr").Select(row => row.GetAttribute("data-notes-key") ?? "")];
+        check(Keys().SequenceEqual(["title", "number", "finished", "problem", "resolution", "report", "executor"]) && cut.FindAll("#ticket-sample-used tr.notes-order-fixed").Count == 3 && cut.Find("tr[data-notes-key='problem']").GetAttribute("draggable") == "true"
+              && cut.Find("tr[data-notes-key='title']").GetAttribute("draggable") is null,
+            "Activity import panel: the required rows come first and only the others can be dragged");
+        cut.Find("tr[data-notes-key='problem']").DragStart();
+        cut.Find("tr[data-notes-key='executor']").Drop();
+        cut.WaitForAssertion(() => { if (!Keys().SequenceEqual(["title", "number", "finished", "resolution", "report", "executor", "problem"])) throw new Exception("pending"); }, TimeSpan.FromSeconds(5));
+        var notesText = cut.Find("#ticket-sample-notes").TextContent;
+        check(notesText.IndexOf("Executant", StringComparison.Ordinal) < notesText.IndexOf("Problema", StringComparison.Ordinal) && cut.FindAll("#ticket-sample-notes strong").Count >= 4 && cut.Find("#ticket-sample-note").TextContent.Contains("Ordinea în observații", StringComparison.Ordinal),
+            "Activity import panel: dropping a row on another moves it there, the preview of the notes follows at once with the labels bold");
+        cut.Find("tr[data-notes-key='report']").DragStart();
+        cut.Find("tr[data-notes-key='title']").Drop();
+        check(Keys().SequenceEqual(["title", "number", "finished", "resolution", "report", "executor", "problem"]), "Activity import panel: a required row is not a place to drop on");
+        cut.Find(".ticket-sample .heading-actions button.danger").Click();
+        settingsService.SavedSettings = null;
+        cut.Find("#ai-save-fields").Click();
+        cut.WaitForAssertion(() => { if (settingsService.SavedSettings is null) throw new Exception("pending"); }, TimeSpan.FromSeconds(5));
+        check(settingsService.SavedSettings!.Order.SequenceEqual([ActivityFieldMap.Resolution, ActivityFieldMap.Report, ActivityFieldMap.Executor, ActivityFieldMap.Problem]), "Activity import panel: the order of the notes is saved with the correspondence");
         return Task.CompletedTask;
     }
 }

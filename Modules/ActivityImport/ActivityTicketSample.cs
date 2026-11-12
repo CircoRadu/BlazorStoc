@@ -31,8 +31,15 @@ public static class ActivityTicketSampleRules
 {
     public const int MaximumValueLength = 4000;
 
+    /// <summary>The destination shown for the end of the event: it is the date of the intervention, not a text of the notes.</summary>
+    public const string Performed = "performed";
+
     private static string? ValueOf(TicketSample sample, string table, string column) =>
         sample.Tables.FirstOrDefault(item => item.Table.Equals(table, StringComparison.OrdinalIgnoreCase))?.Columns.FirstOrDefault(item => item.Column.Equals(column, StringComparison.OrdinalIgnoreCase))?.Value;
+
+    /// <summary>The end of the event as the import would read it: the value of the column chosen for it, written the way the window shows dates.</summary>
+    public static DateTime? FinishedOf(TicketSample sample, ActivityFieldMap map) =>
+        DateTime.TryParseExact(ValueOf(sample, "EvenimenteAgent", map.ColumnOf(ActivityFieldMap.FinishedField)), "dd.MM.yyyy HH:mm:ss", System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.None, out var date) ? date : null;
 
     /// <summary>The ticket as the import would read it with these settings: each text from the column the settings name for it, the extra fields from their columns and the executor from the agents of the event.</summary>
     public static ActivityTicket ToTicket(TicketSample sample, ActivityFieldMap map)
@@ -44,7 +51,7 @@ public static class ActivityTicketSampleRules
         }
         var extras = map.Extras.ToDictionary(extra => extra.Key, extra => ValueOf(sample, extra.Table, extra.Column) ?? "");
         var ticket = new ActivityTicket(sample.TicketId, 0, 0, 0, sample.TicketDate, map.NumberChosen ? From("Tickete", "NumeTicket") : "", From("Tickete", "Subject"), From("Tickete", "DescriptionInternal"),
-            sample.Executor.Length > 0 ? sample.Executor : From("Tickete", "ProcesatDe"), 0, null, null, From("EvenimenteAgent", "DescriptionInternal"), null, "", null, extras.Count == 0 ? null : extras);
+            sample.Executor.Length > 0 ? sample.Executor : From("Tickete", "ProcesatDe"), long.TryParse(ValueOf(sample, "EvenimenteAgent", "ID"), out var eventId) ? eventId : 0, FinishedOf(sample, map), null, From("EvenimenteAgent", "DescriptionInternal"), null, "", null, extras.Count == 0 ? null : extras);
         return ActivityTicketFields.Collect(ticket, map);
     }
 
@@ -55,10 +62,11 @@ public static class ActivityTicketSampleRules
         var items = new List<SamplePreviewItem>
         {
             new(ActivityFieldMap.Title, map.LabelOf(ActivityFieldMap.Title), source.Title, ActivityFieldMap.Notes, map.SourceOf(ActivityFieldMap.Title) ?? ""),
-            new(ActivityFieldMap.Number, map.LabelOf(ActivityFieldMap.Number), source.Number, ActivityFieldMap.Notes, map.NumberChosen ? map.SourceOf(ActivityFieldMap.Number) ?? "" : "coloana nu este aleasă")
+            new(ActivityFieldMap.Number, map.LabelOf(ActivityFieldMap.Number), source.Number, ActivityFieldMap.Notes, map.NumberChosen ? map.SourceOf(ActivityFieldMap.Number) ?? "" : "coloana nu este aleasă"),
+            new(ActivityFieldMap.Finished, map.LabelOf(ActivityFieldMap.Finished), FinishedOf(sample, map) is { } finished ? finished.ToString("dd.MM.yyyy HH:mm", System.Globalization.CultureInfo.InvariantCulture) : "", Performed, map.SourceOf(ActivityFieldMap.Finished) ?? "")
         };
         string From(string key) => key == ActivityFieldMap.Resolution
-            ? ActivityFieldMap.ColumnName("EvenimenteAgent", map.ColumnOf(ActivityFieldMap.Fields.First(field => field.Table == "EvenimenteAgent"))) + " fără textul problemei"
+            ? ActivityFieldMap.ColumnName("EvenimenteAgent", map.ColumnOf(ActivityFieldMap.Fields.First(field => field.Table == "EvenimenteAgent" && field.Column == "DescriptionInternal"))) + " fără textul problemei"
             : map.SourceOf(key) ?? "";
         string Value(string key) => key switch
         {

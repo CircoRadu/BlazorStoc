@@ -199,6 +199,12 @@ public static class ActivityImportChecks
         check(anyKind.Status == StructureStatus.Ok && anyKind.Physical("Tickete", "NumeTicket") == "Valoare" && anyKind.Physical("Tickete", "Subject") == "Valoare"
             && ActivityFieldMap.ReadableColumns(withNew, "Tickete").Contains("Valoare") && !ActivityFieldMap.ReadableColumns(withNew, "Tickete").Contains("Fisier"),
             "Activity import: the title and the number can be read from a number column (shown as text); a binary column is never offered");
+        var withDates = new List<ActivityColumn>([.. withNew, new("EvenimenteAgent", "Terminat", "datetime2")]);
+        var endFromDate = ActivityFieldMap.Create(new Dictionary<string, string> { ["EvenimenteAgent.EndTime"] = "Terminat" }, null, null, null, null, true, out _);
+        var endFromText = ActivityFieldMap.Create(new Dictionary<string, string> { ["EvenimenteAgent.EndTime"] = "DescriptionInternal" }, null, null, null, null, true, out _);
+        check(ActivityStructureChecker.Check(withDates, null, endFromDate).Physical("EvenimenteAgent", "EndTime") == "Terminat" && ActivityStructureChecker.Check(withDates, null, endFromText).Issues.Any(issue => issue.Problem.Contains("nu poate fi citită ca text", StringComparison.Ordinal))
+            && ActivityFieldMap.ChoiceColumns(withDates, ActivityFieldMap.FinishedField) is var dateColumns && dateColumns.Contains("EndTime") && dateColumns.Contains("Terminat") && !dateColumns.Contains("DescriptionInternal"),
+            "Activity import: the end of the event can be read from another date column; a text column is refused and only date columns are offered for it");
         var chosenDefault = ActivityFieldMap.Create(new Dictionary<string, string>(), null, null, null, null, true, out _)!;
         var roundTrip = ActivityFieldMap.FromJson(chosenDefault.ToJson());
         check(chosenDefault.NumberChosen && chosenDefault.ToJson().Length > 0 && roundTrip.NumberChosen && !ActivityFieldMap.FromJson("").NumberChosen && !ActivityFieldMap.Empty.NumberChosen
@@ -370,7 +376,7 @@ public static class ActivityImportChecks
         check(ActivityTicketPlanner.SplitReport("Nu merge", "Am reinstalat tot") is ("Nu merge", "Am reinstalat tot"), "Activity import (tickets): a report the operator rewrote is the resolution as a whole");
         check(ActivityTicketPlanner.SplitReport("", "Raport") is ("", "Raport") && ActivityTicketPlanner.SplitReport("Problema", "") is ("Problema", ""), "Activity import (tickets): with no problem the report is the resolution; with no report there is no resolution");
         var notes = ActivityTicketPlanner.Notes("T-9", "Internet", "Nu merge", "Router nou", "Ion");
-        check(notes == "Preluat din ActivityApp, tichet T-9: Internet\nProblema: Nu merge\nRezolvare: Router nou\nExecutant: Ion", "Activity import (tickets): the notes tell the ticket, the problem, the resolution and the executor");
+        check(notes == "Preluat din ActivityApp\n\n**Titlul tichetului**: Internet\n\n**Numarul tichetului**: T-9\n\n**Problema**: Nu merge\n\n**Rezolvare**: Router nou\n\n**Executant**: Ion", "Activity import (tickets): the notes tell the ticket, the problem, the resolution and the executor");
         check(ActivityTicketPlanner.Notes("T", "t", new string('x', 5000), "", "").Length == 2000 && ActivityTicketPlanner.Notes("T", "t", new string('x', 5000), "", "").EndsWith('…'), "Activity import (tickets): notes longer than the 2000 characters of an intervention are cut (the whole text stays in the source detail)");
 
         var locals = new Dictionary<int, IReadOnlyList<WorkPoint>>
@@ -393,7 +399,7 @@ public static class ActivityImportChecks
         var routerWords = new Dictionary<long, IReadOnlyList<string>> { [4] = ["router"] };
         var plans = ActivityTicketPlanner.Plan(tickets, destinations, map, locals, new DateOnly(2026, 10, 23), routerWords);
         TicketPlan T(long id) => plans.Single(plan => plan.SourceId == id);
-        check(T(10) is { Action: PlanAction.Create, BeneficiaryId: 7, WorkPointId: 70 } && T(10).PerformedOn == new DateOnly(2026, 3, 2) && T(10).Notes.Contains("Rezolvare: S-a schimbat routerul", StringComparison.Ordinal),
+        check(T(10) is { Action: PlanAction.Create, BeneficiaryId: 7, WorkPointId: 70 } && T(10).PerformedOn == new DateOnly(2026, 3, 2) && T(10).Notes.Contains("**Rezolvare**: S-a schimbat routerul", StringComparison.Ordinal),
             "Activity import (tickets): a resolved ticket goes to the queue to validate, for the main point of its client's beneficiary, dated by the end of the event");
         check(T(11) is { Action: PlanAction.Create, WorkPointId: 71 }, "Activity import (tickets): the work point of the ticket is used when it was tied and belongs to the beneficiary");
         check(T(14).WorkPointId == 70 && T(20).WorkPointId == 80, "Activity import (tickets): a tied point of another beneficiary is not used; the main point is");

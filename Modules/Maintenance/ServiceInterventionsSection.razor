@@ -27,7 +27,7 @@
                 {
                     <dt>Scadență</dt><dd>@if (viewing.MovesDue) { <text>@StockMovementRules.DisplayDate(viewing.PlannedDue!.Value) → <strong>@StockMovementRules.DisplayDate(viewing.NextDueSet!.Value)</strong></text> } else { <text>Nu a modificat scadența</text> }</dd>
                 }
-                <dt>Observații</dt><dd class="review-text">@(viewing.Notes.Length > 0 ? viewing.Notes : "—")</dd>
+                <dt>Observații</dt><dd class="review-text">@(viewing.Notes.Length > 0 ? NotesMarkup.Html(viewing.Notes) : new Microsoft.AspNetCore.Components.MarkupString("—"))</dd>
                 <dt>Înregistrată de</dt><dd>@viewing.RecordedBy · @StockMovementRules.DisplayDate(DateOnly.FromDateTime(viewing.RecordedUtc.ToLocalTime()))</dd>
             </dl>
             @if (viewTicketLoading) { <p class="muted" role="status">Se citește tichetul…</p> }
@@ -81,7 +81,7 @@
                     else if (item.MovesDue) { <span>@StockMovementRules.DisplayDate(item.PlannedDue!.Value) → <strong>@StockMovementRules.DisplayDate(item.NextDueSet!.Value)</strong><br /><small class="muted">@ServiceInterventionRules.BasisLabel(item.Basis!.Value)</small></span> }
                     else { <small class="muted">Nu a modificat scadența</small> }
                 </td>
-                <td class="work-point-description" title="@item.Notes">@item.Notes</td>
+                <td class="work-point-description" title="@NotesMarkup.Plain(item.Notes)">@NotesMarkup.Plain(item.Notes)</td>
                 <td class="number">@(photoCounts.TryGetValue(item.Id, out var count) ? count.ToString() : "")</td>
                 <td>
                     <button class="row-icon view" aria-label="Vizualizează intervenția din @StockMovementRules.DisplayDate(item.PerformedOn)" title="Vizualizează intervenția din @StockMovementRules.DisplayDate(item.PerformedOn)" @onclick="() => OpenViewAsync(item)"></button>

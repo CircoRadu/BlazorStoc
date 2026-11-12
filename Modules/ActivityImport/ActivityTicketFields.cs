@@ -27,7 +27,10 @@ public static class ActivityTicketFields
     public static IReadOnlyList<string> Missing(ActivityFieldMap map, string have)
     {
         var held = ActivityFieldMap.Split(have);
-        return [.. map.Required.Where(key => !held.Contains(key)).Order(StringComparer.Ordinal)];
+        var missing = map.Required.Where(key => !held.Contains(key)).ToList();
+        // The end of the event was read from another column and the default is back: the date held is not the one the settings ask for.
+        if (held.Contains(ActivityFieldMap.Finished) && !map.Required.Contains(ActivityFieldMap.Finished)) missing.Add(ActivityFieldMap.Finished);
+        return [.. missing.Order(StringComparer.Ordinal)];
     }
 }
 

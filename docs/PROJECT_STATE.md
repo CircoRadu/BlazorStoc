@@ -9,6 +9,12 @@ Actualizat: 09.11.2026, Europe/Bucharest (Claude, agent unic, mod `claude_only`)
 - Motorul de facturi este geometric (`Services/Invoices`); utilizatorii obisnuiti creeaza/modifica sabloane, stergerea ramane administratorului.
 - Harta codului: `docs/HARTA_COD.md`. Reguli permanente: `CLAUDE.md`.
 
+## Ultimul lucru facut (12.11.2026, dupa-amiaza): BUG-0024 + informatii obligatorii + format observatii (versiunea 0.5.76, ActivityImport 0.19.0, Maintenance 1.12.2)
+- BUG-0024: marginea ferestrei flotante e pe cadrul ferestrei principale (nu pe panou), iar fereastra "Cum arata tichetul preluat" are bara proprie cu buton de inchidere.
+- "Coloane obligatorii": ID ticket si ID eveniment (afisate), "Data finalizarii evenimentului" (`ActivityFieldMap.Finished`, coloana de tip data din EvenimenteAgent, `ReadsDate`/`ChoiceColumns`/`AcceptsType`; `ActivityTicketFields.Missing` reciteste doar la alegere sau la revenire).
+- Observatii: `ActivityTicketPlanner.NotesPrefix(source, lines)` scrie "**eticheta**: valoare" cu rand liber, `RequiredLines` primele, `ActivityFieldMap.Order`/`WithOrder`/`PlaceOf` (JSON v3) pentru restul; `Services/NotesMarkup.cs` (Bold/Plain/Html); randuri trase in `TicketSampleDialog.razor`, `MoveInNotes` in `ActivityImportPanel.razor`. Observatiile vechi raman in formatul vechi (tratate ca editate).
+- Verificat: activityimport, MariaDB Activity, moduleversions, help; pozitiile butoanelor pe macheta in browser. Fereastra reala cere ActivityApp cu autentificare Windows (neverificata in aplicatie).
+
 ## Ultimul lucru facut (12.11.2026): BUG-0021, BUG-0022, BUG-0023 (versiunea 0.5.75, ActivityImport 0.18.0)
 - BUG-0021: dialogul de previzualizare PDF al inventarului (`.pdf-preview-dialog`) are corpul `flex`, iframe-ul are inaltime (app.css).
 - BUG-0022: apasarea pe numele unei intrari deschise din meniul de produse o inchide (`wwwroot/collapsible.js`, `closedNodes` in `MainLayout.razor`).

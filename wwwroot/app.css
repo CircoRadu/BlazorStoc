@@ -1783,14 +1783,21 @@ html.app-dialog-adjusting, html.app-dialog-adjusting * { user-select:none !impor
 .image-annotator { position:fixed; right:24px; top:64px; z-index:5; width:min(720px, calc(100vw - 48px)); max-width:none; }
 .image-annotator > .app-dialog-panel { width:100%; height:min(580px, calc(100vh - 96px)); padding:0; border:1px solid var(--line); box-shadow:0 12px 40px rgba(0,0,0,.35); }
 .image-annotator > .app-dialog-panel > .app-dialog-head { margin:12px 14px 8px; }
+/* BUG-0023: the rows of "Folosite" are dragged to order the lines of the notes; the required rows stay first and cannot be moved. */
+.notes-order-row { cursor:grab; }
+.notes-order-row:active { cursor:grabbing; }
+.notes-order-row[draggable="true"]:hover td { background:var(--c-f4faf8, rgba(31,122,107,.06)); }
+.notes-order-handle { width:22px; padding-right:0; color:var(--muted); letter-spacing:-2px; user-select:none; text-align:center; }
+.notes-order-fixed .notes-order-handle { cursor:default; }
 /* BUG-0023: "Cum arată tichetul preluat", a window that floats beside the sample ticket window (same pattern as the picture marking: frame and panel of every window, moved and resized by app-dialog.js). */
-.ticket-live-preview { position:fixed; right:24px; top:64px; z-index:5; width:min(540px, calc(100vw - 48px)); max-width:none; }
+.ticket-live-preview { position:fixed; right:24px; top:36px; z-index:5; width:min(540px, calc(100vw - 48px)); max-width:none; }
 .ticket-live-preview > .app-dialog-panel { width:100%; height:min(680px, calc(100vh - 96px)); padding:0; border:1px solid var(--line); box-shadow:0 12px 40px rgba(0,0,0,.35); }
 .ticket-live-preview > .app-dialog-panel > .app-dialog-head { margin:12px 14px 8px; }
 .ticket-live-preview-body { padding:6px 24px 26px 18px; }
 .ticket-live-preview-body h3 { margin:14px 0 6px; }
 .ticket-live-preview-body pre { white-space:pre-wrap; margin:0; }
-@media (min-width:1500px) { .app-dialog-backdrop:has(.ticket-live-preview) .ticket-sample { margin-right:560px; } }
+/* The margin goes on the frame (not on the panel), so the bar of buttons of the main window stays above its own panel (BUG-0024). */
+@media (min-width:1500px) { .app-dialog-backdrop:has(.ticket-live-preview) .app-dialog-frame:has(> .ticket-sample) { margin-right:560px; } }
 @media (max-width:719px) { .ticket-live-preview { inset:8px; width:auto; } .ticket-live-preview > .app-dialog-panel { height:calc(100vh - 16px); } }
 .annotator-body { padding:32px 32px 24px 24px; }
 .annotator-stage { position:relative; display:inline-block; max-width:100%; cursor:crosshair; touch-action:none; user-select:none; line-height:0; }
@@ -1899,3 +1906,5 @@ th.num .sort-header, th.right .sort-header { justify-content: flex-end; }
 .esp-badge-link { border:0; font:inherit; font-size:11px; font-weight:650; cursor:pointer; }
 .esp-badge-link:hover { filter:brightness(.94); text-decoration:underline; }
 .esp-filters > span { align-self:center; }
+
+.visually-hidden { position:absolute; width:1px; height:1px; margin:-1px; padding:0; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap; border:0; }
