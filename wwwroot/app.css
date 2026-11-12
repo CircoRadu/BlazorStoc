@@ -1783,6 +1783,15 @@ html.app-dialog-adjusting, html.app-dialog-adjusting * { user-select:none !impor
 .image-annotator { position:fixed; right:24px; top:64px; z-index:5; width:min(720px, calc(100vw - 48px)); max-width:none; }
 .image-annotator > .app-dialog-panel { width:100%; height:min(580px, calc(100vh - 96px)); padding:0; border:1px solid var(--line); box-shadow:0 12px 40px rgba(0,0,0,.35); }
 .image-annotator > .app-dialog-panel > .app-dialog-head { margin:12px 14px 8px; }
+/* BUG-0023: "Cum arată tichetul preluat", a window that floats beside the sample ticket window (same pattern as the picture marking: frame and panel of every window, moved and resized by app-dialog.js). */
+.ticket-live-preview { position:fixed; right:24px; top:64px; z-index:5; width:min(540px, calc(100vw - 48px)); max-width:none; }
+.ticket-live-preview > .app-dialog-panel { width:100%; height:min(680px, calc(100vh - 96px)); padding:0; border:1px solid var(--line); box-shadow:0 12px 40px rgba(0,0,0,.35); }
+.ticket-live-preview > .app-dialog-panel > .app-dialog-head { margin:12px 14px 8px; }
+.ticket-live-preview-body { padding:6px 24px 26px 18px; }
+.ticket-live-preview-body h3 { margin:14px 0 6px; }
+.ticket-live-preview-body pre { white-space:pre-wrap; margin:0; }
+@media (min-width:1500px) { .app-dialog-backdrop:has(.ticket-live-preview) .ticket-sample { margin-right:560px; } }
+@media (max-width:719px) { .ticket-live-preview { inset:8px; width:auto; } .ticket-live-preview > .app-dialog-panel { height:calc(100vh - 16px); } }
 .annotator-body { padding:32px 32px 24px 24px; }
 .annotator-stage { position:relative; display:inline-block; max-width:100%; cursor:crosshair; touch-action:none; user-select:none; line-height:0; }
 .annotator-stage > img { display:block; max-width:100%; height:auto; pointer-events:none; }
@@ -1812,6 +1821,8 @@ html.app-dialog-adjusting, html.app-dialog-adjusting * { user-select:none !impor
 .app-dialog-panel.invoice-modal { --dlg-px:20px; --dlg-pt:20px; --dlg-pb:20px; }
 .app-dialog-panel.map-dialog { --dlg-px:22px; --dlg-pt:18px; --dlg-pb:22px; }
 .app-dialog-panel.pdf-preview-dialog { --dlg-px:26px; --dlg-pt:22px; --dlg-pb:22px; }
+.app-dialog-panel.pdf-preview-dialog > .app-dialog-body { display:flex; flex-direction:column; gap:6px; overflow:hidden; }
+.app-dialog-panel.pdf-preview-dialog .pdf-preview-frame { flex:1 1 auto; min-height:240px; }
 .app-dialog-panel.help-panel, .app-dialog-panel.image-annotator-panel { --dlg-px:0px; --dlg-pt:0px; --dlg-pb:0px; }
 .app-dialog-panel:not(.image-figure):not(.image-lightbox-panel) { padding:0 !important; }
 .app-dialog-panel:not(.image-figure):not(.image-lightbox-panel) > .app-dialog-body { padding:var(--dlg-pt) var(--dlg-px) var(--dlg-pb); }

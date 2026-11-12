@@ -982,3 +982,10 @@ Cerut de utilizator la 06.10.2026 (verificarea fluxului, apoi deciziile: facturi
 - Modulul Modules/EspImport: analiza exportului vechi .sql/.zip, lista pe categorii cu insigne clicabile, parametri propusi din codul vechi, produse preluate inghetate, aplicare ca punct zero (miscari, facturi, oferte, rezervari, copii de siguranta si jurnal sterse; stoc, produse si imagini preluate)
 - Fisiere: Modules/EspImport/*, NasBackup.cs (DeleteFilesAsync), ProductInput/StockMovements (AllowIncomplete, SkipParameterCheck), Settings.razor, Permissions.cs, AuditTrail.cs; teste EspImportChecks (grupul espimport)
 - Verificari: espimport/moduleversions/help/components/parameters, Maria Required parameters, browser pe baza de test cu exportul BStoc; versiunea 0.5.74
+
+## Finalizat la 12.11.2026 09:34 - BUG-0021, BUG-0022, BUG-0023 (versiunea 0.5.75)
+
+- BUG-0021: previzualizarea PDF a inventarului avea iframe fara inaltime in AppDialog; corpul dialogului este acum flex (app.css).
+- BUG-0022: apasarea pe numele unei intrari deschise din meniul de produse o inchide (collapsible.js, closedNodes in MainLayout.razor).
+- BUG-0023: titlul si numarul tichetului din orice coloana citibila, numar obligatoriu fara valoare implicita (NumberChosen), bloc Coloane obligatorii si fereastra flotanta Cum arata tichetul preluat; ActivityImport 0.18.0.
+- Verificari: grupurile activityimport, moduleversions, help, sectiunile MariaDB Activity; BUG-0021/0022 in browser; fereastra flotanta pe macheta.

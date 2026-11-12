@@ -174,7 +174,7 @@ public static class ActivityImportChecks
 
     private static void FieldMap(Action<bool, string> check, IReadOnlyList<ActivityColumn> full)
     {
-        var withNew = new List<ActivityColumn>([.. full, new("Tickete", "Detalii", "nvarchar"), new("Tickete", "Valoare", "int")]);
+        var withNew = new List<ActivityColumn>([.. full, new("Tickete", "Detalii", "nvarchar"), new("Tickete", "Valoare", "int"), new("Tickete", "Fisier", "varbinary")]);
         var map = ActivityFieldMap.Create(new Dictionary<string, string> { ["Tickete.DescriptionInternal"] = "Detalii", ["Tickete.Subject"] = "Subject", ["Tickete.ProcesatDe"] = "" }, out var error);
         check(error is null && map is not null && map.Columns.Count == 1 && map.Columns["Tickete.DescriptionInternal"] == "Detalii" && map.ToJson() == "{\"Tickete.DescriptionInternal\":\"Detalii\"}"
             && ActivityFieldMap.FromJson(map.ToJson()).Columns["Tickete.DescriptionInternal"] == "Detalii" && ActivityFieldMap.Create(new Dictionary<string, string>(), out _)!.ToJson() == "",
@@ -189,10 +189,22 @@ public static class ActivityImportChecks
         var gone = ActivityStructureChecker.Check(full, null, map);
         check(gone.Status == StructureStatus.Partial && gone.Issues.Single() is { Required: false } issue && issue.Problem.StartsWith("coloana aleasă", StringComparison.Ordinal) && gone.Physical("Tickete", "DescriptionInternal") == "DescriptionInternal"
             && gone.BlockedEntities.Count == 0, "Activity import: a chosen column that is gone is reported and the default stays in use (the run itself stops on it)");
-        var notText = ActivityFieldMap.Create(new Dictionary<string, string> { ["Tickete.Subject"] = "Valoare" }, out _);
-        check(ActivityStructureChecker.Check(withNew, null, notText).Issues.Single().Problem.Contains("nu are text", StringComparison.Ordinal)
+        var notText = ActivityFieldMap.Create(new Dictionary<string, string> { ["Tickete.ProcesatDe"] = "Valoare", ["Tickete.Subject"] = "Fisier" }, out _);
+        check(ActivityStructureChecker.Check(withNew, null, notText).Issues.Count(issue => issue.Problem.Contains("nu poate fi citită ca text", StringComparison.Ordinal)) == 2
             && ActivityFieldMap.TextColumns(withNew, "tickete").Contains("Detalii") && !ActivityFieldMap.TextColumns(withNew, "Tickete").Contains("Valoare") && !ActivityFieldMap.TextColumns(withNew, "Tickete").Contains("ID"),
-            "Activity import: a column without text is refused, and only text columns of the table are offered");
+            "Activity import: a column that cannot be read as text is refused for the executor, the title and the others, and only text columns of the table are offered for them");
+        // BUG-0023: the title and the number can be read from a column of any readable kind (number, date, flag), the other pieces only from text.
+        var numberFromNumber = ActivityFieldMap.Create(new Dictionary<string, string> { ["Tickete.NumeTicket"] = "Valoare", ["Tickete.Subject"] = "Valoare" }, null, null, null, null, true, out _);
+        var anyKind = ActivityStructureChecker.Check(withNew, null, numberFromNumber);
+        check(anyKind.Status == StructureStatus.Ok && anyKind.Physical("Tickete", "NumeTicket") == "Valoare" && anyKind.Physical("Tickete", "Subject") == "Valoare"
+            && ActivityFieldMap.ReadableColumns(withNew, "Tickete").Contains("Valoare") && !ActivityFieldMap.ReadableColumns(withNew, "Tickete").Contains("Fisier"),
+            "Activity import: the title and the number can be read from a number column (shown as text); a binary column is never offered");
+        var chosenDefault = ActivityFieldMap.Create(new Dictionary<string, string>(), null, null, null, null, true, out _)!;
+        var roundTrip = ActivityFieldMap.FromJson(chosenDefault.ToJson());
+        check(chosenDefault.NumberChosen && chosenDefault.ToJson().Length > 0 && roundTrip.NumberChosen && !ActivityFieldMap.FromJson("").NumberChosen && !ActivityFieldMap.Empty.NumberChosen
+            && ActivityFieldMap.FromJson("{\"Tickete.DescriptionInternal\":\"Detalii\"}").NumberChosen && ActivityFieldMap.FromJson("{\"v\":2,\"columns\":{},\"off\":[\"report\"],\"targets\":{},\"extras\":[]}").NumberChosen
+            && !ActivityFieldMap.Create(new Dictionary<string, string>(), out _)!.NumberChosen,
+            "Activity import: the number has no default: only settings saved with a chosen number (or saved before this rule) count as chosen, unsaved settings do not");
         check(ActivityStructureChecker.Check(full, null, ActivityFieldMap.Empty).Fingerprint == ActivityStructureChecker.Check(full).Fingerprint && map!.Describe().Contains("Detalii", StringComparison.Ordinal),
             "Activity import: the map does not change the fingerprint of the structure");
     }

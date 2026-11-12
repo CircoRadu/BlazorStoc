@@ -20,15 +20,13 @@
     document.addEventListener("click", event => {
         const summary = event.target instanceof Element ? event.target.closest(`${selector} > summary`) : null;
         if (!summary) return;
-        // Product menu (categories and subcategories): pressing the name only opens the branch and navigates; closing is
-        // done with the arrow, so one press never opens and collapses in the same move.
+        // Product menu: pressing the name of a closed entry opens it (and goes to its products); pressing it again closes
+        // it (BUG-0022). A category closes through the normal toggle (which goes to the category-less list); a subcategory
+        // with children only collapses, without following its link.
         const section = summary.parentElement;
-        if (section.open && section.parentElement?.matches(".product-category-menu, .menu-tree-node") &&
-            !event.target.closest(".collapsible-indicator")) {
+        if (section.open && section.parentElement?.matches(".menu-tree-node")) {
             event.preventDefault();
-            const link = event.target.closest("a[href]");
-            const destination = link ? link.href : section.dataset.collapsibleOpenHref;
-            if (destination && new URL(destination, location.href).href !== location.href) window.location.assign(destination);
+            section.open = false;
             return;
         }
         const intent = { section: summary.parentElement, at: performance.now() };

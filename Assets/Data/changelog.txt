@@ -1,3 +1,11 @@
+## 0.5.75 | 12.11.2026
+### Bugs
+- BUG-0021 · Previzualizarea PDF a situației de inventar se afișează din nou în dialog (era gol).
+- BUG-0022 · În meniul de produse, apăsarea pe numele unei categorii sau subcategorii cu copii o închide dacă este deschisă (nu mai e nevoie de săgeată).
+- BUG-0023 · În fereastra „Tichet exemplu”, titlul și numărul tichetului se aleg din orice coloană citibilă (text, număr, dată); numărul nu mai are valoare implicită și este obligatoriu pentru salvarea corespondenței; sumarul și observațiile apar într-o fereastră flotantă „Cum arată tichetul preluat”, actualizată la fiecare schimbare.
+### Diverse
+- Modulul Preluare ActivityApp trece la 0.18.0.
+
 ## 0.5.74 | 11.11.2026
 ### Funcționalități noi
 - Preluarea stocului din aplicația veche ESPStoc (Setări → Preluare stoc ESPStoc, doar administrator): analiza exportului (.sql sau .zip), lista pe categorii cu insigne clicabile (cu probleme, de verificat, înghețate, omise), alegerea parametrilor propusă din codul vechi, produse preluate înghețate (fără parametri, blocate până sunt completate) și punctul zero al gestiunii (șterge mișcările, facturile preluate, ofertele, rezervările, copiile de siguranță și jurnalul; preia stocul și imaginile din export).

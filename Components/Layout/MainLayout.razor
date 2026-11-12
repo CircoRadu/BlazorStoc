@@ -182,6 +182,7 @@
 
     private void LocationChanged(object? sender, Microsoft.AspNetCore.Components.Routing.LocationChangedEventArgs args)
     {
+        closedNodes.Clear();
         RefreshNavigationAsync().FireAndForget(Logger, "layout navigation refresh");
     }
 
@@ -295,10 +296,13 @@
         }
         return names;
     }
-    private bool IsNodeOpen(SubcategoryNode node) => openNodes.Contains(NodeKey(node)) || SelectedBranch().Contains(node.Name);
+    // Nodes of the selected branch that the user closed by pressing them; cleared when the address changes.
+    private readonly HashSet<string> closedNodes = new(StringComparer.Ordinal);
+    private bool IsNodeOpen(SubcategoryNode node) => openNodes.Contains(NodeKey(node)) || (SelectedBranch().Contains(node.Name) && !closedNodes.Contains(NodeKey(node)));
     private void SetNodeOpen(SubcategoryNode node, bool open)
     {
-        if (open) openNodes.Add(NodeKey(node)); else { openNodes.Remove(NodeKey(node)); }
+        if (open) { openNodes.Add(NodeKey(node)); closedNodes.Remove(NodeKey(node)); }
+        else { openNodes.Remove(NodeKey(node)); closedNodes.Add(NodeKey(node)); }
     }
 
     private RenderFragment<(string Category, string? Parent)> Nodes => scope => @<text>

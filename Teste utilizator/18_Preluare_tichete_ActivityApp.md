@@ -325,3 +325,18 @@ Pasi: Notificari -> Tichete de validat -> Arata tichetele discardate -> iconita 
 | 3 | La o coloana text, in "Rol", alege "Numarul tichetului" | Coloana devine numarul; coloana veche se elibereaza | |
 
 | 4 | Salveaza corespondenta si reincarca pagina | Alegerile pentru titlu si numar s-au pastrat | |
+
+## Modificari de testat - numarul tichetului obligatoriu si fereastra flotanta (12.11.2026, ActivityImport 0.18.0, BUG-0023)
+
+**Ce s-a adaugat:** in fereastra "Tichet exemplu", blocul "Coloane obligatorii" (titlul si numarul tichetului se aleg din orice coloana a tichetului: text, numar sau data), numarul tichetului fara valoare implicita si obligatoriu pentru salvare, fereastra flotanta "Cum arata tichetul preluat".
+
+**Ce face acum:** alegi tu coloana numarului; corespondenta nu se salveaza fara ea. Sumarul si observatiile intervenitiei stau intr-o fereastra separata, care se actualizeaza la fiecare schimbare. Titlul, numarul si CUI-ul nu se mai aleg din lista "Folosite".
+
+| Pas | Ce faci | Ce trebuie sa vezi | OK |
+|---|---|---|---|
+| 1 | Setari -> Preluare ActivityApp -> "Deschide un tichet exemplu" | Sus apare "Coloane obligatorii" cu Numarul, Titlul si CUI client; in dreapta, fereastra "Cum arata tichetul preluat" | |
+| 2 | Daca numarul nu a fost ales: priveste randul "Numarul tichetului" si butonul "Salveaza corespondenta" | "- alege coloana -" si mesajul rosu; butonul este dezactivat si are explicatie | |
+| 3 | Alege pentru numar o coloana numerica (de exemplu ID) | Valoarea apare in coloana "Valoare", iar in fereastra flotanta numarul tichetului se schimba pe loc | |
+| 4 | Alege pentru titlu alta coloana | Titlul si observatiile din fereastra flotanta se actualizeaza imediat | |
+| 5 | Muta fereastra flotanta (trage de bara ei), redimensioneaz-o, apasa "Ascunde", apoi "Arata fereastra ..." din bloc | Fereastra se muta, se redimensioneaza, dispare si reapare | |
+| 6 | Inchide fereastra, apasa "Salveaza corespondenta", reincarca pagina | Alegerea numarului si a titlului s-a pastrat, iar butonul de salvare este activ | |

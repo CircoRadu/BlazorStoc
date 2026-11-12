@@ -137,7 +137,7 @@ public static partial class MariaExtendedChecks
             var lacking = await refresh.CountOutdatedAsync();
             Check(lacking == 0, "Activity ticket fields: with the default settings no ticket kept lacks anything (" + lacking + ": " + await Scalar<string>(probe, "SELECT COALESCE(GROUP_CONCAT(CONCAT(t.ticket_id, '/', t.state, '/', t.fields_read, '/', COALESCE(s.fields_read, '-'), '/', COALESCE(s.intervention_id, '-')) SEPARATOR ' ; '), '') FROM activity_import_tickets t LEFT JOIN service_intervention_source s ON s.source_ticket_id = t.ticket_id") + ")");
             var fieldMap = ActivityFieldMap.Create(new Dictionary<string, string>(), [ActivityFieldMap.Executor], new Dictionary<string, string> { [ActivityFieldMap.Report] = ActivityFieldMap.Both },
-                [new ActivityExtraField("Tickete", "Observatii", "Observatii client", ActivityFieldMap.Both)], out _)!;
+                [new ActivityExtraField("Tickete", "Observatii", "Observatii client", ActivityFieldMap.Both)], null, true, out _)!;
             await settings.SaveFieldSettingsAsync(fieldMap);
             var kept = await Count("SELECT COUNT(*) FROM activity_import_tickets");
             Check(await refresh.CountOutdatedAsync() == kept && kept >= 5, "Activity ticket fields: after an extra field is added every ticket kept lacks it (the ones kept before the settings existed hold the five usual ones)");
@@ -211,7 +211,12 @@ public static partial class MariaExtendedChecks
 
             // A piece renamed together with a new extra field: the notes the import wrote (with the old names, kept with the source record) are rebuilt with the new ones; the edited ones stay.
             fake.ExtraValues[(8001, "x:Tickete.Descriere2")] = "Urgent";
-            var renamed = ActivityFieldMap.Create(new Dictionary<string, string>(), null, null, [new ActivityExtraField("Tickete", "Descriere2", "Descriere client", ActivityFieldMap.Both)], new Dictionary<string, string> { [ActivityFieldMap.Problem] = "Defect" }, out _)!;
+            var renamed = ActivityFieldMap.Create(new Dictionary<string, string>(), null, null, [new ActivityExtraField("Tickete", "Descriere2", "Descriere client", ActivityFieldMap.Both)], new Dictionary<string, string> { [ActivityFieldMap.Problem] = "Defect" }, true, out _)!;
+            // BUG-0023: settings whose number column was not chosen are refused by the service (a return to the defaults is not).
+            var refusedUnchosen = false;
+            try { await settings.SaveFieldSettingsAsync(ActivityFieldMap.Create(new Dictionary<string, string>(), null, null, [new ActivityExtraField("Tickete", "Descriere2", "Descriere client", ActivityFieldMap.Both)], null, false, out _)!); }
+            catch (ActivityImportException exception) when (exception.Message == ActivityFieldMap.NumberRequiredMessage) { refusedUnchosen = true; }
+            Check(refusedUnchosen, "Activity ticket fields: settings without a chosen number column are not saved");
             await settings.SaveFieldSettingsAsync(renamed);
             var renamedRefresh = await refresh.RefreshAsync();
             var renamedNotes = await NotesOf(8001);
@@ -283,7 +288,7 @@ public static partial class MariaExtendedChecks
                 "Activity field map: when the chosen column is gone from ActivityApp the run stops with that reason instead of reading another text");
             await settings.SaveFieldMapAsync(new Dictionary<string, string> { ["Tickete.DescriptionInternal"] = "DescriptionInternal" });
             await tickets.SimulateAsync();
-            Check(await Count("SELECT COUNT(*) FROM activity_import_settings WHERE id = 1 AND field_map IS NULL") == 1 && (await settings.GetFieldMapAsync()).Columns.Count == 0 && fake.LastTicketStructure?.Physical("Tickete", "DescriptionInternal") == "DescriptionInternal",
+            Check(await Count("SELECT COUNT(*) FROM activity_import_settings WHERE id = 1 AND (field_map IS NULL OR field_map LIKE '%NumberChosen%')") == 1 && (await settings.GetFieldMapAsync()).Columns.Count == 0 && fake.LastTicketStructure?.Physical("Tickete", "DescriptionInternal") == "DescriptionInternal",
                 "Activity field map: choosing the default column back clears the choice and the run works again");
             var deniedSettings = new MariaActivityImportService(configuration, protection, fake, new TestAccessControl(false, "operator.ext"), audit);
             var deniedMap = 0;

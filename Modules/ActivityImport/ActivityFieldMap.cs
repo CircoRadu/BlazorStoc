@@ -32,8 +32,9 @@ public sealed class ActivityFieldMap
     public static readonly string[] ExtraTables = ["Tickete", "EvenimenteAgent"];
 
     public ActivityFieldMap(IReadOnlyDictionary<string, string>? columns = null, IEnumerable<string>? off = null, IReadOnlyDictionary<string, string>? targets = null, IEnumerable<ActivityExtraField>? extras = null,
-        IReadOnlyDictionary<string, string>? labels = null)
+        IReadOnlyDictionary<string, string>? labels = null, bool numberChosen = false)
     {
+        NumberChosen = numberChosen;
         Columns = columns ?? new Dictionary<string, string>();
         Off = new HashSet<string>(off ?? [], StringComparer.Ordinal);
         Targets = targets ?? new Dictionary<string, string>();
@@ -64,6 +65,14 @@ public sealed class ActivityFieldMap
     ];
 
     public IReadOnlyDictionary<string, string> Columns { get; }
+    /// <summary>The administrator chose the column of the ticket number (BUG-0023): there is no default for it. Settings never saved, or reset to the defaults, have it false; the import still reads
+    /// the usual column then, but the settings cannot be saved until the column is chosen.</summary>
+    public bool NumberChosen { get; }
+
+    /// <summary>The title and the number may be read from a column of any readable kind (text, number, date, flag), shown as text; the other pieces only from text columns.</summary>
+    public const string NumberRequiredMessage = "Alege coloana din care se citește numărul tichetului: fără ea corespondența nu se salvează.";
+
+    public static bool ReadsAnyKind(ActivityMappableField field) => field.Table == "Tickete" && field.Column is "Subject" or "NumeTicket";
     /// <summary>The optional pieces of information that are switched off (a piece not named here is on).</summary>
     public IReadOnlySet<string> Off { get; }
     /// <summary>The destination chosen for a piece of information that differs from its default.</summary>
@@ -153,7 +162,10 @@ public sealed class ActivityFieldMap
         Create(chosen, off, targets, extras, null, out error);
 
     public static ActivityFieldMap? Create(IReadOnlyDictionary<string, string> chosen, IEnumerable<string>? off, IReadOnlyDictionary<string, string>? targets, IEnumerable<ActivityExtraField>? extras,
-        IReadOnlyDictionary<string, string>? labels, out string? error)
+        IReadOnlyDictionary<string, string>? labels, out string? error) => Create(chosen, off, targets, extras, labels, false, out error);
+
+    public static ActivityFieldMap? Create(IReadOnlyDictionary<string, string> chosen, IEnumerable<string>? off, IReadOnlyDictionary<string, string>? targets, IEnumerable<ActivityExtraField>? extras,
+        IReadOnlyDictionary<string, string>? labels, bool numberChosen, out string? error)
     {
         error = null;
         var result = new Dictionary<string, string>(StringComparer.Ordinal);
@@ -209,7 +221,7 @@ public sealed class ActivityFieldMap
         }
         var names = Info.Select(item => chosenLabels.TryGetValue(item.Key, out var custom) ? custom : item.Label).ToList();
         if (names.GroupBy(name => name, StringComparer.OrdinalIgnoreCase).FirstOrDefault(group => group.Count() > 1) is { } twice) { error = "Numele „" + twice.Key + "” este folosit de două ori."; return null; }
-        return new ActivityFieldMap(result, disabled, chosenTargets, list, chosenLabels);
+        return new ActivityFieldMap(result, disabled, chosenTargets, list, chosenLabels, numberChosen);
     }
 
     private static bool ValidColumn(string column) => column.Length is > 0 and <= 128 && column.All(c => char.IsLetterOrDigit(c) || c is '_');
@@ -217,14 +229,14 @@ public sealed class ActivityFieldMap
     // The old format is the dictionary of the columns alone; the new one (version 2) is an object, written only when something besides the columns differs from the default.
     public string ToJson()
     {
-        if (Columns.Count == 0 && Off.Count == 0 && Targets.Count == 0 && Extras.Count == 0 && Labels.Count == 0) return "";
+        if (!NumberChosen && Columns.Count == 0 && Off.Count == 0 && Targets.Count == 0 && Extras.Count == 0 && Labels.Count == 0) return "";
         var columns = Columns.OrderBy(pair => pair.Key, StringComparer.Ordinal).ToDictionary(pair => pair.Key, pair => pair.Value);
-        if (Off.Count == 0 && Targets.Count == 0 && Extras.Count == 0 && Labels.Count == 0) return JsonSerializer.Serialize(columns);
-        return JsonSerializer.Serialize(new Stored(2, columns, [.. Off.Order(StringComparer.Ordinal)], Targets.OrderBy(pair => pair.Key, StringComparer.Ordinal).ToDictionary(pair => pair.Key, pair => pair.Value),
-            [.. Extras.Select(extra => new StoredExtra(extra.Table, extra.Column, extra.Label, extra.Target))], Labels.OrderBy(pair => pair.Key, StringComparer.Ordinal).ToDictionary(pair => pair.Key, pair => pair.Value)));
+        if (!NumberChosen && Off.Count == 0 && Targets.Count == 0 && Extras.Count == 0 && Labels.Count == 0) return JsonSerializer.Serialize(columns);
+        return JsonSerializer.Serialize(new Stored(3, columns, [.. Off.Order(StringComparer.Ordinal)], Targets.OrderBy(pair => pair.Key, StringComparer.Ordinal).ToDictionary(pair => pair.Key, pair => pair.Value),
+            [.. Extras.Select(extra => new StoredExtra(extra.Table, extra.Column, extra.Label, extra.Target))], Labels.OrderBy(pair => pair.Key, StringComparer.Ordinal).ToDictionary(pair => pair.Key, pair => pair.Value), NumberChosen));
     }
 
-    private sealed record Stored(int V, Dictionary<string, string> Columns, List<string> Off, Dictionary<string, string> Targets, List<StoredExtra> Extras, Dictionary<string, string>? Labels = null);
+    private sealed record Stored(int V, Dictionary<string, string> Columns, List<string> Off, Dictionary<string, string> Targets, List<StoredExtra> Extras, Dictionary<string, string>? Labels = null, bool? NumberChosen = null);
     private sealed record StoredExtra(string Table, string Column, string Label, string Target);
 
     public static ActivityFieldMap FromJson(string? json)
@@ -238,10 +250,10 @@ public sealed class ActivityFieldMap
             {
                 var stored = JsonSerializer.Deserialize<Stored>(json, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
                 if (stored is null) return Empty;
-                return Create(stored.Columns ?? [], stored.Off ?? [], stored.Targets ?? [], (stored.Extras ?? []).Select(extra => new ActivityExtraField(extra.Table, extra.Column, extra.Label, extra.Target)), stored.Labels ?? [], out _) ?? Empty;
+                return Create(stored.Columns ?? [], stored.Off ?? [], stored.Targets ?? [], (stored.Extras ?? []).Select(extra => new ActivityExtraField(extra.Table, extra.Column, extra.Label, extra.Target)), stored.Labels ?? [], stored.NumberChosen ?? true, out _) ?? Empty;
             }
             var values = JsonSerializer.Deserialize<Dictionary<string, string>>(json);
-            return values is null ? Empty : Create(values, out _) ?? Empty;
+            return values is null ? Empty : Create(values, null, null, null, null, true, out _) ?? Empty;
         }
         catch (JsonException) { return Empty; }
     }

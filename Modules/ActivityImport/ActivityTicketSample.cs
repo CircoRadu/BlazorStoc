@@ -43,7 +43,7 @@ public static class ActivityTicketSampleRules
             return ValueOf(sample, table, map.ColumnOf(field)) ?? "";
         }
         var extras = map.Extras.ToDictionary(extra => extra.Key, extra => ValueOf(sample, extra.Table, extra.Column) ?? "");
-        var ticket = new ActivityTicket(sample.TicketId, 0, 0, 0, sample.TicketDate, From("Tickete", "NumeTicket"), From("Tickete", "Subject"), From("Tickete", "DescriptionInternal"),
+        var ticket = new ActivityTicket(sample.TicketId, 0, 0, 0, sample.TicketDate, map.NumberChosen ? From("Tickete", "NumeTicket") : "", From("Tickete", "Subject"), From("Tickete", "DescriptionInternal"),
             sample.Executor.Length > 0 ? sample.Executor : From("Tickete", "ProcesatDe"), 0, null, null, From("EvenimenteAgent", "DescriptionInternal"), null, "", null, extras.Count == 0 ? null : extras);
         return ActivityTicketFields.Collect(ticket, map);
     }
@@ -55,7 +55,7 @@ public static class ActivityTicketSampleRules
         var items = new List<SamplePreviewItem>
         {
             new(ActivityFieldMap.Title, map.LabelOf(ActivityFieldMap.Title), source.Title, ActivityFieldMap.Notes, map.SourceOf(ActivityFieldMap.Title) ?? ""),
-            new(ActivityFieldMap.Number, map.LabelOf(ActivityFieldMap.Number), source.Number, ActivityFieldMap.Notes, map.SourceOf(ActivityFieldMap.Number) ?? "")
+            new(ActivityFieldMap.Number, map.LabelOf(ActivityFieldMap.Number), source.Number, ActivityFieldMap.Notes, map.NumberChosen ? map.SourceOf(ActivityFieldMap.Number) ?? "" : "coloana nu este aleasă")
         };
         string From(string key) => key == ActivityFieldMap.Resolution
             ? ActivityFieldMap.ColumnName("EvenimenteAgent", map.ColumnOf(ActivityFieldMap.Fields.First(field => field.Table == "EvenimenteAgent"))) + " fără textul problemei"

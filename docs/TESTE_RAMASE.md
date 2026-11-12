@@ -935,3 +935,5 @@ Dezvoltator (cont), stergere in bloc, popup propunere fara taburi, editare conti
 Ferestre unitare: bara de prindere, redimensionare, Ajutor si marcare pe structura comuna (0.5.69) (10.11.2026): Ferestrele cu antetul scris in continut (aprox. 60 de utilizari AppDialog fara Title) au bara de prindere deasupra, nu antet in AppDialog; migrarea lor pe Title ramane de facut pe module
 
 Bara ferestrelor template v2 pentru toate dialogurile (0.5.70) (10.11.2026): Verificare vizuala pe ferestrele reale din module cu date (Facturi, Mișcari): doar clasele au fost comparate in harness
+
+BUG-0021, BUG-0022, BUG-0023 (versiunea 0.5.75) (12.11.2026): Fereastra Tichet exemplu cu date reale ActivityApp (necesita autentificare Windows): de verificat de utilizator.

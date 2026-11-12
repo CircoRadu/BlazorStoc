@@ -60,7 +60,10 @@ public static class ActivityFieldSettingsChecks
     private static void SampleRules(Action<bool, string> check)
     {
         var sample = Sample();
-        var preview = ActivityTicketSampleRules.Preview(sample, ActivityFieldMap.Empty);
+        var preview = ActivityTicketSampleRules.Preview(sample, ActivityFieldMap.Create(new Dictionary<string, string>(), null, null, null, null, true, out _)!);
+        var unchosen = ActivityTicketSampleRules.Preview(sample, ActivityFieldMap.Empty);
+        check(unchosen.Items.Single(item => item.Key == "number").Value.Length == 0 && unchosen.Items.Single(item => item.Key == "number").Source.Contains("nu este aleasă", StringComparison.Ordinal) && unchosen.Items.Single(item => item.Key == "title").Value == "Aer conditionat",
+            "Example ticket: until the column of the number is chosen the number is empty in the preview (there is no default), the other pieces are unchanged");
         string Value(string key) => preview.Items.Single(item => item.Key == key).Value;
         check(preview.Items.Count == 6 && Value("problem") == "Nu merge aerul" && Value("resolution") == "Am schimbat filtrul" && Value("executor") == "Ion Pop" && Value("title") == "Aer conditionat" && Value("number") == "T-9"
               && preview.Notes.Contains("Executant: Ion Pop", StringComparison.Ordinal) && preview.Notes.StartsWith("Preluat din ActivityApp, tichet T-9: Aer conditionat", StringComparison.Ordinal),

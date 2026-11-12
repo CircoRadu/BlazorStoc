@@ -268,11 +268,13 @@ public sealed class SqlActivitySource : IActivitySource
             if (structure.IsBlocked(entity)) throw new ActivitySourceException($"„{entity}” nu poate fi citit: structura ActivityApp nu mai corespunde (vezi raportul de structură).");
         string T(string column) => structure.Physical(tickets, column) is { } physical ? "t." + Q(physical) : throw new ActivitySourceException("Tichetele nu pot fi citite: structura ActivityApp nu mai corespunde.");
         string TText(string column) => structure.Physical(tickets, column) is { } physical ? "t." + Q(physical) : "CAST(NULL AS nvarchar(300))";
+        // The title and the number may be read from a column of any readable kind (BUG-0023): read as text.
+        string TAsText(string column) => structure.Physical(tickets, column) is { } physical ? "CAST(t." + Q(physical) + " AS nvarchar(max))" : "CAST(NULL AS nvarchar(300))";
         string E(string column) => structure.Physical(events, column) is { } physical ? "e." + Q(physical) : throw new ActivitySourceException("Evenimentele nu pot fi citite: structura ActivityApp nu mai corespunde.");
         string EOptional(string column, string empty) => structure.Physical(events, column) is { } physical ? "e." + Q(physical) : empty;
         var id = T("ID");
         var columns = new List<string> { id, T("IDActivitate"), T("IDClient"), structure.Physical(tickets, "IDPunctDeLucru") is { } point ? "t." + Q(point) : "CAST(NULL AS bigint)", T("DataTicket"),
-            TText("NumeTicket"), TText("Subject"), TText("DescriptionInternal"), TText("ProcesatDe"), E("ID"), EOptional("EndTime", "CAST(NULL AS datetime)"), EOptional("Status", "CAST(NULL AS bigint)"), EOptional("DescriptionInternal", "CAST(NULL AS nvarchar(max))"), EOptional("DataModificareEveniment", "CAST(NULL AS datetime)"), EOptional("LocatieGPS", "CAST(NULL AS nvarchar(100))"), EOptional("Label", "CAST(NULL AS bigint)") };
+            TAsText("NumeTicket"), TAsText("Subject"), TText("DescriptionInternal"), TText("ProcesatDe"), E("ID"), EOptional("EndTime", "CAST(NULL AS datetime)"), EOptional("Status", "CAST(NULL AS bigint)"), EOptional("DescriptionInternal", "CAST(NULL AS nvarchar(max))"), EOptional("DataModificareEveniment", "CAST(NULL AS datetime)"), EOptional("LocatieGPS", "CAST(NULL AS nvarchar(100))"), EOptional("Label", "CAST(NULL AS bigint)") };
         // The extra fields come after the fixed columns, in the order of the structure report.
         const int fixedColumns = 16;
         foreach (var extra in structure.Extras) columns.Add((extra.Table == events ? "e." : "t.") + Q(extra.Column));

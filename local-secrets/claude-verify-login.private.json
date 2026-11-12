@@ -1,5 +1,14 @@
 {
   "Purpose": "Conturi ale lui Claude pe baza de TEST (blazorstoc_test) pentru verificari in browser; create 09.11.2026 cu --create-administrator (administrator) si din Utilizatori (utilizator simplu). Nu se folosesc in productie.",
-  "Administrator": { "Username": "claude.verify", "DisplayName": "Claude Verificare", "Password": "Vf-9pR4w-Gk2tNc7#Xa" },
-  "User": { "Username": "claude.verify.user", "DisplayName": "Claude Verificare Utilizator", "Password": "Vf-6zD2q-Lm8vTk3#Ob" }
+  "Administrator": {
+    "Username": "claude.verify",
+    "DisplayName": "Claude Verificare",
+    "Password": "Vfb613c47abaffab22c6e0#Ab9",
+    "PasswordPrevious": "Eu8uTpnySyXx19DFC7f39paZ9#"
+  },
+  "User": {
+    "Username": "claude.verify.user",
+    "DisplayName": "Claude Verificare Utilizator",
+    "Password": "Vf-6zD2q-Lm8vTk3#Ob"
+  }
 }

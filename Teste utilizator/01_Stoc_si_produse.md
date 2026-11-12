@@ -359,3 +359,15 @@ Pasi:
 ## Ecran ingust
 
 - Lista de produse si formularul pe latime de telefon, fara scroll orizontal.
+
+## Modificari de testat - meniul de categorii se deschide si se inchide la apasare (12.11.2026, BUG-0022)
+
+**Ce s-a adaugat:** apasarea pe numele unei categorii sau subcategorii cu copii o inchide daca este deschisa.
+
+**Ce face acum:** o apasare deschide intrarea (si duce la produsele ei), a doua apasare o inchide; nu mai e nevoie de sageata. O subcategorie cu copii se inchide fara sa schimbe pagina; o categorie inchisa duce la lista tuturor produselor.
+
+| Pas | Ce faci | Ce trebuie sa vezi | OK |
+|---|---|---|---|
+| 1 | In meniu apasa pe o categorie | Se deschide si arata subcategoriile | |
+| 2 | Apasa din nou pe aceeasi categorie | Se inchide (lista produselor revine la "Toate produsele") | |
+| 3 | Deschide o subcategorie cu copii, apasa din nou pe numele ei | Se inchide fara sa schimbe pagina; a treia apasare o deschide | |

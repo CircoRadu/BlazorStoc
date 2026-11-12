@@ -23,7 +23,8 @@ public static class ActivityImportPanelChecks
         public Task SaveTypesAsync(IReadOnlyList<ActivityTypeChoice> choices, CancellationToken cancellationToken = default) => Task.CompletedTask;
         public Task<ActivityConnection?> GetConnectionAsync(CancellationToken cancellationToken = default) => Task.FromResult<ActivityConnection?>(null);
         public Dictionary<string, string>? SavedMap;
-        public ActivityFieldMap Map = ActivityFieldMap.Empty;
+        // Settings saved with the number chosen (BUG-0023); a test of the unchosen number sets ActivityFieldMap.Empty.
+        public ActivityFieldMap Map = ActivityFieldMap.Create(new Dictionary<string, string>(), null, null, null, null, true, out _)!;
         public ActivityFieldMap? SavedSettings;
         public Task<ActivityFieldMap> GetFieldMapAsync(CancellationToken cancellationToken = default) => Task.FromResult(Map);
         public Task<ActivityFieldMapView> GetFieldChoicesAsync(bool readSource, CancellationToken cancellationToken = default) =>
@@ -329,17 +330,17 @@ public static class ActivityImportPanelChecks
         cut.Find("#ticket-sample-Tickete [aria-label='Folosește coloana Observatii']").Change(false);
         check(cut.FindAll("#ai-extras tbody tr").Count == 0 && cut.Find("#ticket-sample-note").TextContent.Contains("a fost detașată", StringComparison.Ordinal),
             "Activity import panel: switching a column off detaches the free field that read it");
-        // The number (and the title) can be read from any text column of the ticket, chosen in the list of the used columns.
-        cut.Find("#ticket-sample-used [aria-label='Coloana pentru Numărul tichetului']").Change("Detalii");
+        // The number (and the title) can be read from any readable column of the ticket, chosen in the block "Coloane obligatorii" at the top of the window (BUG-0023).
+        cut.Find("#ticket-sample-pick-number").Change("Detalii");
         check(cut.Find("#ticket-sample-note").TextContent.Contains("Tichet – NumeTicket → Tichet – Detalii", StringComparison.Ordinal) && cut.Find("#ticket-sample-preview").TextContent.Contains("Detalii 30", StringComparison.Ordinal)
               && cut.FindAll("#ticket-sample-used button[aria-label^='Detașează Numărul']").Count == 0,
             "Activity import panel: the number of the ticket can be read from another column of the used list, and it still cannot be detached");
-        cut.Find("#ticket-sample-used [aria-label='Coloana pentru Titlul tichetului']").Change("Detalii");
+        cut.Find("#ticket-sample-pick-title").Change("Detalii");
         check(cut.Find("#ticket-sample-note").TextContent.Contains("a trecut pe coloana", StringComparison.Ordinal)
-              && cut.Find("#ticket-sample-used [aria-label='Coloana pentru Titlul tichetului']").GetAttribute("value") == "Detalii",
+              && cut.Find("#ticket-sample-pick-title option[selected]").GetAttribute("value") == "Detalii",
             "Activity import panel: giving the title the column of the number moves the number to the column the title left");
-        cut.Find("#ticket-sample-used [aria-label='Coloana pentru Titlul tichetului']").Change("Subject");
-        cut.Find("#ticket-sample-used [aria-label='Coloana pentru Numărul tichetului']").Change("NumeTicket");
+        cut.Find("#ticket-sample-pick-title").Change("Subject");
+        cut.Find("#ticket-sample-pick-number").Change("NumeTicket");
         cut.Find("#ticket-sample-older").Click();
         cut.Find("#ticket-sample-older").Click();
         cut.WaitForAssertion(() => { if (!cut.Find("#ticket-sample-info").TextContent.Contains("Tichet 10", StringComparison.Ordinal)) throw new Exception("pending"); }, TimeSpan.FromSeconds(5));
@@ -363,6 +364,25 @@ public static class ActivityImportPanelChecks
         cut.Find("#ai-issues button").Click();
         cut.WaitForAssertion(() => { if (cut.FindAll("#ai-issues").Count != 0) throw new Exception("pending"); }, TimeSpan.FromSeconds(5));
         check(partners.Resolved == 1, "Activity import panel: marking a problem resolved removes it from the list");
+        // BUG-0023: the column of the ticket number has no default. Settings without it cannot be saved; the window asks for it at the top and shows the live window "Cum arată tichetul preluat".
+        settingsService.Map = ActivityFieldMap.Empty; settingsService.SavedSettings = null; settingsService.SampleCalls.Clear();
+        cut.FindAll("button").Single(button => button.TextContent.Trim() == "Citește coloanele din ActivityApp").Click();
+        cut.WaitForAssertion(() => { if (!cut.Find("#ai-save-fields").HasAttribute("disabled")) throw new Exception("pending"); }, TimeSpan.FromSeconds(5));
+        check(cut.Find("#ai-save-fields").GetAttribute("title")!.Contains("numărul tichetului", StringComparison.Ordinal), "Activity import panel: the correspondence cannot be saved before the column of the ticket number is chosen");
+        cut.Find("#ai-open-sample").Click();
+        cut.WaitForAssertion(() => { if (cut.FindAll("#ticket-sample-required").Count == 0) throw new Exception("pending"); }, TimeSpan.FromSeconds(5));
+        check(cut.FindAll("#ticket-sample-number-required").Count == 1 && cut.FindAll("#ticket-live-preview #ticket-sample-preview").Count == 1 && cut.Find("#ticket-sample-pick-number").QuerySelectorAll("option").First().TextContent.Contains("alege", StringComparison.Ordinal)
+              && cut.Find("#ticket-sample-pick-title option[selected]").GetAttribute("value") == "Subject",
+            "Activity import panel: the window asks for the column of the number (no default) and shows the preview in its own floating window");
+        cut.Find("#ticket-sample-pick-number").Change("NumeTicket");
+        cut.WaitForAssertion(() => { if (cut.FindAll("#ticket-sample-number-required").Count != 0) throw new Exception("pending"); }, TimeSpan.FromSeconds(5));
+        check(!cut.Find("#ai-save-fields").HasAttribute("disabled") && cut.Find("#ticket-live-preview").TextContent.Contains("T-30", StringComparison.Ordinal), "Activity import panel: choosing the number column enables the saving and the live window shows the number");
+        cut.Find("#ticket-sample-preview-toggle").Click();
+        check(cut.FindAll("#ticket-live-preview").Count == 0, "Activity import panel: the floating window can be hidden");
+        cut.Find(".ticket-sample .heading-actions button.danger").Click();
+        cut.Find("#ai-save-fields").Click();
+        cut.WaitForAssertion(() => { if (settingsService.SavedSettings is null) throw new Exception("pending"); }, TimeSpan.FromSeconds(5));
+        check(settingsService.SavedSettings!.NumberChosen && settingsService.SavedSettings.ToJson().Length > 0, "Activity import panel: the settings are saved with the chosen number, also when it is the usual column");
         return Task.CompletedTask;
     }
 }

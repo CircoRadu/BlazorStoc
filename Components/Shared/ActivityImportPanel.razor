@@ -239,7 +239,7 @@
             <div class="editor-actions">
                 <button type="button" class="refresh act-reload" disabled="@busy" @onclick="LoadFieldsAsync">Citește coloanele din ActivityApp</button>
                 <button type="button" class="refresh act-nav" id="ai-open-sample" disabled="@busy" title="Deschide cel mai recent tichet finalizat din ActivityApp, cu toate coloanele și valorile lui, ca să vezi ce conține fiecare coloană" @onclick="OpenSampleAsync">Deschide un tichet exemplu</button>
-                <button type="button" class="primary" disabled="@(busy || fields is null)" @onclick="SaveFieldsAsync">Salvează corespondența</button>
+                <button type="button" class="primary" id="ai-save-fields" disabled="@(busy || fields is null || !numberChosen)" title="@(numberChosen ? null : ActivityFieldMap.NumberRequiredMessage)" @onclick="SaveFieldsAsync">Salvează corespondența</button>
                 <button type="button" class="refresh act-nav" disabled="@(busy || fields is null)" @onclick="ResetFields">Revino la valorile implicite</button>
                 @if (outdated > 0)
                 {
@@ -343,7 +343,7 @@
 @if (sample is { } shownSample)
 {
     var shownMap = Settings(out var shownProblem);
-    <TicketSampleDialog Sample="shownSample" Map="shownMap" Problem="@shownProblem" Targets="SampleTargets" HasNewer="@(sampleIndex > 0)" Busy="sampleBusy" Error="@sampleError" Note="@sampleNote"
+    <TicketSampleDialog Sample="shownSample" Map="shownMap" NumberChosen="numberChosen" Problem="@shownProblem" Targets="SampleTargets" HasNewer="@(sampleIndex > 0)" Busy="sampleBusy" Error="@sampleError" Note="@sampleNote"
                         Older="OlderSampleAsync" Newer="NewerSample" Close="CloseSample" Used="UsedList()" Toggle="ToggleFromSample" Edit="EditFromSample" />
 }
 
@@ -603,6 +603,8 @@
     }
 
     private List<FieldRow>? fields;
+    // The column of the ticket number has no default: until the administrator chooses it the settings cannot be saved (BUG-0023).
+    private bool numberChosen;
     private readonly List<ExtraRow> extras = [];
     private IReadOnlyDictionary<string, IReadOnlyList<string>>? textColumns;
     private string newTable = ActivityFieldMap.ExtraTables[0], newColumn = "", newLabel = "";
@@ -620,6 +622,7 @@
         fieldsError = view.SourceError;
         structureChange = view.StructureChange;
         var map = view.Map ?? ActivityFieldMap.Empty;
+        numberChosen = map.NumberChosen;
         fields = [.. ActivityFieldMap.Info.Select(item => new FieldRow(item, item.FieldKey is null ? null : view.Fields.FirstOrDefault(choice => choice.Field.Key == item.FieldKey), map.IsEnabled(item.Key), item.Mandatory ? ActivityFieldMap.Notes : map.TargetOf(item.Key)) { Label = map.LabelOf(item.Key) })];
         extras.Clear();
         extras.AddRange(map.Extras.Select(extra => new ExtraRow(extra.Table, extra.Column, extra.Label, extra.Target)));
@@ -648,12 +651,13 @@
         var off = fields!.Where(row => !row.Item.Mandatory && !row.Enabled).Select(row => row.Item.Key);
         var targets = fields!.Where(row => !row.Item.Mandatory).ToDictionary(row => row.Item.Key, row => row.Target);
         var labels = fields!.Where(row => !row.Item.Mandatory).ToDictionary(row => row.Item.Key, row => row.Label);
-        return ActivityFieldMap.Create(columns, off, targets, extras.Select(extra => new ActivityExtraField(extra.Table, extra.Column, extra.Label, extra.Target)), labels, out problem);
+        return ActivityFieldMap.Create(columns, off, targets, extras.Select(extra => new ActivityExtraField(extra.Table, extra.Column, extra.Label, extra.Target)), labels, numberChosen, out problem);
     }
 
     private Task SaveFieldsAsync() => RunAsync("Se salvează corespondența…", async () =>
     {
         var settings = Settings(out var problem) ?? throw new ActivityImportException(problem ?? "Corespondența câmpurilor nu este validă.");
+        if (!numberChosen) throw new ActivityImportException(ActivityFieldMap.NumberRequiredMessage);
         await Import.SaveFieldSettingsAsync(settings, lifetime.Token);
         await ReadFieldsAsync();
         noticeOk = true; notice = "Corespondența câmpurilor a fost salvată.";
@@ -756,7 +760,7 @@
         {
             var table = row.Item.FieldKey?.Split('.')[0] ?? "";
             var column = row.Column ?? "";
-            if (row.Item.Mandatory) list.Add(new(row.Item.Key, table, column, ActivityFieldMap.ColumnName(table, column), row.Item.Label, ActivityFieldMap.Notes, row.Item.Key, true, "Se preia mereu: în observații și titlu"));
+            if (row.Item.Mandatory) list.Add(new(row.Item.Key, table, column, row.Item.Key == ActivityFieldMap.Number && !numberChosen ? "" : ActivityFieldMap.ColumnName(table, column), row.Item.Label, ActivityFieldMap.Notes, row.Item.Key, true, "Se preia mereu: în observații și titlu"));
             else if (row.Enabled) list.Add(new(row.Item.Key, table, column, column.Length == 0 ? "" : ActivityFieldMap.ColumnName(table, column), row.Label, row.Target, row.Item.Key));
         }
         foreach (var extra in extras) list.Add(new(extra.Key, extra.Table, extra.Column, ActivityFieldMap.ColumnName(extra.Table, extra.Column), extra.Label, extra.Target, "extra"));
@@ -899,6 +903,7 @@
         if (!target.Choices.Contains(choice.Column, StringComparer.OrdinalIgnoreCase)) target.Choices.Add(choice.Column);
         target.Column = choice.Column;
         target.Enabled = true;
+        if (target.Item.Key == ActivityFieldMap.Number) numberChosen = true;
         notes.Insert(0, previous.Equals(choice.Column, StringComparison.OrdinalIgnoreCase) ? $"„{target.Label}” se citește din {name}." : $"„{target.Label}”: {ActivityFieldMap.ColumnName(choice.Table, previous)} → {name}.");
         sampleNote = string.Join(" ", notes);
     }
@@ -913,6 +918,7 @@
             row.Label = row.Item.Label;
         }
         extras.Clear();
+        numberChosen = false;
     }
 
 

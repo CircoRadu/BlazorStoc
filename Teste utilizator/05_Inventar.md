@@ -72,3 +72,14 @@ Pasi:
 1. Genereaza situatia pentru o categorie -> PDF.
 2. Completeaza -> scaneaza -> Preluare inventar.
 3. Corecteaza cifrele -> confirma -> stocul se ajusteaza, jurnalul arata corectiile.
+
+## Modificari de testat - previzualizarea PDF a situatiei de inventar (12.11.2026, BUG-0021)
+
+**Ce s-a adaugat:** corectie de afisare: dialogul de previzualizare avea continutul gol.
+
+**Ce face acum:** dupa generare, in dialogul "Situatia de inventar" se vede PDF-ul in vizualizator, sub numele fisierului, iar butoanele Imprima / Salveaza / Inchide sunt dedesubt.
+
+| Pas | Ce faci | Ce trebuie sa vezi | OK |
+|---|---|---|---|
+| 1 | Inventar -> selecteaza categorii -> "Genereaza situatia de inventar" | Dialogul se deschide cu PDF-ul afisat pe toata inaltimea | |
+| 2 | Apasa "Imprima" si "Salveaza" | Pornesc imprimarea, respectiv descarcarea fisierului | |

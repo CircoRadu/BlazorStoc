@@ -9,6 +9,13 @@ Actualizat: 09.11.2026, Europe/Bucharest (Claude, agent unic, mod `claude_only`)
 - Motorul de facturi este geometric (`Services/Invoices`); utilizatorii obisnuiti creeaza/modifica sabloane, stergerea ramane administratorului.
 - Harta codului: `docs/HARTA_COD.md`. Reguli permanente: `CLAUDE.md`.
 
+## Ultimul lucru facut (12.11.2026): BUG-0021, BUG-0022, BUG-0023 (versiunea 0.5.75, ActivityImport 0.18.0)
+- BUG-0021: dialogul de previzualizare PDF al inventarului (`.pdf-preview-dialog`) are corpul `flex`, iframe-ul are inaltime (app.css).
+- BUG-0022: apasarea pe numele unei intrari deschise din meniul de produse o inchide (`wwwroot/collapsible.js`, `closedNodes` in `MainLayout.razor`).
+- BUG-0023: titlul si numarul tichetului din orice coloana citibila (`ActivityFieldMap.ReadsAnyKind`, `CAST` in `ActivitySource`); numarul fara valoare implicita (`NumberChosen`, JSON v3, salvarea refuzata in UI si in `SaveFieldSettingsAsync`); bloc "Coloane obligatorii" si fereastra flotanta "Cum arata tichetul preluat" in `TicketSampleDialog.razor`.
+- Verificat: grupurile activityimport, moduleversions, help si sectiunile MariaDB Activity; BUG-0021/0022 in browser pe instanta de verificare; aspectul ferestrei flotante pe o macheta (fereastra reala cere ActivityApp cu autentificare Windows).
+- De facut la cerere: topicul `setari-tichet-exemplu` si captura (docs/HELP_DE_REGENERAT.md).
+
 ## Ultimul lucru facut (11.11.2026): preluare stoc ESPStoc, modulul `import-espstoc` (0.5.74, branch claude/import-espstoc)
 - `Modules/EspImport/` (vezi `docs/HARTA_COD.md` si `docs/PROPUNERE_IMPORT_ESPSTOC.md`): analiza exportului vechi (.sql/.zip), lista pe categorii cu insigne clicabile, parametri propusi din codul vechi, produse preluate inghetate (`ProductInput.AllowIncomplete`, `StockMovementInput.SkipParameterCheck`), punct zero (sterge miscari/facturi/oferte/rezervari/copii de siguranta/jurnal; starea in `app_metadata` cheia `espstoc.point_zero`, reluabil).
 - Verificat: grupurile espimport, moduleversions, help, components, parameters; sectiunea Maria "Required parameters"; browser pe instanta 5099 (baza de test = exportul BStoc din 11.11.2026): analiza, parametri, inghetare, aplicare completa si reluare dupa erori. Neverificat: incarcarea unui fisier mare cu butonul "Alege fisierul" (doar cale pe server si fisier mic); stergerea pe NAS (NAS oprit in copia de test); suita Maria completa (ar fi rescris baza de test).
