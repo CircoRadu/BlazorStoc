@@ -73,6 +73,7 @@
                                     <td>@ProposalRules.Display(item.CreatedUtc)</td><td>@item.FileCount</td><td>@item.NoteCount</td>
                                     <td class="row-actions">
                                         <button type="button" class="row-icon view" aria-label="Deschide propunerea @item.Number" title="Deschide propunerea @item.Number" @onclick="() => OpenAsync(item)"></button>
+                                        @if (canEdit && item.State != ProposalRules.StateImplemented) { <button type="button" class="row-icon check" disabled="@busy" aria-label="Marchează propunerea @item.Number ca implementată" title="Marchează propunerea @item.Number ca implementată (în versiunea @AppVersion.Current)" @onclick="() => ImplementRowAsync(item)"></button> }
                                         @if (canEdit) { <button type="button" class="row-icon edit" aria-label="Editează propunerea @item.Number" title="Editează propunerea @item.Number" @onclick="() => OpenAsync(item, true)"></button> }
                                         @if (canExport) { <button type="button" class="row-icon export" aria-label="Exportă propunerea @item.Number" title="Exportă propunerea @item.Number (ZIP)" disabled="@busy" @onclick="() => ExportRowAsync(item)"></button> }
                                         @if (canEdit) { <button type="button" class="row-icon delete" aria-label="Șterge propunerea @item.Number" title="Șterge propunerea @item.Number" @onclick="() => AskDelete(item)"></button> }
@@ -362,6 +363,15 @@
         }
         finally { busy = false; }
     }
+
+    // One click from the list: the proposal becomes "Implementată" in the running version (the field of the detail window can still correct it); no answer is added.
+    private Task ImplementRowAsync(Proposal proposal) => RunAsync(async () =>
+    {
+        var saved = await Proposals.ChangeStateAsync(proposal.Id, ProposalRules.StateImplemented, AppVersion.Current, "", lifetime.Token);
+        if (opened?.Id == saved.Id) { opened = saved; newState = saved.State; implementedVersion = saved.ImplementedVersion; note = ""; editing = false; confirmDiscard = false; }
+        notice = $"Propunerea {saved.Number} este acum „{saved.State}” (versiunea {saved.ImplementedVersion}).";
+        await LoadAsync();
+    }, "Starea nu a putut fi salvată.");
 
     private Task SaveStateAsync() => RunAsync(async () =>
     {

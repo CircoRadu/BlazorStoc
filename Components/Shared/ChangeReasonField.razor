@@ -3,9 +3,9 @@
 @if (AutoText is null)
 {
     <label class="change-reason-field @CssClass" for="@Id">
-        <span>Motivare modificare *</span>
+        <span>Motivare modificare@(Optional ? " (opțional)" : " *")</span>
         <textarea id="@Id" rows="3" maxlength="@ChangeReasonRules.MaximumLength" disabled="@Disabled"
-                  value="@Value" @oninput="ValueInputAsync" aria-required="true" aria-describedby="@DescriptionId"></textarea>
+                  value="@Value" @oninput="ValueInputAsync" aria-required="@(Optional ? "false" : "true")" aria-describedby="@DescriptionId"></textarea>
         <small id="@DescriptionId">@(Hint ?? "Descrie motivul editării sau al ștergerii. Informația va fi păstrată în jurnalul de activitate.")</small>
         @if (Error is not null) { <span class="validation-message" role="alert">@Error</span> }
     </label>
@@ -39,6 +39,8 @@ else
     [Parameter] public string CssClass { get; set; } = "full-width";
     // Another explanation under the field (the plain field only), for an operation that is neither an edit nor a deletion.
     [Parameter] public string? Hint { get; set; }
+    // The reason may stay empty (the plain field only): an update of the application, where the journal then says that no reason was given.
+    [Parameter] public bool Optional { get; set; }
     // Not null: the field offers the choice between this generated text (one change on each line) and a text written by the user.
     [Parameter] public string? AutoText { get; set; }
     [Parameter] public bool UseAuto { get; set; } = true;

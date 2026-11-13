@@ -70,6 +70,7 @@
                                 <td>@BugReportRules.Display(item.CreatedUtc)</td><td>@item.FileCount</td>
                                 <td class="row-actions">
                                     <button type="button" class="row-icon view" aria-label="Deschide raportul @item.Number" title="Deschide raportul @item.Number" @onclick="() => OpenAsync(item)"></button>
+                                    @if (canEdit && item.State != BugReportRules.StateResolved) { <button type="button" class="row-icon check" disabled="@busy" aria-label="Marchează raportul @item.Number ca rezolvat" title="Marchează raportul @item.Number ca rezolvat" @onclick="() => ResolveRowAsync(item)"></button> }
                                     @if (canEdit) { <button type="button" class="row-icon edit" aria-label="Editează raportul @item.Number" title="Editează raportul @item.Number" @onclick="() => OpenAsync(item, true)"></button> }
                                     @if (canExport) { <button type="button" class="row-icon export" aria-label="Exportă raportul @item.Number" title="Exportă raportul @item.Number (ZIP)" disabled="@busy" @onclick="() => ExportRowAsync(item)"></button> }
                                     @if (canEdit) { <button type="button" class="row-icon delete" aria-label="Șterge raportul @item.Number" title="Șterge raportul @item.Number" @onclick="() => AskDelete(item)"></button> }
@@ -342,6 +343,15 @@
         }
         finally { busy = false; }
     }
+
+    // One click from the list: the report becomes "Rezolvat" (the version it is resolved in is the running one, set by the service) and keeps its administrator note.
+    private Task ResolveRowAsync(BugReport report) => RunAsync(async () =>
+    {
+        var saved = await Reports.ChangeStateAsync(report.Id, BugReportRules.StateResolved, report.AdminNote, lifetime.Token);
+        if (opened?.Id == saved.Id) { opened = saved; newState = saved.State; note = saved.AdminNote; editing = false; confirmDiscard = false; }
+        notice = $"Raportul {saved.Number} este acum „{saved.State}”.";
+        await LoadAsync();
+    }, "Starea nu a putut fi salvată.");
 
     private Task SaveStateAsync() => RunAsync(async () =>
     {

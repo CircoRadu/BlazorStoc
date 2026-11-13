@@ -514,3 +514,14 @@ Pasi:
 | 2 | Apasa "Actualizeaza cu notificare utilizatori" | Bannerul cu numaratoare apare pentru toti, butonul "Anuleaza actualizarea" merge, la sfarsit aplicatia se actualizeaza | |
 | 3 | Pe alt pachet apasa "Actualizare imediata" | Nu apare banner la alti utilizatori, nu exista numaratoare; actualizarea porneste pe loc | |
 | 4 | Deschide Jurnal activitate | Intrarea "Actualizare aplicatie" cu motivul; la cea imediata, "Porneste in: imediat, fara anunt" | |
+
+## Modificari de testat: fereastra de anunt al actualizarii (13.11.2026)
+
+**Ce s-a adaugat:** la o actualizare cu anunt, ceilalti utilizatori conectati primesc o fereastra deasupra paginii si a oricarei ferestre deschise.
+**Ce face acum:** "Am inteles" si "Inchide" o inchid, actualizarea continua; "Am nevoie de mai mult timp" intrerupe actualizarea pentru toti, iar cel care a pornit-o primeste mesajul "Actualizare intrerupta" cu numele utilizatorului. Cel care porneste actualizarea nu primeste avertizarea.
+
+| Nr | Pas | Rezultat asteptat | OK |
+|----|-----|-------------------|----|
+| 1 | Cu doi utilizatori conectati, porneste o actualizare cu anunt (alt pachet) | Al doilea utilizator vede fereastra cu numaratoare; primul nu | |
+| 2 | La al doilea apasa "Am nevoie de mai mult timp" | Ferestrele se inchid; primul vede "Actualizare intrerupta, utilizatorul X are nevoie de mai mult timp" | |
+| 3 | Jurnal activitate | Intrare "Intrerupere actualizare aplicatie" cu numele utilizatorului | |

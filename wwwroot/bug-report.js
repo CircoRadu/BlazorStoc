@@ -65,8 +65,8 @@
     };
 
     // The computed style of an element as text (cssText of a computed style is empty in current browsers).
-    const computedText = (element) => {
-        const style = getComputedStyle(element);
+    const computedText = (element, pseudo) => {
+        const style = getComputedStyle(element, pseudo);
         let text = "";
         for (let i = 0; i < style.length; i++) text += `${style[i]}:${style.getPropertyValue(style[i])};`;
         return text;
@@ -92,6 +92,7 @@
             const jobs = [];
             const swaps = [];
             const wraps = [];
+            const details = [];
             let hasPopup = false;
             // Every element carries its computed style, so the picture does not depend on re-running the selectors, the viewport units or the fixed positions of the page.
             clone.setAttribute("style", computedText(body));
@@ -108,8 +109,31 @@
                 else if (source instanceof HTMLCanvasElement) { try { swaps.push([target, source.toDataURL("image/png"), source]); } catch { /* tainted */ } }
                 else if (source instanceof HTMLImageElement) jobs.push(inlineImage(target, source));
                 if ((source.scrollTop > 0 || source.scrollLeft > 0) && source.children.length > 0) wraps.push([target, source.scrollLeft, source.scrollTop]);
+                if (source instanceof HTMLDetailsElement || (source instanceof HTMLElement && source.tagName === "SUMMARY")) details.push([target, source]);
             }
             await Promise.all(jobs);
+            // BUG-0035: inside the picture a <details>/<summary> is drawn with the browser's own disclosure layout, which ignores the flex layout of the section headings (the
+            // buttons fell under the title and were cut). They become plain blocks that carry the computed style; a closed <details> keeps only its <summary>.
+            for (const [target, source] of details) {
+                const block = document.createElement("div");
+                if (source.tagName === "SUMMARY") block.classList.add("bug-cap-summary");
+                for (const attribute of Array.from(target.attributes)) if (attribute.name !== "open") block.setAttribute(attribute.name, attribute.value);
+                const closed = source instanceof HTMLDetailsElement && !source.open;
+                for (const child of Array.from(target.childNodes)) {
+                    if (closed && !(child instanceof Element && child.tagName === "SUMMARY")) continue;
+                    block.appendChild(child);
+                }
+                // The ::before of the summary (the chevron) cannot follow the element into a div, so it becomes a real element with the same computed style.
+                if (source.tagName === "SUMMARY") {
+                    const before = getComputedStyle(source, "::before");
+                    if (before.content && before.content !== "none" && before.content !== "normal") {
+                        const mark = document.createElement("span");
+                        mark.setAttribute("style", computedText(source, "::before"));
+                        block.insertBefore(mark, block.firstChild);
+                    }
+                }
+                target.replaceWith(block);
+            }
             for (const [target, url, source] of swaps) {
                 const img = document.createElement("img");
                 img.setAttribute("src", url);
@@ -122,19 +146,20 @@
                 while (target.firstChild) wrapper.appendChild(target.firstChild);
                 target.appendChild(wrapper);
             }
-            clone.querySelectorAll("script,noscript,dialog:not([open]),#bug-dialog,#proposal-dialog,iframe,#blazor-error-ui").forEach((node) => node.remove());
+            clone.querySelectorAll("script,noscript,dialog:not([open]),#bug-dialog,#proposal-dialog,iframe,#blazor-error-ui,#bug-wait").forEach((node) => node.remove());
             if (hasPopup) {
                 const dim = document.createElement("div");
                 dim.setAttribute("style", "position:fixed;left:0;top:0;right:0;bottom:0;background:rgba(0,0,0,.45);z-index:2147482999");
                 clone.appendChild(dim);
             }
             const style = document.createElement("style");
-            style.textContent = collectCss();
+            // BUG-0037: the headings of the sections are one line by design; in the picture (browser zoom, rasterising) a few pixels more made the counter and the last words fall under the title.
+            style.textContent = collectCss() + ".bug-cap-summary, .bug-cap-summary * { white-space: nowrap !important; }";
             const root = document.createElement("div");
             root.className = "bug-cap-root";
             const theme = document.documentElement.getAttribute("data-theme");
             if (theme) root.setAttribute("data-theme", theme);
-            root.setAttribute("style", `width:${width}px;height:${height}px;overflow:hidden;position:relative`);
+            root.setAttribute("style", `width:${width}px;height:${height}px;overflow:hidden;position:relative;background:${getComputedStyle(document.body).backgroundColor}`);
             root.appendChild(style);
             root.appendChild(clone);
             root.setAttribute("xmlns", "http://www.w3.org/1999/xhtml");
@@ -179,6 +204,22 @@
         bug: { attribute: "[data-bug-open]", dialog: "bug-dialog", reference: () => state.ref },
         proposal: { attribute: "[data-proposal-open]", dialog: "proposal-dialog", reference: () => state.proposalRef }
     };
+    // The message shown while the picture of the page is made (a polite status, no focus change).
+    const waitNotice = (text) => {
+        document.getElementById("bug-wait")?.remove();
+        const box = document.createElement("div");
+        box.id = "bug-wait";
+        box.setAttribute("role", "status");
+        box.setAttribute("style", "position:fixed;left:50%;bottom:32px;transform:translateX(-50%);z-index:2147483600;max-width:min(90vw,520px);padding:12px 18px;border-radius:10px;background:#192d31;color:#fff;font-size:14px;line-height:1.4;box-shadow:0 8px 30px rgba(0,0,0,.3);display:flex;align-items:center;gap:10px");
+        const spin = document.createElement("span");
+        spin.setAttribute("style", "width:14px;height:14px;flex:none;border:2px solid rgba(255,255,255,.4);border-top-color:#fff;border-radius:50%;animation:bug-wait-spin .8s linear infinite");
+        const style = document.createElement("style");
+        style.textContent = "@keyframes bug-wait-spin{to{transform:rotate(360deg)}}";
+        box.append(style, spin, document.createTextNode(text));
+        document.body.appendChild(box);
+        return box;
+    };
+
     document.addEventListener("click", async (event) => {
         const origin = event.target instanceof Element ? event.target : null;
         const kind = origin && origin.closest(kinds.proposal.attribute) ? kinds.proposal : origin && origin.closest(kinds.bug.attribute) ? kinds.bug : null;
@@ -188,8 +229,12 @@
         const dialog = document.getElementById(kind.dialog);
         if (!(dialog instanceof HTMLDialogElement) || dialog.open || target.dataset.busy === "1") return;
         target.dataset.busy = "1";
+        let notice = null;
         try {
-            const shot = await capturePage();
+            const pending = capturePage();
+            // The picture is made first (1-2 s on a big page): a message tells the user what is going on until the window opens. It is added after the page was copied, so it is not in the picture.
+            notice = waitNotice(kind === kinds.proposal ? "Se pregătește fereastra de propunere… Se face captura paginii." : "Se pregătește fereastra de raportare… Se face captura paginii.");
+            const shot = await pending;
             const info = environment();
             const reference = kind.reference();
             if (reference) {
@@ -198,7 +243,7 @@
                 } catch (error) { remember(`Fereastra nu a raspuns: ${error}`); }
             }
             if (!dialog.open) dialog.showModal();
-        } finally { delete target.dataset.busy; }
+        } finally { delete target.dataset.busy; notice?.remove(); }
     });
 
     document.addEventListener("paste", async (event) => {

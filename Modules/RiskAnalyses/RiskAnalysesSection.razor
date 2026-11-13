@@ -141,6 +141,14 @@
 
     private void Toggle(int analysisId) { if (!expanded.Remove(analysisId)) expanded.Add(analysisId); }
 
+    // Called by the parent (the "add risk analysis" icon of a work point row): opens the form with that work point chosen.
+    public void OpenAddFor(int workPointId)
+    {
+        if (!CanManage || Locked) return;
+        OpenAdd(workPointId);
+        StateHasChanged();
+    }
+
     private void OpenAdd(int workPointId) { adding = true; editing = renewing = null; presetWorkPointId = workPointId; editorKey = Guid.NewGuid(); notice = error = null; }
     private void OpenEdit(RiskAnalysisView view) { adding = false; renewing = null; editing = view; editorKey = Guid.NewGuid(); notice = error = null; }
     private Task CloseEditorAsync() { adding = false; editing = null; return Task.CompletedTask; }

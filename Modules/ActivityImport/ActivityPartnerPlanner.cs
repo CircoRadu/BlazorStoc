@@ -249,7 +249,7 @@ public static class ActivityPartnerPlanner
     // Active / closed are kept as a note, never as a deletion.
     internal static string Description(ActivityWorkPointRow point)
     {
-        var notes = new List<string> { $"Preluat din ActivityApp (punct {point.Id})." };
+        var notes = new List<string> { "Preluat din ActivityApp." };
         if (point.Closed == true) notes.Add("Marcat „sistat” în ActivityApp.");
         if (point.Active == false) notes.Add("Marcat inactiv în ActivityApp.");
         return string.Join(' ', notes);

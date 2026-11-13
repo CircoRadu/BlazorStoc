@@ -41,7 +41,7 @@ public static class AuditFilterOptions
         (AuditActions.ModuleDisabled, AuditActions.ModuleDisabled), (AuditActions.ModuleRecovered, AuditActions.ModuleRecovered),
         (AuditActions.ModuleRetry, AuditActions.ModuleRetry), (AuditActions.ModuleManualStop, AuditActions.ModuleManualStop),
         (AuditActions.ModuleManualStart, AuditActions.ModuleManualStart), (AuditActions.ApplicationUnexpectedStop, AuditActions.ApplicationUnexpectedStop),
-        (AuditActions.ApplicationUpdate, AuditActions.ApplicationUpdate), (AuditActions.ApplicationUpdateCancelled, AuditActions.ApplicationUpdateCancelled),
+        (AuditActions.ApplicationUpdate, AuditActions.ApplicationUpdate), (AuditActions.ApplicationUpdateCancelled, AuditActions.ApplicationUpdateCancelled), (AuditActions.ApplicationUpdateInterrupted, AuditActions.ApplicationUpdateInterrupted),
         (AuditActions.ApplicationUpdateSucceeded, AuditActions.ApplicationUpdateSucceeded), (AuditActions.ApplicationUpdateInstaller, AuditActions.ApplicationUpdateInstaller),
         (AuditActions.ApplicationUpdateFailed, AuditActions.ApplicationUpdateFailed), (AuditActions.ApplicationUpdateRefused, AuditActions.ApplicationUpdateRefused),
         (AuditActions.ApplicationRollback, AuditActions.ApplicationRollback), (AuditActions.ApplicationUpdateAcknowledged, AuditActions.ApplicationUpdateAcknowledged),

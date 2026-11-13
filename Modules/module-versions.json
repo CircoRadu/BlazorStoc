@@ -1,8 +1,8 @@
 {
     "modules":  {
                     "ActivityImport":  {
-                                           "version":  "0.19.5",
-                                           "hash":  "0d87d9787500c51ccd65f22d43765322dbc81dd7a2a96bd7fb330116d478b2de",
+                                           "version":  "0.19.7",
+                                           "hash":  "fbf245dbe1feb2f118309d836604c07191f5fe269dbdf83a6d68bed675083134",
                                            "history":  [
                                                            {
                                                                "version":  "0.1.0",
@@ -153,6 +153,16 @@
                                                                "version":  "0.19.5",
                                                                "date":  "12.11.2026",
                                                                "note":  "BUG-0028: notificarile de tichete si beneficiari de validat duc la Notificari, nu la Mentenanta/Beneficiari"
+                                                           },
+                                                           {
+                                                               "version":  "0.19.6",
+                                                               "date":  "13.11.2026",
+                                                               "note":  "Nota punctelor de lucru preluate nu mai contine numarul punctului ActivityApp"
+                                                           },
+                                                           {
+                                                               "version":  "0.19.7",
+                                                               "date":  "13.11.2026",
+                                                               "note":  "Listele goale din Notificari (tichete, beneficiari, probleme) au mesaj descriptiv; tabul Probleme import arata numarul"
                                                            }
                                                        ]
                                        },
@@ -210,8 +220,8 @@
                                                   ]
                                   },
                     "Invoices":  {
-                                     "version":  "1.1.6",
-                                     "hash":  "0498b3fa89297b5691dcb938afb274e0724e318c058f11d237cb9b682b928a91",
+                                     "version":  "1.2.0",
+                                     "hash":  "77aee552f180facca41a35acbce134fae58964a4832e5e513866777f6925f5ec",
                                      "history":  [
                                                      {
                                                          "version":  "1.0.0",
@@ -252,12 +262,17 @@
                                                          "version":  "1.1.6",
                                                          "date":  "11.11.2026",
                                                          "note":  "Listele se ordoneaza din antet si retin ordonarea in sesiune (BUG-0018)"
+                                                     },
+                                                     {
+                                                         "version":  "1.2.0",
+                                                         "date":  "13.11.2026",
+                                                         "note":  "Lista de sabloane salvate are pictograma de export: ZIP cu definitia sablonului si factura model, daca serverul o pastreaza"
                                                      }
                                                  ]
                                  },
                     "Journal":  {
-                                    "version":  "1.6.1",
-                                    "hash":  "2715c2e7d189665ca4eabf04503c7277711e4cbef9483a67df835d3ec361695f",
+                                    "version":  "1.6.2",
+                                    "hash":  "65b950da703baa7b116b1a7259150ad73b5f6d97514bbabaa2f1fa494071e547",
                                     "history":  [
                                                     {
                                                         "version":  "1.0.0",
@@ -438,6 +453,11 @@
                                                         "version":  "1.6.1",
                                                         "date":  "11.11.2026",
                                                         "note":  "Filtrul jurnalului cunoaste entitatea Preluare stoc ESPStoc si operatiile punctului zero"
+                                                    },
+                                                    {
+                                                        "version":  "1.6.2",
+                                                        "date":  "13.11.2026",
+                                                        "note":  "Filtrul jurnalului are actiunea Intrerupere actualizare aplicatie"
                                                     }
                                                 ]
                                 },
@@ -598,8 +618,8 @@
                                                     ]
                                     },
                     "Notifications":  {
-                                          "version":  "1.6.3",
-                                          "hash":  "a67854c66b0f73b0280345c6c01d77b8f9d0f4e0ebcb866c5d1be516fba83135",
+                                          "version":  "1.6.4",
+                                          "hash":  "c5305d3f119ff9b64b944a54277eff7d2ff98f24880f6f273062be69fe7095ed",
                                           "history":  [
                                                           {
                                                               "version":  "1.0.0",
@@ -675,6 +695,11 @@
                                                               "version":  "1.6.3",
                                                               "date":  "12.11.2026",
                                                               "note":  "BUG-0030: Deschide obiectul deschide tab-ul de validare chiar daca adresa e cea deschisa"
+                                                          },
+                                                          {
+                                                              "version":  "1.6.4",
+                                                              "date":  "13.11.2026",
+                                                              "note":  "Tabul Probleme import arata numarul problemelor deschise"
                                                           }
                                                       ]
                                       },
@@ -748,8 +773,8 @@
                                                        ]
                                        },
                     "RiskAnalyses":  {
-                                         "version":  "1.3.4",
-                                         "hash":  "ec259043fb69091efc93ed9f87189b82bf8fbc665f6c62aa554b0198c3dba69d",
+                                         "version":  "1.3.5",
+                                         "hash":  "12e7f95236966fcea55a50a609312a2a3bc7b21d66ffee78c6ad30cea08de4a4",
                                          "history":  [
                                                          {
                                                              "version":  "1.0.0",
@@ -810,6 +835,11 @@
                                                              "version":  "1.3.4",
                                                              "date":  "11.11.2026",
                                                              "note":  "Listele se ordoneaza din antet si retin ordonarea in sesiune (BUG-0018)"
+                                                         },
+                                                         {
+                                                             "version":  "1.3.5",
+                                                             "date":  "13.11.2026",
+                                                             "note":  "Sectiunea poate deschide formularul unei analize noi pentru un punct de lucru, la cererea paginii beneficiarului (pictograma de pe randul punctului de lucru)"
                                                          }
                                                      ]
                                      },
@@ -871,8 +901,8 @@
                                                  ]
                                  },
                     "Elcomtur":  {
-                                     "version":  "1.3.3",
-                                     "hash":  "96b18b8a8b2c1051b827de1938e512d463754dcff605dc0ace35652c3b68a629",
+                                     "version":  "1.3.4",
+                                     "hash":  "95333f24a1ae498e4404afd500de48ac3b95cd79e308592e1475c8d19940f0d2",
                                      "history":  [
                                                      {
                                                          "version":  "1.0.0",
@@ -913,12 +943,17 @@
                                                          "version":  "1.3.3",
                                                          "date":  "11.11.2026",
                                                          "note":  "Listele se ordoneaza din antet si retin ordonarea in sesiune (BUG-0018)"
+                                                     },
+                                                     {
+                                                         "version":  "1.3.4",
+                                                         "date":  "13.11.2026",
+                                                         "note":  "Lista goala de balante restante are mesaj descriptiv"
                                                      }
                                                  ]
                                  },
                     "BugReports":  {
-                                       "version":  "1.4.3",
-                                       "hash":  "24bd256166a737f5038d1015f136607dc98ab923f455301d05678f66b8dd70a7",
+                                       "version":  "1.4.5",
+                                       "hash":  "09939aedf2d2ab57c32dc2664c8adc2c50986f00e393aeadd916190ec937ebc0",
                                        "history":  [
                                                        {
                                                            "version":  "1.0.0",
@@ -984,6 +1019,16 @@
                                                            "version":  "1.4.3",
                                                            "date":  "11.11.2026",
                                                            "note":  "Listele se ordoneaza din antet si retin ordonarea in sesiune (BUG-0018)"
+                                                       },
+                                                       {
+                                                           "version":  "1.4.4",
+                                                           "date":  "13.11.2026",
+                                                           "note":  "Lista de raporte din Notificari arata toate raporturile nerezolvate (Nou, In analiza); un raport rezolvat sau respins dispare"
+                                                       },
+                                                       {
+                                                           "version":  "1.4.5",
+                                                           "date":  "13.11.2026",
+                                                           "note":  "Tabul Bugs arata numarul si cand este 0"
                                                        }
                                                    ]
                                    },
@@ -1059,8 +1104,8 @@
                                               ]
                               },
                     "Proposals":  {
-                                      "version":  "1.4.1",
-                                      "hash":  "47b460891c6235e5a5b79d09788c3c840ed0bd42b5467291e548e2063ce207b8",
+                                      "version":  "1.5.3",
+                                      "hash":  "fabfe59a93b569df7da9244b532e4aec76565d9ea662cdd15b9038c4b535bb89",
                                       "history":  [
                                                       {
                                                           "version":  "1.0.0",
@@ -1116,6 +1161,26 @@
                                                           "version":  "1.4.1",
                                                           "date":  "11.11.2026",
                                                           "note":  "Listele se ordoneaza din antet si retin ordonarea in sesiune (BUG-0018)"
+                                                      },
+                                                      {
+                                                          "version":  "1.5.0",
+                                                          "date":  "13.11.2026",
+                                                          "note":  "Lista de propuneri din Setari are pictograma de implementare: un clic trece propunerea in Implementata in versiunea curenta, fara sa deschizi editarea"
+                                                      },
+                                                      {
+                                                          "version":  "1.5.1",
+                                                          "date":  "13.11.2026",
+                                                          "note":  "Alertele din Notificari nu mai includ propunerile inchise (implementate, amanate, respinse), nici pentru autor"
+                                                      },
+                                                      {
+                                                          "version":  "1.5.2",
+                                                          "date":  "13.11.2026",
+                                                          "note":  "Fereastra de propunere arata ca a pastrat o ciorna nesalvata si ofera pornirea unei propuneri noi"
+                                                      },
+                                                      {
+                                                          "version":  "1.5.3",
+                                                          "date":  "13.11.2026",
+                                                          "note":  "Zona propunerii urmeaza pagina curenta, si cu o ciorna pastrata, daca nu a fost scrisa de mana"
                                                       }
                                                   ]
                                   },

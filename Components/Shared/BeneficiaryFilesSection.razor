@@ -2,6 +2,7 @@
 @inject IEntityFileStore Store
 @inject IAccessControl Access
 @inject IJSRuntime JS
+@inject EntityFileChanges FileChanges
 @inject ILogger<BeneficiaryFilesSection> Logger
 @implements IDisposable
 
@@ -9,7 +10,7 @@
    and risk analyses (each with a link to its section; they are changed in their own section). Collapsed by default. *@
 <section class="catalog" id="beneficiary-files-section">
     <details class="catalog-collapse"><summary class="catalog-heading"><h2>Fișiere beneficiar <span>@items.Count</span></h2>
-        <span class="heading-actions"><HelpButton Topic="beneficiari-fisiere" About="Fișierele beneficiarului" />
+        <span class="heading-actions">
         @if (CanManage) { <button type="button" class="refresh act-confirm" disabled="@busy" @onclick="OpenAdd">+ Adaugă fișier</button> }</span>
     </summary>
     @if (error is not null) { <div class="error-banner" role="alert">@error</div> }
@@ -105,10 +106,19 @@
 
     protected override async Task OnInitializedAsync()
     {
+        FileChanges.Changed += FilesChangedElsewhere;
         CanManage = await Access.HasAsync("beneficiari.edit");
         await LoadAsync();
         loading = false;
     }
+
+    // A work point, contract, intervention or risk analysis panel changed a file: the table is read again (it is shown without reloading the page).
+    private void FilesChangedElsewhere() => _ = InvokeAsync(async () =>
+    {
+        if (lifetime.IsCancellationRequested) return;
+        await LoadAsync();
+        StateHasChanged();
+    });
 
     private async Task LoadAsync()
     {
@@ -205,5 +215,5 @@
         await Changed.InvokeAsync();
     }
 
-    public void Dispose() { lifetime.Cancel(); lifetime.Dispose(); }
+    public void Dispose() { FileChanges.Changed -= FilesChangedElsewhere; lifetime.Cancel(); lifetime.Dispose(); }
 }

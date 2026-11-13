@@ -7,7 +7,7 @@
 @if (developer)
 {
     <ModuleGate ModuleId="@BugReportsModule.ModuleId" Notice="false">
-        <button type="button" role="tab" id="tab-bugs" class="settings-tab @(Active ? "active" : "") @(total > 0 ? "needs-attention" : "")" aria-selected="@(Active ? "true" : "false")" aria-controls="panel-notifications" @onclick="Select">Bugs @if (total > 0) { <span class="count-badge">@total</span> }</button>
+        <button type="button" role="tab" id="tab-bugs" class="settings-tab @(Active ? "active" : "") @(total > 0 ? "needs-attention" : "")" aria-selected="@(Active ? "true" : "false")" aria-controls="panel-notifications" @onclick="Select">Bugs <span class="count-badge">@total</span></button>
     </ModuleGate>
 }
 

@@ -263,8 +263,8 @@ public static partial class UpdateEngineChecks
         var report = await page.UploadAsync(newer);
         check(report is { CanInstall: true, Version: "3.1.0", Running: "3.0.0" } && File.Exists(Path.Combine(world.Layout.StagedFolder, report.Package)) && report.Sha256 == Sha(newer),
             "Update page: the package is stored, the updater checks it and the page gets the report of the file it stored");
-        var noReason = await ThrowsAsync(() => page.Service.ConfirmAsync(report.Id, "  "));
-        check(noReason && page.Audit.Entries.Count == 0 && page.Coordinator.Current is null, "Update page: without a reason nothing is journaled and nothing is scheduled");
+        var noReason = await ThrowsAsync(() => page.Service.ConfirmAsync(report.Id, new string('x', ChangeReasonRules.MaximumLength + 1)));
+        check(noReason && page.Audit.Entries.Count == 0 && page.Coordinator.Current is null, "Update page: a reason that is too long is refused, nothing is journaled and nothing is scheduled");
         var strangerReport = await page.UploadAsync(await world.PackAsync(keysOther, "3.2.0"));
         check(strangerReport is { CanInstall: false, Blocking: "untrusted" } && await ThrowsAsync(() => page.Service.ConfirmAsync(strangerReport.Id, "motiv")) && page.Audit.Entries.Count == 0,
             "Update page: a package that cannot be installed cannot be confirmed");
@@ -279,6 +279,30 @@ public static partial class UpdateEngineChecks
             && announced.RequestedBy == "admin.test", "Update page: confirming journals \"Actualizare aplicație\" with the reason under the administrator's name and tells the users");
         check(await ThrowsAsync(() => slow.Service.ConfirmAsync(slowReport.Id, "inca o data")), "Update page: a second update cannot be scheduled while one waits");
         check(await slow.Service.CancelAsync() && slow.Coordinator.Current is null && slow.Audit.Entries.Last().Action == AuditActions.ApplicationUpdateCancelled, "Update page: the administrator can cancel during the notice, and the cancellation is journaled");
+        // The reason is optional (BUG: the administrator may leave it empty): the journal says that none was given.
+        var emptyPage = new Page(world, notice: TimeSpan.FromMilliseconds(600));
+        var emptyReport = await emptyPage.UploadAsync(newer);
+        await emptyPage.Service.ConfirmAsync(emptyReport.Id, "  ");
+        check(emptyPage.Audit.Entries.Single().Motif == ApplicationUpdateService.NoReasonGiven, "Update page: an update without a reason is accepted and the journal says that no reason was given");
+        await emptyPage.Service.CancelAsync();
+
+        // "Am nevoie de mai mult timp": a user stops the update during the notice; the one who started it is told until he takes note; the journal names the user.
+        var moreTime = new Page(world, notice: TimeSpan.FromSeconds(30));
+        var moreReport = await moreTime.UploadAsync(newer);
+        await moreTime.Service.ConfirmAsync(moreReport.Id, "de probat");
+        var stopped = moreTime.Coordinator.RequestMoreTime("ana");
+        check(stopped is { InterruptedBy: "ana", RequestedBy: "admin.test" } && moreTime.Coordinator.Current is null && moreTime.Coordinator.LastInterruption == stopped,
+            "Update notice: 'more time' stops the update and remembers who asked and who started it");
+        moreTime.Coordinator.AcknowledgeInterruption("altcineva");
+        check(moreTime.Coordinator.LastInterruption is not null, "Update notice: only the one who started the update clears the message");
+        moreTime.Coordinator.AcknowledgeInterruption("Admin.Test");
+        check(moreTime.Coordinator.LastInterruption is null && moreTime.Coordinator.RequestMoreTime("bob") is null, "Update notice: after taking note the message is gone, and with nothing waiting 'more time' does nothing");
+        var moreTime2 = new Page(world, notice: TimeSpan.FromSeconds(30));
+        var moreReport2 = await moreTime2.UploadAsync(newer);
+        await moreTime2.Service.ConfirmAsync(moreReport2.Id, "de probat");
+        var viaService = await moreTime2.Service.RequestMoreTimeAsync();
+        check(viaService is not null && moreTime2.Audit.Entries.Last().Action == AuditActions.ApplicationUpdateInterrupted && moreTime2.Coordinator.Current is null,
+            "Update notice: the service journals the interruption with the user who asked");
         await Task.Delay(900);
         check(world.Host.Calls.Count(call => call == "stop") == 0 && world.Layout.Current == "3.0.0" && !Directory.EnumerateFiles(world.Layout.StagedFolder, "request-*").Any(),
             "Update page: after a cancellation nothing is asked of the updater (the application is not stopped)");
@@ -396,8 +420,7 @@ public static partial class UpdateEngineChecks
         panel.WaitForState(() => panel.FindAll("#update-report").Count == 1, TimeSpan.FromSeconds(10));
         check(panel.Find("#update-verdict").TextContent.Contains("Poate fi instalat") && panel.Markup.Contains("5.0.0 → 5.1.0") && panel.Markup.Contains("nicio migrare nouă") && panel.Markup.Contains("Linia unu")
             && panel.FindAll("#update-confirm-title").Count == 1, "Update screen: after the upload the page shows the report: versions, signer, schema, notes and the confirmation");
-        panel.Find("#update-confirm-title").ParentElement!.QuerySelector("button.danger")!.Click();
-        check(panel.Markup.Contains("validation-message") && page.Coordinator.Current is null, "Update screen: without a reason the update is not scheduled and the field says why");
+        check(panel.Markup.Contains("Motivare modificare (opțional)") && page.Coordinator.Current is null, "Update screen: the reason of the update is optional and the field says so");
         panel.Find("#update-reason").Input("din test");
         panel.Find("#update-confirm-title").ParentElement!.QuerySelector("button.danger")!.Click();
         panel.WaitForState(() => panel.FindAll("#update-scheduled").Count == 1, TimeSpan.FromSeconds(5));
@@ -407,6 +430,28 @@ public static partial class UpdateEngineChecks
         var banner = context.Render<UpdateBanner>();
         check(banner.FindAll("#update-notice").Count == 1 && banner.Find("#update-notice").TextContent.Contains("5.1.0") && banner.Find("#update-notice").TextContent.Contains("salvează ce lucrezi"),
             "Update banner: every user is told that the application is about to stop for the update");
+        // The window of the notice: not for the one who started the update; for another user it has the three buttons.
+        context.JSInterop.SetupVoid("blazorStocUpdateNotice.show", _ => true).SetVoidResult();
+        var starterNotice = context.Render<UpdateNoticeDialog>();
+        check(starterNotice.FindAll("#update-notice-dialog").Count == 0, "Update notice window: the user who started the update does not get it");
+        using (var other = new Bunit.TestContext())
+        {
+            other.JSInterop.Mode = Bunit.JSRuntimeMode.Loose;
+            other.Services.AddSingleton(page.Installation);
+            other.Services.AddSingleton<IUpdateLauncher>(page.Launcher);
+            other.Services.AddSingleton(page.Journal);
+            other.Services.AddSingleton(page.Coordinator);
+            other.Services.AddSingleton<IAccessControl>(new TestAccessControl(true, "ana"));
+            other.Services.AddSingleton<IAuditTrail>(page.Audit);
+            other.Services.AddSingleton<TimeProvider>(TimeProvider.System);
+            other.Services.AddScoped(_ => page.Service);
+            var otherNotice = other.Render<UpdateNoticeDialog>();
+            check(otherNotice.FindAll("#update-notice-dialog").Count == 1 && otherNotice.Find("#update-notice-dialog").TextContent.Contains("admin.test") && otherNotice.Find("#update-notice-dialog").TextContent.Contains("5.1.0")
+                && otherNotice.FindAll("#update-notice-understood").Count == 1 && otherNotice.FindAll("#update-notice-close").Count == 1 && otherNotice.FindAll("#update-notice-more-time").Count == 1,
+                "Update notice window: another user gets the window with 'Am înțeles', 'Închide' and 'Am nevoie de mai mult timp'");
+            otherNotice.Find("#update-notice-understood").Click();
+            check(otherNotice.FindAll("#update-notice-dialog").Count == 0 && page.Coordinator.Current is not null, "Update notice window: 'Am înțeles' closes it and the update goes on");
+        }
         panel.Find("#update-scheduled button.act-close").Click();
         panel.WaitForState(() => panel.FindAll("#update-scheduled").Count == 0, TimeSpan.FromSeconds(5));
         banner.WaitForState(() => banner.FindAll("#update-notice").Count == 0, TimeSpan.FromSeconds(5));

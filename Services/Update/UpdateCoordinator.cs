@@ -37,6 +37,9 @@ public sealed class ScheduledTaskLauncher(UpdateInstallation installation) : IUp
 /// <summary>An update that was confirmed and is waiting for its hour (Launched = false) or is running (the application is about to stop, or already did).</summary>
 public sealed record UpdateAnnouncement(string Id, string From, string To, DateTime StartsUtc, string RequestedBy, bool Launched, bool Immediate = false);
 
+/// <summary>A user asked for more time while the notice ran: the update was stopped. The one who started it is told (until he takes note), the others are not.</summary>
+public sealed record UpdateInterruption(string UpdateId, string From, string To, string RequestedBy, string InterruptedBy, DateTime AtUtc);
+
 /// <summary>
 /// The one update of the application that may be waiting or running (a singleton shared by every session). Confirming an update does not stop the application at once: every user is told
 /// (the banner reads <see cref="Current"/>) and the updater is asked only after the notice time. Until then the administrator may still cancel. After it was started, this object watches
@@ -53,6 +56,8 @@ public sealed class UpdateCoordinator(UpdateInstallation installation, IUpdateLa
     public TimeSpan WatchLimit { get; init; } = TimeSpan.FromMinutes(45);
 
     public UpdateAnnouncement? Current { get; private set; }
+    /// <summary>The last update stopped by a user who needs more time; stays until the one who started that update takes note of it (see <see cref="AcknowledgeInterruption"/>).</summary>
+    public UpdateInterruption? LastInterruption { get; private set; }
     /// <summary>Why the updater could not be started the last time (shown on the page).</summary>
     public string? LastError { get; private set; }
     public event Action? Changed;
@@ -78,6 +83,36 @@ public sealed class UpdateCoordinator(UpdateInstallation installation, IUpdateLa
 
     /// <summary>Tells every open session to look again (a failure was acknowledged: the banner of the other administrators goes away too).</summary>
     public void Notify() => Changed?.Invoke();
+
+    /// <summary>
+    /// A user (not the one who started the update) asks for more time during the notice: the update is stopped, every session is told, and the one who started it gets
+    /// <see cref="LastInterruption"/>. Null when nothing could be stopped (no update waiting, an immediate one, or the updater was already asked: too late).
+    /// </summary>
+    public UpdateInterruption? RequestMoreTime(string user)
+    {
+        UpdateInterruption interruption;
+        lock (sync)
+        {
+            if (Current is not { Launched: false, Immediate: false } waiting) return null;
+            interruption = new UpdateInterruption(waiting.Id, waiting.From, waiting.To, waiting.RequestedBy, user, clock.GetUtcNow().UtcDateTime);
+            cancellation?.Cancel();
+            Current = null;
+            LastInterruption = interruption;
+        }
+        Changed?.Invoke();
+        return interruption;
+    }
+
+    /// <summary>The one who started the interrupted update took note: the message goes away.</summary>
+    public void AcknowledgeInterruption(string user)
+    {
+        lock (sync)
+        {
+            if (LastInterruption is not { } last || !string.Equals(last.RequestedBy, user, StringComparison.OrdinalIgnoreCase)) return;
+            LastInterruption = null;
+        }
+        Changed?.Invoke();
+    }
 
     /// <summary>Gives up while the notice time runs. False when there was nothing to cancel or the updater was already asked.</summary>
     public bool Cancel()

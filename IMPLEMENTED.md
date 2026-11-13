@@ -1002,3 +1002,5 @@ Cerut de utilizator la 06.10.2026 (verificarea fluxului, apoi deciziile: facturi
 - 0.5.79: BUG-0028 (notificarile de validat duc in Notificari), BUG-0029 (titlul containerului de discardate cu badge).
 - 0.5.80: BUG-0030 ("Deschide obiectul" deschide tab-ul de validare in aceeasi pagina).
 - 0.5.81: BUG-0031 (drag and drop al randurilor din Folosite, `notes-order.js`), PROP-0022 (linii "Arondat: nume" in descrierea punctului de lucru).
+
+- 13.11.2026 - Versiunile 0.5.82-0.5.86 si anunt de actualizare cu fereastra: PROP-0023..0032, BUG-0032..0043 (fisiere beneficiar live, iconite pe punctele de lucru, export sablon, taburi in fisa beneficiarului, taburi Notificari cu numar, captura paginii in raport) si fereastra "Aplicatia se actualizeaza" pentru ceilalti utilizatori (Am inteles / Inchide / Am nevoie de mai mult timp = intrerupe actualizarea, mesaj pentru cel care a pornit-o, jurnal "Intrerupere actualizare aplicatie"; modulul Jurnal 1.6.2). Motivul la actualizare este optional.

@@ -13,7 +13,7 @@
         <p class="muted"><small>Aici apar tichetele, beneficiarii și punctele de lucru pe care importul din ActivityApp nu le-a putut prelua, cu motivul. Majoritatea dispar singure la importul următor, după ce corectezi datele în ActivityApp; „Marchează rezolvată” scoate din listă o problemă pe care ai tratat-o.</small></p>
         @if (error is not null) { <div class="error-banner" role="alert">@error</div> }
         @if (issues is null) { <p class="muted" role="status">Se citește lista…</p> }
-        else if (issues.Count == 0) { <p class="muted" id="ai-issues-empty">Nu sunt probleme deschise.</p> }
+        else if (issues.Count == 0) { <div class="empty-state" id="ai-issues-empty"><span class="empty-icon">✓</span><h3>Nicio problemă deschisă</h3><p>Aici apar problemele găsite la preluarea din ActivityApp (de exemplu parteneri sau puncte de lucru care lipsesc ori au fost șterse în sursă), până când sunt rezolvate.</p></div> }
     </div>
     @if (issues is { Count: > 0 })
     {

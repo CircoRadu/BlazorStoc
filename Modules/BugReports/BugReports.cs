@@ -225,7 +225,7 @@ public sealed class MariaBugReportService(IConfiguration configuration, IAccessC
         return (clauses.Count == 0 ? "" : "WHERE " + string.Join(" AND ", clauses), parameters);
     }
 
-public async Task<IReadOnlyList<BugReportAlert>> GetAlertsAsync(CancellationToken cancellationToken = default)    {        if (!await access.HasAsync("setari-bug-raport.view", cancellationToken).ConfigureAwait(false)) return [];        var page = await QueryAsync(new BugReportQuery(State: BugReportRules.StateNew), 1, 100, cancellationToken).ConfigureAwait(false);        return [.. page.Items.Select(report => new BugReportAlert(report, "Raport nou"))];    }
+public async Task<IReadOnlyList<BugReportAlert>> GetAlertsAsync(CancellationToken cancellationToken = default)    {        if (!await access.HasAsync("setari-bug-raport.view", cancellationToken).ConfigureAwait(false)) return [];        var page = await QueryAsync(new BugReportQuery(Closed: false), 1, 100, cancellationToken).ConfigureAwait(false);        return [.. page.Items.Select(report => new BugReportAlert(report, report.State == BugReportRules.StateNew ? "Raport nou" : $"Stare: {report.State}"))];    }
     public async Task<BugReportPage> QueryAsync(BugReportQuery query, int page, int pageSize, CancellationToken cancellationToken = default)
     {
         await access.EnsureAsync("setari-bug-raport.view", cancellationToken).ConfigureAwait(false);

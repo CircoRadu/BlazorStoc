@@ -42,7 +42,7 @@
     }
     @if (queues.CanTickets || queues.CanBeneficiaries)
     {
-        <button type="button" role="tab" id="tab-issues" class="settings-tab @(validationTab == "issues" ? "active" : "")" aria-selected="@(validationTab == "issues" ? "true" : "false")" aria-controls="panel-notifications" @onclick="() => OpenIssues()">Probleme import</button>
+        <button type="button" role="tab" id="tab-issues" class="settings-tab @(validationTab == "issues" ? "active" : "")" aria-selected="@(validationTab == "issues" ? "true" : "false")" aria-controls="panel-notifications" @onclick="() => OpenIssues()">Probleme import <span class="count-badge">@queues.Issues</span></button>
     }
     <ElcomturBalancesTab Active="@(validationTab == "balances")" Selected="OpenBalances" />
     <MaintenanceIncompleteTab Active="@(validationTab == "incomplete")" Selected="OpenIncomplete" />

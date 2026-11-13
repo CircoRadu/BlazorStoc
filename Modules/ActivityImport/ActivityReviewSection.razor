@@ -17,7 +17,7 @@
         @if (outcomes.Failed > 0) { <div class="error-banner" role="alert" id="ai-outcomes-failed">@outcomes.Failed tichete decise au fost refuzate de registrul de mentenanță la înregistrare (de exemplu data sau punctul de lucru nu mai sunt valide).</div> }
         @if (error is not null && popup == Popup.None) { <div class="error-banner" role="alert">@error</div> }
         @if (items is null) { <p class="muted" role="status">Se citește lista…</p> }
-        else if (items.Count == 0) { <p class="muted" id="ai-review-empty">Nu sunt evenimente de validat.</p> }
+        else if (items.Count == 0) { <div class="empty-state" id="ai-review-empty"><span class="empty-icon">✓</span><h3>Niciun tichet de validat</h3><p>Aici apar tichetele rezolvate din ActivityApp care așteaptă validarea ta înainte să intre în Mentenanță.</p></div> }
     </div>
     @if (items is { Count: > 0 })
     {

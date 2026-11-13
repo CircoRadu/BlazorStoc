@@ -93,7 +93,7 @@
                         <fieldset class="module-stop-confirm" aria-labelledby="update-confirm-title">
                             <legend id="update-confirm-title">Aplici actualizarea la versiunea @report.Version?</legend>
                             <p>„Actualizează cu notificare utilizatori”: utilizatorii sunt anunțați și, după @((int)Updates.Notice.TotalSeconds) de secunde, aplicația se oprește pentru actualizare; până atunci poți anula. „Actualizare imediată”: actualizarea pornește acum, fără anunț și fără întârziere.</p>
-                            <div class="editor-grid"><ChangeReasonField Id="update-reason" @bind-Value="reason" Error="@reasonError" Disabled="busy" Hint="Scrie de ce actualizezi (de exemplu corecție de erori, funcție nouă cerută). Motivul este păstrat în jurnalul de activitate." /></div>
+                            <div class="editor-grid"><ChangeReasonField Id="update-reason" Optional="true" @bind-Value="reason" Error="@reasonError" Disabled="busy" Hint="Poți scrie de ce actualizezi (de exemplu corecție de erori, funcție nouă cerută); dacă îl lași gol, jurnalul notează „fără motiv indicat”. Motivul este păstrat în jurnalul de activitate." /></div>
                             <div class="editor-actions">
                                 <button class="danger" type="button" disabled="@busy" @onclick="() => ConfirmAsync(false)">@(busy ? "Se programează…" : "Actualizează cu notificare utilizatori")</button>
                                 <button class="danger" type="button" id="update-immediate" disabled="@busy" title="Pornește actualizarea acum, fără anunț în banner și fără întârziere." @onclick="() => ConfirmAsync(true)">Actualizare imediată</button>
@@ -253,7 +253,7 @@
     private async Task ConfirmAsync(bool immediate)
     {
         if (report is null) return;
-        reasonError = ChangeReasonRules.ValidationError(reason);
+        reasonError = ChangeReasonRules.Normalize(reason).Length == 0 ? null : ChangeReasonRules.ValidationError(reason);
         if (reasonError is not null) return;
         error = notice = null;
         busy = true;

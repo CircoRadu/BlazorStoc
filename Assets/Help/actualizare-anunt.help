@@ -1,0 +1,19 @@
+# Anunțul unei actualizări a aplicației
+Cautare: actualizare anunt notificare mai mult timp intrerupere opreste aplicatia
+
+Când un administrator pornește o actualizare cu notificare, ceilalți utilizatori conectați primesc această fereastră. Cel care a pornit actualizarea primește fereastra doar dacă altcineva cere mai mult timp.
+
+## Elemente
+### Fereastra de anunț
+- Titlul și textul | text | Versiunea la care se actualizează aplicația, cine a pornit actualizarea și câte secunde au rămas până se oprește aplicația.
+- Am înțeles | buton | Închide fereastra; actualizarea continuă.
+- Închide | buton | Închide fereastra; actualizarea continuă.
+- Am nevoie de mai mult timp | buton | Oprește actualizarea pentru toți; fereastra se închide la toți utilizatorii, iar cel care a pornit actualizarea este anunțat cine are nevoie de mai mult timp. Faptul rămâne în jurnalul de activitate.
+### Fereastra „Actualizare întreruptă”
+- Mesajul | text | Spune ce utilizator are nevoie de mai mult timp; contactează-l înainte să reprogramezi actualizarea.
+- Închide | buton | Închide mesajul.
+
+## Flux: Cum ceri mai mult timp
+1. Când apare fereastra, salvează ce lucrezi.
+2. Dacă nu ești gata, apasă „Am nevoie de mai mult timp”: actualizarea se oprește.
+3. Altfel apasă „Am înțeles” și așteaptă; pagina se reîncarcă singură când aplicația revine.

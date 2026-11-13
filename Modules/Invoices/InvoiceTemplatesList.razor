@@ -47,6 +47,7 @@ else
                     @if (info.SupplierId is null) { <button type="button" class="row-icon link" disabled="@saving" title="Leagă șablonul de un furnizor" aria-label="@($"Leagă șablonul {info.Name} de un furnizor")" @onclick="() => LinkAsync(info)"></button> }
                     <button type="button" class="row-icon view" title="@(open ? "Ascunde detaliile șablonului" : "Arată detaliile șablonului")" aria-label="@(open ? "Ascunde detaliile șablonului" : "Arată detaliile șablonului")" aria-expanded="@(open ? "true" : "false")" @onclick="() => ToggleDetails(info.Id)"></button>
                     <button type="button" class="row-icon edit" disabled="@saving" title="Editează șablonul (elementele, denumirea și furnizorul)" aria-label="Editează șablonul" @onclick="() => EditAsync(template)"></button>
+                    <button type="button" class="row-icon export" disabled="@saving" title="Exportă șablonul (ZIP; cu factura model, dacă există)" aria-label="@($"Exportă șablonul {info.Name}")" @onclick="() => ExportAsync(template)"></button>
                     @if (isAdmin) { <button type="button" class="row-icon delete" disabled="@saving" title="Șterge șablonul" aria-label="Șterge șablonul" @onclick="() => deleting = info"></button> }
                 </td>
             </tr>
@@ -255,7 +256,58 @@ else
         finally { deleteBusy = false; }
     }
 
+    // Export (PROP-0027): a ZIP with the definition of the template (sablon.json) and, when the server keeps the example invoice the template was made from, that file too.
+    private async Task ExportAsync(InvoiceTemplateRecord template)
+    {
+        if (saving) return;
+        saving = true; error = notice = null;
+        try
+        {
+            var info = template.Info;
+            var model = await Service.GetModelAsync(info.Id, lifetime.Token);
+            var folder = SafeName(info.Name);
+            using var buffer = new MemoryStream();
+            using (var zip = new System.IO.Compression.ZipArchive(buffer, System.IO.Compression.ZipArchiveMode.Create, leaveOpen: true))
+            {
+                AddEntry(zip, folder + "/sablon.json", System.Text.Encoding.UTF8.GetBytes(InvoiceTemplateJson.Serialize(template.Definition)));
+                var lines = new[] { $"Șablon: {info.Name}", $"Furnizor: {info.SupplierName}", $"CUI: {info.SupplierCui}", $"Format: {(template.Definition.IsXml ? "XML" : "PDF")}",
+                    $"Activ: {(info.Active ? "da" : "nu")}", $"Actualizat: {Stamp(info.UpdatedUtc)} ({info.UpdatedBy})", $"Factură model: {(model is null ? "nu este păstrată pe server" : model.FileName)}" };
+                AddEntry(zip, folder + "/informatii.txt", System.Text.Encoding.UTF8.GetBytes(string.Join(Environment.NewLine, lines) + Environment.NewLine));
+                if (model is { Content.Length: > 0 }) AddEntry(zip, folder + "/" + SafeName(model.FileName), model.Content);
+            }
+            buffer.Position = 0;
+            var fileName = $"Sablon-{folder}.zip";
+            downloads ??= await JS.InvokeAsync<IJSObjectReference>("import", "./file-download.js");
+            using var reference = new DotNetStreamReference(buffer);
+            await downloads.InvokeVoidAsync("downloadBinary", fileName, reference, "application/zip");
+            notice = model is null ? $"Fișierul {fileName} a fost descărcat (șablonul, fără factură model)." : $"Fișierul {fileName} a fost descărcat (șablonul și factura model).";
+        }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (Exception exception) when (exception is InvoiceTemplateOperationException or AccessDeniedException) { error = exception.Message; }
+        catch (Exception exception)
+        {
+            Logger.LogError("Invoice template export failed ({ErrorType}).", exception.GetType().Name);
+            error = "Șablonul nu a putut fi exportat. Reîncearcă.";
+        }
+        finally { saving = false; }
+    }
+
+    private static void AddEntry(System.IO.Compression.ZipArchive zip, string path, byte[] content)
+    {
+        var entry = zip.CreateEntry(path, System.IO.Compression.CompressionLevel.Optimal);
+        using var stream = entry.Open();
+        stream.Write(content, 0, content.Length);
+    }
+
+    private static string SafeName(string name)
+    {
+        var clean = new string((name ?? "").Select(c => Path.GetInvalidFileNameChars().Contains(c) || c == '/' ? '_' : c).ToArray()).Trim();
+        return clean.Length == 0 ? "sablon" : clean.Length > 80 ? clean[..80] : clean;
+    }
+
+    private IJSObjectReference? downloads;
+
     private void CancelDelete() { deleting = null; deleteError = null; }
 
-    public void Dispose() { lifetime.Cancel(); lifetime.Dispose(); }
+    public void Dispose() { lifetime.Cancel(); lifetime.Dispose(); _ = downloads?.DisposeAsync(); }
 }

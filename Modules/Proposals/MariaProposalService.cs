@@ -459,7 +459,7 @@ public sealed class MariaProposalService(IConfiguration configuration, IAccessCo
         var alerts = new List<ProposalAlert>();
         await using var connection = await MariaDb.OpenAsync(configuration, cancellationToken).ConfigureAwait(false);
         // The author: the state changed or the administrator answered after the author last opened the proposal.
-        await using (var mine = new MySqlCommand($"SELECT {Columns} FROM proposals p WHERE p.user_name=@user AND p.updated_utc<>'' AND p.updated_utc>p.author_seen_utc ORDER BY p.updated_utc DESC LIMIT 100", connection))
+        await using (var mine = new MySqlCommand($"SELECT {Columns} FROM proposals p WHERE p.user_name=@user AND p.updated_utc<>'' AND p.updated_utc>p.author_seen_utc AND p.state NOT IN ('Implementată','Amânată','Respinsă') ORDER BY p.updated_utc DESC LIMIT 100", connection))
         {
             mine.Parameters.AddWithValue("@user", user);
             foreach (var proposal in await ReadAllAsync(mine, cancellationToken).ConfigureAwait(false))

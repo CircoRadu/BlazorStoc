@@ -454,3 +454,7 @@ Actualizare 04.11.2026 (branch Elcomtur): versiunea 0.5.38, schema 62. Modul nou
 ## Ultimul lucru facut (11.11.2026): versiunea 0.5.73
 
 - Antete unitare si ordonare din antet cu memorare pe sesiune (BUG-0018, `SortTh` + `Paged`), titlul/numarul tichetului din orice coloana (BUG-0019), fara taburi in raportul de eroare (BUG-0020), descarcarea pachetelor de backup (PROP-0020). Puncte de lucru arondate (migrarea 88) intrate in 0.5.72/0.5.73. Ramas: Sorts pe celelalte liste paginate, mutarea ordonarii vechi (miscari, taskuri) pe SortTh; help si capturi in docs/HELP_DE_REGENERAT.md.
+
+## Ultimul lucru facut (13.11.2026): versiunile 0.5.82-0.5.86 + fereastra de anunt al actualizarii
+- 0.5.82-0.5.86: PROP-0023..0032 si BUG-0032..0043 (detalii in Assets/Data/changelog.txt). BUG-0035/0037 (captura paginii) imbunatatit, neconfirmat de utilizator; BUG-0032 nereprodus.
+- Nepachetat inca (dupa 0.5.86): UpdateNoticeDialog (Components/Shared) + update-notice.js; UpdateCoordinator.RequestMoreTime/LastInterruption/AcknowledgeInterruption; ApplicationUpdateService.RequestMoreTimeAsync; actiunea de jurnal "Intrerupere actualizare aplicatie". Verificat cu teste bUnit si pornirea paginii, nu cu o actualizare programata reala. Help: topic actualizare-anunt (fara captura), de regenerat conform docs/HELP_DE_REGENERAT.md.

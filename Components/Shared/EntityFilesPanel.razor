@@ -1,5 +1,6 @@
 @using BlazorStoc.Services
 @inject IEntityFileStore Store
+@inject EntityFileChanges FileChanges
 @inject ILogger<EntityFilesPanel> Logger
 @implements IDisposable
 
@@ -129,6 +130,7 @@
         finally { uploading = false; }
         if (problems.Count > 0) error = string.Join(" ", problems);
         await LoadAsync();
+        FileChanges.Notify();
         await Changed.InvokeAsync();
     }
 
@@ -152,6 +154,7 @@
         }
         finally { busy = false; }
         await LoadAsync();
+        FileChanges.Notify();
         await Changed.InvokeAsync();
     }
 
@@ -181,6 +184,7 @@
         }
         finally { busy = false; }
         await LoadAsync();
+        FileChanges.Notify();
         await Changed.InvokeAsync();
     }
 

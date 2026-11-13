@@ -67,6 +67,7 @@ public static partial class MariaExtendedChecks
             Check(reopened.ImplementedVersion.Length == 0 && reopened.DecidedUtc is null, "Proposal: the version is kept only for Implementată");
             await boss.ChangeStateAsync(proposal.Id, ProposalRules.StateImplemented, "0.5.99", "");
             Check(await boss.CountOpenAsync() == openBefore - 1, "Proposal: a closed proposal leaves the count of the badge");
+            Check((await authorAlerts.GetAlertsAsync()).All(alert => alert.Proposal.Id != proposal.Id) && (await boss.GetAlertsAsync()).All(alert => alert.Proposal.Id != proposal.Id), "Proposal: a closed (implemented) proposal is no longer an alert, not even for its author (PROP-0029)");
 
             var closedPage = await boss.QueryAsync(new ProposalQuery(User: "proba.propune", Closed: true), 1, 10);
             var openPage = await boss.QueryAsync(new ProposalQuery(User: "proba.propune", Closed: false), 1, 10);

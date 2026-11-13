@@ -61,6 +61,11 @@
         else
         {
             <p class="muted bug-intro">Spune-ne ce ai vrea să se schimbe sau ce ai vrea să poți face. Fereastra păstrează ce ai scris dacă o închizi; propunerea pleacă doar când apeși <strong>Trimite propunerea</strong>. O pot vedea toți utilizatorii (textul), iar imaginile doar tu și administratorii.</p>
+            @if (draftKept)
+            {
+                <div class="success-banner" role="status" id="proposal-draft-note">Fereastra a păstrat ciorna ta nesalvată (propunerea nu a fost trimisă).
+                    <span class="editor-actions"><button type="button" class="refresh act-nav" id="proposal-draft-new" @onclick="StartFresh">Începe o propunere nouă</button></span></div>
+            }
             <div class="editor-grid bug-form">
                 <label>Tip
                     <select id="proposal-kind" @bind="kind" disabled="@busy">
@@ -71,7 +76,7 @@
                         @foreach (var item in ProposalRules.Importances) { <option value="@item">@item</option> }
                     </select></label>
                 <label class="wide">Zona aplicației
-                    <input id="proposal-area" maxlength="300" @bind="areaTitle" @bind:event="oninput" disabled="@busy" placeholder="Pagina sau modulul la care se referă; lasă „Toată aplicația” dacă e general" /></label>
+                    <input id="proposal-area" maxlength="300" value="@areaTitle" @oninput="AreaTyped" disabled="@busy" placeholder="Pagina sau modulul la care se referă; lasă „Toată aplicația” dacă e general" /></label>
                 <label class="wide">Titlu scurt
                     <input id="proposal-title-input" maxlength="@ProposalRules.MaxTitle" @bind="title" @bind:event="oninput" @bind:after="SearchSimilarAsync" disabled="@busy" placeholder="Ex.: Căutare după CUI în lista de furnizori" /></label>
                 @if (similar.Count > 0)
@@ -160,7 +165,7 @@
     private readonly List<PendingImage> images = [];
     private DotNetObjectReference<ProposalDialog>? self;
     private string tab = "new", kind = ProposalRules.KindChange, importance = ProposalRules.ImportanceMedium, title = "", description = "", benefit = "", areaTitle = "", areaRoute = "", boardText = "", newNote = "";
-    private bool busy, capturedAuto = true, confirmDiscard, onlyOpen = true, canAnswer;
+    private bool busy, capturedAuto = true, confirmDiscard, onlyOpen = true, canAnswer, draftKept;
     private string? error;
     private Proposal? sent, viewing;
     private IReadOnlyList<Proposal>? mine, board;
@@ -199,7 +204,8 @@
     [JSInvokable]
     public async Task Opened(IJSStreamReference? screenshot, string pageRoute, string pageName, string tech)
     {
-        if (areaTitle.Length == 0 || sent is not null) { areaRoute = pageRoute; areaTitle = PageArea(pageName); }
+        // BUG-0036: the area is the page the window was opened from; a kept draft follows the page too, unless the user wrote the area by hand.
+        if (areaTitle.Length == 0 || sent is not null || !areaTyped) { areaRoute = pageRoute; areaTitle = PageArea(pageName); areaTyped = false; }
         images.RemoveAll(item => item.Kind == ReportImageRules.KindScreenshot);
         capturedAuto = false;
         if (screenshot is not null)
@@ -216,6 +222,8 @@
             catch (Exception exception) when (exception is not OperationCanceledException) { Logger.LogWarning("The capture of the page could not be read ({ErrorType}).", exception.GetType().Name); }
         }
         if (sent is not null) ResetForm();
+        // BUG-0039: a draft that was closed with "Închide (păstrează ciorna)" (or whose sending was refused) is still in the form: the window says so and offers a clean start.
+        draftKept = sent is null && (title.Length > 0 || description.Length > 0 || benefit.Length > 0);
         viewing = null; zoomedUrl = null; annotating = null; tab = "new"; error = null; confirmDiscard = false;
         await InvokeAsync(StateHasChanged);
     }
@@ -392,12 +400,16 @@
 
     private void ResetForm(bool keepSent = false)
     {
+        draftKept = false;
         title = description = benefit = ""; kind = ProposalRules.KindChange; importance = ProposalRules.ImportanceMedium; confirmDiscard = false; similar = [];
         images.RemoveAll(item => item.Kind != ReportImageRules.KindScreenshot || keepSent);
         if (!keepSent) sent = null;
     }
 
     private void NewProposal() { sent = null; ResetForm(); error = null; }
+    private bool areaTyped;
+    private void AreaTyped(ChangeEventArgs args) { areaTitle = args.Value?.ToString() ?? ""; areaTyped = true; }
+    private void StartFresh() { ResetForm(); draftKept = false; error = null; }
 
     private void AskDiscard()
     {

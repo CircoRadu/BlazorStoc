@@ -13,7 +13,7 @@ public sealed class NotificationsModule : IModule
 
     public string Id => ModuleId;
     public string Name => "Notificări";
-    public Version Version { get; } = new(1, 6, 3);
+    public Version Version { get; } = new(1, 6, 4);
     // The menu entry has a warning triangle driven by the count; it stays in MainLayout and is shown only while the module works.
     public IReadOnlyList<ModuleNavItem> Nav { get; } = [];
 

@@ -434,6 +434,7 @@ public static class AuditActions
     // the history of the updater at the next start, also for an update made by the installer on the server) and the administrator taking note of a failed one.
     public const string ApplicationUpdate = "Actualizare aplicație";
     public const string ApplicationUpdateCancelled = "Anulare actualizare aplicație";
+    public const string ApplicationUpdateInterrupted = "Întrerupere actualizare aplicație";
     public const string ApplicationUpdateSucceeded = "Actualizare reușită";
     public const string ApplicationUpdateInstaller = "Actualizare aplicație (installer)";
     public const string ApplicationUpdateFailed = "Actualizare eșuată";

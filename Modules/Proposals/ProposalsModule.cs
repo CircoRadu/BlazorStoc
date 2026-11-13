@@ -10,7 +10,7 @@ public sealed class ProposalsModule : IModule
 
     public string Id => ModuleId;
     public string Name => "Propuneri";
-    public Version Version { get; } = new(1, 4, 1);
+    public Version Version { get; } = new(1, 5, 3);
     // The entry is written in MainLayout (it opens a popup, it is not a page), so the module has no NavItems.
     public IReadOnlyList<ModuleNavItem> Nav { get; } = [];
 
