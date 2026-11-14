@@ -231,9 +231,10 @@ var offContract = await contracts.CreateAsync(beneficiaryRecords[3].Id, new Serv
 });
 await contracts.DeactivateAsync(offContract.Contract);
 
+var demoAnalyzer = await new MariaRiskAnalyzerRepository(configuration, admin, audit).CreateAsync("Ing. Cătălin Moraru", "Analizor de demonstrație.");
 // Risk analyses: one valid, one that expires soon (so the list and the renewal window have something to show).
-await riskAnalyses.CreateAsync(beneficiaryRecords[0].Id, new RiskAnalysisInput { WorkPointId = workPointRecords[0].Id, Number = "RA-0142", Author = "Ing. Cătălin Moraru", InitialDate = Ago(120), ValidityMonths = 24, Notes = "Analiză de risc la securitate fizică." }, false);
-await riskAnalyses.CreateAsync(beneficiaryRecords[1].Id, new RiskAnalysisInput { WorkPointId = workPointRecords[2].Id, Number = "RA-0097", Author = "Ing. Cătălin Moraru", InitialDate = Ago(700), ValidityMonths = 24, Notes = "De reînnoit în curând." }, false);
+await riskAnalyses.CreateAsync(beneficiaryRecords[0].Id, new RiskAnalysisInput { WorkPointId = workPointRecords[0].Id, Number = "RA-0142", AnalyzerId = demoAnalyzer.Id, InitialDate = Ago(120), ValidityMonths = 24, Notes = "Analiză de risc la securitate fizică." }, false);
+await riskAnalyses.CreateAsync(beneficiaryRecords[1].Id, new RiskAnalysisInput { WorkPointId = workPointRecords[2].Id, Number = "RA-0097", AnalyzerId = demoAnalyzer.Id, InitialDate = Ago(700), ValidityMonths = 24, Notes = "De reînnoit în curând." }, false);
 
 // Entries without an invoice yet (the supplier will send it): they wait in "Intrări fără factură".
 foreach (var (code, quantity, daysAgo, supplier) in new[] { ("PIR-DUAL-WL", 10, 6, 0), ("SIRENA-EXT-SOL", 4, 5, 0), ("ACUM-12V-18AH", 6, 2, 3) })
@@ -261,7 +262,7 @@ var colourParameter = await parameterRepository.AddParameterAsync(specialCameras
 foreach (var value in new[] { "alb", "negru" }) await parameterRepository.AddValueAsync(colourParameter.Id, value);
 
 // Risk analyses of the first beneficiary: an old one that was switched off, and a renewal in the history (so the list shows "Arată și analizele Off", the points without an active analysis, the undo of a renewal).
-var offAnalysis = await riskAnalyses.CreateAsync(beneficiaryRecords[0].Id, new RiskAnalysisInput { WorkPointId = workPointRecords[1].Id, Number = "RA-0118", Author = "Ing. Cătălin Moraru", InitialDate = Ago(400), ValidityMonths = 24, Notes = "Analiză veche, înlocuită." }, false);
+var offAnalysis = await riskAnalyses.CreateAsync(beneficiaryRecords[0].Id, new RiskAnalysisInput { WorkPointId = workPointRecords[1].Id, Number = "RA-0118", AnalyzerId = demoAnalyzer.Id, InitialDate = Ago(400), ValidityMonths = 24, Notes = "Analiză veche, înlocuită." }, false);
 await riskAnalyses.DeactivateAsync(offAnalysis.Analysis);
 var hotelAnalysis = (await riskAnalyses.GetForBeneficiaryAsync(beneficiaryRecords[0].Id)).First(view => view.Analysis.Number == "RA-0142");
 await riskAnalyses.RenewAsync(hotelAnalysis.Analysis, new RiskAnalysisRenewalInput { Date = Ago(10), Notes = "Reînnoire periodică." });

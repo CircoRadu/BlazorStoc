@@ -6,6 +6,10 @@ Captura: oprit | /setari | click Module; click sel:label.row-toggle[title*='Vehi
 
 Pagina principală este punctul de plecare: fiecare placă deschide o secțiune a aplicației. Vezi doar plăcile pentru care ai drept de acces. Ajutorul se deschide din meniul „Ajutor”, din placa „Ajutor” sau din iconița din bara de sus, iar în orice fereastră de ajutor ai o **căutare în tot ajutorul** și cuprinsul ferestrelor.
 
+**Ferestrele peste pagină**: se mută de antet (tragere) și se redimensionează din colțul dreapta-jos (dublu-clic = resetare); bara cu „Raportează o eroare”, „Propune o modificare” și închidere are loc propriu deasupra panoului, iar pe ecran îngust butoanele sunt iconițe rotunde.
+**Bara de sus**: arată ruta paginii (Meniu principal › secțiune › subsecțiune › pagină); numele utilizatorului conectat deschide meniul (Autentificatorul meu, Schimbă parola, Deconectare); „Raportează o eroare” și „Propune o modificare” se află tot aici.
+**Tabele**: antetul tuturor tabelelor are același stil; în listele paginate (Beneficiari, Utilizatori, Notificări, Balanțe Elcomtur) poți ordona din antet (clic: crescător, descrescător, ordinea inițială), iar mărimea paginii și ordonarea se rețin cât ține deschis tabul browserului.
+
 ## Elemente
 ### Plăcile secțiunilor
 - Produse și stocuri | placă | Deschide catalogul de produse. Poate arăta numărul produselor de regularizat (stoc negativ).

@@ -10,6 +10,8 @@ Fereastra pentru un act adițional la un contract de mentenanță: numărul și 
 - Ce modifică actul | comutatoare | Valabilitate, ciclicitate, puncte acoperite, alte clauze.
 - Înainte → După | text | Ce se schimbă în contract la salvare.
 - Salvează și aplică | buton | Salvează actul și aplică efectul.
+### Noutăți
+- Data de referință, Componente | comutator | Comutatoarele noi spun ce modifică actul; panoul de componente On/Off, verificarea intervențiilor și scadențele propuse apar în fereastră.
 
 ## Flux: Cum adaug un act adițional
 1. Scrie numărul și data actului.

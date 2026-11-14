@@ -187,7 +187,17 @@ app.MapPost("/api/elcomtur/incarcare", async (HttpContext context, BlazorStoc.Mo
     catch (BlazorStoc.Modules.ModuleUnavailableException) { return Results.StatusCode(StatusCodes.Status503ServiceUnavailable); }
     catch (AccessDeniedException) { return Results.Forbid(); }
 }).RequireAuthorization(PermissionPolicy.For(BlazorStoc.Modules.Elcomtur.ElcomturImportService.ImportKey));
-app.MapGet("/api/backup/{fileName}", async (string fileName, IBackupDownloadService downloads, CancellationToken token) =>
+// The address ANAF sends the administrator back to after the sign-in (registered at ANAF as the redirect address of the application).
+app.MapGet(AnafAuthRules.CallbackPath, async (string? code, string? state, string? error, IAnafAuthService auth, CancellationToken token) =>
+{
+    var target = $"/setari?{SettingsNavigation.TabParameter}=anaf&{SettingsNavigation.SubtabParameter}=factura&anafauth=";
+    if (!string.IsNullOrEmpty(error)) return Results.Redirect(target + "refuzat");
+    try { await auth.CompleteAsync(code, state, token); return Results.Redirect(target + "ok"); }
+    catch (AnafException) { return Results.Redirect(target + "eroare"); }
+    catch (BlazorStoc.Modules.ModuleUnavailableException) { return Results.StatusCode(StatusCodes.Status503ServiceUnavailable); }
+    catch (AccessDeniedException) { return Results.Forbid(); }
+}).RequireAuthorization(PermissionPolicy.For("setari-anaf.edit"));
+app.MapGet("/api/backup/{fileName}",async (string fileName, IBackupDownloadService downloads, CancellationToken token) =>
 {
     try
     {

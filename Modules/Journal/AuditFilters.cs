@@ -157,7 +157,9 @@ public static class AuditFilterOptions
         (AuditActions.ActivateSystemType, AuditActions.ActivateSystemType), (AuditActions.DeactivateSystemType, AuditActions.DeactivateSystemType),
         (AuditActions.MoveSystemType, AuditActions.MoveSystemType), (AuditActions.AddSystemTypeAlias, AuditActions.AddSystemTypeAlias),
         (AuditActions.RemoveSystemTypeAlias, AuditActions.RemoveSystemTypeAlias),
-        (AuditActions.DeleteAnafVersion, AuditActions.DeleteAnafVersion), (AuditActions.ActivateAnafVersion, AuditActions.ActivateAnafVersion)
+        (AuditActions.DeleteAnafVersion, AuditActions.DeleteAnafVersion), (AuditActions.ActivateAnafVersion, AuditActions.ActivateAnafVersion),
+        (AuditActions.EditAnafAuthSettings, AuditActions.EditAnafAuthSettings), (AuditActions.ConnectAnafAuth, AuditActions.ConnectAnafAuth),
+        (AuditActions.RefreshAnafAuth, AuditActions.RefreshAnafAuth), (AuditActions.DisconnectAnafAuth, AuditActions.DisconnectAnafAuth)
     ];
 }
 

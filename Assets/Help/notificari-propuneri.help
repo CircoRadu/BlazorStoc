@@ -5,6 +5,8 @@ Cautare: notificari propuneri propunere noua raspuns stare schimbata autor admin
 
 Fila cu propunerile care cer atenția ta: propuneri noi (pentru administrator) și schimbările de stare sau răspunsurile la propunerile tale. Fila se colorează în roșu cât timp există ceva de văzut.
 
+Propunerile se văd numai dezvoltatorilor.
+
 ## Elemente
 ### Lista de propuneri
 - Motiv | coloană | „Propunere nouă”, „Răspuns nou” sau „Stare: …”.

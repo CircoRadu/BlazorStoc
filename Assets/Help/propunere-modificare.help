@@ -1,7 +1,9 @@
 # Propune o modificare
 Cautare: propunere modificare functionalitate noua sugestie imagine captura ctrl v importanta stare raspuns notificari
 
-Fereastra se deschide din meniul din stânga, intrarea „Propune o modificare” de sub „Raportează o eroare”, sau din butonul „Propune” din bara de deasupra oricărei ferestre. Înainte să apară, aplicația fotografiază pagina pe care lucrai și o atașează propunerii ca primă imagine; o poți scoate.
+Fereastra se deschide din bara de sus, butonul „Propune o modificare”, sau din butonul „Propune” din bara de deasupra oricărei ferestre. Înainte să apară, aplicația fotografiază pagina pe care lucrai și o atașează propunerii ca primă imagine; o poți scoate.
+
+„Propune o modificare” se află acum în bara de sus. Fereastra nu mai are file (doar formularul); imaginile se marchează ca la raportarea unei erori. Dacă a rămas o ciornă nesalvată, apare un mesaj cu butonul „Începe o propunere nouă”.
 
 ## Elemente
 ### Propunere nouă

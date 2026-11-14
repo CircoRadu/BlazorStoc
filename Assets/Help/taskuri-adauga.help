@@ -4,6 +4,8 @@ Cautare: task taskuri utilizator beneficiar adauga termen limita stare activ fin
 
 Pagina din meniul Administrare unde dai un task unui utilizator, pe un beneficiar, și vezi taskurile tuturor utilizatorilor, active și finalizate. Un task are titlu, descriere, utilizator, stare (În viitor, În lucru, Finalizat), termen limită opțional și fișiere atașate.
 
+Pagina are tabul „Nepreluate” și un tab pentru fiecare utilizator. Taskurile se ordonează cu mânerul de tragere. Fereastra „Taskuri noi primite” ([[taskuri-noi]]) apare când ai taskuri noi.
+
 ## Elemente
 ### Task nou
 - Beneficiar | listă cu căutare | Scrie o parte din numele sau CUI-ul beneficiarului și alege-l.

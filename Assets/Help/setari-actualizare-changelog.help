@@ -4,6 +4,8 @@ Captura: fereastra | /setari | click Actualizare; wait 1500; click sel:#update-h
 
 Fereastra arată ce a adus fiecare versiune prin care a trecut o actualizare: data versiunii și câte o linie pentru fiecare schimbare, cea mai nouă versiune sus. O deschizi din [[setari-actualizare]], din Istoric, cu iconița de pe rândul actualizării. Nu se schimbă nimic în ea.
 
+Versiunile noi se afișează împărțite pe categorii: „Funcționalități noi” (propunerile implementate, cu numărul PROP-xxxx și o scurtă descriere), „Bugs” (rapoartele rezolvate, cu numărul BUG-xxxx și o scurtă descriere) și „Diverse”. Fiecare categorie are titlul ei. Versiunile vechi rămân afișate ca o listă simplă.
+
 ## Elemente
 ### Conținutul
 - Titlul ferestrei | text | „versiunea X” pentru o actualizare dintr-un singur pas sau „X → Y” când actualizarea a trecut peste mai multe versiuni; atunci se arată changelog-ul tuturor versiunilor din drum. | sel: #update-changelog-title

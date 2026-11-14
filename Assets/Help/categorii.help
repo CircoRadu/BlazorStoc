@@ -10,6 +10,18 @@ Captura: mutare | /categorii | click sel:.category-management-card summary; wait
 
 Aici organizezi catalogul: redenumești categoriile și subcategoriile, muți subcategorii între categorii și definești parametrii obligatori ai produselor dintr-o subcategorie. Produsele asociate urmează automat modificările. Aceeași fereastră se deschide și separat (din formularul de produs al preluării de factură), fără meniul lateral.
 
+**Arbore**: Subcategorii pe oricâte niveluri: copilul moștenește parametrii și etichetele; rândurile sunt indentate, cu culoare de fundal pe nivel și linii de separare; un mesaj de moștenire apare sub tabel.
+
+**Adăugare / editare**: Se fac într-o fereastră; la o subcategorie se editează doar numele (mutarea se face prin tragere).
+
+**Tragere**: O explicație dinamică lângă cursor (verde / roșu) arată dacă poți lăsa elementul; fâșii între categorii. Variante: înainte, după, ca fiu; mutarea duce toată structura. Se refuză: propriul subarbore, depășirea adâncimii, părinte cu produse, nume repetate, valori moștenite pierdute.
+
+**Verificări la mutare**: La mutarea unei subcategorii care își schimbă părinții: definițiile copiate / îmbinate, deciziile de îmbinare, produsele incomplete de acceptat și motivul; are și modul de promovare.
+
+**Transformare în categorie**: Dai un nume nou subcategoriei; urmează verificările și motivul.
+
+**Preia de la copil**: „Preia definiții de la copii” pe subcategoriile cu copii și pe categorii: fereastră în doi pași (alegere; previzualizare cu decizii de îmbinare, produse incomplete, motiv).
+
 ## Elemente
 ### Antet
 - + Adaugă categorie | buton | Deschide formularul de categorie nouă (doar cu dreptul necesar).
@@ -34,6 +46,9 @@ Aici organizezi catalogul: redenumești categoriile și subcategoriile, muți su
 - Parametri obligatori ai subcategoriei | iconita:params | Deschide parametrii obligatori ai subcategoriei.
 - Editează subcategoria | iconita:edit | Redenumește subcategoria sau o mută în altă categorie.
 - Șterge subcategoria goală | iconita:delete | Apare doar la subcategoriile fără produse.
+### Noutăți
+- Adaugă subcategorie copil | iconita:add | Adaugă o subcategorie sub cea aleasă.
+- Parametri și etichete | iconita:params | Pe titlul categoriei: fereastra categoriei (cu nota de moștenire) ([[categorii-parametri]]).
 
 ## Flux: Cum redenumesc o categorie
 1. Apasă iconița „Editează categoria” din antetul categoriei.

@@ -5,6 +5,14 @@ Captura: editare | /beneficiari | click Panoramic Hotel; wait 3000; jsclick sel:
 
 Formularul pentru un punct de lucru al unui beneficiar. Se deschide din fișa beneficiarului. Fotografiile se adaugă după salvarea punctului.
 
+Adăugarea și editarea unui punct de lucru se fac într-o fereastră peste pagină. Harta are un pin care se trage; eticheta pinului arată numele, adresa și coordonatele. Căutarea automată de coordonate după adresă a fost scoasă: coordonatele se introduc manual, iar butonul „Caută în Google Maps” deschide, într-o fereastră separată, o căutare cu adresa precompletată. Hărțile au comutator Hartă / Satelit.
+
+**Caută în Google Maps**: Deschide Google Maps cu adresa punctului, în fereastră separată.
+
+**Hartă / Satelit**: Schimbă fundalul hărții (satelitul se configurează în Setări → Hartă).
+
+**Puncte arondate**: „Puncte de lucru arondate” și „Adaugă/Editează punct arondat”; pinii punctelor arondate apar pe harta mentenanței.
+
 ## Elemente
 ### Câmpuri
 - Nume * | câmp | Numele punctului de lucru.
@@ -18,6 +26,8 @@ Formularul pentru un punct de lucru al unui beneficiar. Se deschide din fișa be
 - Legendă pentru fotografiile alese | câmp | Text opțional pus pe fotografiile pe care le încarci acum. | img: editare | sel: label.photo-caption
 - Alege fotografii | zonă | Alegi sau tragi fotografii JPG, PNG, WebP sau GIF (cel mult 10 MB fiecare și un număr maxim pe punct); se salvează imediat, fără să apeși „Salvează punctul de lucru”. | img: editare | sel: .work-point-photos .file-drop
 - Lista fotografiilor | listă | Miniatura (apasă pentru mărire), numele fișierului, legenda, cine și când a încărcat-o, și „Șterge”. | img: editare | sel: .work-point-photos
+### Noutăți
+- Fișiere atașate | panou | Fișiere (PDF, imagini, Word, Excel, TXT, CSV) cu iconițe de vizualizare (popup), redenumire (extensia rămâne) și ștergere.
 
 ## Flux: Cum adaug un punct de lucru cu fotografii
 1. Completează numele și adresa și apasă „Salvează punctul de lucru”.

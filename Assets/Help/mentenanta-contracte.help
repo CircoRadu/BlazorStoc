@@ -1,9 +1,11 @@
 # Contracte de mentenanță (fișa beneficiarului)
 Cautare: contracte mentenanta contract on off activeaza dezactiveaza expira ciclicitate puncte de lucru scadenta
-Captura: pagina | /beneficiari | click Panoramic Hotel; wait 3000; full | Contractele din fișa beneficiarului
-Captura: off | /beneficiari | click Asociatia de Proprietari; click Arată și contractele Off; wait 800; full | Contractul oprit (Off) afișat în fișa beneficiarului
+Captura: pagina | /beneficiari | click Panoramic Hotel; wait 3000; click sel:#subtab-bf-mentenanta; wait 1500; full | Contractele din fișa beneficiarului
+Captura: off | /beneficiari | click Asociatia de Proprietari; wait 3000; click sel:#subtab-bf-mentenanta; wait 1500; click Arată și contractele Off; wait 800; full | Contractul oprit (Off) afișat în fișa beneficiarului
 
 Secțiunea „Contracte de mentenanță” din fișa beneficiarului: contractele lui, punctele de lucru acoperite și următoarea scadență. Apare doar cât modulul Mentenanță funcționează.
+
+**Pe componente**: În rândul extins: scadențele pe componente și lista actelor adiționale, cu anulare / ștergere.
 
 ## Elemente
 ### Antet
@@ -19,6 +21,9 @@ Secțiunea „Contracte de mentenanță” din fișa beneficiarului: contractele
 - Comutatorul On/Off | comutator | Oprește sau pornește contractul; la pornire se deschide [[mentenanta-contract-activare]]. | img: off | sel: tr.contract-row-off label.row-toggle
 - Editează contractul | iconita:edit | Deschide formularul contractului.
 - Șterge contractul | iconita:delete | Contractul se arhivează împreună cu punctele acoperite; pentru o simplă oprire folosește comutatorul.
+### Noutăți
+- Componente | coloană | Insigne cu componentele acoperite; insigna „Înghețat” pentru contractele incomplete; referința apare sub ciclicitate.
+- Act adițional | iconita:add | Pe rândul contractului: deschide fereastra actului adițional ([[mentenanta-act-aditional]]).
 
 ## Flux: Cum adaug un contract de mentenanță
 1. Apasă „+ Adaugă contract”.

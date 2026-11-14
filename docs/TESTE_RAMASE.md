@@ -939,3 +939,5 @@ Bara ferestrelor template v2 pentru toate dialogurile (0.5.70) (10.11.2026): Ver
 BUG-0021, BUG-0022, BUG-0023 (versiunea 0.5.75) (12.11.2026): Fereastra Tichet exemplu cu date reale ActivityApp (necesita autentificare Windows): de verificat de utilizator.
 
 BUG-0024, informatii obligatorii si format observatii (versiunea 0.5.76) (12.11.2026): Fereastra Tichet exemplu cu date reale ActivityApp (autentificare Windows) si observatiile aldine in Mentenanta: de verificat de utilizator.
+
+Versiunea 0.5.87: ANAF cu sub-taburi (Preluare date firme, E-Factura) si ajutorul actualizat (14.11.2026): Autentificarea reala in ANAF (E-Factura) nu e testata: cere cont ANAF, certificat calificat si o adresa de raspuns HTTPS inregistrata la ANAF; tokenul obtinut nu e folosit inca pentru facturi.

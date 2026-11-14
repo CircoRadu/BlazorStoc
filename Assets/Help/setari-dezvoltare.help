@@ -1,0 +1,34 @@
+# Setări · Dezvoltare (rapoarte de erori și propuneri)
+Ruta: /setari
+Tab: Dezvoltare
+Cautare: dezvoltare rapoarte erori bug propuneri modificari rezolvat implementat export zip imagini dezvoltator
+
+Secțiune pentru dezvoltatori (conturile marcate „Dezvoltator” în Utilizatori). Are două sub-secțiuni, Erori și Propuneri, iar tile-ul și sub-filele arată numărul rapoartelor nerezolvate / al propunerilor active, actualizat singur. Rapoartele vin din „Raportează o eroare” ([[raportare-eroare]]), propunerile din „Propune o modificare” ([[propunere-modificare]]).
+
+## Elemente
+### Erori (Rapoarte erori)
+- Nerezolvate / Rezolvate | filă | Două liste; filtrele sunt Stare, Gravitate, Autor, De la, Până la.
+- Actualizează | buton | Reîncarcă lista.
+- Exportă lista filtrată (ZIP) | buton | Arhivă cu rapoartele din lista filtrată.
+- Șterge toate cele rezolvate | buton | Ștergere definitivă de pe server, fără arhivare, cu confirmare; se înscrie în Jurnal.
+- Tabelul | tabel | Număr, titlu, gravitate, stare, autor, trimis, imagini.
+- Vizualizează | iconita:view | Deschide raportul cu imaginile lui.
+- Rezolvat | iconita:check | Marchează raportul rezolvat dintr-un clic, fără editare.
+- Editează | iconita:edit | Corectezi titlul și descrierea, adaugi imagini, schimbi starea și nota pentru autor.
+- Exportă | iconita:export | Exportă raportul în ZIP.
+- Șterge | iconita:delete | Șterge raportul, după confirmare.
+### Propuneri
+- Active / Închise | filă | Filtre: Stare, Tip, Importanță, Caută, Autor, De la, Până la.
+- Tabelul | tabel | Număr, titlu, tip, importanță, stare, autor, trimis, imagini, răspunsuri.
+- Implementată | iconita:check | Marchează propunerea „Implementată în versiunea curentă”, dintr-un clic.
+- Editează | iconita:edit | Poți corecta titlul, descrierea și motivarea, adăuga imagini, schimba starea, versiunea în care a fost implementată și răspunsul pentru autor.
+- Exportă propunerea, Șterge toate cele rezolvate | buton | Ca la erori.
+### Fereastra unui raport / unei propuneri
+- Imaginile | text | Se deschid mari; marcajele sunt zone dreptunghiulare numerotate.
+- Închide raportul / propunerea | buton | Închide fereastra; modificările nesalvate cer confirmare („Renunț la modificări” / „Rămân”).
+
+## Flux: Cum închid un raport de eroare
+1. Deschide Dezvoltare → Erori și caută raportul.
+2. Corectează dacă trebuie (Editează) sau apasă bifa „Rezolvat”.
+3. După ce sunt rezolvate, „Șterge toate cele rezolvate” curăță lista.
+Nota: Dezvoltare, precum și filele Bugs și Propuneri din Notificări, se văd numai dezvoltatorilor.

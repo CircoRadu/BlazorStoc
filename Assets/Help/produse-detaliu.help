@@ -14,6 +14,7 @@ Captura: istoric-lung | /produse | type .search-box input=CONECTOR-RJ45; wait 12
 
 Pagina unui produs: datele lui, unde se află bucățile, rezervările și toate mișcările de stoc. Stocul se modifică numai prin intrări și ieșiri; de aici le înregistrezi, le filtrezi, le corectezi sau le stornezi.
 
+
 ## Elemente
 ### Antet
 - ← Produse și stocuri | link | Revine la catalog, cu filtrele pe care le aveai.
@@ -52,6 +53,11 @@ Pagina unui produs: datele lui, unde se află bucățile, rezervările și toate
 - Stornează operația | iconita:void | Stornează operația din care face parte mișcarea; cere confirmare și un motiv, iar mișcarea apare marcată „stornat”. | sel: .row-icon.void
 - Istoric | iconita:history | Deschide istoricul modificărilor mișcării ([[produse-istoric-modificari]]). | img: istoric | sel: .row-icon.history
 - Paginile | butoane | Trec la pagina anterioară sau următoare. | img: istoric-lung | sel: .pagination
+### Noutăți
+- Descriere | card | Card nou sub „Produs”.
+- Produs blocat | banner | „Produs blocat: parametri necompletați”: formularul de mișcare e ascuns, ieșirea rapidă inactivă; în ieșiri apare un avertisment pe linie ([[iesire-multipla]]).
+- Arată operator | comutator | Sub filtre: pe On apare coloana OPERATOR (ultimul operator: cel care a modificat mișcarea, altfel creatorul).
+- Ruta paginii | text | În bara de sus apare ruta (Meniu principal › secțiune › subsecțiune › pagină); „←” numește subcategoria; meniul de categorii rămâne deschis la produs.
 
 ## Flux: Cum înregistrez o intrare cu factură
 1. În „Înregistrează o mișcare” alege „Intrare”, data și „Factură existentă” (sau „Factură nouă (manual)”).

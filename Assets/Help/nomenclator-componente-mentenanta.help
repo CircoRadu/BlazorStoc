@@ -5,6 +5,8 @@ Cautare: nomenclator componente mentenanta familie familii componenta discreta d
 
 Familiile și componentele pe care le acoperă contractele de mentenanță și intervențiile (inclusiv tichetele preluate de un operator). O familie grupează componente (de exemplu „Securitate fizică”: efracție, TVCI, control acces); o componentă fără familie este discretă. Nimic nu se șterge: ce nu mai trebuie se dezactivează.
 
+Tab cu familii și componente (discrete sau în familie), denumiri alternative, mutare, activ / inactiv.
+
 ## Elemente
 ### Adăugare
 - Denumirea unei familii noi | câmp | Numele familiei; „Adaugă familia” o adaugă la final.

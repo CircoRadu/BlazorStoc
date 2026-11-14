@@ -1,0 +1,25 @@
+# Preluare date Elcomtur
+Ruta: /preluare-elcomtur
+Cautare: elcomtur preluare backup elc balanta restante simulare aplicare clienti beneficiari cui sold
+
+Pagina din Administrare pentru preluarea manuală a unui backup Elcomtur (fișier .elc): încarci fișierul, vezi simularea și aplici preluarea. Balanțele preluate apar în fișa beneficiarului (fila „Balanță Elcomtur”) și în Notificări → Balanțe restante.
+
+## Elemente
+### Ultima preluare
+- Ultima preluare | text | Data și rezultatul ultimei preluări (manuale sau automate).
+### Fișier Elcomtur
+- Fișier Elcomtur | câmp | Fișierul .elc încărcat.
+- Firma din arhivă | listă | Firma al cărei balanță o preiei.
+### Simularea
+- Firma, data backup-ului | tabel | Ce firmă și ce backup s-au citit.
+- Clienți în arhivă, Potriviți cu beneficiari (după CUI), Cu plăți restante | tabel | Totalurile simulării.
+- Clienți cu sold pozitiv, fără beneficiar | tabel | Clienți care datorează, dar nu au beneficiar (cod Elcomtur, client, CUI, sold).
+### Operații
+- Aplică preluarea | buton | Salvează balanțele în aplicație.
+- Renunță | buton | Anulează simularea.
+
+## Flux: Cum preiau manual un backup
+1. Încarcă fișierul .elc și alege firma.
+2. Verifică totalurile simulării și lista clienților fără beneficiar.
+3. Apasă „Aplică preluarea”.
+Nota: preluarea automată zilnică se configurează în [[setari-preluare-elcomtur]].

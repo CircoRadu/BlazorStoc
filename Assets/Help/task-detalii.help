@@ -3,6 +3,8 @@ Cautare: detalii task descriere stare preia preluare fisiere termen utilizator
 
 Fereastra cu detaliile unui task: pentru utilizator (din „Taskurile mele” sau din notificări) și pentru administrator (taskurile finalizate).
 
+Detaliile arată prioritatea, „Stadiu / note de lucru” și „Jurnalul taskului” (pliabil). Din fereastră poți edita taskul.
+
 ## Elemente
 ### Campurile si butoanele
 - Preia taskul | buton | Doar utilizatorului căruia îi este dat taskul și doar cât nu l-a preluat.

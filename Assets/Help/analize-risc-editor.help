@@ -4,6 +4,8 @@ Captura: formular | /analize-risc | click Adaugă analiză de risc; click sel:in
 
 Formularul pentru o analiză de risc nouă sau pentru editarea uneia existente. Se deschide în fișa beneficiarului sau în pagina Analize de risc.
 
+Formularul nu mai are „Întocmită de”; câmpul se numește „Data întocmirii”. Analizorul se alege din nomenclator ([[nomenclator-analizor-risc]]), cu iconița + alături care deschide fereastra de adăugare și reîncarcă lista. Fișierele atașate se vizualizează și se redenumesc ca la [[beneficiari-fisiere]].
+
 ## Elemente
 ### Câmpuri
 - Beneficiar * | listă | Doar în pagina Analize de risc, la o analiză nouă.

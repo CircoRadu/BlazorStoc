@@ -525,3 +525,12 @@ Pasi:
 | 1 | Cu doi utilizatori conectati, porneste o actualizare cu anunt (alt pachet) | Al doilea utilizator vede fereastra cu numaratoare; primul nu | |
 | 2 | La al doilea apasa "Am nevoie de mai mult timp" | Ferestrele se inchid; primul vede "Actualizare intrerupta, utilizatorul X are nevoie de mai mult timp" | |
 | 3 | Jurnal activitate | Intrare "Intrerupere actualizare aplicatie" cu numele utilizatorului | |
+
+### 14.11.2026 - Setari -> ANAF: sub-taburi "Preluare date firme" si "Factura" (autentificare ANAF)
+**Ce s-a adaugat:** tile-ul/tabul "Preluare date ANAF" se numeste acum "ANAF" si are doua sub-taburi: "Preluare date firme" (configuratorul de pana acum, neschimbat) si "E-Factura" (autentificarea aplicatiei in ANAF, OAuth2 e-Factura): client id, client secret (se pastreaza criptat, nu se mai afiseaza), adresa de raspuns (HTTPS), mediu productie/test, butoanele Autentifica-te in ANAF, Reinnoieste tokenul, Deconecteaza. Operatiile sunt jurnalizate (Modificare setari autentificare ANAF, Autentificare in ANAF, Reinnoire token ANAF, Deconectare autentificare ANAF).
+**Ce face acum:** dupa salvarea setarilor, "Autentifica-te in ANAF" te duce pe pagina ANAF (certificat calificat); ANAF te aduce inapoi la /anaf/autentificare/raspuns (adresa trebuie inregistrata la ANAF ca redirect) si pagina arata starea si data expirarii tokenului.
+| Nr | Pas | Rezultat asteptat | Rezultat |
+|----|-----|-------------------|----------|
+| 1 | Setari -> ANAF | Doua sub-taburi: Preluare date firme (ca inainte) si E-Factura | |
+| 2 | E-Factura: completeaza client id, secret, adresa HTTPS de raspuns, Salveaza | Mesaj de salvare; secretul nu mai apare | |
+| 3 | Autentifica-te in ANAF cu datele reale inregistrate la ANAF | Revii pe E-Factura cu "Autentificat" si data expirarii (necesita cont/certificat ANAF real) | |

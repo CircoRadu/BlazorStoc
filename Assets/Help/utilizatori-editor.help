@@ -5,11 +5,15 @@ Captura: editare | /setari | click Utilizatori; wait 1500; click sel:button.row-
 
 Formularul pentru un cont nou sau pentru editarea unuia existent. Se deschide deasupra listei sau fișei utilizatorului.
 
+**Condițiile parolei**: Lista condițiilor (8 caractere, literă mică, literă mare, cifră, caracter special) se colorează live verde / roșu.
+
+**Parola de schimbat**: Contul marcat astfel trece la prima autentificare prin pagina „Alege o parolă nouă”.
+
 ## Elemente
 ### Câmpuri
 - Nume utilizator * | câmp | Numele cu care se autentifică.
 - Nume afișat * | câmp | Numele care apare în aplicație.
-- Parolă * / Parolă nouă | câmp | La cont nou: cel puțin numărul minim de caractere cerut. La editare: lasă gol ca să păstrezi parola actuală.
+- Parolă * / Parolă nouă | câmp | La cont nou: respectă politica de parolă (8 caractere, literă mică, literă mare, cifră, caracter special). La editare: lasă gol ca să păstrezi parola actuală.
 - Confirmă parola | câmp | Repetă parola; mesajul de sub câmp spune dacă se potrivește.
 - Arată parola | opțiune | Afișează temporar parola scrisă.
 - Tip utilizator * | listă | Tipurile existente, cu numărul de permisiuni al fiecăruia; drepturile se definesc în Setări → Tipuri de utilizatori.
@@ -18,6 +22,8 @@ Formularul pentru un cont nou sau pentru editarea unuia existent. Se deschide de
 ### Butoane
 - Salvează utilizatorul | buton | Salvează; la editare cere confirmarea modificărilor.
 - Anulează, Închide | buton | Închid formularul; dacă ai modificat ceva, ești întrebat dacă renunți.
+### Parola
+- Arată parola | comutator | Afișează parola tastată.
 
 ## Flux: Cum creez un cont nou
 1. Scrie numele de utilizator și numele afișat.

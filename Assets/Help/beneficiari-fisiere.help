@@ -13,6 +13,10 @@ Categoria pliabilă (închisă la deschiderea paginii) cu toate fișierele legat
 - Șterge | iconita:delete | Doar la fișierele libere: cere confirmarea și șterge fișierul.
 ### Fișiere libere
 - Adaugă fișier | buton | Deschide o fereastră în care alegi unul sau mai multe fișiere; se salvează imediat.
+### Noutăți
+- Vizualizează | iconita:view | Fereastră de vizualizare (imagini, PDF, TXT, CSV); Word și Excel se pot doar descărca.
+- Redenumește | iconita:edit | Schimbă numele fișierului; extensia rămâne. În Jurnal apare „Redenumire fișier atașat”.
+- Fișiere beneficiar | text | Categorie pliabilă (închisă la deschidere) cu toate fișierele beneficiarului, cu legătură spre secțiunea de origine; poți adăuga fișiere libere (fereastră de adăugare), le vizualizezi, redenumești (fără extensie) și ștergi.
 
 ## Flux: Cum adaug un fișier liber
 1. Deschide categoria „Fișiere beneficiar”.

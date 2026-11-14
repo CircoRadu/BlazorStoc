@@ -6,6 +6,8 @@ Captura: pagina | /setari | click Backup; full | Backup și restaurare
 
 Aici faci și programezi copii de siguranță, vezi pachetele existente, ștergi automat pachetele vechi de pe server și restaurezi. Un pachet conține baza de date și toate imaginile și fișierele aplicației (pozele produselor, fișierele proiectelor, pozele intervențiilor și arhiva fișierelor șterse); nu conține cheile care protejează parolele salvate. Backup-urile se fac pe server; dacă „Copiere pe NAS” este activă ([[setari-backup-nas]]), fiecare pachet nou este copiat și pe NAS.
 
+**Descarcă pachetul**: Pe fiecare pachet din tabel: descarcă arhiva (cu suma de control, dacă există) sau, dacă pachetul se află doar pe NAS, îl aduce de acolo.
+
 ## Elemente
 ### Generare backup
 - Backup la preluarea de inventar | comutator | Obligatoriu și mereu activ: înainte de operarea unui inventar se face un backup verificat.

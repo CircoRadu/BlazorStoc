@@ -12,6 +12,12 @@ Captura: esuata | /setari | node tools/help-demo-updater.mjs failure; click Actu
 
 Aici se actualizează aplicația întreagă, cu toate modulele ei, dintr-un pachet de actualizare (un fișier .bsu) făcut și semnat pe calculatorul de dezvoltare. Aplicația nu se instalează singură: predă pachetul programului Updater, care rulează separat, cu drepturi de administrator, și care o repune pe versiunea veche dacă cea nouă nu pornește. Datele (baza de date, fișierele, cheile) nu se ating.
 
+**Actualizează cu notificare utilizatori**: Programează actualizarea și anunță toți utilizatorii. Alături este „Actualizare imediată”: pornește acum, fără anunț în banner și fără întârziere (nimeni nu e avertizat). Intră în jurnal „Actualizare aplicație”, cu versiunile, motivul și suma de control a pachetului.
+
+**Actualizează cu notificare utilizatori**: Înlocuiește vechiul „Aplică actualizarea”: anunță utilizatorii conectați printr-un banner și aplică actualizarea după întârziere ([[actualizare-anunt]]).
+
+**Încărcarea pachetului**: Pachetul se încarcă printr-o cerere directă către server, iar pe ecran apare procentul încărcat în loc de un mesaj fix.
+
 ## Elemente
 ### Antet
 - Versiunea aplicației | text | Versiunea care rulează acum, versiunea anterioară păstrată pe server (la care se poate reveni cu installerul) și versiunile aflate pe disc. | sel: .app-version
@@ -34,6 +40,10 @@ Aici se actualizează aplicația întreagă, cu toate modulele ei, dintr-un pach
 ### Istoricul
 - Istoric | tabel | Fiecare actualizare, refuz sau revenire: data, versiunile, de unde s-a cerut (din aplicație sau din installer pe server), cine a cerut, rezultatul și motivul. Sub tabel alegi câte actualizări se văd pe pagină (10, 25, 50 sau toate) și treci între pagini. | sel: #update-history
 - Ce conține update (Vezi changelog) | iconita:view | Ultima coloană a istoricului. Deschide fereastra cu ce a adus versiunea (sau versiunile) acelei actualizări; vezi [[setari-actualizare-changelog]]. Iconița este dezactivată când versiunea nu are changelog.
+### Noutăți
+- Actualizare imediată | buton | Aplică actualizarea fără banner și fără întârziere.
+- Istoric · Randuri pe pagină | listă | Istoricul este paginat; alegi 10, 25, 50 sau Toate.
+- Vezi changelog | iconita:view | Deschide notele versiunii ([[setari-actualizare-changelog]]).
 
 ## Flux: Cum actualizez aplicația
 1. Pe calculatorul de dezvoltare se construiește pachetul cu tools\release.ps1 (se oprește dacă testele nu trec) și se copiază pe calculatorul de pe care ai deschis aplicația.

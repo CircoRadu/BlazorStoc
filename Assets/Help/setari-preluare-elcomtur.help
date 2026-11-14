@@ -1,0 +1,30 @@
+# Setări · Preluare date Elcomtur
+Ruta: /setari
+Tab: Preluare date Elcomtur
+Cautare: elcomtur preluare automata backup director nas cont parola masca firma ora verificare alerta lipsa balanta
+
+Preluarea automată, zilnică, a backup-ului Elcomtur de pe un director sau de pe NAS. Aplicația verifică directorul la ora aleasă, preia cel mai recent backup mai nou decât ultimul preluat și trimite notificări (preluat, eșuat, lipsă).
+
+## Elemente
+### Setări
+- Preluare automată | comutator | Pornește verificarea zilnică.
+- Director cu backup-urile Elcomtur | câmp | Cale de rețea (\\server\partajare\folder) sau director local.
+- Cont, Parolă | câmp | Contul pentru o cale de rețea; „Arată parola” este un întrerupător.
+- Mască nume fișier | câmp | Care fișiere din director sunt backup-uri.
+- Firma de preluat | câmp | Firma (din arhivă) al cărei balanță se preia.
+- Ora verificării zilnice | câmp | 00:00–23:00, implicit 04:00; textele din panou arată ora aleasă.
+- Prag alertă lipsă backup (zile) | câmp | După câte zile fără backup nou se trimite alerta.
+- Salvează | buton | Păstrează setările.
+### Operații
+- Testează conexiunea | buton | Verifică directorul și contul.
+- Citește firmele din backup | buton | Listează firmele din cel mai recent backup, ca să o alegi pe cea de preluat.
+- Verifică acum | buton | Face acum aceeași verificare ca cea zilnică.
+- Preia ultimul backup acum | buton | Preia cel mai recent backup chiar dacă nu este mai nou decât ultimul preluat.
+### Notificări
+- Model notificare „Backup lipsă” | text | Textul alertei trimise când lipsește un backup nou.
+
+## Flux: Cum pornesc preluarea automată
+1. Completează directorul, contul și parola, apoi apasă „Testează conexiunea”.
+2. Apasă „Citește firmele din backup” și alege firma.
+3. Alege ora și pragul de alertă, pornește „Preluare automată” și apasă „Salvează”.
+Nota: preluarea manuală dintr-un fișier .elc se face din pagina [[elcomtur-preluare]].

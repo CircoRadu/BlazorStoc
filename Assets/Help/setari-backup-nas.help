@@ -6,6 +6,8 @@ Captura: pagina | /setari | click Backup; click Backup NAS; full | Backup NAS
 
 Fiecare backup făcut local se copiază apoi pe NAS. Pachetele de pe NAS nu se șterg niciodată din aplicație. Parola se păstrează criptat și nu se mai afișează.
 
+Fiecare backup se copiază pe NAS într-un subdirector propriu (numele pachetului, fără extensie) care conține fișierul .zip și suma de control .sha256. Pachetele copiate înainte rămân în rădăcină și sunt tratate ca deja copiate; lista și aducerea de pe NAS caută și în subdirectoare.
+
 ## Elemente
 ### Setările
 - Copiere pe NAS | comutator | Activează copierea automată a fiecărui backup.

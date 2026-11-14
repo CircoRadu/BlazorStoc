@@ -1,10 +1,14 @@
-# Setări · Preluare date ANAF
+# Setări · ANAF
 Ruta: /setari
-Tab: Preluare date ANAF
-Cautare: anaf configurare interogare cui conexiune cerere mapare raspuns test versiuni activeaza draft
-Captura: pagina | /setari | click Preluare date ANAF; full | Preluarea datelor ANAF
+Tab: ANAF
+Cautare: anaf preluare date firme factura autentificare token client secret configurare interogare cui conexiune cerere mapare raspuns test versiuni activeaza draft
+Captura: pagina | /setari | click ANAF; click 1. Conexiune; click 2. Cerere; click 3. Mapare răspuns; click 4. Testare; click 5. Versiuni; wait 500; full | Preluarea datelor firmelor din ANAF
+Captura: e-factura | /setari | click ANAF; click sel:#subtab-factura; wait 1200; full | Autentificarea ANAF (E-Factura)
 
 Configurezi interogarea serviciului public ANAF (registrul TVA) după CUI: conexiunea, cererea, maparea răspunsului, testarea și versiunile activate. Testele trimit cereri reale la ANAF și nu modifică datele niciunei firme. Butonul „Preia date din ANAF” din formularele de beneficiar și furnizor folosește configurația activă.
+
+Secțiunea ANAF are două sub-secțiuni: „Preluare date firme” (configurarea interogării de mai sus) și „E-Factura” (autentificarea aplicației în ANAF, descrisă mai jos). Pe „Preluare date firme” cele cinci secțiuni numerotate sunt restrânse la deschidere; le deschizi cu un clic pe titlu.
+
 
 ## Elemente
 ### Starea
@@ -34,6 +38,20 @@ Configurezi interogarea serviciului public ANAF (registrul TVA) după CUI: conex
 - Tabelul versiunilor | tabel | Versiunile activate: data, administratorul, cum a fost creată și comutatorul „Activă”. | sel: fieldset.anaf-section:last-of-type table.settings-result
 - Încarcă versiunea în editor | iconita:load | Aduce o versiune veche în editor.
 - Șterge versiunea | iconita:delete | Șterge o versiune neactivă.
+### Sub-secțiunile ANAF
+- Preluare date firme | filă | Configurarea interogării serviciului public ANAF după CUI (conținutul descris în restul paginii). | img: e-factura
+- E-Factura | filă | Autentificarea aplicației în ANAF pentru serviciul e-Factura (OAuth2): datele aplicației înregistrate la ANAF și tokenul obținut. | img: e-factura
+### E-Factura · Aplicația înregistrată la ANAF
+- Stare autentificare | insignă | „Neautentificat”, „Autentificat” sau „Token expirat”; lângă ea apar data obținerii, administratorul și data expirării tokenului. | img: e-factura | sel: #anaf-auth-state
+- Client id | câmp | Identificatorul aplicației înregistrate la ANAF. | img: e-factura
+- Client secret | câmp | Secretul aplicației. Se păstrează criptat pe server și nu se mai afișează; lăsat gol la o salvare ulterioară, rămâne secretul salvat. | img: e-factura
+- Adresă de răspuns (redirect) | câmp | Adresa HTTPS la care ANAF te aduce înapoi după autentificare; trebuie să fie exact cea înregistrată la ANAF (implicit se propune adresa aplicației, cu terminația /anaf/autentificare/raspuns). | img: e-factura
+- Mediu | listă | Producție sau Test. | img: e-factura
+- Salvează setările | buton | Salvează datele aplicației. Dacă se schimbă client id-ul, secretul sau mediul, tokenul obținut până atunci se șterge. | img: e-factura | sel: #anaf-auth-save
+### E-Factura · Autentificare
+- Autentifică-te în ANAF | buton | Te duce pe pagina de autentificare ANAF (cu certificatul calificat din browser); după autentificare ANAF te aduce înapoi pe pagină, cu starea și data expirării tokenului. Pornește doar după salvarea setărilor. | img: e-factura | sel: #anaf-auth-begin
+- Reînnoiește tokenul | buton | Obține un token nou cu tokenul de reînnoire salvat, fără o nouă autentificare. | img: e-factura | sel: #anaf-auth-refresh
+- Deconectează | buton | Șterge tokenul de pe server, după confirmare și cu motiv obligatoriu; setările aplicației rămân. | img: e-factura | sel: #anaf-auth-disconnect
 
 ## Flux: Cum verific că ANAF funcționează
 1. Deschide secțiunea și apasă butonul de testare.
@@ -43,3 +61,10 @@ Configurezi interogarea serviciului public ANAF (registrul TVA) după CUI: conex
 ## Flux: Cum revin la o configurație veche
 1. În „Versiuni” alege versiunea dorită.
 2. Pornește comutatorul „Activă” de pe rândul ei, sau folosește „Revino la activarea precedentă”.
+
+## Flux: Cum autentific aplicația în ANAF (E-Factura)
+1. În Setări → ANAF alege sub-secțiunea „E-Factura”.
+2. Completează client id, client secret, adresa de răspuns (exact cea înregistrată la ANAF) și mediul, apoi apasă „Salvează setările”.
+3. Apasă „Autentifică-te în ANAF”, autentifică-te cu certificatul calificat pe pagina ANAF și revii în aplicație.
+4. Verifică insigna „Autentificat” și data expirării; înainte de expirare apasă „Reînnoiește tokenul”.
+Nota: Fiecare operație (modificarea setărilor, autentificarea, reînnoirea, deconectarea) se înscrie în Jurnalul de activitate cu denumirea ei.

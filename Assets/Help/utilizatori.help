@@ -7,6 +7,10 @@ Captura: eroare | /setari | click Utilizatori; wait 1500; sql RENAME TABLE web_u
 
 Conturile care se pot autentifica în aplicație și tipul fiecărui utilizator; se află în Setări → Utilizatori (subsecțiunea „Utilizatori”). Drepturile fiecărui tip se definesc în subsecțiunea „Tipuri de utilizatori” ([[setari-tipuri-utilizatori]]). Parolele nu sunt afișate și nu pot fi recuperate.
 
+**Sub-secțiunea Dezvoltatori**: Tabel cu dezvoltatorii și revocarea rolului.
+
+**Ordonare**: Tabelul se ordonează din antet (clic: crescător, descrescător, ordinea inițială); alegerea se reține cât ține deschis tabul browserului.
+
 ## Elemente
 ### Antet
 - + Adaugă utilizator | buton | În antetul cardului „Conturi web”. Deschide formularul de cont nou ([[utilizatori-editor]]); doar cu dreptul necesar.
@@ -23,6 +27,8 @@ Conturile care se pot autentifica în aplicație și tipul fiecărui utilizator;
 - Stare | coloană | „Activ” sau „Inactiv”.
 - Editează utilizatorul | iconita:edit | Deschide formularul de editare.
 - Șterge utilizatorul | iconita:delete | Contul nu se va mai putea autentifica; pentru o suspendare temporară folosește editarea și oprește „Cont activ”.
+### Dezvoltatori
+- Dezvoltator | comutator | Coloană nouă: marchează contul ca dezvoltator (vede Setări → Dezvoltare și filele Bugs / Propuneri din Notificări).
 
 ## Flux: Cum adaug un utilizator
 1. Apasă „+ Adaugă utilizator”.

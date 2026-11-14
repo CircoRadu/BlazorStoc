@@ -21,8 +21,7 @@ public static class HelpChecks
     // its topic (the check below then asks to take it out as soon as the topic exists).
     private static readonly HashSet<string> Pending = new(StringComparer.OrdinalIgnoreCase)
     {
-        // Elcomtur (branch Elcomtur): the help is written on request (user's rule of 04.11.2026), see docs/HELP_DE_REGENERAT.md.
-        "/preluare-elcomtur"
+        // Empty: every page has its topic.
     };
 
     private const string Sample = """
@@ -229,7 +228,9 @@ public static class HelpChecks
         // New 07.11.2026: the window of an addendum of a maintenance contract (not wired into the page yet); the description is completed with the components stage.
         "mentenanta-act-aditional",
         // New 09.11.2026: tasks of users on beneficiaries (module Taskuri); the pictures are made on request (docs/HELP_DE_REGENERAT.md).
-        "taskuri-adauga", "taskurile-mele", "task-formular", "task-detalii", "notificari-taskuri"
+        "taskuri-adauga", "taskurile-mele", "task-formular", "task-detalii", "notificari-taskuri",
+        // New 14.11.2026: topics of the settings sections and the Elcomtur page written from the interface; the pictures are made on request (docs/HELP_DE_REGENERAT.md).
+        "setari-preluare-activityapp", "setari-preluare-elcomtur", "elcomtur-preluare", "setari-espstoc", "setari-catalog", "setari-baza-spatiu", "setari-dezvoltare", "setari-autentificare"
     };
 
     // Elements that the demo environment cannot show in the state they describe (topic key|element name); the list only shrinks.
@@ -241,7 +242,9 @@ public static class HelpChecks
         "setari-facturi-generare|Selectează zona CUI",
         "setari-backup|Copiază pe NAS",
         "setari-baza-conexiune|Rezultatul ultimei operații",
-        "analize-risc-editor|Anulează, Închide"
+        "analize-risc-editor|Anulează, Închide",
+        // The demo has no saved ANAF version, so the table of versions is empty; the result count of the products list needs a state the demo list does not show.
+        "setari-anaf|Tabelul versiunilor", "produse-catalog|Numărul de rezultate"
     };
 
     // The pictures shipped with the topics (tools/help-capture.mjs): every "Captura:" has its picture and map, the maps point to real elements, the size stays small.

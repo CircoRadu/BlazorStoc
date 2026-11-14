@@ -458,3 +458,8 @@ Actualizare 04.11.2026 (branch Elcomtur): versiunea 0.5.38, schema 62. Modul nou
 ## Ultimul lucru facut (13.11.2026): versiunile 0.5.82-0.5.86 + fereastra de anunt al actualizarii
 - 0.5.82-0.5.86: PROP-0023..0032 si BUG-0032..0043 (detalii in Assets/Data/changelog.txt). BUG-0035/0037 (captura paginii) imbunatatit, neconfirmat de utilizator; BUG-0032 nereprodus.
 - Nepachetat inca (dupa 0.5.86): UpdateNoticeDialog (Components/Shared) + update-notice.js; UpdateCoordinator.RequestMoreTime/LastInterruption/AcknowledgeInterruption; ApplicationUpdateService.RequestMoreTimeAsync; actiunea de jurnal "Intrerupere actualizare aplicatie". Verificat cu teste bUnit si pornirea paginii, nu cu o actualizare programata reala. Help: topic actualizare-anunt (fara captura), de regenerat conform docs/HELP_DE_REGENERAT.md.
+
+## Ultimul lucru facut (14.11.2026): versiunea 0.5.87
+- Setari -> ANAF: sub-taburile "Preluare date firme" (AnafConfigurator) si "E-Factura" (AnafAuthPanel: autentificare OAuth2, secret si token criptate cu data protection, callback /anaf/autentificare/raspuns). Module Anaf 1.1.0, Journal 1.6.3.
+- Ajutorul actualizat (text + capturi) pentru lista din docs/HELP_DE_REGENERAT.md; elementele care nu pot fi fotografiate raman paragrafe aldine in rezumat; exceptii noi in HelpChecks (tabelul versiunilor ANAF, numarul de rezultate din Produse).
+- Nefacut: autentificarea reala ANAF (cont/certificat) si folosirea tokenului pentru facturi; topicurile noi nu au captura.

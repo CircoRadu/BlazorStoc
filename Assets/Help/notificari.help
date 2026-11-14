@@ -5,6 +5,10 @@ Captura: pagina | /notificari |  | Notificările
 
 Expirările apropiate sau depășite, după șabloanele definite de administrator. O notificare rămâne în listă până este rezolvată. O notificare preluată nu mai avertizează; dacă o amâni, avertizează din nou la sfârșitul perioadei. Fereastra are două secțiuni: **Active** și **Rezolvate**.
 
+**Numărul filei**: Fiecare filă arată numărul (și 0); „Probleme import” și „Bugs” au acum insignă; filele cu elemente de validat sunt roșii.
+
+**Ordonare**: Tabelul notificărilor active se ordonează din antet.
+
 ## Elemente
 ### Antet
 - ↻ Actualizează | buton | Reîncarcă lista.
@@ -17,6 +21,13 @@ Expirările apropiate sau depășite, după șabloanele definite de administrato
 - Scadență / Expiră la | coloană | Data de expirare. | sel: table.notification-table th:nth-child(4)
 - Depășit cu (zile) / zile rămase | coloană | Cât a trecut sau cât a rămas. | sel: table.notification-table th.number
 - Rândul | rând | Apasă un rând (sau Enter) ca să deschizi detaliile ([[notificari-detaliu]]); rândurile necitite sunt evidențiate. | sel: tr.notification-row
+### Noutăți
+- Tichete de validat | filă | Lista tichetelor rezolvate din ActivityApp (inclusiv „Tichete discardate”, cu iconiță de vizualizare doar pentru citire); lista goală are mesaj descriptiv. Motivul notificării „Validează mentenanța” rezolvate spune câte evenimente au fost preluate ca mentenanță / service / discardate, de cine și când.
+- Beneficiari de validat | filă | Beneficiarii preluați din ActivityApp care așteaptă validarea (permisiune „Validare beneficiari ActivityApp”).
+- Probleme import | filă | Problemele deschise ale importului din ActivityApp.
+- Contracte incomplete | filă | Contractele înghețate și ce le lipsește; fila e roșie cât timp există.
+- Balanțe restante | filă | Balanțele Elcomtur restante; lista goală are mesaj descriptiv.
+- Taskuri, Propuneri, Bugs | filă | Taskurile utilizatorului ([[notificari-taskuri]]); propunerile și bugurile, doar pentru dezvoltatori ([[notificari-propuneri]]).
 
 ## Flux: Cum rezolv o notificare
 1. Apasă rândul notificării ca să-i vezi detaliile.

@@ -7,6 +7,10 @@ Captura: salvate | /setari | click Hartă; wait 1000; type #map-start-zoom=7; ke
 
 Furnizorul fundalului hărții de mentenanță: adresa dalelor, atribuirea cerută de furnizor, limitele de zoom și punctul de pornire. Browserul cere dalele direct de la furnizor; numele beneficiarilor, contractele și scadențele nu părăsesc aplicația.
 
+Harta și satelitul: în secțiunea „Fundal satelit (opțional)” setezi adresa, atribuirea și cheia fundalului și îl verifici cu „Testează satelitul”; hărțile din aplicație au un comutator Hartă / Satelit. Căutarea de adrese prin Geoapify a fost scoasă: coordonatele se introduc manual, iar punctele de lucru au link „Caută în Google Maps”.
+
+**Adresă fundal satelit**: Adresa șablonului de dale pentru imaginea de satelit.
+
 ## Elemente
 ### Furnizorul
 - Starea setărilor | text | „Setări salvate din această pagină” sau „Se folosesc valorile din configurația aplicației”. | sel: text:"Se folosesc valorile"
@@ -20,6 +24,10 @@ Furnizorul fundalului hărții de mentenanță: adresa dalelor, atribuirea cerut
 - Salvează setările | buton | Salvează.
 - Renunță la modificări | buton | Revine la valorile salvate.
 - Revino la valorile din configurația aplicației | buton | Apare când există setări salvate: le șterge. | img: salvate
+### Fundal satelit
+- Atribuire | câmp | Textul de atribuire afișat pe hartă.
+- Cheie | câmp | Cheia de acces a furnizorului, dacă are nevoie.
+- Testează satelitul | buton | Verifică fundalul configurat.
 
 ## Flux: Cum schimb furnizorul hărții
 1. Completează adresa dalelor și atribuirea.

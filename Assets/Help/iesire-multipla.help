@@ -9,6 +9,8 @@ Captura: rezervari | /iesiri/multipla | click sel:.relation-row input.searchable
 
 Înregistrezi, într-o singură operație, ieșirea mai multor produse către aceeași destinație. Operația se salvează **întreagă sau deloc**; înainte de salvare vezi un sumar cu toate avertismentele liniilor (ieșire peste stoc, produse rezervate de alte proiecte, ieșire repetată).
 
+Un produs cu parametri necompletați este blocat: linia lui de ieșire arată un avertisment.
+
 ## Elemente
 ### Antet
 - ← Produse | buton | Revine la catalogul de produse.

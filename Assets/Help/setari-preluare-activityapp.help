@@ -1,0 +1,50 @@
+# Setări · Preluare date ActivityApp
+Ruta: /setari
+Tab: Preluare date ActivityApp
+Cautare: activityapp preluare tichete beneficiari conexiune corespondenta campuri simulare sincronizare programare ignorati discardate tipuri tichet
+
+Configurezi conexiunea la baza de date ActivityApp (doar citire), alegi tipurile de tichete preluate, simulezi și aplici importul beneficiarilor și al tichetelor, stabilești corespondența câmpurilor tichetului și programezi sincronizarea periodică. Cozile de lucru (tichete de validat, tichete discardate, probleme de import) se văd în Notificări ([[notificari]]).
+
+## Elemente
+### 1. Conexiune
+- Preluare activată | comutator | Pornește sau oprește preluarea.
+- Server, Port, Bază de date, Cont de citire, Parolă | câmp | Datele conexiunii; „Arată parola” este un întrerupător.
+- Tichete de la data | câmp | Se preiau tichetele de la această dată.
+- Fereastra orară: de la ora / până la ora | câmp | Intervalul zilei în care se poate citi.
+- Rânduri pe pagină (50–1000) | câmp | Mărimea paginii de citire.
+- La potrivire, completează câmpurile goale ale beneficiarilor existenți | comutator | La potrivire completează doar ce lipsește.
+- Salvează, Testează conexiunea | buton | Salvează setările; testul verifică conexiunea și structura tabelelor (tabelă, coloană, problemă, așteptat, găsit, efect).
+### 2. Tipuri de tichete
+- Citește tipurile din ActivityApp | buton | Aduce tipurile existente; „Tipuri folosite” și „Tipuri nefolosite” sunt liste pliabile; tipul „de mentenanță” se preia fără cuvânt cheie și intră la validare (punct cu contract activ) sau la cerere.
+- Salvează alegerea | buton | Păstrează tipurile preluate.
+### 3. Beneficiari
+- Preia și beneficiarii fără tichete | comutator | Preia toți partenerii din ActivityApp, inclusiv persoanele fizice și partenerii fără tichete.
+- Import automat al beneficiarilor curați | comutator | Beneficiarii fără probleme se preiau singuri; ceilalți merg în coada de verificare (motive: „așteaptă acceptarea manuală”, „același CUI sau nume repetat”, „date refuzate”).
+- Simulează importul / Aplică importul | buton | Simularea arată totalurile (deja legați, probleme, ignorați) și trei liste pliabile: „Cu probleme”, „Selectați pentru preluare”, „Ignorați” (cu includere manuală: persoană fizică / juridică, neverificat). Listele sunt paginate. Doar persoanele juridice se verifică în ANAF.
+### 4. Tichete
+- Simulează tichetele / Aplică tichetele | buton | Simularea arată totalurile și patru liste pliabile paginate: „Cu probleme”, „În așteptarea clientului”, „Selectate pentru preluare”, „Ignorate”.
+- Recitește tot | buton | Citește din nou toate tichetele (altfel citirea este incrementală).
+### 5. Programare
+- Sincronizare periodică | comutator | Pornește sincronizarea automată.
+- Programare, Orele, La fiecare (ore) și (minute) | câmp | Orele fixe (HH:mm, separate prin virgulă) sau intervalul.
+- Importă acum | buton | Pornește o sincronizare imediată.
+### 6. Corespondența câmpurilor („Informațiile din tichet”)
+- Tabelul informațiilor | tabel | Pentru fiecare informație (problemă, rezoluție, raport original, executant): comutator „Se preia”, coloana din care se citește, destinația (observații, câmp separat sau ambele) și la ce se folosește; titlul, numărul și CUI-ul clientului se preiau mereu. Numele informațiilor sunt editabile.
+- Câmpuri suplimentare | tabel | Orice coloană din Tickete / EvenimenteAgent cu un nume ales de tine; nu există limită de câmpuri.
+- Citește coloanele din ActivityApp | buton | Reîncarcă lista coloanelor.
+- Deschide un tichet exemplu | buton | Fereastra cu valorile unui tichet real ([[setari-tichet-exemplu]]).
+- Salvează corespondența, Revino la valorile implicite | buton | Salvarea cere ca numărul tichetului să aibă o coloană aleasă.
+- Actualizează tichetele preluate | buton | Rescrie tichetele deja preluate după noua corespondență; se face și automat la salvare / sincronizare.
+- Corespondența verificată | buton | Apare la bannerul „structura tichetelor s-a modificat”: confirmă corespondența, iar importul suspendat repornește; se trimite și notificarea „Structura tichetelor”.
+### Validarea tichetelor
+- Evenimente de validat | text | Toate tichetele rezolvate (service și mentenanță) intră în coada de validare, nimic nu se înregistrează singur. Pe fiecare: vizualizare, „Modifică și preia”, „Preia ca ...”, „Discard” (cu confirmare). Mentenanța se poate înregistra și fără contract. Coada e în Notificări → Tichete de validat și, pentru operatorii cu permisiune, în Mentenanță.
+- Tichete discardate | tabel | Lista discardatelor, cu vizualizare și reactivare.
+- Probleme deschise | tabel | Probleme ale importului cu „Marchează rezolvată”.
+
+## Flux: Cum configurez preluarea
+1. Completează conexiunea, salvează și apasă „Testează conexiunea”.
+2. Citește tipurile din ActivityApp și alege-le pe cele preluate.
+3. Simulează importul beneficiarilor, verifică listele și aplică.
+4. Stabilește corespondența câmpurilor (secțiunea 6), apoi simulează și aplică tichetele.
+5. Pornește sincronizarea periodică și programează orele.
+Nota: pentru fotografiere, fereastra cere o conexiune ActivityApp; captura se face la cerere.

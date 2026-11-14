@@ -1,7 +1,9 @@
 # Raportează o eroare
 Cautare: raportare eroare bug problema raport captura imagine ctrl v gravitate stare
 
-Fereastra se deschide din meniul din stânga, intrarea „Raportează o eroare” de deasupra lui „Ajutor”. Înainte să apară, aplicația fotografiază pagina pe care lucrai și o atașează raportului.
+Fereastra se deschide din bara de sus, butonul „Raportează o eroare”. Înainte să apară, aplicația fotografiază pagina pe care lucrai și o atașează raportului.
+
+„Raportează o eroare” se află acum în bara de sus, pe orice pagină. Fereastra are secțiuni explicative închise implicit, captură automată a paginii, lipire cu Ctrl+V, alegere de fișiere și detalii tehnice. Imaginile se deschid mari într-o fereastră de marcare (zone dreptunghiulare numerotate, cel mult 10, doar ștergere). „Rapoartele mele” / „Raport nou” este un buton (nu o filă). Ferestrele se mută de antet și se redimensionează din colțul dreapta-jos (dublu-clic = resetare).
 
 ## Elemente
 ### Raport nou

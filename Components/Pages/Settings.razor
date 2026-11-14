@@ -60,7 +60,15 @@
     @if (activeTab == AnafTab && allowedTabs.Contains(AnafTab))
     {
         <div role="tabpanel" id="panel-@AnafTab" aria-labelledby="tab-@AnafTab" class="settings-body">
-            <ModuleGate ModuleId="@BlazorStoc.Modules.Anaf.AnafModule.ModuleId" Section="Configurare ANAF"><AnafConfigurator /></ModuleGate>
+            @SubtabBar(AnafSubtabs, "Secțiuni ANAF")
+            @if (anafSubtab == AnafInvoiceSubtab)
+            {
+                <div role="tabpanel" id="subpanel-@AnafInvoiceSubtab" aria-labelledby="subtab-@AnafInvoiceSubtab"><ModuleGate ModuleId="@BlazorStoc.Modules.Anaf.AnafModule.ModuleId" Section="Autentificare ANAF"><AnafAuthPanel Result="@AnafAuthResult" /></ModuleGate></div>
+            }
+            else
+            {
+                <div role="tabpanel" id="subpanel-@AnafCompaniesSubtab" aria-labelledby="subtab-@AnafCompaniesSubtab"><ModuleGate ModuleId="@BlazorStoc.Modules.Anaf.AnafModule.ModuleId" Section="Configurare ANAF"><AnafConfigurator /></ModuleGate></div>
+            }
         </div>
     }
     else if (activeTab == ActivityImportTab && allowedTabs.Contains(ActivityImportTab))
@@ -217,6 +225,13 @@
     private void ServerChanged() => connectionRevision++;
 
     private const string AnafTab = "anaf";
+    // ANAF is one tab with two sub-tabs: the lookup of company data (the configurator) and the invoice side (the authentication with ANAF).
+    private const string AnafCompaniesSubtab = "firme";
+    private const string AnafInvoiceSubtab = "factura";
+    private static readonly (string Id, string Title)[] AnafSubtabs = [(AnafCompaniesSubtab, "Preluare date firme"), (AnafInvoiceSubtab, "E-Factura")];
+    private string anafSubtab = AnafCompaniesSubtab;
+    // Set by the return from ANAF (?anafauth=ok|refuzat|eroare).
+    [SupplyParameterFromQuery(Name = "anafauth")] public string? AnafAuthResult { get; set; }
     private const string ActivityImportTab = "preluare-activityapp";
     private const string ElcomturTab = "preluare-elcomtur";
     private const string EspImportTab = "preluare-espstoc";
@@ -260,7 +275,7 @@
     private const string BackupTimeSubtab = "backup-time";
     private static readonly (string Id, string Title)[] BackupSubtabs = [(BackupMainSubtab, "Backup și restaurare"), (NasTab, "Backup NAS"), (BackupTimeSubtab, "Verificare oră")];
     private string backupSubtab = BackupMainSubtab;
-    private static readonly (string Id, string Title)[] Tabs = [(AnafTab, "Preluare date ANAF"), (ActivityImportTab, "Preluare date ActivityApp"), (ElcomturTab, "Preluare date Elcomtur"), (EspImportTab, "Preluare stoc ESPStoc"), (NotificationsTab, "Notificări"), (MapTab, "Hartă"), (InvoicesTab, "Facturi"), (BackupTab, "Backup"), (JournalTab, "Jurnal activitate"), (BugTab, "Dezvoltare"), (CatalogTab, "Catalog"), (ModulesTab, "Module"), (UpdateTab, "Actualizare"), (UsersTab, "Utilizatori"), (AuthTab, "Autentificare"), (DatabaseTab, "Bază de date")];
+    private static readonly (string Id, string Title)[] Tabs = [(AnafTab, "ANAF"), (ActivityImportTab, "Preluare date ActivityApp"), (ElcomturTab, "Preluare date Elcomtur"), (EspImportTab, "Preluare stoc ESPStoc"), (NotificationsTab, "Notificări"), (MapTab, "Hartă"), (InvoicesTab, "Facturi"), (BackupTab, "Backup"), (JournalTab, "Jurnal activitate"), (BugTab, "Dezvoltare"), (CatalogTab, "Catalog"), (ModulesTab, "Module"), (UpdateTab, "Actualizare"), (UsersTab, "Utilizatori"), (AuthTab, "Autentificare"), (DatabaseTab, "Bază de date")];
     // The key that opens each tab (what the user type of the signed-in user allows).
     private static readonly Dictionary<string, string> TabKeys = new()
     {
@@ -295,7 +310,7 @@
 
     private static string TileText(string id) => id switch
     {
-        AnafTab => "Interogarea serviciului public ANAF pentru datele firmelor.",
+        AnafTab => "Preluarea datelor firmelor din serviciul public ANAF și autentificarea aplicației în ANAF pentru facturi.",
         ActivityImportTab => "Conexiunea la ActivityApp, tichetele preluate, corespondența câmpurilor și programarea importului.",
         ElcomturTab => "Preluarea automată, zilnică, a backup-ului Elcomtur de pe un director (NAS), firma preluată și alerta de backup lipsă.",
         EspImportTab => "Preluarea stocului din aplicația veche ESPStoc și stabilirea punctului zero al gestiunii (produse, cantități, imagini).",
@@ -426,7 +441,7 @@
     }
 
     private string CurrentSubtab((string Id, string Title)[] subtabs) =>
-        subtabs == MapSubtabs ? mapSubtab : subtabs == InvoiceSubtabs ? invoiceSubtab : subtabs == BackupSubtabs ? backupSubtab : subtabs == DatabaseSubtabs ? databaseSubtab : subtabs == UserSubtabs ? userSubtab : subtabs == DevSubtabs ? devSubtab : notificationSubtab;
+        subtabs == AnafSubtabs ? anafSubtab : subtabs == MapSubtabs ? mapSubtab : subtabs == InvoiceSubtabs ? invoiceSubtab : subtabs == BackupSubtabs ? backupSubtab : subtabs == DatabaseSubtabs ? databaseSubtab : subtabs == UserSubtabs ? userSubtab : subtabs == DevSubtabs ? devSubtab : notificationSubtab;
 
     // Deep links (for example from the Journal) open the named tab, sub-tab and object; later clicks on the tabs win.
     [SupplyParameterFromQuery(Name = SettingsNavigation.TabParameter)] public string? TabQuery { get; set; }
@@ -460,6 +475,7 @@
         if (allowedTabs.Contains(BackupTab) && TabQuery == NasTab) { activeTab = BackupTab; backupSubtab = NasTab; }
         if (BackupSubtabs.Any(tab => tab.Id == SubtabQuery)) { backupSubtab = SubtabQuery!; if (isAdmin && TabQuery is null or BackupTab) activeTab = BackupTab; }
         if (allowedTabs.Contains(DatabaseTab) && TabQuery == DatabaseTab && DatabaseSubtabs.Any(tab => tab.Id == SubtabQuery)) databaseSubtab = SubtabQuery!;
+        if (TabQuery == AnafTab && AnafSubtabs.Any(tab => tab.Id == SubtabQuery)) anafSubtab = SubtabQuery!;
         if (NotificationSubtabs.Any(tab => tab.Id == SubtabQuery)) notificationSubtab = SubtabQuery!;
         if (MapSubtabs.Any(tab => tab.Id == SubtabQuery)) mapSubtab = SubtabQuery!;
         if (TabQuery == BugTab && DevSubtabs.Any(tab => tab.Id == SubtabQuery)) devSubtab = SubtabQuery!;
@@ -536,7 +552,8 @@
 
     private void SelectSubtab((string Id, string Title)[] subtabs, string id)
     {
-        if (subtabs == MapSubtabs) mapSubtab = id;
+        if (subtabs == AnafSubtabs) anafSubtab = id;
+        else if (subtabs == MapSubtabs) mapSubtab = id;
         else if (subtabs == BackupSubtabs) backupSubtab = id;
         else if (subtabs == DatabaseSubtabs) databaseSubtab = id;
         else if (subtabs == UserSubtabs) userSubtab = id;

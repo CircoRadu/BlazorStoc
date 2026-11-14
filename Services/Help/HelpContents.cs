@@ -24,7 +24,7 @@ public static class HelpContents
         ("Raportare erori", ["raportare-eroare"]),
         ("Propuneri de modificări", ["propunere-modificare"]),
         ("Categorii și nomenclator", ["categorii", "nomenclator"]),
-        ("Setări și utilizatori", ["setari", "utilizatori", "actualizare"])
+        ("Setări și utilizatori", ["setari", "utilizatori", "actualizare", "elcomtur"])
     ];
 
     public const string Other = "Alte ferestre";

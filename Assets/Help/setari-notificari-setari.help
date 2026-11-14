@@ -6,6 +6,7 @@ Captura: pagina | /setari | click Notificări; click Setări notificări; full |
 
 O notificare rezolvată rămâne în lista „Rezolvate” a paginii Notificări. Cu ștergerea activată, notificările rezolvate mai vechi decât perioada aleasă se elimină din baza de date, o dată pe zi. Notificările nerezolvate nu se șterg niciodată.
 
+
 ## Elemente
 ### Ștergerea notificărilor rezolvate
 - Șterge notificările rezolvate mai vechi de | comutator | Pornește sau oprește ștergerea automată.
@@ -13,6 +14,8 @@ O notificare rezolvată rămâne în lista „Rezolvate” a paginii Notificări
 - Stare actuală | text | Ce este setat acum.
 - Salvează setările | buton | Salvează.
 - Renunță la modificări | buton | Revine la valorile salvate.
+### Avertizarea taskurilor
+- Avertizarea taskurilor înainte de termen | câmp | Cu câte zile înainte de termen se anunță taskurile utilizatorilor ([[taskurile-mele]]).
 
 ## Flux: Cum activez curățarea notificărilor vechi
 1. Pornește comutatorul de ștergere.

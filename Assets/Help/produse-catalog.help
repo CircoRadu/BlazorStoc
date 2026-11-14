@@ -5,6 +5,14 @@ Captura: pagina | /produse | | Catalogul de produse
 
 Catalogul arată toate produsele cu stocul lor. Poți căuta, filtra după categorie și disponibilitate, deschide mișcările unui produs și adăuga produse noi. Fereastra are două secțiuni: **Catalog** și **De regularizat**.
 
+**Parametri · Etichete**: Eticheta unui parametru e împărțită în parametru și valoare, ambele filtre (parametrul filtrează produsele care au o valoare pentru el, valoarea pe cea exactă); un parametru cu valoare fixă dintr-o familie arată numele familiei; „lipsește” marchează ce nu e completat.
+
+**Filtrat după**: Bara filtrelor active arată și filtrele pe parametru și etichetă.
+
+**Doar incomplete**: Arată doar produsele cu parametri necompletați.
+
+**Meniul Stoc**: Meniul secțiunii Stoc este un arbore (noduri intermediare pliabile) care își mărește lățimea după ramurile deschise; un clic pe numele unei categorii o deschide și rămâne deschisă (se închide doar cu săgeata); lista unui nod intermediar include frunzele de sub el.
+
 ## Elemente
 ### Antet
 - ← Meniu principal | buton | Revine la pagina principală.
@@ -31,6 +39,8 @@ Catalogul arată toate produsele cu stocul lor. Poți căuta, filtra după categ
 ### Subsol
 - Numărul de rezultate | text | Câte produse corespund filtrelor. | sel: .table-footer > span:first-child
 - Paginile | butoane | Catalogul are 10 produse pe pagină; săgețile trec la pagina anterioară sau următoare. | sel: .pagination
+### Noutăți
+- Editează | iconita:edit | Pe fiecare rând: deschide formularul de produs într-o fereastră.
 
 ## Flux: Cum caut un produs
 1. Scrie în câmpul de căutare o parte din codul sau din descrierea produsului.

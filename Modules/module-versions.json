@@ -167,8 +167,8 @@
                                                        ]
                                        },
                     "Anaf":  {
-                                 "version":  "1.0.1",
-                                 "hash":  "cac088db532d3d6507c9e6bb1f3e226abb24c661a2e19cd181bb1c55e0a9905b",
+                                 "version":  "1.1.0",
+                                 "hash":  "6f4599b022fe2500cbed1d8f4a71ac380d27020bbb371b350e461849f11f2432",
                                  "history":  [
                                                  {
                                                      "version":  "1.0.0",
@@ -179,6 +179,11 @@
                                                      "version":  "1.0.1",
                                                      "date":  "10.11.2026",
                                                      "note":  "Sectiunile paginii Preluare date ANAF sunt restranse implicit"
+                                                 },
+                                                 {
+                                                     "version":  "1.1.0",
+                                                     "date":  "14.11.2026",
+                                                     "note":  "Tab Factura in Setari -\u003e ANAF: autentificare OAuth2 cu ANAF (setari aplicatie, token criptat); pagina existenta devine Preluare date firme"
                                                  }
                                              ]
                              },
@@ -271,8 +276,8 @@
                                                  ]
                                  },
                     "Journal":  {
-                                    "version":  "1.6.2",
-                                    "hash":  "65b950da703baa7b116b1a7259150ad73b5f6d97514bbabaa2f1fa494071e547",
+                                    "version":  "1.6.3",
+                                    "hash":  "e956dfced55af53ddb27b8e56d8f7342ba0ad45b465d7a6f534c5f62d3a44790",
                                     "history":  [
                                                     {
                                                         "version":  "1.0.0",
@@ -458,6 +463,11 @@
                                                         "version":  "1.6.2",
                                                         "date":  "13.11.2026",
                                                         "note":  "Filtrul jurnalului are actiunea Intrerupere actualizare aplicatie"
+                                                    },
+                                                    {
+                                                        "version":  "1.6.3",
+                                                        "date":  "14.11.2026",
+                                                        "note":  "Filtrul de actiuni include operatiile de autentificare ANAF"
                                                     }
                                                 ]
                                 },

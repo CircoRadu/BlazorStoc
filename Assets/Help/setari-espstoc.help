@@ -1,0 +1,29 @@
+# Setări · Preluare stoc ESPStoc
+Ruta: /setari
+Tab: Preluare stoc ESPStoc
+Cautare: espstoc preluare stoc punct zero produse categorii parametri inghetate omise analiza export vechi
+
+Preia stocul din aplicația veche ESPStoc și stabilește punctul zero al gestiunii (produse, cantități, imagini). Analizezi exportul vechi, verifici produsele pe categorii, completezi parametrii acolo unde lipsesc și aplici punctul zero.
+
+## Elemente
+### Fișierul
+- Alege fișierul (încărcare) | câmp | Exportul ESPStoc încărcat de pe calculatorul tău.
+- Calea fișierului de pe server | câmp | Alternativ, calea unui fișier aflat pe server; „Analizează fișierul de pe server” îl citește.
+- Actualizează catalogul | buton | Aduce catalogul la zi înainte de analiză.
+- Renunță la analiză | buton | Abandonează analiza curentă.
+### Rezultatul analizei
+- Filtrele | buton | „cu probleme”, „cu parametri propuși (de verificat)”, „înghețate”, „omise” și „Arată toate produsele”.
+- Lista pe categorii | tabel | Categorii pliabile cu insigne; pe produs: cod vechi, subcategorie, stoc, rezultat în BlazorStoc, parametri, observații și comutatorul „Preia”.
+- Editorul de parametri | formular | Pe un produs: „Model (fără parametri)”, „Salvează parametrii”, „Preia înghețat, fără parametri”, „Renunță”.
+- Preia înghețate produsele fără parametri | buton | Preia toate produsele nerezolvate ca înghețate.
+### Punctul zero
+- Arată ce se șterge | buton | Arată tabelul „Se șterge” (rânduri) și pachetele care se șterg.
+- Aplică punctul zero | buton | Șterge stocul curent și scrie stocul preluat.
+- Jurnalul operațiunii, Ce nu a mers | text | Secțiuni pliabile cu desfășurarea și erorile.
+
+## Flux: Cum stabilesc punctul zero
+1. Încarcă exportul și analizează-l.
+2. Parcurge produsele cu probleme și cele cu parametri propuși; completează parametrii sau preia-le înghețate.
+3. Verifică „Arată ce se șterge”.
+4. Apasă „Aplică punctul zero”.
+Nota: operația înlocuiește stocul curent; verifică tabelul „Se șterge” înainte.

@@ -1,0 +1,16 @@
+# Setări · Catalog
+Ruta: /setari
+Tab: Catalog
+Cautare: catalog adancime arbore subcategorii perioada pastrare restaurare arhiva zile
+
+Secțiune pentru administratori: stabilești câte niveluri de subcategorii poate avea o categorie și cât timp poate fi restaurat un parametru, o familie sau o etichetă arhivată.
+
+## Elemente
+### Catalog
+- Adâncimea maximă a arborelui de subcategorii | câmp | Între 1 și 15 niveluri (implicit 10). Nu poate fi mai mică decât adâncimea arborelui existent, afișată sub câmp. Produsele se asociază doar subcategoriilor de la ultimul nivel.
+- Perioada de păstrare pentru restaurare (zile) | câmp | Cât timp un parametru, o familie sau o etichetă arhivată poate fi restaurată; după acest număr de zile poate fi lăsată definitiv fără restaurare ([[categorii-parametri]]).
+- Salvează | buton | Păstrează valorile.
+
+## Flux: Cum schimb adâncimea arborelui
+1. Alege valoarea dorită (nu sub adâncimea curentă).
+2. Apasă „Salvează”.
