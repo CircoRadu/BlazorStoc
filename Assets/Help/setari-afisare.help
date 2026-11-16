@@ -18,3 +18,9 @@ Pagina din meniul numelui tău din bara de sus. Aici îți alegi mărimea textul
 ### Roata de deasupra unui tabel
 - Roata | buton | Deschide setările acestui tabel: text, antet, imagini, iconițe. O valoare lăsată pe „Din setările globale” se ia din regulile globale.
 - Resetează tabelul | buton | Scoate setările proprii ale tabelului; tabelul folosește din nou regulile globale.
+
+## Flux: Cum îmi aleg aspectul aplicației
+1. Deschide meniul numelui tău din bara de sus și alege „Setări afișare”.
+2. Apasă o presetare (Compact, Normal sau Mare) sau alege separat mărimea fiecărui element; previzualizarea se schimbă pe loc.
+3. Pentru un singur tabel, deschide pagina cu tabelul (de exemplu Produse și stocuri) și apasă roata de deasupra lui; valorile alese acolo înlocuiesc regulile globale numai pentru acel tabel.
+4. „Resetează tabelul” revine la regulile globale, iar „Resetează tot” (din Setări afișare) revine la aspectul implicit.
