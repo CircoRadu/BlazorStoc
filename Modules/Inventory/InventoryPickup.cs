@@ -83,7 +83,7 @@ public interface IInventoryPickupBuilder
 // Matches OCR-scanned rows against the live catalogue and computes the warehouse-stock difference for each,
 // using the same "in depozit" value (excludes vehicles) the situatia de inventar PDF itself was built from
 // (InventoryReportBuilder), since "Valoare reala" is what the user physically counted in the warehouse.
-public sealed class InventoryPickupBuilder(IProductRepository products, IStockMovementRepository movements) : IInventoryPickupBuilder
+public sealed class InventoryPickupBuilder(IProductRepository products, IStockMovementRepository movements, ISubcategoryTree? tree = null) : IInventoryPickupBuilder
 {
     public async Task<InventoryPickupReview> BuildAsync(IReadOnlyList<InventoryPickupScanRow> rows, CancellationToken cancellationToken = default)
     {
@@ -111,7 +111,20 @@ public sealed class InventoryPickupBuilder(IProductRepository products, IStockMo
             // the (possibly wrong) recognized value happens to equal the current stock.
             if (line.Uncertain || line.Difference != 0) lines.Add(line);
         }
-        return new InventoryPickupReview(lines, notFound);
+
+        // Same order as the "Situatia de inventar" report (InventoryReportBuilder): categories alphabetically, subcategories in the
+        // order of the tree (then by name), and inside a subcategory the negative stock first, then by product name.
+        var nodes = tree is null ? [] : await tree.GetTreeAsync(cancellationToken).ConfigureAwait(false);
+        var place = new Dictionary<string, int>(StringComparer.Ordinal);
+        for (var index = 0; index < nodes.Count; index++) place[InventoryRules.Key(nodes[index].Category, nodes[index].Name)] = index;
+        var ordered = lines
+            .OrderBy(line => line.Category ?? "", StringComparer.CurrentCultureIgnoreCase)
+            .ThenBy(line => place.GetValueOrDefault(InventoryRules.Key(line.Category ?? "", line.Subcategory ?? ""), int.MaxValue))
+            .ThenBy(line => line.Subcategory ?? "", StringComparer.CurrentCultureIgnoreCase)
+            .ThenBy(line => line.CurrentStock < 0 ? 0 : 1)
+            .ThenBy(line => line.ProductName ?? "", StringComparer.OrdinalIgnoreCase)
+            .ToList();
+        return new InventoryPickupReview(ordered, notFound);
     }
 }
 

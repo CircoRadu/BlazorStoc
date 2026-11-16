@@ -1,0 +1,18 @@
+# Vizualizarea unei mișcări
+Cautare: vizualizare miscare intrare iesire parametri detalii istoric modificari
+
+Fereastra arată o intrare sau ieșire de stoc cu toți parametrii ei: data, tipul, numărul de bucăți, descrierea, proveniența sau destinația, referința și cine a creat-o sau a modificat-o. Se deschide din pagina produsului, cu iconița „Vezi” de pe rândul mișcării.
+
+## Elemente
+### Fereastra
+- Titlul | text | Tipul mișcării și data ei.
+- Editează | buton | În dreapta sus. Închide fereastra și deschide editarea mișcării; apare doar pentru cine are dreptul de modificare și numai pentru o mișcare care nu este stornată.
+- Parametrii mișcării | listă | Fiecare parametru pe un rând, doar cei pe care mișcarea îi are.
+- Istoricul modificărilor | secțiune | Închisă la deschiderea ferestrei; insigna arată câte modificări s-au făcut. Deschisă, listează fiecare modificare: data, utilizatorul, ce s-a schimbat și motivul.
+- Închide | buton | Închide fereastra; Escape face același lucru.
+
+## Flux: Cum văd o mișcare
+1. În pagina produsului, pe rândul mișcării, apasă iconița „Vezi”.
+2. Citește parametrii mișcării.
+3. Ca să vezi cine a modificat-o, deschide secțiunea „Istoricul modificărilor”.
+4. Ca să o corectezi, apasă „Editează” din dreapta sus.

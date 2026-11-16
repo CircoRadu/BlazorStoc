@@ -1963,3 +1963,10 @@ td.row-actions > .row-toggle { margin-right:10px; }
 .settings-tab:not(.active) .count-badge, .settings-subtab:not(.active) .count-badge, .invoice-page-tab:not(.active) .count-badge { background:var(--c-d6d6d6); color:var(--c-555555); }
 .settings-tab.needs-attention:not(.active) { background:var(--c-fbeceb); border-color:var(--c-e1b4b0); color:var(--c-a63a32); box-shadow:inset 0 3px 0 var(--c-a63a32); }
 .settings-section-bar .settings-tab:not(.active) { background:none; border:0; box-shadow:none; }
+
+/* Vizualizarea unei miscari: butonul de editare in dreapta sus, parametrii pe doua coloane, istoricul in sectiune pliabila. */
+.movement-view-top { display:flex; justify-content:flex-end; margin-bottom:12px; }
+.movement-view-facts { display:grid; grid-template-columns:max-content 1fr; gap:8px 18px; margin:0 0 18px; font-size:14px; }
+.movement-view-facts dt { color:var(--c-748a7e); font-weight:600; }
+.movement-view-facts dd { margin:0; overflow-wrap:anywhere; }
+.movement-view .collapsible-section { margin-bottom:16px; }

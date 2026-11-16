@@ -210,7 +210,7 @@ public sealed class InventoryPickupOcrService : IInventoryPickupOcrService, IDis
     private static List<GridLine> FindPageGridLines(PreparedPage prepared, InventoryTableColumns columns, double scale, bool debug)
     {
         var gray = prepared.Gray;
-        var gridLines = FindGridLines(prepared.Binary);
+        var gridLines = NormalizeLineExtents(FindGridLines(prepared.Binary), gray.Cols);
         var legacyLeft = ToPixel(columns.NumberX, scale, gray.Cols);
         var legacyRight = ToPixel(columns.RightEdge, scale, gray.Cols);
         if (gridLines.Count < 2)
@@ -408,7 +408,7 @@ public sealed class InventoryPickupOcrService : IInventoryPickupOcrService, IDis
     private static int ToPixel(double points, double scale, int max) => Math.Clamp((int)Math.Round(points * scale), 0, max - 1);
 
     // A grid rule line found in the page: its row (y) and horizontal extent.
-    private sealed record GridLine(int Y, int Left, int Right);
+    internal sealed record GridLine(int Y, int Left, int Right);
 
     // The table grid is read from the scan itself, not from the generated PDF's geometry, because a printed-then-
     // scanned page rarely lands on those coordinates (printer scaling, feed offset - a real Konica Minolta scan of
@@ -454,6 +454,20 @@ public sealed class InventoryPickupOcrService : IInventoryPickupOcrService, IDis
         }
         if (runStart >= 0) Flush(runStart, previous);
         return lines;
+    }
+
+    // A rule of the table can come out shorter than its neighbours (a pen stroke or a speck of dirt breaks it near an end, so only its longest stretch
+    // is kept: x=304 instead of ~216 on a real scan). Its row then fails the border test and the two rows next to it were silently dropped from the
+    // review. A line that stops short of the usual left/right edge of the page's rules is therefore taken out to that edge; the vertical
+    // borders are still checked per row, so a band that really has no table borders stays "between tables".
+    internal static List<GridLine> NormalizeLineExtents(List<GridLine> lines, int pageWidth)
+    {
+        if (lines.Count < 3) return lines;
+        var usualLeft = lines.Select(line => line.Left).Order().ElementAt(lines.Count / 2);
+        var usualRight = lines.Select(line => line.Right).Order().ElementAt(lines.Count / 2);
+        // A break can be as wide as a handwritten number crossing the rule (right end cut at x=1454 of 2281 on a real scan), so there is no tolerance:
+        // every rule long enough to count as one is taken out to the usual edges.
+        return lines.Select(line => new GridLine(line.Y, Math.Min(line.Left, usualLeft), Math.Max(line.Right, usualRight))).ToList();
     }
 
     // Longest stretch of non-zero entries, bridging gaps of up to maxGap zeros (a scanned rule has small breaks).

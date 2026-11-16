@@ -279,7 +279,7 @@ else
                         <th aria-sort="@(descending ? "descending" : "ascending")"><button class="sort-header" @onclick="ToggleSortAsync" aria-label="Sortează după dată @(descending ? "crescător" : "descrescător")">DATA <span aria-hidden="true">@(descending ? "▼" : "▲")</span></button></th>
                         @if (showOperator) { <th>OPERATOR</th> }
                         <th>INTRARE/IEȘIRE</th><th class="number">NUMĂR BUCĂȚI</th><th>DESCRIERE</th><th>FURNIZOR / FACTURĂ</th><th>BENEFICIAR/PROIECT</th><th>VEHICUL</th>
-                        @if (canManage) { <th><span class="sr-only">Acțiuni</span></th> }
+                        <th><span class="sr-only">Acțiuni</span></th>
                     </tr></thead>
                     <tbody>
                         @foreach (var m in pageData.Items)
@@ -313,9 +313,10 @@ else
                                     @if (m.VehiclePlate is not null) { <span class="movement-project">în <a class="category-table-link" href="@VehicleNavigation.PageUrl(m.VehicleId!.Value)">@m.VehiclePlate</a> <button type="button" class="audit-filter-link filter-hint" title="Filtrează după acest vehicul" aria-label="Filtrează după acest vehicul" @onclick="() => FilterByVehicleAsync(m.VehicleId!.Value)">⌕</button></span> }
                                     @if (m.SourceVehiclePlate is not null) { <span class="movement-project">din <a class="category-table-link" href="@VehicleNavigation.PageUrl(m.SourceVehicleId!.Value)">@m.SourceVehiclePlate</a> <button type="button" class="audit-filter-link filter-hint" title="Filtrează după acest vehicul" aria-label="Filtrează după acest vehicul" @onclick="() => FilterByVehicleAsync(m.SourceVehicleId!.Value)">⌕</button></span> }
                                 </td>
-                                @if (canManage)
-                                {
-                                    <td class="movement-actions">
+                                <td class="movement-actions">
+                                    <button type="button" class="row-icon view" aria-label="Vezi mișcarea din @StockMovementRules.DisplayDate(m.Date)" title="Vezi mișcarea din @StockMovementRules.DisplayDate(m.Date)" @onclick="() => OpenViewAsync(m)"></button>
+                                    @if (canManage)
+                                    {
                                         @if (!m.IsVoided && stockModify)
                                         {
                                             @if (!Blocked) { <button class="row-icon edit" aria-label="Editează mișcarea din @StockMovementRules.DisplayDate(m.Date)" @onclick="() => OpenEditAsync(m)" title="Editează mișcarea din @StockMovementRules.DisplayDate(m.Date)"></button> }
@@ -330,8 +331,8 @@ else
                                             }
                                         }
                                         @if (m.Modified) { <button class="row-icon history" aria-label="Istoricul modificărilor mișcării din @StockMovementRules.DisplayDate(m.Date)" title="Istoricul modificărilor mișcării din @StockMovementRules.DisplayDate(m.Date)" @onclick="() => OpenHistoryAsync(m)"></button> }
-                                    </td>
-                                }
+                                    }
+                                </td>
                             </tr>
                         }
                     </tbody>
@@ -457,6 +458,42 @@ else
                 <button type="button" class="refresh act-close" disabled="@voidBusy" @onclick="CancelVoid">Renunț</button>
             </div>
     </AppDialog>
+}
+
+@if (viewing is not null)
+{
+    <AppDialog TitleId="movement-view-title" HelpTopic="produse-miscare-vizualizare" HelpAbout="Vizualizarea unei mișcări" PanelClass="movement-dialog movement-view" OnKeyDown="ViewKey" OnClose="CloseView"><TitleContent>@StockMovementRules.KindLabel(viewing.Kind) din @StockMovementRules.DisplayDate(viewing.Date)</TitleContent><ChildContent>
+            @if (CanEditViewing)
+            {
+                <div class="movement-view-top"><button type="button" class="refresh act-edit" @onclick="EditFromViewAsync">Editează</button></div>
+            }
+            <dl class="movement-view-facts">
+                @foreach (var fact in ViewFacts(viewing))
+                {
+                    <dt>@fact.Label</dt><dd>@fact.Value</dd>
+                }
+            </dl>
+            <CollapsibleSection Id="movement-view-history" Expanded="viewHistoryOpen" ExpandedChanged="value => viewHistoryOpen = value">
+                <Header><span>Istoricul modificărilor</span><span class="count-badge" aria-label="@($"{viewHistory.Count} modificări")">@viewHistory.Count</span></Header>
+                <ChildContent>
+                    @if (viewHistoryLoading) { <p class="muted">Se încarcă istoricul…</p> }
+                    else if (viewHistoryError is not null) { <div class="error-banner" role="alert">@viewHistoryError</div> }
+                    else if (viewHistory.Count == 0) { <p class="muted">Nu există modificări înregistrate.</p> }
+                    else
+                    {
+                        <ol class="movement-history-list">
+                            @foreach (var entry in viewHistory)
+                            {
+                                <li><strong>@entry.TimestampUtc.ToLocalTime().ToString("dd.MM.yyyy HH:mm")</strong> · @entry.Actor
+                                    <div>@StockMovementRules.NormalizeDisplayDates(entry.Changes)</div>
+                                    <div class="muted">Motiv: @entry.Reason</div></li>
+                            }
+                        </ol>
+                    }
+                </ChildContent>
+            </CollapsibleSection>
+            <div class="editor-actions"><button type="button" class="primary" autofocus @onclick="CloseView">Închide</button></div>
+    </ChildContent></AppDialog>
 }
 
 @if (historyFor is not null)

@@ -167,8 +167,8 @@
                                                        ]
                                        },
                     "Anaf":  {
-                                 "version":  "1.1.0",
-                                 "hash":  "6f4599b022fe2500cbed1d8f4a71ac380d27020bbb371b350e461849f11f2432",
+                                 "version":  "1.1.1",
+                                 "hash":  "e9fcccef240980ffe5a172483d391a6ca15845d9375286b1c37f11ca424f49c6",
                                  "history":  [
                                                  {
                                                      "version":  "1.0.0",
@@ -184,6 +184,11 @@
                                                      "version":  "1.1.0",
                                                      "date":  "14.11.2026",
                                                      "note":  "Tab Factura in Setari -\u003e ANAF: autentificare OAuth2 cu ANAF (setari aplicatie, token criptat); pagina existenta devine Preluare date firme"
+                                                 },
+                                                 {
+                                                     "version":  "1.1.1",
+                                                     "date":  "16.11.2026",
+                                                     "note":  "Registrul de versiuni resincronizat (sursele modulului neschimbate fata de 0.5.87)"
                                                  }
                                              ]
                              },
@@ -204,8 +209,8 @@
                                                ]
                                },
                     "Inventory":  {
-                                      "version":  "1.1.1",
-                                      "hash":  "85302e6545efcd05f66a049ed40c10e6affe6727f2a91bfeb0c6eb82abd05936",
+                                      "version":  "1.1.2",
+                                      "hash":  "df098d51cb918b437b2e7bda39824aea8bbd1eded7ae8b6ab45b3651fd48bf10",
                                       "history":  [
                                                       {
                                                           "version":  "1.0.0",
@@ -221,6 +226,11 @@
                                                           "version":  "1.1.1",
                                                           "date":  "10.11.2026",
                                                           "note":  "Ferestrele folosesc componenta globala AppDialog (bara cu butoane deasupra panoului)"
+                                                      },
+                                                      {
+                                                          "version":  "1.1.2",
+                                                          "date":  "16.11.2026",
+                                                          "note":  "Preluare inventar: produsele in aceeasi ordine ca in situatia de inventar"
                                                       }
                                                   ]
                                   },

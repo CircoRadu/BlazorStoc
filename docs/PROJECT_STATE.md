@@ -9,6 +9,8 @@ Actualizat: 09.11.2026, Europe/Bucharest (Claude, agent unic, mod `claude_only`)
 - Motorul de facturi este geometric (`Services/Invoices`); utilizatorii obisnuiti creeaza/modifica sabloane, stergerea ramane administratorului.
 - Harta codului: `docs/HARTA_COD.md`. Reguli permanente: `CLAUDE.md`.
 
+## Versiunea 0.5.88 (16.11.2026): ordine la preluare inventar, OCR cu linii intrerupte, fereastra "Vezi" a unei miscari (detalii in IMPLEMENTED.md)
+
 ## Versiunea 0.5.81 (12.11.2026): BUG-0031 + PROP-0022
 - BUG-0031: ordonarea prin tragere a randurilor din Folosite (Tichet exemplu) nu primea drop-ul (evenimente la server la fiecare dragover); acum wwwroot/notes-order.js (ca category-order.js) accepta drop-ul in browser si cheama TicketSampleDialog.MoveNotes(key, targetKey) (JSInvokable). Verificat: logica JS pe un tabel de proba (dragstart/dragover/drop sintetice) si testul bUnit (MoveNotes); nu in fereastra reala (cere ActivityApp).
 - PROP-0022: in fisa beneficiarului, coloana Descriere a punctelor de lucru arata cate o linie Arondat: nume pentru fiecare punct arondat (BeneficiaryDetail.razor, AttachedNames); neverificat in browser (salvarea unui punct arondat de proba nu a reusit din UI-ul automatizat).

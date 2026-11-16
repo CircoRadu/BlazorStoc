@@ -1,3 +1,12 @@
+## 0.5.88 | 16.11.2026
+### Funcționalități noi
+- În pagina unui produs, fiecare mișcare are iconița „Vezi”: fereastra arată toți parametrii mișcării, butonul „Editează” în dreapta sus și, într-o secțiune pliabilă, istoricul modificărilor cu numărul lor.
+### Bugs
+- Preluare inventar: produsele apar în aceeași ordine ca în situația de inventar (categorii, subcategorii în ordinea arborelui, stocurile negative primele).
+- Citirea foii scanate nu mai sare peste rânduri când o linie a tabelului este întreruptă de scris de mână.
+### Diverse
+- Modulele Inventar 1.1.2 și ANAF 1.1.1.
+
 ## 0.5.87 | 14.11.2026
 ### Funcționalități noi
 - Setări → ANAF are acum două sub-secțiuni: „Preluare date firme” (configuratorul de până acum) și „E-Factura”, cu autentificarea aplicației în ANAF (OAuth2): datele aplicației înregistrate la ANAF, autentificarea cu certificatul calificat, reînnoirea și ștergerea tokenului; secretul și tokenul se păstrează criptate, iar operațiile sunt jurnalizate.

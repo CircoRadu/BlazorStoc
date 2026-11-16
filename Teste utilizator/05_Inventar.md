@@ -83,3 +83,16 @@ Pasi:
 |---|---|---|---|
 | 1 | Inventar -> selecteaza categorii -> "Genereaza situatia de inventar" | Dialogul se deschide cu PDF-ul afisat pe toata inaltimea | |
 | 2 | Apasa "Imprima" si "Salveaza" | Pornesc imprimarea, respectiv descarcarea fisierului | |
+
+## Modificari de testat - ordinea la preluare si citirea scanului (16.11.2026, versiunea 0.5.88)
+
+**Ce s-a adaugat:** lista de la Preluare inventar are aceeasi ordine ca situatia de inventar; citirea scanului nu mai pierde randuri cand o linie a tabelului este intrerupta de scris.
+
+**Ce face acum:** categoriile sunt alfabetic, subcategoriile in ordinea din arbore, in fiecare produsele cu stoc negativ primele, apoi dupa cod. Randurile de langa o linie intrerupta (ex. scris peste ea) sunt citite.
+
+| Pas | Ce faci | Ce trebuie sa vezi | OK |
+|---|---|---|---|
+| 1 | Genereaza situatia de inventar si noteaza ordinea subcategoriilor si a produselor | - | |
+| 2 | Preluare inventar -> incarca scanul foii completate | Subcategoriile si produsele apar in aceeasi ordine ca pe foaie | |
+| 3 | La un scan cu scris peste linia tabelului, verifica pozitiile din jurul ei | Pozitiile apar in lista (daca au diferenta de stoc) | |
+| 4 | Un produs cu valoarea scrisa egala cu stocul curent | Nu apare in lista (nu are de corectat), este normal | |

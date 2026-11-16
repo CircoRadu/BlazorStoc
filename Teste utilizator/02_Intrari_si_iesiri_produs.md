@@ -179,3 +179,16 @@ Neverificat încă: legarea de bonul de consum / storno (Task următor).
 
 - Formularul de iesire (Referinta, panoul de iesire repetata, nota de depasire) pe latime de telefon: fara depasiri orizontale.
 - Filtrele noi se aseaza pe mai multe randuri.
+
+## Modificari de testat - fereastra "Vezi" a unei miscari (16.11.2026, versiunea 0.5.88)
+
+**Ce s-a adaugat:** iconita "Vezi" pe fiecare rand de miscare, cu o fereastra de detalii.
+
+**Ce face acum:** fereastra arata toti parametrii miscarii, butonul "Editeaza" in dreapta sus si, intr-o sectiune pliabila inchisa implicit, istoricul modificarilor cu insigna numarului de modificari.
+
+| Pas | Ce faci | Ce trebuie sa vezi | OK |
+|---|---|---|---|
+| 1 | Produse -> un produs -> Intrari/iesiri; apasa iconita "Vezi" de pe un rand | Se deschide fereastra cu data, tipul, bucatile, descrierea, provenienta/destinatia, creat de/la | |
+| 2 | Deschide sectiunea "Istoricul modificarilor" la o miscare modificata | Insigna arata numarul; lista are data, utilizatorul, schimbarea si motivul | |
+| 3 | Apasa "Editeaza" din dreapta sus | Fereastra se inchide si se deschide editarea miscarii | |
+| 4 | O miscare stornata sau un utilizator fara drept de modificare | "Editeaza" lipseste; iconita "Vezi" ramane | |
