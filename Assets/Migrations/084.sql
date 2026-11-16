@@ -6,7 +6,7 @@
 -- column: user_display_settings.settings
 -- statement
 CREATE TABLE IF NOT EXISTS `user_display_settings` (
-  `user_id` INT NOT NULL,
+  `user_id` BIGINT NOT NULL,
   `scope` VARCHAR(80) NOT NULL,
   `settings` VARCHAR(1000) NOT NULL DEFAULT '',
   `updated_utc` VARCHAR(40) NOT NULL DEFAULT '',
