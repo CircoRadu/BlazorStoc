@@ -445,6 +445,11 @@ public static class AuditActions
     public const string ApplicationUpdateRefused = "Actualizare refuzată";
     public const string ApplicationRollback = "Revenire la versiunea anterioară";
     public const string ApplicationUpdateAcknowledged = "Confirmare eșec actualizare";
+    // OCR learning of the inventory take-over (Inventar -> Invatare OCR): the corrections of a confirmed take-over are saved, the user then chooses what the reading learns from, ignores a correction or resets what was learned.
+    public const string SaveOcrCorrections = "Salvare corecții OCR";
+    public const string LearnOcr = "Învățare OCR";
+    public const string IgnoreOcrCorrection = "Ignorare corecție OCR";
+    public const string ResetOcrLearning = "Resetare învățare OCR";
 
     // Operations that remove their object: earlier events about it stop linking to its page.
     public static bool IsDeletion(string? action) => action is Delete or DeleteInvoiceTemplate or DeleteUserTask;

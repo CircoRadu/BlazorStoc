@@ -20,6 +20,7 @@ public static class StructureChecks
             "Route: a product address is recognised, the main page has no steps and a detail page links back to its list");
         Routes(check);
         SettleNumbers(check);
+        OcrLearningChecks.Run(check);
         OverStock(check);
         PermissionCatalog(check);
         LoginRateLimits(check);

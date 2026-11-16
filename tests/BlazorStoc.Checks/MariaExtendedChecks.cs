@@ -50,6 +50,7 @@ public static partial class MariaExtendedChecks
             await Section("User tasks: creation, access of the user, taking over, status, files, moves, alerts, warning days, deletion, journal", () => UserTasksAsync(configuration, admin, audit, probe));
             await Section("User types: system types, catalog permissions, seeding, assignment", () => UserTypesAsync(configuration, admin, audit, probe));
             await Section("Stock permissions: each kind of movement asks for its own key", () => StockPermissionsAsync(configuration, admin, audit));
+            await Section("OCR learning: corrections of the inventory take-over, list, decisions (administrator), reset, journal", () => OcrLearningAsync(configuration, admin, audit, probe));
             await Section("Module state: modules stopped by hand are saved, put back at restart, journal", () => ModuleStateAsync(configuration, admin, audit, probe));
             await Section("Activity import: settings with encrypted password, test, structure state, ticket types, journal, administrator only", () => ActivityImportAsync(configuration, admin, audit, probe));
             await Section("Activity import partners: simulation, application, ties, problems, journal, administrator only", () => ActivityPartnersAsync(configuration, admin, audit, probe));

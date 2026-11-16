@@ -221,6 +221,8 @@ public static class HelpChecks
         "nomenclator-analizor-risc", "analizor-risc-editor", "beneficiari-fisiere",
         // New 06.11.2026: needs an ActivityApp connection to be photographed; the picture is made on request (docs/HELP_DE_REGENERAT.md).
         "setari-tichet-exemplu",
+        // New 16.11.2026: the OCR learning list of the inventory take-over; the picture is made on request (docs/HELP_DE_REGENERAT.md).
+        "inventar-invatare-ocr",
         // New 16.11.2026: the view window of a stock movement; the picture is made on request (docs/HELP_DE_REGENERAT.md).
         "produse-miscare-vizualizare",
         // New 07.11.2026: the popup of the menu entry "Raporteaza o eroare"; the picture is made on request (docs/HELP_DE_REGENERAT.md).

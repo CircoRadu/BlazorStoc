@@ -209,8 +209,8 @@
                                                ]
                                },
                     "Inventory":  {
-                                      "version":  "1.1.2",
-                                      "hash":  "df098d51cb918b437b2e7bda39824aea8bbd1eded7ae8b6ab45b3651fd48bf10",
+                                      "version":  "1.3.0",
+                                      "hash":  "b7981a3e3286093f13057e3ede27053c1d8d52c3e8784d91e555fd11f73d7d5c",
                                       "history":  [
                                                       {
                                                           "version":  "1.0.0",
@@ -231,6 +231,21 @@
                                                           "version":  "1.1.2",
                                                           "date":  "16.11.2026",
                                                           "note":  "Preluare inventar: produsele in aceeasi ordine ca in situatia de inventar"
+                                                      },
+                                                      {
+                                                          "version":  "1.2.0",
+                                                          "date":  "16.11.2026",
+                                                          "note":  "Invatare OCR: corectiile utilizatorului la preluarea inventarului se salveaza (cifra citita / cifra corecta, captura din formular), lista Invatare OCR cu decizii globale (invata / ignora / reseteaza)"
+                                                      },
+                                                      {
+                                                          "version":  "1.2.1",
+                                                          "date":  "16.11.2026",
+                                                          "note":  "Invatare OCR: limita de 1000 de esantioane (cele mai vechi Noi/Ignorate se sterg primele, cele Invatate raman)"
+                                                      },
+                                                      {
+                                                          "version":  "1.3.0",
+                                                          "date":  "16.11.2026",
+                                                          "note":  "Invatare OCR etapa 4: citirea unui formular nou foloseste corectiile marcate Invatat (cifra nesigura inlocuita cu cea pusa de utilizator, rand marcat de verificat cu nota)"
                                                       }
                                                   ]
                                   },
@@ -286,8 +301,8 @@
                                                  ]
                                  },
                     "Journal":  {
-                                    "version":  "1.6.3",
-                                    "hash":  "e956dfced55af53ddb27b8e56d8f7342ba0ad45b465d7a6f534c5f62d3a44790",
+                                    "version":  "1.6.4",
+                                    "hash":  "1b64c4bfe54e1aa615f1b8ee468e16fc9ee45c8b61ae23e8745bacc2c5f324af",
                                     "history":  [
                                                     {
                                                         "version":  "1.0.0",
@@ -478,6 +493,11 @@
                                                         "version":  "1.6.3",
                                                         "date":  "14.11.2026",
                                                         "note":  "Filtrul de actiuni include operatiile de autentificare ANAF"
+                                                    },
+                                                    {
+                                                        "version":  "1.6.4",
+                                                        "date":  "16.11.2026",
+                                                        "note":  "Filtrul de actiuni contine operatiile Invatare OCR (salvare corectii, invatare, ignorare, resetare)"
                                                     }
                                                 ]
                                 },

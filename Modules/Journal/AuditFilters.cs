@@ -45,6 +45,8 @@ public static class AuditFilterOptions
         (AuditActions.ApplicationUpdateSucceeded, AuditActions.ApplicationUpdateSucceeded), (AuditActions.ApplicationUpdateInstaller, AuditActions.ApplicationUpdateInstaller),
         (AuditActions.ApplicationUpdateFailed, AuditActions.ApplicationUpdateFailed), (AuditActions.ApplicationUpdateRefused, AuditActions.ApplicationUpdateRefused),
         (AuditActions.ApplicationRollback, AuditActions.ApplicationRollback), (AuditActions.ApplicationUpdateAcknowledged, AuditActions.ApplicationUpdateAcknowledged),
+        (AuditActions.SaveOcrCorrections, AuditActions.SaveOcrCorrections), (AuditActions.LearnOcr, AuditActions.LearnOcr),
+        (AuditActions.IgnoreOcrCorrection, AuditActions.IgnoreOcrCorrection), (AuditActions.ResetOcrLearning, AuditActions.ResetOcrLearning),
         (AuditActions.Create, "Adăugare"), (AuditActions.Edit, "Editare"), (AuditActions.Delete, "Ștergere"), (AuditActions.Login, "Conectare"),
         (AuditActions.Logout, "Deconectare"), (AuditActions.LoginFailed, AuditActions.LoginFailed), (AuditActions.Unlock, "Deblocare"), (AuditActions.Generate, "Generare"),
         (AuditActions.ExportJournal, AuditActions.ExportJournal),

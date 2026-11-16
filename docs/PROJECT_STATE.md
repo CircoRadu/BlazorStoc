@@ -9,6 +9,10 @@ Actualizat: 09.11.2026, Europe/Bucharest (Claude, agent unic, mod `claude_only`)
 - Motorul de facturi este geometric (`Services/Invoices`); utilizatorii obisnuiti creeaza/modifica sabloane, stergerea ramane administratorului.
 - Harta codului: `docs/HARTA_COD.md`. Reguli permanente: `CLAUDE.md`.
 
+## Versiunea 0.5.89 (16.11.2026): Invatare OCR la preluarea inventarului (detalii in IMPLEMENTED.md, design in docs/PROPUNERE_INVATARE_OCR.md)
+
+- Modul Inventar 1.3.0: `Modules/Inventory/OcrLearning.cs` (corectii, `MariaOcrLearningService`, `OcrCalibrationRules`), pagina `InventoryOcrLearning.razor` (/inventar/invatare-ocr), migrarea 089 (`ocr_learning_sessions`, `ocr_learning_samples`, max 1000 de esantioane); OCR-ul pastreaza poza celulei si cifrele (`InventoryPickupDigit`); teste: grupul `ocrlearning`, sectiunea MariaDB "OCR learning". Ramas: verificarea in browser a salvarii corectiilor din pagina de preluare (backup-ul nu a rulat pe instanta de test).
+
 ## Versiunea 0.5.88 (16.11.2026): ordine la preluare inventar, OCR cu linii intrerupte, fereastra "Vezi" a unei miscari (detalii in IMPLEMENTED.md)
 
 ## Versiunea 0.5.81 (12.11.2026): BUG-0031 + PROP-0022

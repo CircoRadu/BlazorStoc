@@ -941,3 +941,7 @@ BUG-0021, BUG-0022, BUG-0023 (versiunea 0.5.75) (12.11.2026): Fereastra Tichet e
 BUG-0024, informatii obligatorii si format observatii (versiunea 0.5.76) (12.11.2026): Fereastra Tichet exemplu cu date reale ActivityApp (autentificare Windows) si observatiile aldine in Mentenanta: de verificat de utilizator.
 
 Versiunea 0.5.87: ANAF cu sub-taburi (Preluare date firme, E-Factura) si ajutorul actualizat (14.11.2026): Autentificarea reala in ANAF (E-Factura) nu e testata: cere cont ANAF, certificat calificat si o adresa de raspuns HTTPS inregistrata la ANAF; tokenul obtinut nu e folosit inca pentru facturi.
+
+Invatare OCR la preluarea inventarului (etapele 1-3) (16.11.2026): Preluare end-to-end cu un scan real si produse reale (salvarea corectiilor din pagina de preluare) si etapa 4 (folosirea invatarii la citire)
+
+Invatare OCR etapa 4 si 5 (calibrare pe cifre, teste) (16.11.2026): Preluarea completa pana la salvarea corectiilor in browser nu a mers: backup-ul de siguranta nu ruleaza pe instanta de test, deci salvarea e acoperita doar de testul MariaDB

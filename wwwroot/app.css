@@ -1970,3 +1970,10 @@ td.row-actions > .row-toggle { margin-right:10px; }
 .movement-view-facts dt { color:var(--c-748a7e); font-weight:600; }
 .movement-view-facts dd { margin:0; overflow-wrap:anywhere; }
 .movement-view .collapsible-section { margin-bottom:16px; }
+.ocr-shot { position:relative; width:220px; max-width:100%; border:1px solid var(--line); border-radius:5px; background:var(--c-ffffff); overflow:hidden; }
+.ocr-shot img { display:block; width:100%; height:100%; }
+.ocr-shot-box { position:absolute; border:2px solid var(--c-b3675a); border-radius:3px; pointer-events:none; }
+.ocr-state { display:inline-block; padding:5px 10px; border-radius:5px; font-size:10px; font-weight:600; background:var(--c-eef3ef); color:var(--c-748a7e); }
+.ocr-state-learned { background:var(--c-eaf5ee); color:var(--c-3a8964); }
+.ocr-state-ignored { background:var(--c-fbf4e6); color:var(--c-a78135); }
+.ocr-learning-actions .editor-actions { margin-top:12px; }

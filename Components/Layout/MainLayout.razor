@@ -69,6 +69,7 @@
                 <ChildContent>
                     <AuthorizeView Policy="perm:inventar.view"><Authorized><NavLink href="/inventar" Match="NavLinkMatch.All">Generare situație inventar</NavLink></Authorized></AuthorizeView>
                     <AuthorizeView Policy="perm:inventar-preluare.view"><Authorized><NavLink href="/inventar/preluare" Match="NavLinkMatch.Prefix">Preluare inventar</NavLink></Authorized></AuthorizeView>
+                    <AuthorizeView Policy="perm:inventar-preluare.view"><Authorized><NavLink href="/inventar/invatare-ocr" Match="NavLinkMatch.Prefix">Învățare OCR</NavLink></Authorized></AuthorizeView>
                 </ChildContent>
             </CollapsibleSection></Authorized></AuthorizeView>
             }

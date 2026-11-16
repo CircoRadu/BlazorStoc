@@ -1015,3 +1015,14 @@ Cerut de utilizator la 06.10.2026 (verificarea fluxului, apoi deciziile: facturi
 - Citirea scanului (OCR): o linie de tabel intrerupta de scris de mana era detectata mai scurta si cele doua randuri vecine dispareau tacut din lista (pe un scan real 8 randuri din 341); liniile se extind acum pana la marginile obisnuite ale paginii (`NormalizeLineExtents`, test in `StructureChecks`).
 - Produse -> Intrari/iesiri: iconita "Vezi" pe fiecare rand; fereastra cu toti parametrii miscarii, buton Editeaza in dreapta sus si istoricul modificarilor in sectiune pliabila (inchisa implicit) cu insigna numarului; topic de help `produse-miscare-vizualizare` (captura la cerere).
 - Anaf 1.1.1: registrul de versiuni resincronizat (sursele nemodificate).
+
+## Finalizat la 16.11.2026 18:37 - Invatare OCR la preluarea inventarului (etapele 1-3)
+
+- OCR pastreaza poza celulei si cifrele citite (casete, top 3, imagine 28x28); la preluarea confirmata se compara valoarea citita cu cea trimisa si se salveaza corectiile (cifra / segmentare) in ocr_learning_sessions si ocr_learning_samples (migrarea 089, max 1000 esantioane)
+- Pagina /inventar/invatare-ocr: lista cu captura, filtre, decizii globale ale administratorului (Invata / Ignora / Marcheaza nou / Reseteaza); jurnal cu actiuni proprii; module Inventory 1.2.1, Journal 1.6.4
+- Verificari: grupurile structure, help, moduleversions, ocrlearning; sectiunea MariaDB OCR learning (16); browser pe instanta de test cu esantioane seed (lista, invatare, resetare, jurnal)
+
+## Finalizat la 16.11.2026 19:11 - Invatare OCR etapa 4 si 5 (calibrare pe cifre, teste)
+
+- Citirea unui formular nou aplica corectiile marcate Invatat (OcrCalibrationRules: cifra sub 90% incredere inlocuita daca invatata de >=2 ori, >=50% din ce s-a invatat pentru cifra si in top 3), rand marcat de verificat cu nota; Inventory 1.3.0
+- Verificari: grupurile structure, help, moduleversions, ocrlearning, ocrworker (196); MariaDB OCR learning (17); scanare reala cu captura cifrelor; browser pe pagina de preluare cu scan real si produse de test (citire, potrivire, selectie, dialog de confirmare)

@@ -71,6 +71,7 @@ data = await new DemoProductRepository().GetProductsAsync();
             ["appdialog"] = () => PopupScriptChecks.RunAsync(Check),
             ["elcomtur"] = () => ElcomturChecks.RunAsync(Check),
             ["ocrworker"] = () => OcrWorkerChecks.RunAsync(Check),
+            ["ocrlearning"] = async () => { OcrLearningChecks.Run(Check); await OcrLearningChecks.ScanAsync(Check); },
             ["backupworker"] = () => BackupWorkerChecks.RunAsync(Check),
             ["runtracking"] = () => RunTrackingChecks.RunAsync(Check)
         };
