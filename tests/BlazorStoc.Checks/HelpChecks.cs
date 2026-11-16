@@ -234,7 +234,9 @@ public static class HelpChecks
         // New 09.11.2026: tasks of users on beneficiaries (module Taskuri); the pictures are made on request (docs/HELP_DE_REGENERAT.md).
         "taskuri-adauga", "taskurile-mele", "task-formular", "task-detalii", "notificari-taskuri",
         // New 14.11.2026: topics of the settings sections and the Elcomtur page written from the interface; the pictures are made on request (docs/HELP_DE_REGENERAT.md).
-        "setari-preluare-activityapp", "setari-preluare-elcomtur", "elcomtur-preluare", "setari-espstoc", "setari-catalog", "setari-baza-spatiu", "setari-dezvoltare", "setari-autentificare"
+        "setari-preluare-activityapp", "setari-preluare-elcomtur", "elcomtur-preluare", "setari-espstoc", "setari-catalog", "setari-baza-spatiu", "setari-dezvoltare", "setari-autentificare",
+        // New 16.11.2026: user display settings (PROP-0034); the picture is made on request (docs/HELP_DE_REGENERAT.md).
+        "setari-afisare"
     };
 
     // Elements that the demo environment cannot show in the state they describe (topic key|element name); the list only shrinks.

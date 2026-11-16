@@ -20,6 +20,7 @@
             <div class="account-head"><strong>@display</strong><small>@name · @role</small></div>
             @if (tasks.HasUser) { <a class="account-item" role="menuitem" href="/taskurile-mele" @onclick="Close">Taskurile mele @if (tasks.NotAccepted > 0) { <span class="account-badge">@tasks.NotAccepted</span> }</a> }
             <a class="account-item" role="menuitem" href="/Account/TwoFactor" @onclick="Close">Autentificatorul meu</a>
+            <a class="account-item" role="menuitem" href="/setari-afisare" @onclick="Close">Setări afișare</a>
             <button type="button" class="account-item" role="menuitem" disabled="@(!canChangePassword)" @onclick="OpenPassword"
                     title="@(canChangePassword ? "Schimbă parola contului tău" : "Parola administratorului din configurare se schimbă din fișierul de configurare")">Schimbă parola</button>
             @if (!canChangePassword) { <span class="account-note">Parola acestui cont este în fișierul de configurare.</span> }

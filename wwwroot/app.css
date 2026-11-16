@@ -1977,3 +1977,36 @@ td.row-actions > .row-toggle { margin-right:10px; }
 .ocr-state-learned { background:var(--c-eaf5ee); color:var(--c-3a8964); }
 .ocr-state-ignored { background:var(--c-fbf4e6); color:var(--c-a78135); }
 .ocr-learning-actions .editor-actions { margin-top:12px; }
+/* Display scale of the user (PROP-0034, Setari afisare): --ui-table / --ui-header / --ui-images / --ui-icons / --ui-titles / --ui-tabs are factors (1 = as designed), set inline on the
+   application shell from the user's global settings and, for a table, on its own container (the table's particular settings win). Not set = 1. */
+.workspace h1 { font-size:calc(32px * var(--ui-titles, 1)); }
+.settings-tab { font-size:calc(13px * var(--ui-tabs, 1)); }
+.table-scroll td { font-size:calc(12px * var(--ui-table, 1)); }
+.table-scroll th { font-size:calc(9px * var(--ui-header, 1)); }
+.table-scroll .product-name { font-size:calc(12px * var(--ui-table, 1)); line-height:1.35; }
+.table-scroll .product-cell small { font-size:calc(10px * var(--ui-table, 1)); line-height:1.35; }
+.table-scroll .quantity { font-size:calc(14px * var(--ui-table, 1)); }
+.table-scroll .product-thumbnail { width:calc(34px * var(--ui-images, 1)); height:calc(34px * var(--ui-images, 1)); flex-basis:calc(34px * var(--ui-images, 1)); }
+.table-scroll .row-icon { width:calc(32px * var(--ui-icons, 1)); height:calc(32px * var(--ui-icons, 1)); }
+.table-scroll .row-icon::before { width:calc(16px * var(--ui-icons, 1)); height:calc(16px * var(--ui-icons, 1)); }
+.table-scroll .product-cell > div { min-width:0; }
+
+/* The gear above a table and its small panel. */
+.display-gear { position:relative; display:inline-block; }
+.display-gear > .gear-button { position:relative; width:32px; height:32px; padding:0; border:1px solid var(--c-c9d6d2); border-radius:6px; background:var(--c-ffffff); color:var(--green); }
+.display-gear > .gear-button::before { content:""; position:absolute; inset:0; margin:auto; width:16px; height:16px; background:currentColor; -webkit-mask:var(--gear-shape) center/contain no-repeat; mask:var(--gear-shape) center/contain no-repeat; }
+.display-gear > .gear-button[aria-expanded=true], .display-gear > .gear-button:hover { background:var(--c-eaf4f0); border-color:var(--c-9fc9bd); }
+.display-gear { --gear-shape:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='3'/%3E%3Cpath d='M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z'/%3E%3C/svg%3E"); }
+.display-gear-backdrop { position:fixed; inset:0; z-index:29; }
+.display-gear-panel { position:absolute; right:0; top:40px; z-index:30; width:300px; padding:16px 18px; background:var(--c-ffffff); border:1px solid var(--line); border-radius:10px; box-shadow:0 12px 40px #0002; text-align:left; }
+.display-gear-panel h3 { margin:0 0 4px; font-size:14px; }
+.display-gear-panel .form-note { margin:0 0 12px; }
+.display-gear-panel label { display:block; font-size:12px; font-weight:600; margin-top:10px; }
+.display-gear-panel select { display:block; width:100%; margin-top:6px; }
+.display-gear-panel .editor-actions { margin-top:16px; }
+.display-sample { margin-top:18px; }
+.display-sample .table-scroll { border:1px solid var(--line); border-radius:8px; }
+.display-presets { display:flex; gap:10px; flex-wrap:wrap; margin-bottom:6px; }
+.display-settings-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(230px, 1fr)); gap:18px; }
+.display-settings-grid label { font-size:13px; font-weight:600; }
+.display-settings-grid select { display:block; width:100%; margin-top:8px; }

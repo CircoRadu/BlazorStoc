@@ -8,10 +8,11 @@
 @inject IOperationLockService OperationLock
 @inject IExpiryNotificationService Notifications
 @inject BlazorStoc.Modules.Tasks.IUserTaskAlerts TaskAlerts
+@inject IUserDisplayService Display
 @inject NavigationManager Navigation
 @inject ILogger<MainLayout> Logger
 
-<div class="app-shell" style="@($"--sidebar-extra:{SidebarExtra()}px")">
+<div class="app-shell" style="@($"--sidebar-extra:{SidebarExtra()}px;{displayStyle}")">
     <aside class="sidebar">
         <a class="brand" href="/"><span class="brand-icon">B</span><span>Blazor<span class="brand-light">Stoc</span><small>ESP · GESTIUNE</small></span></a>
         @if (productSection)
@@ -143,8 +144,12 @@
     private int alertCount;
     private readonly CancellationTokenSource lifetime = new();
 
+    // The display scale chosen by the signed-in user (Setari afisare), put on the shell as CSS custom properties.
+    private string displayStyle = "";
+
     protected override async Task OnInitializedAsync()
     {
+        displayStyle = await Display.StyleAsync();
         Navigation.LocationChanged += LocationChanged;
         // A module stopped or started again (Setări -> Module) changes the menu at once, not at the next navigation.
         Modules.Changed += ModulesChanged;

@@ -1,0 +1,98 @@
+@page "/setari-afisare"
+@attribute [Authorize]
+@rendermode @(new InteractiveServerRenderMode(prerender: false))
+@inject IUserDisplayService Display
+@inject IJSRuntime JS
+@inject ILogger<DisplaySettings> Logger
+<PageBoundary>
+
+<PageTitle>Setări afișare · BlazorStoc</PageTitle>
+<div class="page-heading"><div><p class="eyebrow">CONTUL MEU</p><h1>Setări afișare</h1><p class="muted">Mărimea textului, a imaginilor și a iconițelor din aplicație, numai pentru contul tău.</p></div></div>
+
+<section class="catalog" id="display-settings">
+    <div class="catalog-heading"><h2>Reguli globale</h2></div>
+    <div class="catalog-body">
+        <p class="form-note muted">Valorile de aici se aplică în toată aplicația. Un tabel care are propriile setări (iconița cu roată de deasupra tabelului) le păstrează pe ale lui; ce nu a setat tabelul vine de aici.</p>
+        <div class="display-presets" role="group" aria-label="Presetări">
+            @foreach (var (name, percent) in DisplayRules.Presets)
+            {
+                <button type="button" class="refresh act-confirm" title="Setează toate valorile la @percent%" @onclick="() => SaveAsync(DisplayRules.Preset(percent))">@name</button>
+            }
+        </div>
+        <div class="display-settings-grid">
+            <label>Titluri de pagină<select aria-label="Mărimea titlurilor de pagină" value="@Show(global.Titles)" @onchange="e => SaveAsync(global with { Titles = Parse(e) })">@Options()</select></label>
+            <label>Text taburi<select aria-label="Mărimea textului din taburi" value="@Show(global.Tabs)" @onchange="e => SaveAsync(global with { Tabs = Parse(e) })">@Options()</select></label>
+            <label>Text tabele<select aria-label="Mărimea textului din tabele" value="@Show(global.TableText)" @onchange="e => SaveAsync(global with { TableText = Parse(e) })">@Options()</select></label>
+            <label>Antet tabele<select aria-label="Mărimea antetului tabelelor" value="@Show(global.HeaderText)" @onchange="e => SaveAsync(global with { HeaderText = Parse(e) })">@Options()</select></label>
+            <label>Imagini din tabele<select aria-label="Mărimea imaginilor din tabele" value="@Show(global.Images)" @onchange="e => SaveAsync(global with { Images = Parse(e) })">@Options()</select></label>
+            <label>Iconițe din tabele<select aria-label="Mărimea iconițelor din tabele" value="@Show(global.Icons)" @onchange="e => SaveAsync(global with { Icons = Parse(e) })">@Options()</select></label>
+        </div>
+        @if (!string.IsNullOrEmpty(error)) { <span class="validation-message" role="alert">@error</span> }
+        <div class="editor-actions">
+            <button type="button" class="refresh act-close" disabled="@(global.IsEmpty && !hasTables)" title="Șterge regulile globale și setările tuturor tabelelor: aplicația revine la aspectul implicit" @onclick="ResetAllAsync">Resetează tot</button>
+        </div>
+        <h3 class="display-sample-title">Previzualizare</h3>
+        <div class="display-sample" id="display-sample" style="@sampleStyle">
+            <h1 class="display-sample-heading">Titlu de pagină</h1>
+            <div class="settings-tabs" role="presentation"><span class="settings-tab active">Catalog</span><span class="settings-tab">De regularizat</span></div>
+            <div class="table-scroll"><table><thead><tr><th>COD PRODUS</th><th>CATEGORIE</th><th class="number">CANTITATE</th><th><span class="sr-only">Acțiuni</span></th></tr></thead>
+                <tbody><tr><td><div class="product-cell"><span class="product-thumbnail" aria-hidden="true"><img alt="" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 10'%3E%3Crect width='10' height='10' fill='%2399b8ae'/%3E%3C/svg%3E" /></span><div><span class="product-name">AC8001</span><small>Exemplu de produs pentru previzualizare</small></div></div></td><td>Incendiu</td><td class="number quantity">86 <small>buc.</small></td><td class="row-actions"><span class="row-icon edit" aria-hidden="true"></span></td></tr></tbody></table></div>
+        </div>
+    </div>
+</section>
+</PageBoundary>
+
+@code {
+    private DisplaySettings global = new();
+    private bool hasTables;
+    private string error = "", sampleStyle = "";
+
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        var data = await Display.GetAsync();
+        global = data.Global;
+        hasTables = data.Tables.Count > 0;
+        sampleStyle = DisplayRules.ToStyle(global);
+    }
+
+    private static string Show(int? value) => value?.ToString() ?? "";
+    private static int? Parse(ChangeEventArgs e) => int.TryParse(e.Value?.ToString(), out var value) ? DisplayRules.Clamp(value) : null;
+
+    private RenderFragment Options() => builder =>
+    {
+        var seq = 0;
+        builder.OpenElement(seq++, "option"); builder.AddAttribute(seq++, "value", ""); builder.AddContent(seq++, $"Implicit ({DisplayRules.Default}%)"); builder.CloseElement();
+        foreach (var step in DisplayRules.Steps) { builder.OpenElement(seq++, "option"); builder.AddAttribute(seq++, "value", step.ToString()); builder.AddContent(seq++, $"{step}%"); builder.CloseElement(); }
+    };
+
+    private async Task SaveAsync(DisplaySettings settings)
+    {
+        error = "";
+        try { await Display.SaveAsync(DisplayRules.GlobalScope, settings); await LoadAsync(); await ApplyAsync(); }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            Logger.LogWarning("Global display settings were not saved ({ErrorType}).", exception.GetType().Name);
+            error = "Setările nu au putut fi salvate.";
+        }
+    }
+
+    private async Task ResetAllAsync()
+    {
+        error = "";
+        try { await Display.ClearAllAsync(); await LoadAsync(); await ApplyAsync(); }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            Logger.LogWarning("Display settings were not reset ({ErrorType}).", exception.GetType().Name);
+            error = "Setările nu au putut fi șterse.";
+        }
+    }
+
+    // The shell of the page (rendered by the layout) takes the new scale at once.
+    private async Task ApplyAsync()
+    {
+        var pairs = sampleStyle.Split(';', StringSplitOptions.RemoveEmptyEntries).Select(part => part.Split(':', 2)).ToArray();
+        await JS.InvokeVoidAsync("displaySettings.apply", pairs.Select(pair => pair[0].Replace("--ui-", "")).ToArray(), pairs.Select(pair => pair[1]).ToArray());
+    }
+}

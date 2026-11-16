@@ -1,4 +1,4 @@
-﻿# Componente modificate - help de regenerat la cerere
+# Componente modificate - help de regenerat la cerere
 
 Regula (23.10.2026): help-ul (`Assets/Help/*.help`) si capturile (`node tools/help-capture.mjs --topic cheie`, doar pe baza demo, vezi `docs/PROPUNERE_HELP_IMAGINI.md`) NU se actualizeaza odata cu o schimbare. Aici se noteaza componentele modificate; help-ul se regenereaza numai cand utilizatorul cere, pentru componentele din lista. Randurile refacute se scot de aici. Fara diacritice.
 
@@ -155,3 +155,4 @@ Stare: **text** = topicul `.help` este la zi; **captura** = imaginea si harta el
 - Produse -> Intrari/iesiri (16.11.2026): iconita "Vezi" pe fiecare rand de miscare (si pentru utilizatorii fara drept de gestionare); fereastra noua cu toti parametrii miscarii, butonul Editeaza in dreapta sus si sectiunea pliabila (inchisa implicit) "Istoricul modificarilor" cu insigna numarului de modificari; topic nou produse-miscare-vizualizare (captura de facut), de completat si produse-detaliu cu iconita
 - Inventar -> Invatare OCR (16.11.2026): pagina noua /inventar/invatare-ocr (corectiile utilizatorului la preluarea inventarului, cu captura din formular; filtre dupa stare, tip si confuzie; administratorul alege Invata / Ignora / Marchează nou / Reseteaza invatarea; limita de 1000 de esantioane). Topic nou inventar-invatare-ocr (textul exista, captura de facut; cheia e in WithoutCapture din HelpChecks pana atunci). Pagina Preluare inventar are acum butonul "Invatare OCR" in antet: topic inventar-preluare, captura "pagina" de refacut.
 - Preluare inventar (16.11.2026, Invatare OCR etapa 4): un rand corectat din invatare are insigna "↻ din invatare 4 -> 1" langa "de verificat"; de adaugat in topicul inventar-preluare (Cod produs) si de refacut captura "diferente".
+| Meniul contului -> Setari afisare; roata de setari deasupra tabelului Catalog produse | Pagina noua `/setari-afisare` si roata cu panou (PROP-0034): topicul `setari-afisare` este scris, descrierea roatei este in el | setari-afisare, produse (roata deasupra catalogului) | topic scris, de completat la cerere | de facut | 16.11.2026 |
