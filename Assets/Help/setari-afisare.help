@@ -1,0 +1,20 @@
+# Setări afișare
+Ruta: /setari-afisare
+Cautare: setari afisare marime font text imagini iconite titluri taburi tabel gear roata tema personala compact mare
+
+Pagina din meniul numelui tău din bara de sus. Aici îți alegi mărimea textului, a imaginilor și a iconițelor din aplicație; setările sunt păstrate pe contul tău, în baza de date, și se aplică de fiecare dată când te autentifici, de pe orice calculator. Fiecare tabel poate avea și setări proprii, din iconița cu roată de deasupra lui; ele înlocuiesc setările globale numai pentru câmpurile pe care le-ai ales.
+
+## Elemente
+### Reguli globale
+- Compact, Normal, Mare | butoane | Setează dintr-o dată toate valorile la 90%, 100% sau 120%.
+- Titluri de pagină | listă | Mărimea titlului paginii (între 80% și 160% din mărimea implicită).
+- Text taburi | listă | Mărimea textului din taburi.
+- Text tabele | listă | Mărimea textului din celulele tabelelor.
+- Antet tabele | listă | Mărimea antetelor de coloană.
+- Imagini din tabele | listă | Mărimea imaginilor mici de pe rândurile tabelelor.
+- Iconițe din tabele | listă | Mărimea iconițelor de acțiune de pe rânduri.
+- Resetează tot | buton | Șterge regulile globale și setările proprii ale tuturor tabelelor: aplicația revine la aspectul implicit.
+- Previzualizare | zonă | Arată pe loc cum arată titlul, tabul și un rând de tabel cu valorile alese.
+### Roata de deasupra unui tabel
+- Roata | buton | Deschide setările acestui tabel: text, antet, imagini, iconițe. O valoare lăsată pe „Din setările globale” se ia din regulile globale.
+- Resetează tabelul | buton | Scoate setările proprii ale tabelului; tabelul folosește din nou regulile globale.

@@ -4,6 +4,11 @@ Fluxul: meniul Stoc -> lista de produse (cautare, categorii in stanga) -> adaugi
 
 ## Modificari de testat
 
+### 16.11.2026 - Setari de afisare per utilizator (PROP-0034, etapa 1)
+**Ce s-a adaugat:** pagina "Setari afisare" (meniul numelui tau din bara de sus) cu reguli globale (titluri, taburi, text tabele, antet, imagini, iconite; presetari Compact / Normal / Mare) si o roata de setari deasupra tabelului "Catalog produse" cu setari proprii tabelului. Setarile se salveaza pe contul tau in baza de date (migrarea 84).
+**Ce face acum:** valorile sunt procente din marimea implicita (80%-160%). Setarile proprii ale tabelului de produse inlocuiesc, camp cu camp, pe cele globale; ce lasi pe "Din setarile globale" se ia din global. Dupa autentificare pe alt calculator aceleasi setari se aplica.
+Pasi: meniul numelui -> Setari afisare -> alege "Mare" -> titlul, taburile, textul si iconitele din toata aplicatia cresc, previzualizarea se schimba pe loc; Produse -> roata de deasupra catalogului -> Text din tabel 80% -> numai tabelul de produse are text mai mic, iar antetul si imaginile raman la valoarea globala; "Resetaza tabelul" -> revine la global; Setari afisare -> "Reseteaza tot" -> aspect implicit; deconecteaza-te si autentifica-te din nou -> setarile raman; un alt utilizator are propriile setari (nu le vede pe ale tale).
+
 
 
 ### 05.11.2026 - Intrari/iesiri produs: comutatorul "Arata operator"

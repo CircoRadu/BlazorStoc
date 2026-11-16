@@ -83,6 +83,8 @@ internal static class ServiceRegistration
     {
         services.AddScoped<IUserRepository, MariaUserRepository>();
         services.AddScoped<IOwnAccountService, OwnAccountService>();
+        services.AddScoped<IUserDisplayRepository, MariaUserDisplayRepository>();
+        services.AddScoped<IUserDisplayService, UserDisplayService>();
         services.AddScoped<IUserTypeRepository, MariaUserTypeRepository>();
         services.AddScoped<IUserAuthenticator>(provider => (IUserAuthenticator)provider.GetRequiredService<IUserRepository>());
         return services;

@@ -229,7 +229,9 @@ public static class HelpChecks
         // New 07.11.2026: the window of an addendum of a maintenance contract (not wired into the page yet); the description is completed with the components stage.
         "mentenanta-act-aditional",
         // New 09.11.2026: tasks of users on beneficiaries (module Taskuri); the pictures are made on request (docs/HELP_DE_REGENERAT.md).
-        "taskuri-adauga", "taskurile-mele", "task-formular", "task-detalii", "notificari-taskuri"
+        "taskuri-adauga", "taskurile-mele", "task-formular", "task-detalii", "notificari-taskuri",
+        // New 16.11.2026: user display settings (PROP-0034); the picture is made on request (docs/HELP_DE_REGENERAT.md).
+        "setari-afisare"
     };
 
     // Elements that the demo environment cannot show in the state they describe (topic key|element name); the list only shrinks.

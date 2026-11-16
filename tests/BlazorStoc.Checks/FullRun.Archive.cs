@@ -65,7 +65,8 @@ data = await new DemoProductRepository().GetProductsAsync();
             ["elcomtur"] = () => ElcomturChecks.RunAsync(Check),
             ["ocrworker"] = () => OcrWorkerChecks.RunAsync(Check),
             ["backupworker"] = () => BackupWorkerChecks.RunAsync(Check),
-            ["runtracking"] = () => RunTrackingChecks.RunAsync(Check)
+            ["runtracking"] = () => RunTrackingChecks.RunAsync(Check),
+            ["display"] = () => { DisplayChecks.Run(Check); return Task.CompletedTask; }
         };
         var selectedGroups = (Environment.GetEnvironmentVariable("CHECKS_ONLY") ?? "").Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList();
         if (Environment.GetEnvironmentVariable("INVOICE_CHECKS_ONLY") == "1") selectedGroups.Add("invoices");
