@@ -61,6 +61,22 @@ window.tableGears = (function () {
         }
         return null;
     }
+    // Something under the place of a gear that must not be covered: a field, a button, a link, or text. The layer of the gears does not take part (it lets the mouse through, and the buttons are skipped).
+    function blocked(left, top) {
+        var m = 6, points = [[left - m, top - m], [left + GEAR + m, top - m], [left - m, top + GEAR + m], [left + GEAR + m, top + GEAR + m], [left + GEAR / 2, top + GEAR / 2], [left - m, top + GEAR / 2], [left + GEAR + m, top + GEAR / 2]];
+        return points.some(function (point) {
+            var hit = document.elementsFromPoint(point[0], point[1]).find(function (item) { return !item.closest('.table-gear-layer'); });
+            if (!hit) return false;
+            if (hit.closest('input, select, textarea, button, a, label, [role=button]:not(summary), .searchable-select, .search-box')) return true;
+            // Text: only when a line of text of the element is really under the point (a cell wider than its text is free).
+            return Array.prototype.some.call(hit.childNodes, function (node) {
+                if (node.nodeType !== 3 || node.textContent.trim().length === 0) return false;
+                var range = document.createRange();
+                range.selectNodeContents(node);
+                return Array.prototype.some.call(range.getClientRects(), function (box) { return point[0] >= box.left - 2 && point[0] <= box.right + 2 && point[1] >= box.top - 2 && point[1] <= box.bottom + 2; });
+            });
+        });
+    }
     function place() {
         gears.forEach(function (gear, table) {
             var rect = table.getBoundingClientRect();
@@ -71,37 +87,31 @@ window.tableGears = (function () {
             if (!shown) visible = false;
             gear.button.style.display = visible ? '' : 'none';
             if (!visible) return;
-            if (!row) {
-                gear.button.style.left = Math.round(Math.min(rect.right, window.innerWidth - 8) - EDGE - GEAR) + 'px';
-                gear.button.style.top = Math.round(Math.max(rect.top + 4, 64)) + 'px';
-                return;
+            var holder = table.closest('.table-scroll, .table-wrap') || table;
+            var edge = holder.getBoundingClientRect();
+            var candidates = [];
+            if (row) {
+                // The card is the outer one when the heading is inside a collapsible section of it (the actions of the card are its own children, not the section's).
+                var scope = row.card.parentElement && row.card.parentElement.matches('.catalog, .card, .editor-card') ? row.card.parentElement : row.card;
+                var card = scope.getBoundingClientRect();
+                var middle = head.top + head.height / 2;
+                var left = card.right - EDGE - GEAR;
+                // Only the controls on the right half of the card count (the handle to drag a card on the left is not "the icons of the row").
+                scope.querySelectorAll('button, a.row-icon, [role=button]').forEach(function (control) {
+                    if (control === row.heading || control.contains(row.heading) || control.closest('table, .table-gear-layer') || control.offsetWidth === 0) return;
+                    var box = control.getBoundingClientRect();
+                    if (box.left + box.width / 2 < card.left + card.width / 2) return;
+                    if (Math.abs(box.top + box.height / 2 - middle) <= Math.max(head.height, box.height) / 2 && box.right <= card.right + 1) left = Math.min(left, box.left - SPACE - GEAR);
+                });
+                candidates.push([left, middle - GEAR / 2]);
             }
-            var card = row.card.getBoundingClientRect();
-            var middle = head.top + head.height / 2;
-            var left = card.right - EDGE - GEAR;
-            // Only the controls on the right half of the card count (the handle to drag a card on the left is not "the icons of the row").
-            row.card.querySelectorAll('button, a.row-icon, [role=button]').forEach(function (control) {
-                if (control.closest('table, .table-gear-layer') || control.offsetWidth === 0) return;
-                var box = control.getBoundingClientRect();
-                if (box.left + box.width / 2 < card.left + card.width / 2) return;
-                if (Math.abs(box.top + box.height / 2 - middle) <= Math.max(head.height, box.height) / 2 && box.right <= card.right + 1) left = Math.min(left, box.left - SPACE - GEAR);
-            });
-            // When text of the heading runs under the place of the gear (a long note on the right) the row has no free place: the gear goes to the zone just above the header of the table, at its right edge.
-            var crowded = false;
-            head && row.heading.querySelectorAll('*').forEach(function (item) {
-                if (crowded || item.children.length > 0 || item.closest('button, a.row-icon, [role=button], .table-gear-layer') || !item.textContent.trim()) return;
-                var box = item.getBoundingClientRect();
-                if (box.width > 0 && box.right > left - 4 && box.left < left + GEAR && box.bottom > middle - GEAR / 2 && box.top < middle + GEAR / 2) crowded = true;
-            });
-            if (crowded) {
-                var holder = table.closest('.table-scroll, .table-wrap') || table;
-                var edge = holder.getBoundingClientRect();
-                gear.button.style.left = Math.round(Math.min(edge.right, window.innerWidth - 8) - EDGE - GEAR) + 'px';
-                gear.button.style.top = Math.round(Math.max(edge.top - GEAR - 6, 64)) + 'px';
-                return;
-            }
-            gear.button.style.left = Math.round(left) + 'px';
-            gear.button.style.top = Math.round(middle - GEAR / 2) + 'px';
+            // Zone 2: just above the header of the table, at its right edge; then the corner of the table itself.
+            var right = Math.min(edge.right, window.innerWidth - 8) - EDGE - GEAR;
+            candidates.push([right, Math.max(edge.top - GEAR - 6, 64)]);
+            candidates.push([right, Math.max(rect.top + 4, 64)]);
+            var chosen = candidates.find(function (item) { return !blocked(item[0], item[1]); }) || candidates[0];
+            gear.button.style.left = Math.round(chosen[0]) + 'px';
+            gear.button.style.top = Math.round(chosen[1]) + 'px';
         });
     }
     function scan() {
