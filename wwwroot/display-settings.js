@@ -79,11 +79,27 @@ window.tableGears = (function () {
             var card = row.card.getBoundingClientRect();
             var middle = head.top + head.height / 2;
             var left = card.right - EDGE - GEAR;
+            // Only the controls on the right half of the card count (the handle to drag a card on the left is not "the icons of the row").
             row.card.querySelectorAll('button, a.row-icon, [role=button]').forEach(function (control) {
                 if (control.closest('table, .table-gear-layer') || control.offsetWidth === 0) return;
                 var box = control.getBoundingClientRect();
+                if (box.left + box.width / 2 < card.left + card.width / 2) return;
                 if (Math.abs(box.top + box.height / 2 - middle) <= Math.max(head.height, box.height) / 2 && box.right <= card.right + 1) left = Math.min(left, box.left - SPACE - GEAR);
             });
+            // When text of the heading runs under the place of the gear (a long note on the right) the row has no free place: the gear goes to the zone just above the header of the table, at its right edge.
+            var crowded = false;
+            head && row.heading.querySelectorAll('*').forEach(function (item) {
+                if (crowded || item.children.length > 0 || item.closest('button, a.row-icon, [role=button], .table-gear-layer') || !item.textContent.trim()) return;
+                var box = item.getBoundingClientRect();
+                if (box.width > 0 && box.right > left - 4 && box.left < left + GEAR && box.bottom > middle - GEAR / 2 && box.top < middle + GEAR / 2) crowded = true;
+            });
+            if (crowded) {
+                var holder = table.closest('.table-scroll, .table-wrap') || table;
+                var edge = holder.getBoundingClientRect();
+                gear.button.style.left = Math.round(Math.min(edge.right, window.innerWidth - 8) - EDGE - GEAR) + 'px';
+                gear.button.style.top = Math.round(Math.max(edge.top - GEAR - 6, 64)) + 'px';
+                return;
+            }
             gear.button.style.left = Math.round(left) + 'px';
             gear.button.style.top = Math.round(middle - GEAR / 2) + 'px';
         });
