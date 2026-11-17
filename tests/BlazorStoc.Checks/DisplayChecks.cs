@@ -26,10 +26,13 @@ public static class DisplayChecks
         check(DisplayRules.ToStyle(new DisplaySettings(TableText: 120, Icons: 150)) == "--ui-table:1.2;--ui-icons:1.5", "Display: the style has one scale factor per set field, with a dot");
         check(DisplayRules.ToStyle(new DisplaySettings(Menu: 150, Text: 125)) == "--ui-menu:1.5;--ui-text:1.25", "Display: the menu and text scales have their own factors");
         check(DisplayRules.ToStyle(new DisplaySettings(Buttons: 110, Fields: 120, Topbar: 130, Dialogs: 140)) == "--ui-buttons:1.1;--ui-fields:1.2;--ui-topbar:1.3;--ui-dialogs:1.4", "Display: buttons, fields, top bar and dialogs have their own factors");
-        // BUG-0050 / BUG-0051 / BUG-0052: the gear of a table sits on the heading row of its card (15 px from the edge, first of the icons on the right half), and above the header of the table when text of the heading is in the way.
+        // BUG-0050..0053: the gear of a table sits above the header of the table, at the right edge of its holder, in a strip the page reserves (class gear-reserved, taken away when the gears are off);
+        // the gear of the products table has its own strip in the page.
         var gearScript = StyleSheet("display-settings.js") ?? "";
-        check(gearScript.Contains("EDGE = 15", StringComparison.Ordinal) && gearScript.Contains("card.left + card.width / 2", StringComparison.Ordinal) && gearScript.Contains("function blocked(", StringComparison.Ordinal) && gearScript.Contains("elementsFromPoint", StringComparison.Ordinal),
-            "Display: the gear of a table is 15 px from the right edge of its card, left of the icons on the right half of the heading row, and above the table header when text of the heading is in the way");
+        var gearCss = StyleSheet() ?? "";
+        check(gearScript.Contains("gear-reserved", StringComparison.Ordinal) && gearScript.Contains("function reserve(", StringComparison.Ordinal) && gearScript.Contains("reserve(holderOf(table), false)", StringComparison.Ordinal)
+              && gearCss.Contains(".gear-reserved { margin-top:37px; }", StringComparison.Ordinal) && gearCss.Contains(".display-gear-strip", StringComparison.Ordinal),
+            "Display: the gear of a table is in a strip above the header of the table (space reserved in the page), and the space is taken away when the gears are turned off");
         // PROP-0037: the gear of the tables is shown unless the user turned it off; the flag is saved with the global rules (JSON), does not make them empty-looking when it is the only one set, and keeps the table settings.
         var off = new DisplaySettings(TableGear: false);
         check(DisplayRules.ShowTableGear(null) && DisplayRules.ShowTableGear(new DisplaySettings()) && !DisplayRules.ShowTableGear(off) && !off.IsEmpty && DisplayRules.FromJson(DisplayRules.ToJson(off)).TableGear == false

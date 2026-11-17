@@ -548,3 +548,10 @@ Pasi:
 2. Notificări → Balanțe restante: apasă "Arată evoluție balanță": bare verticale, cu valoarea deasupra și data backup-ului dedesubt (roșu = a crescut, verde = a scăzut, gri = prima).
 3. Schimbă perioada: Anul curent / Ultimele 6 luni / Ultimele 3 luni; o preluare a aceleiași date și firme înlocuiește bara ei.
 Istoricul începe de la preluările făcute după această versiune (nu există valori mai vechi).
+
+## Modificari de testat (17.11.2026) - BUG-0053
+**Ce s-a adaugat:** roata de setari a tabelelor este intr-un rand rezervat in pagina, deasupra antetului tabelului, in dreapta holderului.
+**Ce face acum:**
+1. Deschide Categorii (deschide o categorie), Beneficiari, Furnizori, Facturi, Jurnal, Registru vehicule: roata e deasupra antetului tabelului, la marginea dreapta, si nu acopera nimic; intre elementele de sus (cautare, comutatoare) si antet este spatiu pentru ea.
+2. Setari afisare: comutatorul "Arata buton particularizare tabel" pe Off: roata dispare si spatiul rezervat dispare odata cu ea (tabelul urca). Pe On: reapar.
+3. Categoriile pliate nu au roata; apare cand le deschizi.

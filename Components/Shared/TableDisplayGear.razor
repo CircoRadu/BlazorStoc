@@ -5,6 +5,7 @@
 
 @if (DisplayRules.ShowTableGear(global))
 {
+<div class="display-gear-strip">
 <span class="display-gear" @onkeydown="KeyDown">
     <button type="button" id="@($"gear-{Scope}")" class="gear-button" aria-haspopup="dialog" aria-expanded="@(open ? "true" : "false")" aria-label="Setări de afișare pentru @Label" title="Setări de afișare pentru @Label" @onclick="Toggle"></button>
     @if (open)
@@ -24,6 +25,7 @@
         </div>
     }
 </span>
+</div>
 }
 
 @code {

@@ -1,3 +1,7 @@
+## 0.5.95 | 17.11.2026
+### Bugs
+- BUG-0053 – Roata de setări a unui tabel stă acum în pagină, deasupra antetului tabelului, în extremitatea dreaptă a holderului care îl ține, într-un spațiu rezervat: nu mai acoperă câmpuri, butoane sau text, nici în Categorii, nici în Beneficiari sau Registrul de vehicule. Dacă din Setări afișare ascunzi roțile, spațiul rezervat dispare odată cu ele. Roata nu apare pentru tabelele din categoriile pliate.
+
 ## 0.5.94 | 17.11.2026
 ### Bugs
 - BUG-0051 – Roata de setări a tabelelor din cardurile pliabile (Categorii) stă în dreapta, prima dintre iconițele rândului, nu lângă mânerul de tragere din stânga.
