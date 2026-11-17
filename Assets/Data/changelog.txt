@@ -1,3 +1,9 @@
+## 0.5.91 | 17.11.2026
+### Funcționalități noi
+- PROP-0034 – Setări afișare extinse: pagina are 12 slidere de la 100% la 500% (titluri de pagină, text general și titluri de secțiuni, taburi, text/antet/imagini/iconițe din tabele, butoane, câmpuri de formular, meniul principal, bara de sus, ferestre), grupate în secțiuni pliabile, fiecare cu propria previzualizare, și presetările Normal, Mare și Foarte mare. Regulile se aplică tuturor elementelor de același fel din aplicație (inclusiv insignele din taburi și din titlurile de secțiune), iar roata de setări apare acum pe fiecare tabel de date, cu slidere proprii care înlocuiesc câmp cu câmp regulile globale.
+### Diverse
+- Antetul tabelelor din catalogul de produse revine la mărimea unitară a antetelor (11px) în loc de 9px.
+
 ## 0.5.90 | 17.11.2026
 ### Funcționalități noi
 - PROP-0034 – Setări afișare pentru fiecare cont: pagina „Setări afișare” din meniul contului reglează mărimea titlurilor, a taburilor, a textului și antetului de tabel, a imaginilor și a iconițelor (80%–160%), cu presetările Compact, Normal și Mare. Deasupra catalogului de produse, roata de setări dă valori proprii tabelului, care înlocuiesc câmp cu câmp pe cele globale. Setările se salvează pe cont și se aplică pe orice dispozitiv; schema bazei: migrarea 90.

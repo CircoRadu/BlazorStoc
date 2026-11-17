@@ -11,11 +11,10 @@
         <div class="display-gear-panel" role="dialog" aria-label="Setări de afișare pentru @Label">
             <h3>Afișare: @Label</h3>
             <p class="form-note muted">Valorile alese aici se aplică numai acestui tabel și înlocuiesc setările globale.</p>
-            <label>Text din tabel<select aria-label="Mărimea textului din tabel" value="@Show(table.TableText)" @onchange="e => Set(table with { TableText = Parse(e) })">@Options(global.TableText)</select></label>
-            <label>Antet tabel<select aria-label="Mărimea antetului tabelului" value="@Show(table.HeaderText)" @onchange="e => Set(table with { HeaderText = Parse(e) })">@Options(global.HeaderText)</select></label>
-            <label>Imagini<select aria-label="Mărimea imaginilor din tabel" value="@Show(table.Images)" @onchange="e => Set(table with { Images = Parse(e) })">@Options(global.Images)</select></label>
-            <label>Iconițe<select aria-label="Mărimea iconițelor din tabel" value="@Show(table.Icons)" @onchange="e => Set(table with { Icons = Parse(e) })">@Options(global.Icons)</select></label>
-            @if (!string.IsNullOrEmpty(error)) { <span class="validation-message" role="alert">@error</span> }
+            <PercentSlider TableMode="true" Title="Text din tabel" AriaLabel="Mărimea textului din tabel" Value="table.TableText" Inherited="global.TableText" ValueChanged="v => Set(table with { TableText = v })" />
+            <PercentSlider TableMode="true" Title="Antet tabel" AriaLabel="Mărimea antetului tabelului" Value="table.HeaderText" Inherited="global.HeaderText" ValueChanged="v => Set(table with { HeaderText = v })" />
+            <PercentSlider TableMode="true" Title="Imagini" AriaLabel="Mărimea imaginilor din tabel" Value="table.Images" Inherited="global.Images" ValueChanged="v => Set(table with { Images = v })" />
+            <PercentSlider TableMode="true" Title="Iconițe" AriaLabel="Mărimea iconițelor din tabel" Value="table.Icons" Inherited="global.Icons" ValueChanged="v => Set(table with { Icons = v })" />            @if (!string.IsNullOrEmpty(error)) { <span class="validation-message" role="alert">@error</span> }
             <div class="editor-actions">
                 <button type="button" class="refresh act-reload" disabled="@table.IsEmpty" title="@(table.IsEmpty ? "Tabelul folosește deja setările globale" : "Revine la setările globale pentru acest tabel")" @onclick="Reset">Resetează tabelul</button>
                 <button type="button" class="refresh act-close" @onclick="Close">Închide</button>
@@ -40,16 +39,6 @@
         global = data.Global;
         table = data.Tables.GetValueOrDefault(Scope) ?? new();
     }
-
-    private static string Show(int? value) => value?.ToString() ?? "";
-    private static int? Parse(ChangeEventArgs e) => int.TryParse(e.Value?.ToString(), out var value) ? DisplayRules.Clamp(value) : null;
-
-    private RenderFragment Options(int? globalValue) => builder =>
-    {
-        var seq = 0;
-        builder.OpenElement(seq++, "option"); builder.AddAttribute(seq++, "value", ""); builder.AddContent(seq++, $"Din setările globale ({globalValue ?? DisplayRules.Default}%)"); builder.CloseElement();
-        foreach (var step in DisplayRules.Steps) { builder.OpenElement(seq++, "option"); builder.AddAttribute(seq++, "value", step.ToString()); builder.AddContent(seq++, $"{step}%"); builder.CloseElement(); }
-    };
 
     private async Task Set(DisplaySettings settings)
     {

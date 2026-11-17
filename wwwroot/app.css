@@ -1406,9 +1406,10 @@ body.dragging-node .category-drop-strip.drop-blocked{background:var(--c-fff0eb);
 .drag-tip.blocked{background:var(--c-a83d35);border-color:var(--c-eacbc0)}
 
 /* The menu of the stock section is a tree; the sidebar widens by --sidebar-extra (set by the layout from the open branches) and the page follows. */
-.sidebar{width:calc(236px + var(--sidebar-extra,0px));transition:width .18s ease}
-.main-shell{margin-left:calc(236px + var(--sidebar-extra,0px));width:calc(100% - 236px - var(--sidebar-extra,0px));transition:margin-left .18s ease,width .18s ease}
-@media(max-width:1150px){.sidebar{width:calc(205px + var(--sidebar-extra,0px))}.main-shell{margin-left:calc(205px + var(--sidebar-extra,0px));width:calc(100% - 205px - var(--sidebar-extra,0px))}}
+.app-shell{--sidebar-w:calc((236px + var(--sidebar-extra,0px)) * var(--ui-menu,1))}
+.sidebar{width:var(--sidebar-w);transition:width .18s ease}
+.main-shell{margin-left:var(--sidebar-w);width:calc(100% - var(--sidebar-w));transition:margin-left .18s ease,width .18s ease}
+@media(max-width:1150px){.app-shell{--sidebar-w:calc((205px + var(--sidebar-extra,0px)) * var(--ui-menu,1))}}
 @media(max-width:900px){.sidebar{width:100%}.main-shell{margin-left:0;width:100%}}
 .menu-tree-node{display:block}
 .menu-tree-toggle{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:0 10px 0 0;border-radius:6px;color:var(--c-62766f);font-size:12px;line-height:1.25;white-space:nowrap}
@@ -1979,16 +1980,32 @@ td.row-actions > .row-toggle { margin-right:10px; }
 .ocr-learning-actions .editor-actions { margin-top:12px; }
 /* Display scale of the user (PROP-0034, Setari afisare): --ui-table / --ui-header / --ui-images / --ui-icons / --ui-titles / --ui-tabs are factors (1 = as designed), set inline on the
    application shell from the user's global settings and, for a table, on its own container (the table's particular settings win). Not set = 1. */
-.workspace h1 { font-size:calc(32px * var(--ui-titles, 1)); }
-.settings-tab { font-size:calc(13px * var(--ui-tabs, 1)); }
-.table-scroll td { font-size:calc(12px * var(--ui-table, 1)); }
-.table-scroll th { font-size:calc(9px * var(--ui-header, 1)); }
-.table-scroll .product-name { font-size:calc(12px * var(--ui-table, 1)); line-height:1.35; }
-.table-scroll .product-cell small { font-size:calc(10px * var(--ui-table, 1)); line-height:1.35; }
-.table-scroll .quantity { font-size:calc(14px * var(--ui-table, 1)); }
-.table-scroll .product-thumbnail { width:calc(34px * var(--ui-images, 1)); height:calc(34px * var(--ui-images, 1)); flex-basis:calc(34px * var(--ui-images, 1)); }
-.table-scroll .row-icon { width:calc(32px * var(--ui-icons, 1)); height:calc(32px * var(--ui-icons, 1)); }
-.table-scroll .row-icon::before { width:calc(16px * var(--ui-icons, 1)); height:calc(16px * var(--ui-icons, 1)); }
+/* ============================================================================================================================================================
+   UI SCALE REGISTRY (PROP-0034, Setari afisare): the ONE place where the display scales of the user reach the interface. Each scale is a factor (1 = as designed) in a CSS custom
+   property (--ui-titles, --ui-text, --ui-tabs, --ui-table, --ui-header, --ui-images, --ui-icons, --ui-buttons, --ui-fields, --ui-topbar, --ui-dialogs, --ui-menu) that Setari afisare puts on the
+   shell and that a table's own gear can override on the table. Every kind of element has a global class, and the rule below is both for the class and for the existing elements of that kind:
+     NEW elements: put the class on the element (ui-scale-title / -text / -tab / -cell / -header / -button / -field / -topbar / -dialog / -menu; for a picture or an icon of a size of its own
+     ui-scale-image / ui-scale-icon with --ui-base-size) - nothing else is needed, the scale reaches it like it reaches the old ones. Do not put two of these classes on nested elements: the
+     inner one would be scaled twice. Text-like elements that already are p, h2, h3, h4, .form-note, buttons (.primary, .danger, .refresh, .secondary), label/input/select/textarea, td/th need no class.
+   The scales are applied with zoom, so the whole element (text, spacing, what is inside it) grows in proportion.
+   ============================================================================================================================================================ */
+.ui-scale-title, .workspace h1 { zoom:var(--ui-titles, 1); }
+.ui-scale-tab, .settings-tab, .settings-subtab, .invoice-page-tab { zoom:var(--ui-tabs, 1); }
+.ui-scale-header, th { zoom:var(--ui-header, 1); }
+.ui-scale-cell, td, tbody th, th[scope=row] { zoom:var(--ui-table, 1); }
+td, th { --ui-cell: var(--ui-table, 1); }
+.ui-scale-text, .workspace :is(p, h2, h3, h4, .form-note, .catalog-heading > small):not(:is(p, h2, h3, h4, .form-note) *):not(.settings-tabs *):not(td *, th *, dialog *, .app-dialog-frame *, .display-gear-panel *, .table-gear-panel *, .sample-dialog *, .sample-menu *, .sample-topbar *, .display-settings-grid *) { zoom:var(--ui-text, 1); }
+.ui-scale-button, .workspace :is(.primary, .danger, .refresh, .secondary):not(td *, th *, dialog *, .app-dialog-frame *, .display-gear-panel *, .table-gear-panel *, .sample-dialog *, .sample-menu *, .sample-topbar *, .display-settings-grid *) { zoom:var(--ui-buttons, 1); }
+.ui-scale-field, .workspace label:not(td *, th *, dialog *, .app-dialog-frame *, .display-gear-panel *, .table-gear-panel *, .sample-dialog *, .sample-menu *, .sample-topbar *, .display-settings-grid *), .workspace :is(input, select, textarea):not(label *):not(td *, th *, dialog *, .app-dialog-frame *, .display-gear-panel *, .table-gear-panel *, .sample-dialog *, .sample-menu *, .sample-topbar *, .display-settings-grid *) { zoom:var(--ui-fields, 1); }
+.ui-scale-topbar, .topbar, .sample-topbar { zoom:var(--ui-topbar, 1); }
+.ui-scale-dialog, .app-dialog-frame, .sample-dialog { zoom:var(--ui-dialogs, 1); }
+.ui-scale-menu, .sidebar > *, .sample-menu { zoom:var(--ui-menu, 1); }
+/* A picture or an icon whose size is a measure of its own (not text): --ui-base-size is its designed size. Inside a table cell the scale of the cell is divided out, so Imagini / Iconite stay independent of Text tabele. */
+.ui-scale-image, .product-thumbnail:not(.movement-image) { --ui-base-size:34px; width:calc(var(--ui-base-size) * var(--ui-images, 1) / var(--ui-cell, 1)); height:calc(var(--ui-base-size) * var(--ui-images, 1) / var(--ui-cell, 1)); flex-basis:calc(var(--ui-base-size) * var(--ui-images, 1) / var(--ui-cell, 1)); }
+.ui-scale-icon, td .row-icon { --ui-base-size:32px; width:calc(var(--ui-base-size) * var(--ui-icons, 1) / var(--ui-cell, 1)); height:calc(var(--ui-base-size) * var(--ui-icons, 1) / var(--ui-cell, 1)); }
+.ui-scale-icon::before, td .row-icon::before { width:calc(var(--ui-base-size) / 2 * var(--ui-icons, 1) / var(--ui-cell, 1)); height:calc(var(--ui-base-size) / 2 * var(--ui-icons, 1) / var(--ui-cell, 1)); }
+.table-scroll .product-name { line-height:1.35; }
+.table-scroll .product-cell small { line-height:1.35; }
 .table-scroll .product-cell > div { min-width:0; }
 
 /* The gear above a table and its small panel. */
@@ -1996,7 +2013,7 @@ td.row-actions > .row-toggle { margin-right:10px; }
 .display-gear > .gear-button { position:relative; width:32px; height:32px; padding:0; border:1px solid var(--c-c9d6d2); border-radius:6px; background:var(--c-ffffff); color:var(--green); }
 .display-gear > .gear-button::before { content:""; position:absolute; inset:0; margin:auto; width:16px; height:16px; background:currentColor; -webkit-mask:var(--gear-shape) center/contain no-repeat; mask:var(--gear-shape) center/contain no-repeat; }
 .display-gear > .gear-button[aria-expanded=true], .display-gear > .gear-button:hover { background:var(--c-eaf4f0); border-color:var(--c-9fc9bd); }
-.display-gear { --gear-shape:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='3'/%3E%3Cpath d='M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z'/%3E%3C/svg%3E"); }
+.display-gear, .table-gear-layer { --gear-shape:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='3'/%3E%3Cpath d='M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z'/%3E%3C/svg%3E"); }
 .display-gear-backdrop { position:fixed; inset:0; z-index:29; }
 .display-gear-panel { position:absolute; right:0; top:40px; z-index:30; width:300px; padding:16px 18px; background:var(--c-ffffff); border:1px solid var(--line); border-radius:10px; box-shadow:0 12px 40px #0002; text-align:left; }
 .display-gear-panel h3 { margin:0 0 4px; font-size:14px; }
@@ -2004,6 +2021,35 @@ td.row-actions > .row-toggle { margin-right:10px; }
 .display-gear-panel label { display:block; font-size:12px; font-weight:600; margin-top:10px; }
 .display-gear-panel select { display:block; width:100%; margin-top:6px; }
 .display-gear-panel .editor-actions { margin-top:16px; }
+.percent-slider { display:block; font-size:12px; font-weight:600; }
+.percent-slider-title { display:block; }
+.percent-slider-value { color:var(--green); margin-left:6px; font-variant-numeric:tabular-nums; }
+.percent-slider input[type=range] { display:block; width:100%; margin:10px 0 2px; accent-color:var(--green); }
+.percent-slider-source { font-weight:400; color:var(--muted); margin-left:6px; }
+.percent-slider-reset { margin-left:8px; padding:1px 8px; border:1px solid var(--c-c9d6d2); border-radius:5px; background:var(--c-ffffff); color:var(--green); font-size:11px; font-weight:600; cursor:pointer; }
+.display-gear-panel .percent-slider { margin-top:12px; }
+.percent-slider-scale { display:flex; justify-content:space-between; font-size:11px; font-weight:400; color:var(--muted); }
+/* Samples of Setari afisare: the menu, the top bar and a window, drawn with the same scales as the real ones. */
+.display-section { border:1px solid var(--line); border-radius:10px; margin-top:12px; background:var(--c-ffffff); }
+.display-section > summary { cursor:pointer; padding:14px 18px; font-weight:650; font-size:14px; list-style:none; display:flex; align-items:center; gap:10px; }
+.display-section > summary::before { content:"▸"; color:var(--green); transition:transform .15s; }
+.display-section[open] > summary::before { transform:rotate(90deg); }
+.display-section-body { padding:0 18px 18px; }
+.sample-topbar { display:flex; align-items:center; justify-content:space-between; gap:12px; height:56px; padding:0 18px; border:1px solid var(--line); border-radius:8px; background:var(--c-ffffff); font-size:12px; color:var(--muted); margin-bottom:12px; }
+.sample-pill { padding:6px 12px; border-radius:6px; background:var(--c-eef3ef); font-size:11px; }
+.sample-menu { width:236px; max-width:100%; padding:10px; border:1px solid var(--line); border-radius:8px; background:var(--c-ffffff); }
+.sample-menu a { display:flex; align-items:center; gap:10px; min-height:48px; padding:0 12px; border-radius:7px; font-size:13px; font-weight:600; color:var(--ink); }
+.sample-menu a.active { background:var(--c-eaf4f0); color:var(--c-176d5e); box-shadow:inset 4px 0 0 var(--green); }
+.sample-dialog { width:340px; max-width:100%; padding:18px 20px; border:1px solid var(--line); border-radius:10px; background:var(--c-ffffff); box-shadow:0 12px 40px #0002; }
+.sample-dialog h3 { margin:0 0 6px; font-size:15px; }
+.sample-dialog p { margin:0 0 12px; font-size:13px; }
+.sample-dialog .editor-actions { margin-top:0; }
+.sample-row { margin-top:12px; }
+.table-gear-layer { position:fixed; inset:0; pointer-events:none; z-index:25; }
+.table-gear-button { position:fixed; width:28px; height:28px; padding:0; pointer-events:auto; opacity:.55; border:1px solid var(--c-c9d6d2); border-radius:6px; background:var(--c-ffffff); color:var(--green); cursor:pointer; }
+.table-gear-button:hover, .table-gear-button:focus-visible { opacity:1; background:var(--c-eaf4f0); border-color:var(--c-9fc9bd); }
+.table-gear-button::before { content:""; position:absolute; inset:0; margin:auto; width:14px; height:14px; background:currentColor; -webkit-mask:var(--gear-shape) center/contain no-repeat; mask:var(--gear-shape) center/contain no-repeat; }
+.table-gear-panel { position:fixed; right:auto; z-index:60; }
 .display-sample { margin-top:18px; }
 .display-sample .table-scroll { border:1px solid var(--line); border-radius:8px; }
 .display-presets { display:flex; gap:10px; flex-wrap:wrap; margin-bottom:6px; }

@@ -7,36 +7,110 @@
 <PageBoundary>
 
 <PageTitle>Setări afișare · BlazorStoc</PageTitle>
-<div class="page-heading"><div><p class="eyebrow">CONTUL MEU</p><h1>Setări afișare</h1><p class="muted">Mărimea textului, a imaginilor și a iconițelor din aplicație, numai pentru contul tău.</p></div></div>
+<div class="page-heading"><div><p class="eyebrow">CONTUL MEU</p><h1>Setări afișare</h1><p class="muted">Mărimea elementelor vizuale din aplicație, numai pentru contul tău. Deschide o secțiune ca să vezi previzualizarea ei.</p></div></div>
 
 <section class="catalog" id="display-settings">
     <div class="catalog-heading"><h2>Reguli globale</h2></div>
     <div class="catalog-body">
-        <p class="form-note muted">Valorile de aici se aplică în toată aplicația. Un tabel care are propriile setări (iconița cu roată de deasupra tabelului) le păstrează pe ale lui; ce nu a setat tabelul vine de aici.</p>
+        <p class="form-note muted">Valorile de aici se aplică în toată aplicația, tuturor elementelor de același fel. Un tabel care are propriile setări (iconița cu roată de pe tabel) le păstrează pe ale lui; ce nu a setat tabelul vine de aici. 100% este mărimea implicită.</p>
         <div class="display-presets" role="group" aria-label="Presetări">
             @foreach (var (name, percent) in DisplayRules.Presets)
             {
                 <button type="button" class="refresh act-confirm" title="Setează toate valorile la @percent%" @onclick="() => SaveAsync(DisplayRules.Preset(percent))">@name</button>
             }
         </div>
-        <div class="display-settings-grid">
-            <label>Titluri de pagină<select aria-label="Mărimea titlurilor de pagină" value="@Show(global.Titles)" @onchange="e => SaveAsync(global with { Titles = Parse(e) })">@Options()</select></label>
-            <label>Text taburi<select aria-label="Mărimea textului din taburi" value="@Show(global.Tabs)" @onchange="e => SaveAsync(global with { Tabs = Parse(e) })">@Options()</select></label>
-            <label>Text tabele<select aria-label="Mărimea textului din tabele" value="@Show(global.TableText)" @onchange="e => SaveAsync(global with { TableText = Parse(e) })">@Options()</select></label>
-            <label>Antet tabele<select aria-label="Mărimea antetului tabelelor" value="@Show(global.HeaderText)" @onchange="e => SaveAsync(global with { HeaderText = Parse(e) })">@Options()</select></label>
-            <label>Imagini din tabele<select aria-label="Mărimea imaginilor din tabele" value="@Show(global.Images)" @onchange="e => SaveAsync(global with { Images = Parse(e) })">@Options()</select></label>
-            <label>Iconițe din tabele<select aria-label="Mărimea iconițelor din tabele" value="@Show(global.Icons)" @onchange="e => SaveAsync(global with { Icons = Parse(e) })">@Options()</select></label>
-        </div>
+
+        <details class="display-section" id="display-section-text">
+            <summary>Titluri și text</summary>
+            <div class="display-section-body">
+                <div class="display-settings-grid">
+                    <PercentSlider Title="Titluri de pagină" AriaLabel="Mărimea titlurilor de pagină" Value="global.Titles" ValueChanged="v => SaveAsync(global with { Titles = v })" />
+                    <PercentSlider Title="Text general și titluri de secțiuni" AriaLabel="Mărimea textului general din pagini" Value="global.Text" ValueChanged="v => SaveAsync(global with { Text = v })" />
+                </div>
+                <div class="display-sample" style="@sampleStyle">
+                    <h1 class="display-sample-heading">Titlu de pagină</h1>
+                    <section class="catalog sample-card">
+                        <div class="catalog-heading"><h2>Titlu de secțiune <span class="count-badge">3</span></h2><small>Actualizat la 17.11.2026 09:00</small></div>
+                        <div class="catalog-body">
+                            <p class="muted"><small>Notă explicativă: textul mic care descrie ce face secțiunea și cum se folosește.</small></p>
+                            <p>Text obișnuit dintr-o pagină, așa cum apar mesajele și explicațiile.</p>
+                        </div>
+                    </section>
+                </div>
+            </div>
+        </details>
+
+        <details class="display-section" id="display-section-tabs">
+            <summary>Taburi</summary>
+            <div class="display-section-body">
+                <div class="display-settings-grid">
+                    <PercentSlider Title="Text taburi" AriaLabel="Mărimea textului din taburi" Value="global.Tabs" ValueChanged="v => SaveAsync(global with { Tabs = v })" />
+                </div>
+                <div class="display-sample" style="@sampleStyle">
+                    <div class="settings-tabs" role="presentation"><span class="settings-tab active">Active <span class="count-badge">3</span></span><span class="settings-tab">Rezolvate <span class="count-badge">42</span></span><span class="settings-tab needs-attention">Tichete <span class="count-badge">5</span></span></div>
+                </div>
+            </div>
+        </details>
+
+        <details class="display-section" id="display-section-tables">
+            <summary>Tabele</summary>
+            <div class="display-section-body">
+                <div class="display-settings-grid">
+                    <PercentSlider Title="Text tabele" AriaLabel="Mărimea textului din tabele" Value="global.TableText" ValueChanged="v => SaveAsync(global with { TableText = v })" />
+                    <PercentSlider Title="Antet tabele" AriaLabel="Mărimea antetului tabelelor" Value="global.HeaderText" ValueChanged="v => SaveAsync(global with { HeaderText = v })" />
+                    <PercentSlider Title="Imagini din tabele" AriaLabel="Mărimea imaginilor din tabele" Value="global.Images" ValueChanged="v => SaveAsync(global with { Images = v })" />
+                    <PercentSlider Title="Iconițe din tabele" AriaLabel="Mărimea iconițelor din tabele" Value="global.Icons" ValueChanged="v => SaveAsync(global with { Icons = v })" />
+                </div>
+                <div class="display-sample" id="display-sample" style="@sampleStyle">
+                    <div class="table-scroll"><table><thead><tr><th>COD PRODUS</th><th>CATEGORIE</th><th class="number">CANTITATE</th><th><span class="sr-only">Acțiuni</span></th></tr></thead>
+                        <tbody><tr><td><div class="product-cell"><span class="product-thumbnail" aria-hidden="true"><img alt="" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 10'%3E%3Crect width='10' height='10' fill='%2399b8ae'/%3E%3C/svg%3E" /></span><div><span class="product-name">AC8001</span><small>Exemplu de produs pentru previzualizare</small></div></div></td><td>Incendiu</td><td class="number quantity">86 <small>buc.</small></td><td class="row-actions"><span class="row-icon edit" aria-hidden="true"></span></td></tr></tbody></table></div>
+                </div>
+            </div>
+        </details>
+
+        <details class="display-section" id="display-section-controls">
+            <summary>Butoane și câmpuri</summary>
+            <div class="display-section-body">
+                <div class="display-settings-grid">
+                    <PercentSlider Title="Butoane" AriaLabel="Mărimea butoanelor" Value="global.Buttons" ValueChanged="v => SaveAsync(global with { Buttons = v })" />
+                    <PercentSlider Title="Câmpuri de formular" AriaLabel="Mărimea câmpurilor de formular" Value="global.Fields" ValueChanged="v => SaveAsync(global with { Fields = v })" />
+                </div>
+                <div class="display-sample" style="@sampleStyle">
+                    <div class="editor-actions"><button type="button" class="primary" tabindex="-1">Salvează</button><button type="button" class="refresh act-reload" tabindex="-1">Actualizează</button><button type="button" class="danger" tabindex="-1">Șterge</button></div>
+                    <div class="editor-grid sample-row"><label>Câmp de text<input type="text" value="Exemplu" tabindex="-1" /></label><label>Listă de alegere<select tabindex="-1"><option>Prima opțiune</option><option>A doua opțiune</option></select></label></div>
+                </div>
+            </div>
+        </details>
+
+        <details class="display-section" id="display-section-frame">
+            <summary>Meniul principal și bara de sus</summary>
+            <div class="display-section-body">
+                <div class="display-settings-grid">
+                    <PercentSlider Title="Meniul principal (stânga)" AriaLabel="Mărimea meniului principal" Value="global.Menu" ValueChanged="v => SaveAsync(global with { Menu = v })" />
+                    <PercentSlider Title="Bara de sus" AriaLabel="Mărimea barei de sus" Value="global.Topbar" ValueChanged="v => SaveAsync(global with { Topbar = v })" />
+                </div>
+                <div class="display-sample" style="@sampleStyle">
+                    <div class="sample-topbar" aria-hidden="true"><span>Meniu principal › Produse › Stoc</span><span class="sample-pill">Sesiune autentificată</span></div>
+                    <div class="sample-menu" aria-hidden="true"><a class="active"><span>▦</span> Produse</a><a><span>▥</span> Inventar</a><a><span>≡</span> Jurnal activitate</a></div>
+                </div>
+            </div>
+        </details>
+
+        <details class="display-section" id="display-section-dialogs">
+            <summary>Ferestre</summary>
+            <div class="display-section-body">
+                <div class="display-settings-grid">
+                    <PercentSlider Title="Ferestre (dialoguri)" AriaLabel="Mărimea ferestrelor de dialog" Value="global.Dialogs" ValueChanged="v => SaveAsync(global with { Dialogs = v })" />
+                </div>
+                <div class="display-sample" style="@sampleStyle">
+                    <div class="sample-dialog" aria-hidden="true"><h3>Confirmi ștergerea?</h3><p>Operația nu poate fi anulată.</p><div class="editor-actions"><button type="button" class="danger" tabindex="-1">Șterge</button><button type="button" class="refresh act-close" tabindex="-1">Renunță</button></div></div>
+                </div>
+            </div>
+        </details>
+
         @if (!string.IsNullOrEmpty(error)) { <span class="validation-message" role="alert">@error</span> }
         <div class="editor-actions">
             <button type="button" class="refresh act-close" disabled="@(global.IsEmpty && !hasTables)" title="Șterge regulile globale și setările tuturor tabelelor: aplicația revine la aspectul implicit" @onclick="ResetAllAsync">Resetează tot</button>
-        </div>
-        <h3 class="display-sample-title">Previzualizare</h3>
-        <div class="display-sample" id="display-sample" style="@sampleStyle">
-            <h1 class="display-sample-heading">Titlu de pagină</h1>
-            <div class="settings-tabs" role="presentation"><span class="settings-tab active">Catalog</span><span class="settings-tab">De regularizat</span></div>
-            <div class="table-scroll"><table><thead><tr><th>COD PRODUS</th><th>CATEGORIE</th><th class="number">CANTITATE</th><th><span class="sr-only">Acțiuni</span></th></tr></thead>
-                <tbody><tr><td><div class="product-cell"><span class="product-thumbnail" aria-hidden="true"><img alt="" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 10'%3E%3Crect width='10' height='10' fill='%2399b8ae'/%3E%3C/svg%3E" /></span><div><span class="product-name">AC8001</span><small>Exemplu de produs pentru previzualizare</small></div></div></td><td>Incendiu</td><td class="number quantity">86 <small>buc.</small></td><td class="row-actions"><span class="row-icon edit" aria-hidden="true"></span></td></tr></tbody></table></div>
         </div>
     </div>
 </section>
@@ -57,19 +131,10 @@
         sampleStyle = DisplayRules.ToStyle(global);
     }
 
-    private static string Show(int? value) => value?.ToString() ?? "";
-    private static int? Parse(ChangeEventArgs e) => int.TryParse(e.Value?.ToString(), out var value) ? DisplayRules.Clamp(value) : null;
-
-    private RenderFragment Options() => builder =>
-    {
-        var seq = 0;
-        builder.OpenElement(seq++, "option"); builder.AddAttribute(seq++, "value", ""); builder.AddContent(seq++, $"Implicit ({DisplayRules.Default}%)"); builder.CloseElement();
-        foreach (var step in DisplayRules.Steps) { builder.OpenElement(seq++, "option"); builder.AddAttribute(seq++, "value", step.ToString()); builder.AddContent(seq++, $"{step}%"); builder.CloseElement(); }
-    };
-
     private async Task SaveAsync(DisplaySettings settings)
     {
         error = "";
+        global = settings;   // at once: a second change made before the save ends builds on this one
         try { await Display.SaveAsync(DisplayRules.GlobalScope, settings); await LoadAsync(); await ApplyAsync(); }
         catch (Exception exception) when (exception is not OperationCanceledException)
         {

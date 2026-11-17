@@ -1,0 +1,36 @@
+@* A slider for a display scale (PROP-0034): 100% (as designed) up to 500%; the chosen value is shown right after the title while the slider moves, and saved when it is released.
+   Global rules: 100% means "not set" (the default). Table panel (Inherited given): a table that sets nothing shows the global value marked "global"; moving the slider sets the table's own value
+   (also 100%), and the "Global" button gives it back to the global rules. *@
+<label class="percent-slider">
+    <span class="percent-slider-title">@Title <strong class="percent-slider-value">@shown%</strong>@if (TableMode && Value is null) { <small class="percent-slider-source">(global)</small> }
+        @if (TableMode && Value is not null) { <button type="button" class="percent-slider-reset" title="Revine la setarea globală pentru acest tabel" @onclick="ResetAsync" @onclick:preventDefault="true">Global</button> }</span>
+    <input type="range" min="@DisplayRules.Min" max="@DisplayRules.Max" step="@Step" value="@shown" aria-label="@AriaLabel" aria-valuetext="@(shown + "%")"
+           @oninput="OnInput" @onchange="OnChange" />
+    <span class="percent-slider-scale" aria-hidden="true"><span>@DisplayRules.Min%</span><span>@DisplayRules.Max%</span></span>
+</label>
+
+@code {
+    [Parameter, EditorRequired] public string Title { get; set; } = "";
+    [Parameter] public string AriaLabel { get; set; } = "";
+    [Parameter] public int? Value { get; set; }
+    // Table panel only: the value of the global rules, shown while the table has none of its own.
+    [Parameter] public int? Inherited { get; set; }
+    [Parameter] public bool TableMode { get; set; }
+    [Parameter] public EventCallback<int?> ValueChanged { get; set; }
+    [Parameter] public int Step { get; set; } = 5;
+
+    private int shown = DisplayRules.Default;
+
+    protected override void OnParametersSet() => shown = Value ?? Inherited ?? DisplayRules.Default;
+
+    private void OnInput(ChangeEventArgs e) { if (int.TryParse(e.Value?.ToString(), out var value)) shown = DisplayRules.Clamp(value); }
+
+    private async Task OnChange(ChangeEventArgs e)
+    {
+        if (!int.TryParse(e.Value?.ToString(), out var value)) return;
+        shown = DisplayRules.Clamp(value);
+        await ValueChanged.InvokeAsync(!TableMode && shown == DisplayRules.Default ? null : shown);
+    }
+
+    private Task ResetAsync() => ValueChanged.InvokeAsync(null);
+}
