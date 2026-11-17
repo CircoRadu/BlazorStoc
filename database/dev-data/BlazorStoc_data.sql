@@ -56,6 +56,11 @@ LOCK TABLES `activity_import_types` WRITE;
 /*!40000 ALTER TABLE `activity_import_types` ENABLE KEYS */;
 UNLOCK TABLES;
 
+LOCK TABLES `activity_ticket_outcomes` WRITE;
+/*!40000 ALTER TABLE `activity_ticket_outcomes` DISABLE KEYS */;
+/*!40000 ALTER TABLE `activity_ticket_outcomes` ENABLE KEYS */;
+UNLOCK TABLES;
+
 LOCK TABLES `app_metadata` WRITE;
 /*!40000 ALTER TABLE `app_metadata` DISABLE KEYS */;
 REPLACE INTO `app_metadata` (`key`, `value`) VALUES ('diacritics_normalized','2026-09-28T09:30:13.7557522Z'),
@@ -174,6 +179,11 @@ LOCK TABLES `archive_web_users` WRITE;
 /*!40000 ALTER TABLE `archive_web_users` ENABLE KEYS */;
 UNLOCK TABLES;
 
+LOCK TABLES `archive_work_point_attached` WRITE;
+/*!40000 ALTER TABLE `archive_work_point_attached` DISABLE KEYS */;
+/*!40000 ALTER TABLE `archive_work_point_attached` ENABLE KEYS */;
+UNLOCK TABLES;
+
 LOCK TABLES `archive_work_points` WRITE;
 /*!40000 ALTER TABLE `archive_work_points` DISABLE KEYS */;
 REPLACE INTO `archive_work_points` (`archive_id`, `original_id`, `beneficiary_id`, `name`, `address`, `phone`, `contact_person`, `description`, `latitude`, `longitude`, `is_primary`, `version`) VALUES ('66dd0cba-7b47-453a-b220-0fc20ea94f42',15,2,'ZZ Test confirmare','Str. Test Confirmare 3','','','',NULL,NULL,0,0),
@@ -184,13 +194,13 @@ UNLOCK TABLES;
 
 LOCK TABLES `backup_nas_settings` WRITE;
 /*!40000 ALTER TABLE `backup_nas_settings` DISABLE KEYS */;
-REPLACE INTO `backup_nas_settings` (`id`, `unc_path`, `username`, `password_protected`, `copy_enabled`, `schedule_enabled`, `schedule_time`, `last_scheduled_date`, `last_attempt_utc`, `last_ok`, `last_message`, `updated_by`, `updated_utc`, `max_age_days`, `last_error_utc`, `last_error`) VALUES (1,'\\\\192.168.100.50\\BackupStocDepozit','EspStoc','CfDJ8K0zpf6bAUBDhx3Tp8Qg3Xav6-YSC473xDg_-5Es-Xeb0VlR6nNgopDby_NVUByUlbuSC9dwi2qq2xCHZ3boQt1MyvdM1n0h3JLOKAI7SWCrjIvwV387zr0s1A9cCxH2kA',1,1,'11:10','2026-10-08','2026-11-16T08:00:38.044Z',1,'Copiate 1, deja pe NAS 5.','administrator.demo','2026-10-19T05:43:21.076Z',2,NULL,NULL);
+REPLACE INTO `backup_nas_settings` (`id`, `unc_path`, `username`, `password_protected`, `copy_enabled`, `schedule_enabled`, `schedule_time`, `last_scheduled_date`, `last_attempt_utc`, `last_ok`, `last_message`, `updated_by`, `updated_utc`, `max_age_days`, `last_error_utc`, `last_error`) VALUES (1,'\\\\192.168.100.50\\BackupStocDepozit','EspStoc','CfDJ8K0zpf6bAUBDhx3Tp8Qg3Xav6-YSC473xDg_-5Es-Xeb0VlR6nNgopDby_NVUByUlbuSC9dwi2qq2xCHZ3boQt1MyvdM1n0h3JLOKAI7SWCrjIvwV387zr0s1A9cCxH2kA',1,1,'11:10','2026-10-08','2026-11-17T08:00:54.199Z',1,'Copiate 1, deja pe NAS 5.','administrator.demo','2026-10-19T05:43:21.076Z',2,NULL,NULL);
 /*!40000 ALTER TABLE `backup_nas_settings` ENABLE KEYS */;
 UNLOCK TABLES;
 
 LOCK TABLES `backup_settings` WRITE;
 /*!40000 ALTER TABLE `backup_settings` DISABLE KEYS */;
-REPLACE INTO `backup_settings` (`id`, `schedule_enabled`, `schedule_time`, `last_scheduled_date`, `max_age_days`, `retention_enabled`, `retention_days`, `last_error_utc`, `last_error`, `updated_by`, `updated_utc`, `ntp_check_enabled`, `ntp_servers`, `clock_issue_utc`, `clock_skew_minutes`, `schedule_days`) VALUES (1,1,'10:00','2026-11-16',2,1,7,'2026-10-15T10:06:40.073Z','Copia de siguranta nu a putut fi generata (eroare la exportul bazei de date). Cauza: utilitarul mariadb-dump nu a fost gasit pe server (se seteaza Database:MariaDumpExecutablePath la calea lui).','administrator.demo','2026-10-09T06:41:42.369Z',1,'time.cloudflare.com, pool.ntp.org, time.windows.com',NULL,0,31);
+REPLACE INTO `backup_settings` (`id`, `schedule_enabled`, `schedule_time`, `last_scheduled_date`, `max_age_days`, `retention_enabled`, `retention_days`, `last_error_utc`, `last_error`, `updated_by`, `updated_utc`, `ntp_check_enabled`, `ntp_servers`, `clock_issue_utc`, `clock_skew_minutes`, `schedule_days`) VALUES (1,1,'10:00','2026-11-17',2,1,7,'2026-10-15T10:06:40.073Z','Copia de siguranta nu a putut fi generata (eroare la exportul bazei de date). Cauza: utilitarul mariadb-dump nu a fost gasit pe server (se seteaza Database:MariaDumpExecutablePath la calea lui).','administrator.demo','2026-10-09T06:41:42.369Z',1,'time.cloudflare.com, pool.ntp.org, time.windows.com',NULL,0,31);
 /*!40000 ALTER TABLE `backup_settings` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -211,6 +221,17 @@ UNLOCK TABLES;
 LOCK TABLES `beneficiary_aliases` WRITE;
 /*!40000 ALTER TABLE `beneficiary_aliases` DISABLE KEYS */;
 /*!40000 ALTER TABLE `beneficiary_aliases` ENABLE KEYS */;
+UNLOCK TABLES;
+
+LOCK TABLES `beneficiary_project_types` WRITE;
+/*!40000 ALTER TABLE `beneficiary_project_types` DISABLE KEYS */;
+REPLACE INTO `beneficiary_project_types` (`id`, `name`, `name_key`, `active`, `sort_order`, `version`, `created_utc`, `updated_utc`) VALUES (1,'Reparații sisteme existente','reparatiisistemeexistente',1,1,0,'2026-11-17T13:56:03.680Z','2026-11-17T13:56:03.680Z');
+/*!40000 ALTER TABLE `beneficiary_project_types` ENABLE KEYS */;
+UNLOCK TABLES;
+
+LOCK TABLES `beneficiary_tasks` WRITE;
+/*!40000 ALTER TABLE `beneficiary_tasks` DISABLE KEYS */;
+/*!40000 ALTER TABLE `beneficiary_tasks` ENABLE KEYS */;
 UNLOCK TABLES;
 
 LOCK TABLES `beneficiary_work_points` WRITE;
@@ -262,6 +283,11 @@ LOCK TABLES `elcomtur_auto_settings` WRITE;
 /*!40000 ALTER TABLE `elcomtur_auto_settings` DISABLE KEYS */;
 REPLACE INTO `elcomtur_auto_settings` (`id`, `enabled`, `directory_path`, `username`, `password_protected`, `file_mask`, `firm_folder`, `firm_name`, `alert_days`, `last_scheduled_date`, `last_check_utc`, `last_check_ok`, `last_message`, `failing_since_utc`, `last_file_name`, `last_file_modified_utc`, `last_import_utc`, `last_data_date`, `last_summary`, `updated_by`, `updated_utc`, `scheduled_hour`) VALUES (1,0,'','',NULL,'','firma3','KS TEST ENERGY SRL',2,'2026-11-05','2026-11-05T11:55:24.515Z',1,'Nu există un backup mai nou decât ultima preluare (cel mai recent fișier: Backup_elcomtur_sintetic.elc, modificat 05.11.2026 10:54).',NULL,'Backup_elcomtur_sintetic.elc','2026-11-05T08:54:12.000Z','2026-11-05T11:54:45.904Z','2026-10-30','0 beneficiari cu balanță, 0 cu plăți restante (total 0,00 RON)','claude.dev','2026-11-05T11:55:46.729Z',4);
 /*!40000 ALTER TABLE `elcomtur_auto_settings` ENABLE KEYS */;
+UNLOCK TABLES;
+
+LOCK TABLES `elcomtur_balance_history` WRITE;
+/*!40000 ALTER TABLE `elcomtur_balance_history` DISABLE KEYS */;
+/*!40000 ALTER TABLE `elcomtur_balance_history` ENABLE KEYS */;
 UNLOCK TABLES;
 
 LOCK TABLES `elcomtur_balances` WRITE;
@@ -398,6 +424,16 @@ REPLACE INTO `notification_templates` (`id`, `source_key`, `subject`, `body`, `t
 (17,'sistem.beneficiari-activityapp-de-verificat','Verifică beneficiarul: <beneficiar de verificat>','<detalii verificare> Vezi Beneficiari → De verificat.',1,1,0,'sistem.beneficiari-activityapp-de-verificat'),
 (18,'sistem.preluare-elcomtur','Elcomtur: <situatie elcomtur>','<detalii elcomtur> Vezi Setări → Preluare Elcomtur.',1,1,0,'sistem.preluare-elcomtur');
 /*!40000 ALTER TABLE `notification_templates` ENABLE KEYS */;
+UNLOCK TABLES;
+
+LOCK TABLES `ocr_learning_samples` WRITE;
+/*!40000 ALTER TABLE `ocr_learning_samples` DISABLE KEYS */;
+/*!40000 ALTER TABLE `ocr_learning_samples` ENABLE KEYS */;
+UNLOCK TABLES;
+
+LOCK TABLES `ocr_learning_sessions` WRITE;
+/*!40000 ALTER TABLE `ocr_learning_sessions` DISABLE KEYS */;
+/*!40000 ALTER TABLE `ocr_learning_sessions` ENABLE KEYS */;
 UNLOCK TABLES;
 
 LOCK TABLES `offer_line_matches` WRITE;
@@ -871,13 +907,37 @@ UNLOCK TABLES;
 
 LOCK TABLES `projects` WRITE;
 /*!40000 ALTER TABLE `projects` DISABLE KEYS */;
-REPLACE INTO `projects` (`id`, `beneficiary_id`, `name`, `normalized_name`, `observations`, `version`, `created_utc`, `updated_utc`) VALUES (2,2,'Instalare TVCI Barcea','INSTALARE TVCI BARCEA','',0,'2026-09-24T13:27:12.7227815Z','2026-09-24T13:27:12.7227815Z'),
-(5,7,'Renovare casa Deva','RENOVARE CASA DEVA','',0,'2026-09-29T11:53:32.418Z','2026-09-29T11:53:32.418Z'),
-(6,8,'Oferta sistem controla acces','OFERTA SISTEM CONTROLA ACCES','',0,'2026-10-08T11:43:16.015Z','2026-10-08T11:43:16.015Z'),
-(8,10,'Sistem TVCI IP','SISTEM TVCI IP','',0,'2026-10-09T10:34:06.817Z','2026-10-09T10:34:06.817Z'),
-(9,2,'test','TEST','',0,'2026-10-09T13:50:02.774Z','2026-10-09T13:50:02.774Z'),
-(10,10,'Oferta extindere retea internet + telefonie birou administrativ','OFERTA EXTINDERE RETEA INTERNET + TELEFONIE BIROU ADMINISTRATIV','',0,'2026-10-09T13:51:54.858Z','2026-10-09T13:51:54.858Z');
+REPLACE INTO `projects` (`id`, `beneficiary_id`, `name`, `normalized_name`, `observations`, `version`, `created_utc`, `updated_utc`, `mandatory_type_id`) VALUES (2,2,'Instalare TVCI Barcea','INSTALARE TVCI BARCEA','',0,'2026-09-24T13:27:12.7227815Z','2026-09-24T13:27:12.7227815Z',NULL),
+(5,7,'Renovare casa Deva','RENOVARE CASA DEVA','',0,'2026-09-29T11:53:32.418Z','2026-09-29T11:53:32.418Z',NULL),
+(6,8,'Oferta sistem controla acces','OFERTA SISTEM CONTROLA ACCES','',0,'2026-10-08T11:43:16.015Z','2026-10-08T11:43:16.015Z',NULL),
+(8,10,'Sistem TVCI IP','SISTEM TVCI IP','',0,'2026-10-09T10:34:06.817Z','2026-10-09T10:34:06.817Z',NULL),
+(9,2,'test','TEST','',0,'2026-10-09T13:50:02.774Z','2026-10-09T13:50:02.774Z',NULL),
+(10,10,'Oferta extindere retea internet + telefonie birou administrativ','OFERTA EXTINDERE RETEA INTERNET + TELEFONIE BIROU ADMINISTRATIV','',0,'2026-10-09T13:51:54.858Z','2026-10-09T13:51:54.858Z',NULL),
+(11,1,'Reparații sisteme existente','REPARATII SISTEME EXISTENTE','',0,'2026-11-17T13:56:03.681Z','2026-11-17T13:56:03.681Z',1),
+(12,2,'Reparații sisteme existente','REPARATII SISTEME EXISTENTE','',0,'2026-11-17T13:56:03.681Z','2026-11-17T13:56:03.681Z',1),
+(13,3,'Reparații sisteme existente','REPARATII SISTEME EXISTENTE','',0,'2026-11-17T13:56:03.681Z','2026-11-17T13:56:03.681Z',1),
+(14,6,'Reparații sisteme existente','REPARATII SISTEME EXISTENTE','',0,'2026-11-17T13:56:03.681Z','2026-11-17T13:56:03.681Z',1),
+(15,8,'Reparații sisteme existente','REPARATII SISTEME EXISTENTE','',0,'2026-11-17T13:56:03.681Z','2026-11-17T13:56:03.681Z',1),
+(16,10,'Reparații sisteme existente','REPARATII SISTEME EXISTENTE','',0,'2026-11-17T13:56:03.681Z','2026-11-17T13:56:03.681Z',1),
+(17,4,'Reparații sisteme existente','REPARATII SISTEME EXISTENTE','',0,'2026-11-17T13:56:03.681Z','2026-11-17T13:56:03.681Z',1),
+(18,5,'Reparații sisteme existente','REPARATII SISTEME EXISTENTE','',0,'2026-11-17T13:56:03.681Z','2026-11-17T13:56:03.681Z',1),
+(19,7,'Reparații sisteme existente','REPARATII SISTEME EXISTENTE','',0,'2026-11-17T13:56:03.681Z','2026-11-17T13:56:03.681Z',1);
 /*!40000 ALTER TABLE `projects` ENABLE KEYS */;
+UNLOCK TABLES;
+
+LOCK TABLES `proposal_files` WRITE;
+/*!40000 ALTER TABLE `proposal_files` DISABLE KEYS */;
+/*!40000 ALTER TABLE `proposal_files` ENABLE KEYS */;
+UNLOCK TABLES;
+
+LOCK TABLES `proposal_notes` WRITE;
+/*!40000 ALTER TABLE `proposal_notes` DISABLE KEYS */;
+/*!40000 ALTER TABLE `proposal_notes` ENABLE KEYS */;
+UNLOCK TABLES;
+
+LOCK TABLES `proposals` WRITE;
+/*!40000 ALTER TABLE `proposals` DISABLE KEYS */;
+/*!40000 ALTER TABLE `proposals` ENABLE KEYS */;
 UNLOCK TABLES;
 
 LOCK TABLES `risk_analyses` WRITE;
@@ -978,7 +1038,19 @@ REPLACE INTO `schema_migrations` (`version`, `description`, `checksum`, `origin`
 (77,'Contracte de mentenanta cu componente: data de referinta, inghetare si unitati (familii / componente discrete)','55355d2eb38e865f20994e6c66cb1e883c3554ffec2cbae365ac9c2b3acde100','applied','2026-11-09 07:55:55','0.5.52'),
 (78,'Scadente de mentenanta pe punct de lucru si componenta (unitate de contract)','fa8be64df56905971e08e6827f5376eb7f188bee3a4e6ae30df54ded5d872c64','applied','2026-11-09 07:55:55','0.5.52'),
 (79,'Componentele acoperite de o interventie de mentenanta','e5fbaa8766b89608095b76fc4156c0212687e8712c0685a548f0518041acca9e','applied','2026-11-09 07:55:55','0.5.52'),
-(80,'Acte aditionale: data de referinta si componentele contractului inainte / dupa act','8f8bf9719b519edcdfa5bcc6cc5bfbc083f99f9541ffa5393b4ddd6e8a31b39d','applied','2026-11-09 07:55:55','0.5.52');
+(80,'Acte aditionale: data de referinta si componentele contractului inainte / dupa act','8f8bf9719b519edcdfa5bcc6cc5bfbc083f99f9541ffa5393b4ddd6e8a31b39d','applied','2026-11-09 07:55:55','0.5.52'),
+(81,'Taskuri ale utilizatorilor pe beneficiar (modulul Taskuri)','95abe240ebc21e665ed01e4cc8bacd34daab602b13a362e3c5eee57e7a07049d','applied','2026-11-17 07:31:29','0.5.91'),
+(82,'Nivel de prioritate la taskurile utilizatorilor','14bbeb9ac7fcbdf2bf8ce25a4eae77843dcadb36c515a2b6a2240d5116acc51e','applied','2026-11-17 07:31:29','0.5.91'),
+(83,'Propuneri de modificari si functionalitati noi (modulul Propuneri)','d75d113b1f83a9d45f968895ae4ba40812d9df9fab68130652a48abafdfd92c7','applied','2026-11-17 07:31:29','0.5.91'),
+(84,'Rezultatele tichetelor ActivityApp decise (preluare separata de modulul Mentenanta)','3f8487feda22a6bcc01ba267ae195c5b077416bba82a4922db2c8e0a3190230c','applied','2026-11-17 07:31:29','0.5.91'),
+(85,'Taskuri: ordinea proprie a fiecarui utilizator si stadiul / notele de lucru','12c98804d537b21b1c0540af9b12153fdfc27297e8d3946d55e09151733101ba','applied','2026-11-17 07:31:29','0.5.91'),
+(86,'Dezvoltator: indicator pe conturile de utilizator (Propuneri si Erori vizibile doar dezvoltatorilor)','0992a392261a7b22dec95f6288d282aa991b05a9e621477ab0ffc4f1c1fe1fe4','applied','2026-11-17 07:31:29','0.5.91'),
+(87,'Raportare erori: versiunea aplicatiei in care a fost rezolvat un raport (pentru changelog)','4046113d06a3672b42960ecb7f41dfa3719df0138bbfafb986c6c15f968e7a99','applied','2026-11-17 07:31:29','0.5.91'),
+(88,'Puncte de lucru arondate: componente ale unui punct de lucru (cladiri, corpuri) cu nume, adresa si/sau coordonate GPS, telefon, persoana de contact; arhivare la stergere','72d881bb6e3ac18ac9f586700e2f5367cb41471674b4badc00b561fb809acf52','applied','2026-11-17 07:31:29','0.5.91'),
+(89,'Invatare OCR la preluarea inventarului: sesiuni de preluare si esantioane (cifre citite gresit si corectate de utilizator)','c03417fb694f897d63703c5cc3dbd12d70390c49b4d0758385601dfd76f0863d','applied','2026-11-17 07:31:29','0.5.91'),
+(90,'Setari de afisare per utilizator (global si pe tabel)','07f3e882ccf81202a0afe95db3f8ec9150688f268dd51fe9d19b633144dcad11','applied','2026-11-17 07:31:29','0.5.91'),
+(91,'Nomenclator: tipuri obligatorii de proiecte ale beneficiarilor','2d60d21dbb138b1a5372ee7abb77ce208707972a6ce7f0cb8160757a852e8baf','applied','2026-11-17 13:56:03','0.5.95'),
+(92,'Elcomtur: istoricul totalului platilor restante, o valoare la fiecare preluare','c1e8a82b5f6dbeeed92e0dc765f04be5cb0922bfc2a7ad4c390f51095ec498a2','applied','2026-11-17 13:56:03','0.5.95');
 /*!40000 ALTER TABLE `schema_migrations` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -1576,6 +1648,17 @@ REPLACE INTO `system_types` (`id`, `name`, `name_key`, `active`, `sort_order`, `
 /*!40000 ALTER TABLE `system_types` ENABLE KEYS */;
 UNLOCK TABLES;
 
+LOCK TABLES `task_settings` WRITE;
+/*!40000 ALTER TABLE `task_settings` DISABLE KEYS */;
+/*!40000 ALTER TABLE `task_settings` ENABLE KEYS */;
+UNLOCK TABLES;
+
+LOCK TABLES `user_display_settings` WRITE;
+/*!40000 ALTER TABLE `user_display_settings` DISABLE KEYS */;
+REPLACE INTO `user_display_settings` (`user_id`, `scope`, `settings`, `updated_utc`) VALUES (3,'global','{\"TableText\":null,\"HeaderText\":null,\"Images\":null,\"Icons\":null,\"Titles\":null,\"Tabs\":null,\"Menu\":135,\"Text\":null,\"Buttons\":115,\"Fields\":130,\"Topbar\":115,\"Dialogs\":165,\"Palette\":null,\"IsEmpty\":false}','2026-11-17T07:32:49.838Z');
+/*!40000 ALTER TABLE `user_display_settings` ENABLE KEYS */;
+UNLOCK TABLES;
+
 LOCK TABLES `user_type_permissions` WRITE;
 /*!40000 ALTER TABLE `user_type_permissions` DISABLE KEYS */;
 REPLACE INTO `user_type_permissions` (`user_type_id`, `permission_key`) VALUES (1,'analize-risc.add'),
@@ -1592,6 +1675,8 @@ REPLACE INTO `user_type_permissions` (`user_type_id`, `permission_key`) VALUES (
 (1,'categorii.delete'),
 (1,'categorii.edit'),
 (1,'categorii.view'),
+(1,'elcomtur.import'),
+(1,'elcomtur.view'),
 (1,'export-consum.export'),
 (1,'export-consum.view'),
 (1,'facturi.add'),
@@ -1644,6 +1729,9 @@ REPLACE INTO `user_type_permissions` (`user_type_id`, `permission_key`) VALUES (
 (1,'setari-backup.edit'),
 (1,'setari-backup.restore'),
 (1,'setari-backup.view'),
+(1,'setari-bug-raport.edit'),
+(1,'setari-bug-raport.export'),
+(1,'setari-bug-raport.view'),
 (1,'setari-facturi.add'),
 (1,'setari-facturi.delete'),
 (1,'setari-facturi.edit'),
@@ -1654,6 +1742,11 @@ REPLACE INTO `user_type_permissions` (`user_type_id`, `permission_key`) VALUES (
 (1,'setari-import-activityapp.reset'),
 (1,'setari-import-activityapp.run'),
 (1,'setari-import-activityapp.view'),
+(1,'setari-import-elcomtur.edit'),
+(1,'setari-import-elcomtur.run'),
+(1,'setari-import-elcomtur.view'),
+(1,'setari-import-espstoc.run'),
+(1,'setari-import-espstoc.view'),
 (1,'setari-jurnal.edit'),
 (1,'setari-jurnal.view'),
 (1,'setari-module.retry'),
@@ -1661,6 +1754,9 @@ REPLACE INTO `user_type_permissions` (`user_type_id`, `permission_key`) VALUES (
 (1,'setari-module.view'),
 (1,'setari-notificari.edit'),
 (1,'setari-notificari.view'),
+(1,'setari-propuneri.edit'),
+(1,'setari-propuneri.export'),
+(1,'setari-propuneri.view'),
 (1,'stoc.iesire'),
 (1,'stoc.intrare'),
 (1,'stoc.minim'),
@@ -1668,6 +1764,10 @@ REPLACE INTO `user_type_permissions` (`user_type_id`, `permission_key`) VALUES (
 (1,'stoc.rezervare'),
 (1,'stoc.stornare'),
 (1,'stoc.view'),
+(1,'taskuri.add'),
+(1,'taskuri.delete'),
+(1,'taskuri.edit'),
+(1,'taskuri.view'),
 (1,'tipuri-utilizatori.add'),
 (1,'tipuri-utilizatori.delete'),
 (1,'tipuri-utilizatori.edit'),
@@ -1779,10 +1879,15 @@ UNLOCK TABLES;
 
 LOCK TABLES `web_users` WRITE;
 /*!40000 ALTER TABLE `web_users` DISABLE KEYS */;
-REPLACE INTO `web_users` (`id`, `username`, `normalized_username`, `display_name`, `password_hash`, `role`, `is_active`, `version`, `user_type_id`, `must_change_password`) VALUES (1,'administrator.demo','ADMINISTRATOR.DEMO','Administrator demonstratie','AQAAAAIAAYagAAAAEIeR3dzbxxPEXnPWJ2h6E1QnJg7VWSxKvvZFsk1/hylP26VxVBIILKj/Fr3b6PgsNA==','Administrator',1,0,1,1),
-(2,'utilizator.demo','UTILIZATOR.DEMO','Utilizator demonstratie','AQAAAAIAAYagAAAAEG6GfKQW+dSJCuHG4T16Zl9QvtaQHTwtCCh2KIHJ9kP9C37eKheuYMQLSONzkTzCpg==','Utilizator',1,0,2,1),
-(3,'claude.dev','CLAUDE.DEV','Claude dezvoltare','AQAAAAIAAYagAAAAEESqUBAG36THU/WhsRqsC2ZMgMkUTkFdG1AbUShu6Vk2UABSSi96auup9Sf/uUweyg==','Administrator',1,2,1,0);
+REPLACE INTO `web_users` (`id`, `username`, `normalized_username`, `display_name`, `password_hash`, `role`, `is_active`, `version`, `user_type_id`, `must_change_password`, `is_developer`) VALUES (1,'administrator.demo','ADMINISTRATOR.DEMO','Administrator demonstratie','AQAAAAIAAYagAAAAEIeR3dzbxxPEXnPWJ2h6E1QnJg7VWSxKvvZFsk1/hylP26VxVBIILKj/Fr3b6PgsNA==','Administrator',1,0,1,1,0),
+(2,'utilizator.demo','UTILIZATOR.DEMO','Utilizator demonstratie','AQAAAAIAAYagAAAAEG6GfKQW+dSJCuHG4T16Zl9QvtaQHTwtCCh2KIHJ9kP9C37eKheuYMQLSONzkTzCpg==','Utilizator',1,0,2,1,0),
+(3,'claude.dev','CLAUDE.DEV','Claude dezvoltare','AQAAAAIAAYagAAAAEESqUBAG36THU/WhsRqsC2ZMgMkUTkFdG1AbUShu6Vk2UABSSi96auup9Sf/uUweyg==','Administrator',1,2,1,0,0);
 /*!40000 ALTER TABLE `web_users` ENABLE KEYS */;
+UNLOCK TABLES;
+
+LOCK TABLES `work_point_attached` WRITE;
+/*!40000 ALTER TABLE `work_point_attached` DISABLE KEYS */;
+/*!40000 ALTER TABLE `work_point_attached` ENABLE KEYS */;
 UNLOCK TABLES;
 /*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;
 
