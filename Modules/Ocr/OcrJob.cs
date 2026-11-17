@@ -21,6 +21,8 @@ internal static class OcrFiles
     public const string Document = "document.json";
     public const string Result = "result.json";
     public const string Refusal = "refuz.json";
+    // The share of the work done (a whole number, percent), written by the worker as it goes and read by the application while the worker runs.
+    public const string Progress = "progress.txt";
     public static string Preview(int index) => $"preview-{index}.png";
 }
 

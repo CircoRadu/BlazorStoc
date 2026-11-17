@@ -223,6 +223,15 @@ public static partial class FullRun
             Check(multiPageScan.PageCount == 2, "The multi-page fixture has two pages");
             Check(multiPageScan.Rows.Count(row => row.Page == 1) == 10, "Page 1 (mild skew) is fully read on its own");
             Check(multiPageScan.Rows.Count(row => row.Page == 2) == 10, "Page 2 (visible rotation) is fully read on its own, independently of page 1's skew");
+
+            // The progress of the analysis (PROP-0033): reported while the pages are read, never going back, ending at 100 % (the page shows it as a percentage).
+            await using var progressFixtureStream = File.OpenRead(Path.Combine(AppContext.BaseDirectory, "Fixtures", "inventar-proba-multipagina.pdf"));
+            var reported = new List<int>();
+            await ocrService.ScanAsync(progressFixtureStream, CancellationToken.None, new ImmediateProgress(reported.Add));
+            Check(reported.Count >= 3 && reported[0] == 0 && reported[^1] == 100 && reported.Zip(reported.Skip(1), (before, after) => after >= before).All(ok => ok) && reported.Distinct().Count() >= 3,
+                $"The scan reports its progress in percent as the pages are read: from 0 to 100 without going back ({string.Join(", ", reported)})");
+            Check(InventoryPickupOcrRules.ProgressAfterPages(0, 4) == 5 && InventoryPickupOcrRules.ProgressAfterPages(2, 4) == 53 && InventoryPickupOcrRules.ProgressAfterPages(4, 4) == 100 && InventoryPickupOcrRules.ProgressAfterPages(9, 4) == 100 && InventoryPickupOcrRules.ProgressAfterPages(1, 0) == 0,
+                "The progress of the analysis: 5 % when the pages are rendered, the pages share the rest, 100 % when all are read");
         }
     }
 }

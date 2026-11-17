@@ -16,8 +16,13 @@
         <div class="display-presets" role="group" aria-label="Presetări">
             @foreach (var (name, percent) in DisplayRules.Presets)
             {
-                <button type="button" class="refresh act-confirm" title="Setează toate valorile la @percent%" @onclick="() => SaveAsync(DisplayRules.Preset(percent))">@name</button>
+                <button type="button" class="refresh act-confirm" title="Setează toate valorile la @percent%" @onclick="() => SaveAsync(DisplayRules.Preset(percent) with { TableGear = global.TableGear })">@name</button>
             }
+        </div>
+        <div class="display-table-gear-toggle" id="display-table-gear">
+            <ToggleSwitch Id="display-table-gear-toggle" Value="DisplayRules.ShowTableGear(global)" ValueChanged="v => SaveAsync(global with { TableGear = v })" OnText="On" OffText="Off" AriaLabel="Arată buton particularizare tabel" />
+            <span>Arată buton particularizare tabel</span>
+            <small class="muted">Dacă e On, deasupra antetului fiecărui tabel, în dreapta sus, apare iconița cu setările individuale ale tabelului; dacă e Off, iconița este ascunsă. Setările făcute pentru un tabel se păstrează în ambele cazuri.</small>
         </div>
 
         <details class="display-section" id="display-section-text">

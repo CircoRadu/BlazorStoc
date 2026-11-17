@@ -82,7 +82,10 @@
     background: var(--c-f2f6f4);
     padding: 0;
 }
-.product-thumbnail img { width: 100%; height: 100%; display: block; object-fit: cover; }
+.product-thumbnail { overflow: visible; border: 0; background: transparent; display: flex; align-items: center; justify-content: center; }
+.product-thumbnail img { width: auto; height: auto; max-width: 100%; max-height: 100%; display: block; object-fit: contain; border: 1px solid var(--c-dfe8e4); border-radius: 8px; background: var(--c-f2f6f4); }
+.product-thumbnail:hover img { border-color: var(--green); }
+.catalog-heading > .catalog-updated { margin: 0 auto 0 10px; }
 .product-thumbnail:hover { border-color: var(--green); }
 
 .detail-product-image {
@@ -2045,7 +2048,19 @@ td, th { --ui-cell: var(--ui-table, 1); }
 .sample-dialog p { margin:0 0 12px; font-size:13px; }
 .sample-dialog .editor-actions { margin-top:0; }
 .sample-row { margin-top:12px; }
-.table-gear-layer { position:fixed; inset:0; pointer-events:none; z-index:25; }
+/* The progress of the analysis of a scan (Preluare inventar, PROP-0033). */
+.scan-percent { margin-left:8px; color:var(--green); font-variant-numeric:tabular-nums; }
+.scan-progress { width:min(420px, 100%); height:8px; margin:6px auto 14px; border-radius:999px; background:var(--c-e4eae8); overflow:hidden; }
+.scan-progress > span { display:block; height:100%; border-radius:999px; background:var(--green); transition:width .25s ease; }
+/* The tab "Balanță Elcomtur" of the beneficiary (BUG-0045): coloured by the balance also when it is not the open tab; the badge is the balance. */
+.settings-subtab.balance-due, .settings-subtab.balance-due:hover { color:var(--c-a63a32); }
+.settings-subtab.balance-due:not(.active) { background:var(--c-fbeceb); border-color:var(--c-e1b4b0); box-shadow:inset 0 3px 0 var(--c-a63a32); }
+.settings-subtab.balance-due.active { border-color:var(--c-a63a32); }
+.settings-subtab.balance-due .count-badge, .settings-subtab.balance-due:not(.active) .count-badge { background:var(--c-a63a32); color:var(--c-ffffff); }
+.settings-subtab.balance-ok, .settings-subtab.balance-ok:hover { color:var(--c-176d5e); }
+.settings-subtab.balance-ok:not(.active) { background:var(--c-eaf4f0); border-color:var(--c-9fc9bd); box-shadow:inset 0 3px 0 var(--green); }
+.settings-subtab.balance-ok.active { border-color:var(--green); }
+.settings-subtab.balance-ok .count-badge, .settings-subtab.balance-ok:not(.active) .count-badge { background:var(--green); color:var(--c-ffffff); }.table-gear-layer { position:fixed; inset:0; pointer-events:none; z-index:25; }
 .table-gear-button { position:fixed; width:28px; height:28px; padding:0; pointer-events:auto; opacity:.55; border:1px solid var(--c-c9d6d2); border-radius:6px; background:var(--c-ffffff); color:var(--green); cursor:pointer; }
 .table-gear-button:hover, .table-gear-button:focus-visible { opacity:1; background:var(--c-eaf4f0); border-color:var(--c-9fc9bd); }
 .table-gear-button::before { content:""; position:absolute; inset:0; margin:auto; width:14px; height:14px; background:currentColor; -webkit-mask:var(--gear-shape) center/contain no-repeat; mask:var(--gear-shape) center/contain no-repeat; }
@@ -2056,3 +2071,17 @@ td, th { --ui-cell: var(--ui-table, 1); }
 .display-settings-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(230px, 1fr)); gap:18px; }
 .display-settings-grid label { font-size:13px; font-weight:600; }
 .display-settings-grid select { display:block; width:100%; margin-top:8px; }
+
+.display-table-gear-toggle { display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin:16px 0 10px; }
+.display-table-gear-toggle > small { flex-basis:100%; }
+
+.evolution-periods { display:flex; gap:10px; flex-wrap:wrap; margin:0 0 16px; }
+.elcomtur-evolution-dialog { width:min(900px, calc(100vw - 16px)); }
+.balance-chart-scroll { overflow-x:auto; }
+.balance-chart { display:block; max-width:none; }
+.balance-chart-axis { stroke:var(--c-e4eae8); stroke-width:1; }
+.balance-bar-first { fill:var(--c-60766c); }
+.balance-bar-up { fill:var(--c-a83d35); }
+.balance-bar-down { fill:var(--c-13796a); }
+.balance-bar-value { font-size:11px; font-weight:700; fill:var(--ink); }
+.balance-bar-date { font-size:11px; fill:var(--muted); }

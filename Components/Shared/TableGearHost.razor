@@ -64,7 +64,7 @@
         if (disposed) return;
         var data = await Display.GetAsync();
         var map = data.Tables.Where(pair => pair.Key != DisplayRules.ProductsCatalogScope).ToDictionary(pair => pair.Key, pair => DisplayRules.ToStyle(data.For(pair.Key)));
-        try { await JS.InvokeVoidAsync("tableGears.setStyles", map); }
+        try { await JS.InvokeVoidAsync("tableGears.setVisible", DisplayRules.ShowTableGear(data.Global)); await JS.InvokeVoidAsync("tableGears.setStyles", map); }
         catch (Exception exception) when (exception is JSException or InvalidOperationException or JSDisconnectedException) { }
     }
 

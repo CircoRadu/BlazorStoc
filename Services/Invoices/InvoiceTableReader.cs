@@ -566,7 +566,20 @@ public static partial class InvoiceTableReader
     {
         var plain = text.Trim();
         if (expected == 1 && plain is "]" or "[" or "|" or "!" or "l" or "I") return 1;
-        return ParseIndex(plain.Trim('„', '“', '”', '"', '\'', '’', '‘', '`', '|', '_', ' '));
+        var cleaned = plain.Trim('„', '“', '”', '"', '\'', '’', '‘', '`', '|', '_', ' ');
+        if (ParseIndex(cleaned) is { } exact) return exact;
+        // A scan sticks a speck to a running number ("1M" for "1", "2~" for "2"): the number of the row that is expected, followed by one or two letters or signs and
+        // nothing else, is that number. Only the expected number is accepted, and only with the speck stuck to it (a text like "3 pcs" never numbers a row).
+        var noisy = System.Text.RegularExpressions.Regex.Match(cleaned, @"^(\d{1,3})[^\d\s.,:;()]{1,2}$");
+        return noisy.Success && int.Parse(noisy.Groups[1].Value, System.Globalization.CultureInfo.InvariantCulture) == expected ? expected : null;
+    }
+
+    // The first number of a column of running numbers, a speck stuck to it tolerated ("1M" is 1): used to find where the numbering starts.
+    internal static int? ParseIndexLoose(string text)
+    {
+        if (ParseIndex(text) is { } exact) return exact;
+        var noisy = System.Text.RegularExpressions.Regex.Match(text.Trim().Trim('„', '“', '”', '"', '\'', '|', '_', ' '), @"^(\d{1,3})[^\d\s.,:;()]{1,2}$");
+        return noisy.Success ? int.Parse(noisy.Groups[1].Value, System.Globalization.CultureInfo.InvariantCulture) : null;
     }
 
     internal static int? ParseIndex(string text)

@@ -1,0 +1,15 @@
+# Informațiile unui proiect
+Cautare: proiect beneficiar echipamente predate
+
+Fereastra care se deschide din tabelul de intrări/ieșiri al unui produs când apeși pe proiect. Arată beneficiarul, proiectul și echipamentele predate pe el; nu modifică nimic.
+
+## Elemente
+### Fereastra
+- Beneficiar | link | Deschide fișa beneficiarului. | sel: #project-info-facts
+- Proiect | link | Deschide pagina proiectului. | sel: #project-info-facts
+- Echipamente în proiect | tabel | Codul produsului (link spre mișcările produsului) și bucățile predate, minus returnări. | sel: #project-info-equipment
+- Închide | buton | Închide fereastra.
+
+## Flux: Cum văd echipamentele unui proiect
+1. În coloana „Beneficiar / proiect” apasă pe numele proiectului.
+2. Citești lista de echipamente; apasă un cod de produs ca să-i vezi mișcările.

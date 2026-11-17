@@ -8,6 +8,7 @@ internal sealed class GuardedElcomturBalanceRepository(IElcomturBalanceRepositor
     public Task<IReadOnlyList<BeneficiaryBalance>> GetOwedAsync(CancellationToken cancellationToken = default) => modules.RunAsync(Id, () => inner.GetOwedAsync(cancellationToken));
     public Task<int> CountOwedAsync(CancellationToken cancellationToken = default) => modules.RunAsync(Id, () => inner.CountOwedAsync(cancellationToken));
     public Task<ElcomturImportInfo?> GetInfoAsync(CancellationToken cancellationToken = default) => modules.RunAsync(Id, () => inner.GetInfoAsync(cancellationToken));
+    public Task<IReadOnlyList<ElcomturBalancePoint>> GetHistoryAsync(DateOnly from, CancellationToken cancellationToken = default) => modules.RunAsync(Id, () => inner.GetHistoryAsync(from, cancellationToken));
     public Task ReplaceAsync(string firm, DateOnly dataDate, IReadOnlyList<BeneficiaryBalance> balances, CancellationToken cancellationToken = default) =>
         modules.RunAsync(Id, () => inner.ReplaceAsync(firm, dataDate, balances, cancellationToken));
 }
@@ -29,6 +30,7 @@ internal sealed class UnavailableElcomturBalanceRepository : IElcomturBalanceRep
     public Task<IReadOnlyList<BeneficiaryBalance>> GetOwedAsync(CancellationToken cancellationToken = default) => Out<IReadOnlyList<BeneficiaryBalance>>();
     public Task<int> CountOwedAsync(CancellationToken cancellationToken = default) => Out<int>();
     public Task<ElcomturImportInfo?> GetInfoAsync(CancellationToken cancellationToken = default) => Out<ElcomturImportInfo?>();
+    public Task<IReadOnlyList<ElcomturBalancePoint>> GetHistoryAsync(DateOnly from, CancellationToken cancellationToken = default) => Out<IReadOnlyList<ElcomturBalancePoint>>();
     public Task ReplaceAsync(string firm, DateOnly dataDate, IReadOnlyList<BeneficiaryBalance> balances, CancellationToken cancellationToken = default) => Out<object>();
 }
 

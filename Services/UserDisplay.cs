@@ -5,9 +5,9 @@ namespace BlazorStoc.Services;
 
 // Display settings of one user (PROP-0034). Every value is a percent of the default size (100 = as designed); null = "not set here": the value of the
 // level above is used (table settings -> the user's global settings -> the default). The settings are stored in the database per user and loaded when the user opens a page.
-public sealed record DisplaySettings(int? TableText = null, int? HeaderText = null, int? Images = null, int? Icons = null, int? Titles = null, int? Tabs = null, int? Menu = null, int? Text = null, int? Buttons = null, int? Fields = null, int? Topbar = null, int? Dialogs = null)
+public sealed record DisplaySettings(int? TableText = null, int? HeaderText = null, int? Images = null, int? Icons = null, int? Titles = null, int? Tabs = null, int? Menu = null, int? Text = null, int? Buttons = null, int? Fields = null, int? Topbar = null, int? Dialogs = null, bool? TableGear = null)
 {
-    public bool IsEmpty => TableText is null && HeaderText is null && Images is null && Icons is null && Titles is null && Tabs is null && Menu is null && Text is null && Buttons is null && Fields is null && Topbar is null && Dialogs is null;
+    public bool IsEmpty => TableText is null && HeaderText is null && Images is null && Icons is null && Titles is null && Tabs is null && Menu is null && Text is null && Buttons is null && Fields is null && Topbar is null && Dialogs is null && TableGear is null;
 }
 
 public static class DisplayRules
@@ -22,12 +22,12 @@ public static class DisplayRules
     public static int Clamp(int percent) => Math.Clamp(percent, Min, Max);
     private static int? Clamp(int? percent) => percent is { } value ? Clamp(value) : null;
 
-    public static DisplaySettings Normalize(DisplaySettings settings) => new(Clamp(settings.TableText), Clamp(settings.HeaderText), Clamp(settings.Images), Clamp(settings.Icons), Clamp(settings.Titles), Clamp(settings.Tabs), Clamp(settings.Menu), Clamp(settings.Text), Clamp(settings.Buttons), Clamp(settings.Fields), Clamp(settings.Topbar), Clamp(settings.Dialogs));
+    public static DisplaySettings Normalize(DisplaySettings settings) => new(Clamp(settings.TableText), Clamp(settings.HeaderText), Clamp(settings.Images), Clamp(settings.Icons), Clamp(settings.Titles), Clamp(settings.Tabs), Clamp(settings.Menu), Clamp(settings.Text), Clamp(settings.Buttons), Clamp(settings.Fields), Clamp(settings.Topbar), Clamp(settings.Dialogs), settings.TableGear);
 
     // Field by field: a value set for the table wins, what the table leaves unset comes from the global settings, the rest from the default.
     public static DisplaySettings Merge(DisplaySettings? global, DisplaySettings? table) => new(
         table?.TableText ?? global?.TableText, table?.HeaderText ?? global?.HeaderText, table?.Images ?? global?.Images,
-        table?.Icons ?? global?.Icons, table?.Titles ?? global?.Titles, table?.Tabs ?? global?.Tabs, table?.Menu ?? global?.Menu, table?.Text ?? global?.Text, table?.Buttons ?? global?.Buttons, table?.Fields ?? global?.Fields, table?.Topbar ?? global?.Topbar, table?.Dialogs ?? global?.Dialogs);
+        table?.Icons ?? global?.Icons, table?.Titles ?? global?.Titles, table?.Tabs ?? global?.Tabs, table?.Menu ?? global?.Menu, table?.Text ?? global?.Text, table?.Buttons ?? global?.Buttons, table?.Fields ?? global?.Fields, table?.Topbar ?? global?.Topbar, table?.Dialogs ?? global?.Dialogs, table?.TableGear ?? global?.TableGear);
 
     // One preset sets every field to the same scale.
     public static DisplaySettings Preset(int percent) => new(percent, percent, percent, percent, percent, percent, percent, percent, percent, percent, percent, percent);
@@ -52,6 +52,9 @@ public static class DisplayRules
         try { return Normalize(JsonSerializer.Deserialize<DisplaySettings>(json) ?? new()); }
         catch (JsonException) { return new(); }
     }
+
+    // PROP-0037: the button of the individual style of a table (the gear) is shown unless the user turned it off (global rule); the table settings are kept either way.
+    public static bool ShowTableGear(DisplaySettings? global) => global?.TableGear ?? true;
 
     public static bool IsValidScope(string scope) => scope.Length is > 0 and <= 80 && scope.All(character => char.IsAsciiLetterOrDigit(character) || character is '.' or '-' or '_');
 }

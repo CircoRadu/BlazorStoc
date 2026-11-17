@@ -534,3 +534,17 @@ Pasi:
 | 1 | Setari -> ANAF | Doua sub-taburi: Preluare date firme (ca inainte) si E-Factura | |
 | 2 | E-Factura: completeaza client id, secret, adresa HTTPS de raspuns, Salveaza | Mesaj de salvare; secretul nu mai apare | |
 | 3 | Autentifica-te in ANAF cu datele reale inregistrate la ANAF | Revii pe E-Factura cu "Autentificat" si data expirarii (necesita cont/certificat ANAF real) | |
+
+## Modificari de testat (17.11.2026) - PROP-0037 / PROP-0035
+**Ce s-a adaugat:** în Setări afișare, între presetări și secțiuni, comutatorul "Arată buton particularizare tabel"; în Preluare date Elcomtur firma apare cu numele ei.
+**Ce face acum:**
+1. Meniul contului -> Setări afișare: pune comutatorul pe Off; pe orice tabel dispare roata de setări. Pune-l pe On: reapare. Setările făcute înainte pentru un tabel se păstrează.
+2. Preluare date Elcomtur (și fișa beneficiarului, tabul Balanță): la "firma ..." apare numele firmei (după ce preluarea automată a citit firma o dată); altfel rămâne firma1.
+
+## Modificari de testat (17.11.2026) - PROP-0036
+**Ce s-a adaugat:** migrarea 92 (istoric al totalului platilor restante, o valoare la fiecare preluare Elcomtur); butonul "Arată evoluție balanță" sub "Total plăți restante" (Notificări → Balanțe restante) și fereastra cu grafic.
+**Ce face acum:**
+1. Fă o preluare Elcomtur (Administrare → Preluare date Elcomtur sau cea automată); totalul de la acea preluare se notează. La prima preluare după actualizare se notează și totalul dinainte.
+2. Notificări → Balanțe restante: apasă "Arată evoluție balanță": bare verticale, cu valoarea deasupra și data backup-ului dedesubt (roșu = a crescut, verde = a scăzut, gri = prima).
+3. Schimbă perioada: Anul curent / Ultimele 6 luni / Ultimele 3 luni; o preluare a aceleiași date și firme înlocuiește bara ei.
+Istoricul începe de la preluările făcute după această versiune (nu există valori mai vechi).

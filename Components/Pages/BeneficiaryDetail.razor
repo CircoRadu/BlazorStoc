@@ -1,4 +1,4 @@
-﻿@page "/beneficiari/{Id:int}"
+@page "/beneficiari/{Id:int}"
 @attribute [Authorize(Policy = "perm:beneficiari.view")]
 @rendermode @(new InteractiveServerRenderMode(prerender: false))
 @using BlazorStoc.Services
@@ -17,6 +17,8 @@
 @inject ExitFormDraft ExitDraft
 @inject UnsavedChanges Guard
 @inject IAccessControl Access
+@using BlazorStoc.Modules.Elcomtur
+@inject IElcomturBalanceRepository ElcomturBalances
 @inject NavigationManager Navigation
 @inject IJSRuntime JS
 @inject IChangeFeed ChangeFeed
@@ -106,7 +108,7 @@ else if (beneficiary is not null)
         @foreach (var (tabId, tabTitle) in SectionTabs)
         {
             var current = tabId;
-            <button type="button" role="tab" id="subtab-bf-@tabId" data-tab-target="@tabId" class="settings-subtab @(sectionTab == tabId ? "active" : "")" aria-selected="@(sectionTab == tabId ? "true" : "false")" aria-controls="subpanel-bf-@tabId" tabindex="@(sectionTab == tabId ? 0 : -1)" @onclick="() => sectionTab = current">@tabTitle</button>
+            <button type="button" role="tab" id="subtab-bf-@tabId" data-tab-target="@tabId" class="settings-subtab @(sectionTab == tabId ? "active" : "") @BalanceTabClass(tabId)" aria-selected="@(sectionTab == tabId ? "true" : "false")" aria-controls="subpanel-bf-@tabId" tabindex="@(sectionTab == tabId ? 0 : -1)" @onclick="() => sectionTab = current">@tabTitle@if (tabId == "balanta" && tabBalance is not null) { <span class="count-badge" id="balance-tab-badge" title="@(tabBalance.IsOwed ? "Plăți restante" : "Fără plăți restante")">@ElcomturFormat.Money(tabBalance.Balance)</span> }</button>
         }
     </div>
 
@@ -233,6 +235,17 @@ else if (beneficiary is not null)
     // ?balanta=1: opened from the Balante restante tab of the Notifications page; the Elcomtur balance section opens and is brought into view.
     [SupplyParameterFromQuery(Name = "balanta")] public string? BalanceFlag { get; set; }
     private bool BalanceRequested => BalanceFlag == "1";
+    // BUG-0045: the tab "Balanță Elcomtur" shows the balance in its badge and its colour (red for a positive balance, green for zero or less) also when it is not the open one.
+    // Nothing is shown when there is no balance to show: the module is off, the user may not see balances, or the last import had no client for the beneficiary.
+    private BeneficiaryBalance? tabBalance;
+    private string BalanceTabClass(string tabId) => tabId != "balanta" || tabBalance is null ? "" : tabBalance.IsOwed ? "balance-due" : "balance-ok";
+
+    private async Task<BeneficiaryBalance?> ReadTabBalanceAsync()
+    {
+        try { return await ElcomturBalances.GetAsync(Id, lifetime.Token); }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { return null; }
+        catch (Exception exception) { Logger.LogDebug("The balance for the tab could not be read ({ErrorType}).", exception.GetType().Name); return null; }
+    }
     // BUG-0038: the sections of the page are tabs (scripts/section-tabs.js keeps their <details> open); the balance of Elcomtur is the last one.
     private static readonly (string Id, string Title)[] SectionTabs = [("puncte", "Puncte de lucru"), ("consum", "Consum rețea"), ("mentenanta", "Mentenanță"), ("analize", "Analize de risc"), ("taskuri", "Taskuri"), ("fisiere", "Fișiere beneficiar"), ("proiecte", "Proiecte"), ("balanta", "Balanță Elcomtur")];
     private string sectionTab = "puncte";
@@ -377,6 +390,7 @@ else if (beneficiary is not null)
             beneficiary = all.FirstOrDefault(item => item.Id == Id);
             if (beneficiary is null) { error = "Beneficiarul solicitat nu mai există."; return; }
             workPoints = await WorkPointStore.GetAsync(Id, lifetime.Token);
+            tabBalance = await ReadTabBalanceAsync();
             photoCounts = await PhotoStore.CountsForBeneficiaryAsync(Id, lifetime.Token);
             attachedAll = await AttachedStore.GetForBeneficiaryAsync(Id, lifetime.Token);
             await LoadOriginAsync();
@@ -593,6 +607,7 @@ else if (beneficiary is not null)
         try
         {
             workPoints = await WorkPointStore.GetAsync(Id, lifetime.Token);
+            tabBalance = await ReadTabBalanceAsync();
             photoCounts = await PhotoStore.CountsForBeneficiaryAsync(Id, lifetime.Token);
             attachedAll = await AttachedStore.GetForBeneficiaryAsync(Id, lifetime.Token);
         }

@@ -2,6 +2,7 @@
 @using BlazorStoc.Modules.Elcomtur
 @using BlazorStoc.Services
 @inject IElcomturBalanceRepository Balances
+@inject IServiceProvider Services
 @inject TimeProvider Clock
 @inject IJSRuntime Js
 @inject ILogger<ElcomturBalanceSection> Logger
@@ -30,7 +31,7 @@
                 }
             </summary>
             <div class="catalog-body">
-                <p class="muted"><small>Date din backup-ul Elcomtur de la @StockMovementRules.DisplayDate(balance.DataDate) (firma @balance.Firm); se actualizează la fiecare preluare din Administrare → Preluare date Elcomtur. Balanța este facturat minus încasat; facturile sunt cele pe care Elcomtur le marchează neachitate.</small></p>
+                <p class="muted"><small>Date din backup-ul Elcomtur de la @StockMovementRules.DisplayDate(balance.DataDate) (firma @ElcomturFirmNames.Display(balance.Firm, autoSettings)); se actualizează la fiecare preluare din Administrare → Preluare date Elcomtur. Balanța este facturat minus încasat; facturile sunt cele pe care Elcomtur le marchează neachitate.</small></p>
             </div>
             @if (balance.IsOwed)
             {
@@ -108,9 +109,11 @@ else if (allowed)
 
     private static string Invoices(int count) => count == 1 ? "1 factură" : $"{count} facturi";
 
+    private ElcomturAutoSettings? autoSettings;
     protected override async Task OnParametersSetAsync()
     {
         allowed = true;
+        try { autoSettings = await (Services.GetService<IElcomturAutoService>()?.GetAsync() ?? Task.FromResult<ElcomturAutoSettings?>(null)!); } catch (Exception) { autoSettings = null; }
         try { balance = await Balances.GetAsync(BeneficiaryId); }
         catch (Exception exception) when (exception is AccessDeniedException or BlazorStoc.Modules.ModuleUnavailableException) { balance = null; allowed = false; }
         catch (Exception exception) when (exception is not OperationCanceledException)

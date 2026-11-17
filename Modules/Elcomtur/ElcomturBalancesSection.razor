@@ -16,6 +16,7 @@
         @if (owed is null && error is null) { <p class="muted" role="status">Se citește lista…</p> }
         else if (owed is { Count: 0 }) { <div class="empty-state" id="elcomtur-balances-empty"><span class="empty-icon">✓</span><h3>Nicio balanță restantă</h3><p>Aici apar beneficiarii cu plăți restante către Elcomtur, după fiecare preluare a balanței.</p></div> }
         else if (owed is not null) { <p id="elcomtur-balances-total">Total plăți restante: <strong>@ElcomturFormat.Money(owed.Sum(item => item.Balance))</strong></p> }
+        @if (owed is not null) { <div class="editor-actions"><button type="button" class="refresh act-nav" id="elcomtur-evolution-open" @onclick="() => showEvolution = true">Arată evoluție balanță</button></div> }
     </div>
     @if (owed is { Count: > 0 })
     {
@@ -41,7 +42,10 @@
     }
 </section>
 
+@if (showEvolution) { <ElcomturEvolutionDialog Closed="() => { showEvolution = false; return Task.CompletedTask; }" /> }
+
 @code {
+    private bool showEvolution;
     private IReadOnlyList<BeneficiaryBalance>? owed;
     private ElcomturImportInfo? info;
     private string? error;

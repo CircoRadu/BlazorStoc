@@ -79,6 +79,11 @@ public static class OcrWorkerChecks
         var expectedInventory = await inventoryEngine.ScanAsync(new MemoryStream(inventoryPdf));
         var actualInventory = await new OutOfProcessInventoryPickupOcrService(runner, modules, tessdata).ScanAsync(new MemoryStream(inventoryPdf));
         check(OcrJson.Write(actualInventory) == OcrJson.Write(expectedInventory) && actualInventory.Rows.Count > 0, "OCR worker: the scanned inventory sheet gives the same rows as in-process");
+        // The worker writes its progress to the job folder and the application passes it on while the worker runs (PROP-0033).
+        var workerProgress = new List<int>();
+        await new OutOfProcessInventoryPickupOcrService(runner, modules, tessdata).ScanAsync(new MemoryStream(inventoryPdf), CancellationToken.None, new ImmediateProgress(workerProgress.Add));
+        check(workerProgress.Count >= 1 && workerProgress[^1] == 100 && workerProgress.Zip(workerProgress.Skip(1), (before, after) => after >= before).All(ok => ok),
+            $"OCR worker: the progress of the analysis reaches the application while the worker runs and ends at 100 % ({string.Join(", ", workerProgress)})");
         check(modules.StatusOf("ocr") == ModuleStatus.Healthy, "OCR worker: after real jobs the module is Healthy");
         if (OperatingSystem.IsWindows())
             check(runner.PeakProcessMemoryBytes is > 0 and < 4096L * 1024 * 1024, $"OCR worker: the real jobs (text PDF, scan, inventory) stay under the default 4096 MB process cap (peak {runner.PeakProcessMemoryBytes / 1048576} MB)");

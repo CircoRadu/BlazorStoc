@@ -4,6 +4,11 @@ Fluxul: meniul Stoc -> lista de produse (cautare, categorii in stanga) -> adaugi
 
 ## Modificari de testat
 
+### 17.11.2026 - Categorii si subcategorii noi direct din editarea produsului
+**Ce s-a adaugat:** butonul "Adauga categorie / subcategorie" din formularul de produs apare si la editarea unui produs existent (inainte apare numai la produs nou; la editare exista doar un link spre pagina Categorii, care te scotea din editare).
+**Ce face acum:** butonul deschide fereastra de categorii peste formular; creezi categoria sau subcategoria, apesi "Gata, inapoi la produs" si formularul ramane exact cum era (ce ai scris nu se pierde), cu lista de categorii reimprospatata, deci noua subcategorie se poate alege imediat.
+Pasi: Produse -> un produs -> Editeaza -> scrie ceva in Descriere -> "Adauga categorie / subcategorie" -> creeaza o subcategorie noua -> "Gata, inapoi la produs" -> Descrierea scrisa a ramas, iar subcategoria noua apare in selectorul de categorie.
+
 ### 16.11.2026 - Setari de afisare per utilizator (PROP-0034, etapa 1)
 **Ce s-a adaugat:** pagina "Setari afisare" (meniul numelui tau din bara de sus) cu reguli globale, fiecare un slider de la 100% la 500% cu valoarea afisata dupa titlu, grupate in sectiuni pliabile (inchise implicit), fiecare cu propria previzualizare: Titluri si text, Taburi, Tabele, Butoane si campuri, Meniul principal si bara de sus, Ferestre (presetari Normal / Mare / Foarte mare) si o roata de setari pe fiecare tabel de date din aplicatie (Produse, Jurnal, Beneficiari, Setari etc.), cu slidere 100%-500% proprii tabelului. Setarile se salveaza pe contul tau in baza de date (migrarea 90).
 **Ce face acum:** valorile sunt procente din marimea implicita (100%-500%) si se aplica la toate elementele de acelasi fel din aplicatie: toate tabelele (text, antet, imagini, iconite de rand), toate taburile si subtaburile, titlul fiecarei pagini si meniul din stanga (care se largeste odata cu el). Setarile proprii ale tabelului de produse inlocuiesc, camp cu camp, pe cele globale. Dupa autentificare pe alt calculator aceleasi setari se aplica.

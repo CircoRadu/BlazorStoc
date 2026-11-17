@@ -26,6 +26,11 @@ public static class DisplayChecks
         check(DisplayRules.ToStyle(new DisplaySettings(TableText: 120, Icons: 150)) == "--ui-table:1.2;--ui-icons:1.5", "Display: the style has one scale factor per set field, with a dot");
         check(DisplayRules.ToStyle(new DisplaySettings(Menu: 150, Text: 125)) == "--ui-menu:1.5;--ui-text:1.25", "Display: the menu and text scales have their own factors");
         check(DisplayRules.ToStyle(new DisplaySettings(Buttons: 110, Fields: 120, Topbar: 130, Dialogs: 140)) == "--ui-buttons:1.1;--ui-fields:1.2;--ui-topbar:1.3;--ui-dialogs:1.4", "Display: buttons, fields, top bar and dialogs have their own factors");
+        // PROP-0037: the gear of the tables is shown unless the user turned it off; the flag is saved with the global rules (JSON), does not make them empty-looking when it is the only one set, and keeps the table settings.
+        var off = new DisplaySettings(TableGear: false);
+        check(DisplayRules.ShowTableGear(null) && DisplayRules.ShowTableGear(new DisplaySettings()) && !DisplayRules.ShowTableGear(off) && !off.IsEmpty && DisplayRules.FromJson(DisplayRules.ToJson(off)).TableGear == false
+              && DisplayRules.Merge(off, new DisplaySettings(TableText: 150)).TableGear == false && DisplayRules.Merge(off, new DisplaySettings(TableText: 150)).TableText == 150 && DisplayRules.ToStyle(off) == "",
+            "Display: the button of the individual style of a table can be turned off globally; the flag is saved, merged and keeps the settings of the tables");
         check(DisplayRules.ToStyle(DisplayRules.Preset(100)).Split(';').Length == 12 && !new DisplaySettings(Dialogs: 100).IsEmpty, "Display: a preset sets all twelve fields");
         check(DisplayRules.ToStyle(new DisplaySettings(Images: 250)) == "--ui-images:2.5" && DisplayRules.FromJson(DisplayRules.ToJson(new DisplaySettings(Images: 250))).Images == 250, "Display: a step above 100% reaches the style and the database unchanged");
 

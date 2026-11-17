@@ -20,11 +20,11 @@
                         <SearchableSelect Id="link-supplier" Label="Furnizor" Placeholder="Caută sau alege furnizorul…" EmptyText="Niciun furnizor găsit."
                                           Options="options" SelectedId="supplierId" SelectedIdChanged="SupplierChangedAsync" Disabled="busy" />
                     </div>
-                    <label for="link-invoice">Factura *
-                        <select id="link-invoice" disabled="@(busy || supplierId is null)" @onchange="args => invoiceId = int.TryParse(args.Value?.ToString(), out var id) ? id : null">
-                            <option value="" selected="@(invoiceId is null)">@(supplierId is null ? "— alege întâi furnizorul —" : invoices.Count == 0 ? "— furnizorul nu are facturi —" : "— alege factura —")</option>
-                            @foreach (var invoice in invoices) { <option value="@invoice.Id" selected="@(invoiceId == invoice.Id)">@invoice.Label (@invoice.MovementCount @(invoice.MovementCount == 1 ? "intrare" : "intrări"))</option> }
-                        </select></label>
+                    <div>
+                        <span class="field-label">Factura *</span>
+                        <SearchableSelect Id="link-invoice" Label="Factura" Placeholder="@InvoiceChoice.Placeholder(supplierId, invoices.Count)" EmptyText="Nicio factură găsită."
+                                          Options="InvoiceChoice.Options(invoices)" SelectedId="invoiceId" SelectedIdChanged="id => { invoiceId = id; }" Disabled="@(busy || supplierId is null)" />
+                    </div>
                 </div>
                 @if (MismatchSupplier is { } mismatch) { <small class="form-note" role="status">⚠ Intrarea a fost înregistrată pentru furnizorul «@mismatch»; factura aleasă este a altui furnizor. Explică în motiv.</small> }
             }

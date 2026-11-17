@@ -47,7 +47,9 @@
 }
 else if (scanning)
 {
-    <div class="empty-state" role="status"><div class="spinner"></div><h3>Se citește fișierul…</h3><p>OCR-ul poate dura câteva secunde pentru un formular cu multe pagini.</p></div>
+    <div class="empty-state" role="status"><div class="spinner"></div><h3>Se citește fișierul… <span id="pickup-scan-percent" class="scan-percent">@scanPercent%</span></h3>
+        <div class="scan-progress" role="progressbar" aria-label="Progresul analizei scanării" aria-valuemin="0" aria-valuemax="100" aria-valuenow="@scanPercent"><span style="@($"width:{scanPercent}%")"></span></div>
+        <p>OCR-ul poate dura câteva secunde pentru un formular cu multe pagini.</p></div>
 }
 else if (loadError is null && review is null)
 {
@@ -189,6 +191,8 @@ else if (review is not null)
 
 @code {
     private bool loading = true, scanning, sending;
+    // The share of the analysis of the scan that is done (percent), shown while the file is read (PROP-0033).
+    private int scanPercent;
     private string? loadError, error, notice, sendError, backupProgress, pdfWindowNotice;
     private InventoryPickupReview? review;
     private readonly HashSet<int> selectedProductIds = [];
@@ -286,6 +290,7 @@ else if (review is not null)
         if (file.Size > InventoryPickupOcrRules.MaxFileSizeBytes) { error = InventoryPickupOcrRules.TooLargeMessage; return; }
 
         scanning = true;
+        scanPercent = 0;
         try
         {
             byte[] bytes;
@@ -301,7 +306,8 @@ else if (review is not null)
             await OpenPdfViewerAsync(bytes, file.Name);
 
             using var scanStream = new MemoryStream(bytes, writable: false);
-            var scanResult = await OcrService.ScanAsync(scanStream, lifetime.Token);
+            var scanProgress = new Progress<int>(value => { scanPercent = value; _ = InvokeAsync(StateHasChanged); });
+            var scanResult = await OcrService.ScanAsync(scanStream, lifetime.Token, scanProgress);
             review = await PickupBuilder.BuildAsync(await CalibratedRowsAsync(scanResult.Rows), lifetime.Token);
             if (review.Lines.Count == 0 && review.NotFound.Count == 0) notice = "Fișierul a fost citit. Nu au fost gasite diferente de stoc.";
         }

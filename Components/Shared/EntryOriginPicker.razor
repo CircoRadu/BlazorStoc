@@ -53,11 +53,11 @@
                 <SearchableSelect Id="@($"{Prefix}-invoice-supplier")" Label="Furnizor" Placeholder="Caută sau alege furnizorul…" EmptyText="Niciun furnizor găsit."
                                   Options="SupplierOptions" SelectedId="invoiceSupplierId" SelectedIdChanged="InvoiceSupplierChangedAsync" Disabled="Disabled" />
             </div>
-            <label for="@($"{Prefix}-invoice")">Factura *
-                <select id="@($"{Prefix}-invoice")" disabled="@(Disabled || invoiceSupplierId is null)" @onchange="InvoiceChanged">
-                    <option value="" selected="@(Model.InvoiceId is null)">@(invoiceSupplierId is null ? "— alege întâi furnizorul —" : invoices.Count == 0 ? "— furnizorul nu are facturi —" : "— alege factura —")</option>
-                    @foreach (var invoice in invoices) { <option value="@invoice.Id" selected="@(Model.InvoiceId == invoice.Id)">@invoice.Label (@invoice.MovementCount @(invoice.MovementCount == 1 ? "intrare" : "intrări"))</option> }
-                </select></label>
+            <div>
+                <span class="field-label">Factura *</span>
+                <SearchableSelect Id="@($"{Prefix}-invoice")" Label="Factura" Placeholder="@InvoiceChoice.Placeholder(invoiceSupplierId, invoices.Count)" EmptyText="Nicio factură găsită."
+                                  Options="InvoiceChoice.Options(invoices)" SelectedId="Model.InvoiceId" SelectedIdChanged="InvoiceSelectedAsync" Disabled="@(Disabled || invoiceSupplierId is null)" />
+            </div>
             <label for="@($"{Prefix}-invoice-quantity")">Cantitate pe factură (opțional)
                 <InputNumber id="@($"{Prefix}-invoice-quantity")" TValue="int?" @bind-Value="Model.InvoiceQuantity" min="1" max="@StockMovementRules.MaxQuantity" /></label>
         </div>
@@ -167,9 +167,9 @@
         catch (Exception) { invoices = []; }
     }
 
-    private async Task InvoiceChanged(ChangeEventArgs args)
+    private async Task InvoiceSelectedAsync(int? id)
     {
-        Model.InvoiceId = int.TryParse(args.Value?.ToString(), out var id) ? id : null;
+        Model.InvoiceId = id;
         await Changed.InvokeAsync();
     }
 

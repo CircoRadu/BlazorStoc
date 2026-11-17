@@ -23,6 +23,16 @@ public static class GridChecks
         check(joined.Any(rule => rule.Vertical && Math.Abs(rule.Position - 420) < 0.1) && joined.Count(rule => rule.Vertical) == 3 && joined.Count(rule => !rule.Vertical) == 1,
             "Table grid: rules that do not lie on the same line are not joined");
 
+        // The running numbers of a scan: a speck stuck to the number ("1M" for "1", read from a real scan of an invoice without rules between the rows) is still the number that is
+        // expected; any other number, a number followed by a word or by a figure, or a plain number that is not the expected one, is not.
+        check(InvoiceTableReader.ParseRunningNumber("1M", 1) == 1 && InvoiceTableReader.ParseRunningNumber("2~", 2) == 2 && InvoiceTableReader.ParseRunningNumber("„3", 3) == 3 && InvoiceTableReader.ParseRunningNumber("]", 1) == 1,
+            "Running numbers: a number with a speck of the scan stuck to it is the expected number");
+        check(InvoiceTableReader.ParseRunningNumber("1M", 2) is null && InvoiceTableReader.ParseRunningNumber("3 buc", 3) is null && InvoiceTableReader.ParseRunningNumber("12", 1) == 12 && InvoiceTableReader.ParseRunningNumber("1.5", 1) is null && InvoiceTableReader.ParseRunningNumber("M", 1) is null,
+            "Running numbers: only the expected number takes a speck; text after a number, another number or a figure with decimals is never a running number");
+        // Where the numbering starts (a zone that begins under the first rows): "1M" is 1, so a first row with a speck is not skipped.
+        check(InvoiceTableReader.ParseIndexLoose("1M") == 1 && InvoiceTableReader.ParseIndexLoose("2") == 2 && InvoiceTableReader.ParseIndexLoose("3 buc") is null && InvoiceTableReader.ParseIndexLoose("1.5") is null,
+            "Running numbers: the start of the numbering tolerates a speck on the first number");
+
         // The row of column numbers as OCR read it ("0 1 2 3 4 5 6" -> "o 1 = a i. 5 6") is still that row; a row of goods is not.
         check(InvoiceTableReader.IsColumnNumberRow(["o", "1", "=", "a", "i.", "5", "6"]) && InvoiceTableReader.IsColumnNumberRow(["0", "1", "2", "3", "4", "5", "6"]) &&
               !InvoiceTableReader.IsColumnNumberRow(["1.", "Compot Mere", "buc", "1,00", "32,00", "32,00", "6,08"]) && !InvoiceTableReader.IsColumnNumberRow(["o", "1", "Compot"]),

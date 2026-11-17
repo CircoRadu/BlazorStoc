@@ -292,16 +292,17 @@ else
                                 <td>
                                     @if (m.InvoiceNumber is not null)
                                     {
-                                        <span>@m.InvoiceNumber</span>
-                                        @if (m.SupplierId is { } supplierId && m.SupplierName is not null) { <span class="movement-project"> · <a class="category-table-link" href="@SupplierNavigation.SupplierUrl(supplierId)">@m.SupplierName</a> <button type="button" class="audit-filter-link filter-hint" title="Filtrează după acest furnizor" aria-label="Filtrează după acest furnizor" @onclick="() => FilterBySupplierAsync(supplierId)">⌕</button></span> }
+                                        @if (m.SupplierId is { } supplierId && m.SupplierName is not null) { <div><a class="category-table-link" href="@SupplierNavigation.SupplierUrl(supplierId)">@m.SupplierName</a></div> }
+                                        @if (m.SupplierId is { } invoiceSupplierId) { <div><button type="button" class="audit-filter-link category-table-link invoice-info-link" title="Vezi informațiile facturii" @onclick="() => invoiceInfo = (invoiceSupplierId, m.InvoiceNumber!)">Factura: @m.InvoiceNumber</button></div> }
+                                        else { <div>Factura: @m.InvoiceNumber</div> }
                                     }
                                     else if (m.Kind == StockMovementKind.Entry) { <span class="destination-label">Intrare liberă</span> }
                                 </td>
                                 <td>
                                     @if (m.BeneficiaryName is not null)
                                     {
-                                        <a class="category-table-link" href="@($"/beneficiari/{m.BeneficiaryId}")">@m.BeneficiaryName</a> <button type="button" class="audit-filter-link filter-hint" title="Filtrează după acest beneficiar" aria-label="Filtrează după acest beneficiar" @onclick="() => FilterByBeneficiaryAsync(m.BeneficiaryId!.Value)">⌕</button>
-                                        @if (m.ProjectName is not null) { <span class="movement-project"> · <a class="category-table-link" href="@($"/proiecte/{m.ProjectId}")">@m.ProjectName</a></span> }
+                                        <div><a class="category-table-link" href="@($"/beneficiari/{m.BeneficiaryId}")">@m.BeneficiaryName</a> <button type="button" class="audit-filter-link filter-hint" title="Filtrează după acest beneficiar" aria-label="Filtrează după acest beneficiar" @onclick="() => FilterByBeneficiaryAsync(m.BeneficiaryId!.Value)">⌕</button></div>
+                                        @if (m.ProjectName is not null && m.ProjectId is { } infoProjectId) { <div><button type="button" class="audit-filter-link category-table-link project-info-link" title="Vezi informațiile proiectului" @onclick="() => projectInfo = (m.BeneficiaryId!.Value, m.BeneficiaryName!, infoProjectId, m.ProjectName)">@m.ProjectName</button></div> }
                                     }
                                     else if (m.Destination is ExitDestination.GenericSale or ExitDestination.StockCorrection or ExitDestination.WarehouseReturn)
                                     {
@@ -356,6 +357,8 @@ else
     </AppDialog>
 }
 
+@if (invoiceInfo is { } shownInvoice) { <InvoiceInfoDialog SupplierId="shownInvoice.SupplierId" Number="@shownInvoice.Number" Closed="() => { invoiceInfo = null; return Task.CompletedTask; }" /> }
+@if (projectInfo is { } shownProject) { <ProjectInfoDialog BeneficiaryId="shownProject.BeneficiaryId" BeneficiaryName="@shownProject.BeneficiaryName" ProjectId="shownProject.ProjectId" ProjectName="@shownProject.ProjectName" Closed="() => { projectInfo = null; return Task.CompletedTask; }" /> }
 @if (editing is not null)
 {
     <UnsavedChangesTracker @key="editing.Id" @ref="editTracker" Subject="@(BlazorStoc.Services.PopupSubject.Of("mișcare de stoc", product.Name))" Snapshot="EditSnapshot" Discard="DiscardEditAsync" />
@@ -519,6 +522,8 @@ else
 </PageBoundary>
 
 @code {
+    private (int SupplierId, string Number)? invoiceInfo;
+    private (int BeneficiaryId, string BeneficiaryName, int ProjectId, string ProjectName)? projectInfo;
     // "Arată operator": the column with the last operator of each movement (the one that modified it, else the one that created it); only the state of the page.
     private bool showOperator;
     private RenderFragment CauseChoice(StockMovementInput target, string name) => @<fieldset class="cause-choice full-width">

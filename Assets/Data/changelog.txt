@@ -1,3 +1,22 @@
+## 0.5.93 | 17.11.2026
+### Funcționalități noi
+- PROP-0033 – Procent de progres la analiza scanării din Preluare inventar: în timp ce se citește documentul apare cât la sută s-a făcut.
+- PROP-0035 – În Preluare date Elcomtur și în fișa beneficiarului firma apare cu numele ei, nu cu numele folderului (firma1).
+- PROP-0036 – Notificări → Balanțe restante: butonul „Arată evoluție balanță” deschide un grafic cu bare verticale cu totalul plăților restante de la fiecare preluare Elcomtur, pe anul curent, ultimele 6 sau ultimele 3 luni.
+- PROP-0037 – Setări afișare: comutatorul „Arată buton particularizare tabel” ascunde sau arată roțile de setări de pe tabele; setările fiecărui tabel se păstrează.
+- PROP-0038 – Intrări/ieșiri produs: beneficiarul și proiectul sunt pe două rânduri; proiectul deschide o fereastră cu beneficiarul, proiectul și echipamentele predate.
+- PROP-0039 – Intrări/ieșiri produs: furnizorul și „Factura: nr” sunt pe două rânduri, fără lupă; factura deschide o fereastră cu datele ei și intrările din ea.
+### Bugs
+- BUG-0045 – Tabul „Balanță Elcomtur” din fișa beneficiarului este roșu sau verde după balanță, cu suma în insignă, chiar dacă nu e tabul deschis.
+- BUG-0047 – Butonul X al ferestrei „Ieșire rapidă” închide acum fereastra.
+- BUG-0048 – Miniaturile din tabelul de produse nu mai sunt tăiate: imaginea se vede întreagă, cu chenarul după proporțiile ei.
+- BUG-0049 – Textul „Actualizat la…” stă lipit de insigna numărului de produse, la 10 px.
+- BUG-0050 – Roata de setări de pe cardurile pliabile stă pe rândul de titlu, la 15 px de margine, înaintea altor iconițe de pe rând.
+### Diverse
+- Căutarea la tastare în câmpul „Factura” din formularul intrării și din fereastra de legare a intrărilor de o factură.
+- Formularul de produs: „Adaugă categorie / subcategorie” și la editare, într-o fereastră separată.
+- Citirea facturilor scanate: numărul curent cu un semn lipit („1M”) este recunoscut și când zona tabelului pornește sub primele rânduri.
+
 ## 0.5.92 | 17.11.2026
 ### Diverse
 - Proiecte obligatorii ale beneficiarilor: în Nomenclator există tabul „Proiecte obligatorii”, cu tipurile de proiect pe care le are fiecare beneficiar (primul: „Reparații sisteme existente”). Beneficiarii existenți primesc proiectele la pornirea aplicației, cei noi la creare, iar un tip nou sau reactivat le creează la toți beneficiarii care nu îl au. Proiectul obligatoriu nu se redenumește și nu se șterge din pagina lui; un beneficiar care are doar proiecte obligatorii nefolosite se șterge împreună cu ele.

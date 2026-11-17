@@ -46,7 +46,7 @@ else
     <article><span>Fără stoc</span><strong>@(loaded ? ScopedProducts.Count(p => p.Quantity == 0).ToString() : "—")</strong><small>Cantitate disponibilă zero</small><i class="amber">○</i></article>
     <article><span>Stoc negativ</span><strong>@(loaded ? ScopedProducts.Count(p => p.Quantity < 0).ToString() : "—")</strong><small>De verificat în selecție</small><i class="red">!</i></article>
 </section>
-<section class="catalog"><div class="catalog-heading"><h2>Catalog produse <span>@Filtered.Count</span></h2><small>@(lastLoaded is null ? "În așteptarea datelor" : $"Actualizat la {lastLoaded:HH:mm:ss} UTC")</small><TableDisplayGear Scope="@DisplayRules.ProductsCatalogScope" Label="catalogul de produse" /></div>
+<section class="catalog"><div class="catalog-heading"><h2>Catalog produse <span>@Filtered.Count</span></h2><small class="catalog-updated">@(lastLoaded is null ? "În așteptarea datelor" : $"Actualizat la {lastLoaded:HH:mm:ss} UTC")</small><TableDisplayGear Scope="@DisplayRules.ProductsCatalogScope" Label="catalogul de produse" /></div>
 <div class="filters"><label class="search-box"><span>⌕</span><input aria-label="Caută produse" placeholder="Caută după cod produs sau descriere…" @bind="query" @bind:event="oninput" @bind:after="ResetPage" /></label><label><span class="sr-only">Disponibilitate</span><select @bind="stock" @bind:after="ResetPage"><option value="">Orice stoc</option><option value="positive">În stoc</option><option value="zero">Fără stoc</option><option value="negative">Stoc negativ</option></select></label>@if (IncompleteInScope > 0 || onlyIncomplete) { <label><span class="sr-only">Completare parametri</span><select @bind="onlyIncomplete" @bind:after="ResetPage"><option value="@false">Toate produsele</option><option value="@true">Doar incomplete (@IncompleteInScope)</option></select></label> }</div>
 @if (loading) { <div class="empty-state" role="status"><div class="spinner"></div><h3>Se încarcă produsele</h3><p>Preluăm catalogul pentru această sesiune.</p></div> }
 else if (Filtered.Count == 0) { <div class="empty-state"><span class="empty-icon">▦</span><h3>@(error is not null ? "Catalog indisponibil" : products.Count == 0 ? "Catalogul nu conține produse" : "Nu am găsit produse")</h3><p>@(error is not null ? "Datele nu au putut fi preluate. Reîncearcă după verificarea conexiunii." : products.Count == 0 ? "Folosește „Adaugă produs” pentru a crea primul produs și categoriile sale." : "Încearcă alt termen sau elimină filtrele.")</p>@if (products.Count > 0) { <button class="refresh act-reload" @onclick="ClearFilters">Resetează filtrele</button> }</div> }
@@ -64,7 +64,7 @@ else { @ActiveTagsBar()<div class="table-scroll" style="@tableStyle" data-displa
 
 @if (quickExit is not null)
 {
-    <AppDialog PanelClass="invoice-modal quick-exit-modal" Label="@($"Ieșire rapidă {quickExit.Name}")">
+    <AppDialog OnClose="CloseQuickExitAsync" PanelClass="invoice-modal quick-exit-modal" Label="@($"Ieșire rapidă {quickExit.Name}")">
             <ExitOperation @key="quickExit.Id" Embedded="true" InitialProductId="quickExit.Id" OnClosed="CloseQuickExitAsync" />
     </AppDialog>
 }

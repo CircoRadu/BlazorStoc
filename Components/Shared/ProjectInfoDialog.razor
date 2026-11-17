@@ -1,0 +1,47 @@
+@using BlazorStoc.Services
+@inject IStockMovementRepository Movements
+@inject ILogger<ProjectInfoDialog> Logger
+@* PROP-0038: the information of a project in a window (opened from the table of stock movements): beneficiary (link), project (link) and the equipment handed over to it
+   (net of returns; the product codes are links to the movements of the product). Read only. *@
+<AppDialog Title="@($"Proiect {ProjectName}")" TitleId="project-info-title" HelpTopic="proiecte-informatii" HelpAbout="Informațiile proiectului" PanelClass="movement-dialog" OnClose="Closed">
+    <table class="facts" id="project-info-facts"><tbody>
+        <tr><th scope="row">Beneficiar</th><td><a class="category-table-link" href="@($"/beneficiari/{BeneficiaryId}")">@BeneficiaryName</a></td></tr>
+        <tr><th scope="row">Proiect</th><td><a class="category-table-link" href="@($"/proiecte/{ProjectId}")">@ProjectName</a></td></tr>
+    </tbody></table>
+    <h3>Echipamente în proiect <span class="count-badge">@items.Count</span></h3>
+    @if (error is not null) { <div class="error-banner" role="alert">@error</div> }
+    else if (!loaded) { <p class="muted" role="status">Se citește…</p> }
+    else if (items.Count == 0) { <p class="muted">Niciun echipament nu a fost predat pe acest proiect.</p> }
+    else
+    {
+        <div class="table-scroll"><table id="project-info-equipment"><thead><tr><th>COD PRODUS</th><th class="number">BUCĂȚI</th></tr></thead><tbody>
+            @foreach (var item in items)
+            {
+                <tr><td><a class="category-table-link" href="@($"/produse/{item.ProductId}/miscari")">@item.ProductName</a></td><td class="number">@item.Net</td></tr>
+            }
+        </tbody></table></div>
+    }
+    <div class="editor-actions"><button type="button" class="refresh act-close" @onclick="Closed">Închide</button></div>
+</AppDialog>
+
+@code {
+    [Parameter, EditorRequired] public int BeneficiaryId { get; set; }
+    [Parameter] public string BeneficiaryName { get; set; } = "";
+    [Parameter, EditorRequired] public int ProjectId { get; set; }
+    [Parameter] public string ProjectName { get; set; } = "";
+    [Parameter] public EventCallback Closed { get; set; }
+    private IReadOnlyList<NetConsumption> items = [];
+    private bool loaded;
+    private string? error;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try { items = [.. (await Movements.GetNetConsumptionAsync(ProjectId, null)).Where(item => item.Net > 0).OrderBy(item => item.ProductName, StringComparer.CurrentCultureIgnoreCase)]; }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            Logger.LogWarning("The project equipment could not be read ({ErrorType}).", exception.GetType().Name);
+            error = "Echipamentele proiectului nu au putut fi citite.";
+        }
+        loaded = true;
+    }
+}

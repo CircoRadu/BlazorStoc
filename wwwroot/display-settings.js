@@ -14,7 +14,7 @@ window.displaySettings = {
 // table settings of the user are put on the tables as CSS custom properties. The panel itself is drawn by the Blazor component TableGearHost.
 window.tableGears = (function () {
     var NAMES = ['table', 'header', 'images', 'icons', 'titles', 'tabs'];
-    var ref = null, styles = {}, layer = null, observer = null, scheduled = false;
+    var ref = null, styles = {}, layer = null, observer = null, scheduled = false, shown = true;
     var gears = new Map();   // table element -> { scope, label, button }
 
     function slug(text, max) {
@@ -51,14 +51,41 @@ window.tableGears = (function () {
         document.body.appendChild(layer);
         return layer;
     }
+    // The one rule of place: the gear sits on the heading row of the card (or collapsible section) the table is in, 15 px from the right edge of the card; when the row has
+    // other buttons or icons (the actions of the card) the gear is on the same row, in the first position (left of them, 8 px apart). A table with no heading row keeps the gear at its own top right.
+    var GEAR = 28, EDGE = 15, SPACE = 8;
+    function headingRow(table) {
+        for (var card = table.parentElement; card && card !== document.body; card = card.parentElement) {
+            var heading = card.querySelector(':scope > summary, :scope > .catalog-heading, :scope > details > summary, :scope > details > .catalog-heading, :scope > .collapsible-details > .catalog-heading');
+            if (heading && !heading.contains(table)) return { card: card, heading: heading };
+        }
+        return null;
+    }
     function place() {
         gears.forEach(function (gear, table) {
             var rect = table.getBoundingClientRect();
             var visible = table.isConnected && rect.width > 0 && rect.bottom > 40 && rect.top < window.innerHeight;
+            var row = visible ? headingRow(table) : null;
+            var head = row ? row.heading.getBoundingClientRect() : null;
+            if (row && (head.width === 0 || head.bottom < 40 || head.top > window.innerHeight)) visible = false;
+            if (!shown) visible = false;
             gear.button.style.display = visible ? '' : 'none';
             if (!visible) return;
-            gear.button.style.left = Math.round(Math.min(rect.right, window.innerWidth - 8) - 34) + 'px';
-            gear.button.style.top = Math.round(Math.max(rect.top + 4, 64)) + 'px';
+            if (!row) {
+                gear.button.style.left = Math.round(Math.min(rect.right, window.innerWidth - 8) - EDGE - GEAR) + 'px';
+                gear.button.style.top = Math.round(Math.max(rect.top + 4, 64)) + 'px';
+                return;
+            }
+            var card = row.card.getBoundingClientRect();
+            var middle = head.top + head.height / 2;
+            var left = card.right - EDGE - GEAR;
+            row.card.querySelectorAll('button, a.row-icon, [role=button]').forEach(function (control) {
+                if (control.closest('table, .table-gear-layer') || control.offsetWidth === 0) return;
+                var box = control.getBoundingClientRect();
+                if (Math.abs(box.top + box.height / 2 - middle) <= Math.max(head.height, box.height) / 2 && box.right <= card.right + 1) left = Math.min(left, box.left - SPACE - GEAR);
+            });
+            gear.button.style.left = Math.round(left) + 'px';
+            gear.button.style.top = Math.round(middle - GEAR / 2) + 'px';
         });
     }
     function scan() {
@@ -117,6 +144,8 @@ window.tableGears = (function () {
             schedule();
         },
         setStyles: function (map) { styles = map || {}; scan(); },
+        // PROP-0037: the buttons of the individual style of a table are hidden when the user turned them off (the settings of the tables are kept).
+        setVisible: function (value) { shown = value !== false; place(); },
         dispose: function () {
             ref = null;
             if (observer) { observer.disconnect(); observer = null; }

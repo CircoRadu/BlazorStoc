@@ -33,7 +33,7 @@ public static class OcrWorker
                 case OcrOperations.InventoryScan:
                 {
                     using var service = new InventoryPickupOcrService(tessdata);
-                    var scan = await service.ScanAsync(new MemoryStream(pdfBytes)).ConfigureAwait(false);
+                    var scan = await service.ScanAsync(new MemoryStream(pdfBytes), CancellationToken.None, new FileProgress(Path.Combine(jobFolder, OcrFiles.Progress))).ConfigureAwait(false);
                     await WriteResultAsync(jobFolder, scan).ConfigureAwait(false);
                     break;
                 }
@@ -58,6 +58,16 @@ public static class OcrWorker
         var temporary = Path.Combine(jobFolder, OcrFiles.Result + ".tmp");
         await File.WriteAllTextAsync(temporary, OcrJson.Write(value)).ConfigureAwait(false);
         File.Move(temporary, Path.Combine(jobFolder, OcrFiles.Result), overwrite: true);
+    }
+
+    // The progress of the work as the worker has it: written (not buffered) to progress.txt of the job folder, where the application reads it while the worker runs.
+    private sealed class FileProgress(string path) : IProgress<int>
+    {
+        public void Report(int value)
+        {
+            try { File.WriteAllText(path, value.ToString(System.Globalization.CultureInfo.InvariantCulture)); }
+            catch (Exception exception) when (exception is IOException or UnauthorizedAccessException) { }
+        }
     }
 
     private static async Task<int> WriteErrorAsync(string jobFolder, string kind, string message)

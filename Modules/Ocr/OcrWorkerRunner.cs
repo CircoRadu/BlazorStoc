@@ -35,7 +35,7 @@ public sealed class OcrWorkerRunner
     /// <summary>The most memory one worker has committed so far, native libraries included (0 where Job Objects are not available).</summary>
     public long PeakProcessMemoryBytes => Interlocked.Read(ref peakProcessMemoryBytes);
 
-    internal async Task<T> RunAsync<T>(string operation, string tessdataPath, byte[] pdf, string? documentJson, Func<string, T> read, CancellationToken cancellationToken)
+    internal async Task<T> RunAsync<T>(string operation, string tessdataPath, byte[] pdf, string? documentJson, Func<string, T> read, CancellationToken cancellationToken, IProgress<int>? progress = null)
     {
         await gate.WaitAsync(cancellationToken).ConfigureAwait(false);
         var folder = Path.Combine(Path.GetTempPath(), "blazorstoc-ocr", Guid.NewGuid().ToString("N"));
@@ -46,7 +46,7 @@ public sealed class OcrWorkerRunner
             await File.WriteAllBytesAsync(Path.Combine(folder, OcrFiles.Input), pdf, cancellationToken).ConfigureAwait(false);
             if (documentJson is not null) await File.WriteAllTextAsync(Path.Combine(folder, OcrFiles.Document), documentJson, cancellationToken).ConfigureAwait(false);
 
-            var (exitCode, stderr) = await RunProcessAsync(folder, cancellationToken).ConfigureAwait(false);
+            var (exitCode, stderr) = await RunProcessAsync(folder, cancellationToken, progress).ConfigureAwait(false);
 
             var errorPath = Path.Combine(folder, OcrFiles.Refusal);
             if (File.Exists(errorPath))
@@ -74,7 +74,7 @@ public sealed class OcrWorkerRunner
         }
     }
 
-    private async Task<(int ExitCode, string Stderr)> RunProcessAsync(string folder, CancellationToken cancellationToken)
+    private async Task<(int ExitCode, string Stderr)> RunProcessAsync(string folder, CancellationToken cancellationToken, IProgress<int>? progress = null)
     {
         var info = launch(folder);
         info.RedirectStandardError = true;
@@ -100,6 +100,9 @@ public sealed class OcrWorkerRunner
             var errors = process.StandardError.ReadToEndAsync(CancellationToken.None);
             using var limit = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
             limit.CancelAfter(timeout);
+            // While the worker runs, the share of the work it has done (progress.txt in the job folder) is passed on to the caller.
+            using var watching = new CancellationTokenSource();
+            var watcher = progress is null ? Task.CompletedTask : WatchProgressAsync(folder, progress, watching.Token);
             try { await process.WaitForExitAsync(limit.Token).ConfigureAwait(false); }
             catch (OperationCanceledException)
             {
@@ -108,11 +111,32 @@ public sealed class OcrWorkerRunner
                 logger?.LogError("OCR worker over the time limit of {Seconds} s was stopped.", (int)timeout.TotalSeconds);
                 throw new OcrWorkerException(OcrRules.TimeoutMessage);
             }
+            finally { watching.Cancel(); await watcher.ConfigureAwait(false); }
             _ = await Task.WhenAny(output, Task.Delay(TimeSpan.FromSeconds(2), CancellationToken.None)).ConfigureAwait(false);
             var stderr = errors.IsCompletedSuccessfully ? errors.Result : "";
             RememberPeak(job);
             return (process.ExitCode, stderr);
         }
+    }
+
+    // Reads progress.txt of the job folder about three times a second and reports each new value; ends when the token is cancelled (the worker ended). A file that is being written
+    // (or not there yet) is simply read again at the next turn. A last reading after the end makes sure the last value is not lost.
+    internal static async Task WatchProgressAsync(string folder, IProgress<int> progress, CancellationToken token)
+    {
+        var path = Path.Combine(folder, OcrFiles.Progress);
+        var last = -1;
+        void Read()
+        {
+            try
+            {
+                if (File.Exists(path) && int.TryParse(File.ReadAllText(path).Trim(), System.Globalization.NumberStyles.Integer, System.Globalization.CultureInfo.InvariantCulture, out var value) && value is >= 0 and <= 100 && value != last)
+                { last = value; progress.Report(value); }
+            }
+            catch (Exception exception) when (exception is IOException or UnauthorizedAccessException) { }
+        }
+        try { while (!token.IsCancellationRequested) { Read(); await Task.Delay(300, token).ConfigureAwait(false); } }
+        catch (OperationCanceledException) { }
+        Read();
     }
 
     private void RememberPeak(ProcessJob? job)

@@ -215,6 +215,11 @@ Cunoscut: daca adaugarea componentelor alese la creare esueaza (de ex. tipul a f
 
 ## Modificari de testat - telefon optional (23.10.2026)
 
+### 17.11.2026 - Tabul "Balanta Elcomtur" colorat dupa balanta, cu valoarea in insigna (BUG-0045)
+**Ce s-a adaugat:** pe fisa beneficiarului, tabul "Balanta Elcomtur" arata balanta direct in insigna si este colorat dupa ea, si cand nu este tabul deschis.
+**Ce face acum:** balanta pozitiva (plati restante) face tabul rosu, cu valoarea (de exemplu "1.234,50 RON") in insigna rosie; balanta zero sau negativa il face verde, cu valoarea in insigna verde. Daca modulul Elcomtur e oprit, nu ai dreptul la balante sau importul nu a avut client pentru beneficiar, tabul ramane simplu, fara culoare si fara insigna.
+Pasi: Beneficiari -> un beneficiar cu balanta pozitiva (din Preluare date Elcomtur) -> tabul "Balanta Elcomtur" este rosu si arata suma, desi alt tab este deschis; un beneficiar cu balanta 0 -> tabul este verde cu "0,00 RON".
+
 **Ce s-a adaugat:** campul „Numar de telefon” al beneficiarului nu mai este obligatoriu (ANAF nu il are intotdeauna; preluarea din ActivityApp creeaza beneficiari si fara telefon).
 **Ce face acum:** formularul se salveaza cu telefonul gol; daca este completat, trebuie sa aiba 7-15 cifre (optional cu +).
 

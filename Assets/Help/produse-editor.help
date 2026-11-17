@@ -17,7 +17,7 @@ Formularul pentru un produs nou sau pentru editarea unuia existent. Se deschide 
 ## Elemente
 ### Identificare
 - Cod produs / Model * | câmp | Codul stabilit de producător. Dacă subcategoria are parametri obligatori, aici scrii modelul (fără variantă), iar codul se compune din model și valorile alese. Aplicația te avertizează dacă a găsit caractere care se confundă ușor cu litere sau cifre. | img: parametri | sel: .product-editor .editor-grid > label.full-width:first-child
-- Categorie *, Subcategorie * | listă | Doar combinații existente. „Adaugă categorie / subcategorie” (la produs nou) deschide pagina de categorii într-o fereastră separată; „Gata, înapoi la produs” o închide.
+- Categorie *, Subcategorie * | listă | Doar combinații existente. „Adaugă categorie / subcategorie” (și la adăugarea, și la editarea unui produs) deschide pagina de categorii într-o fereastră separată; „Gata, înapoi la produs” o închide.
 - Parametrii obligatori | listă | Pentru fiecare parametru alegi o valoare; „Adaugă valoarea” adaugă o valoare nouă în listă. Sub ei vezi „Codul produsului rezultat”. | img: parametri | sel: .product-editor select:not(#product-category):not(#product-subcategory)
 - Descriere | câmp | Text liber, cel mult 1000 de caractere.
 ### Imagine

@@ -33,11 +33,16 @@ public static class InventoryPickupOcrRules
     public const string NoTableFoundMessage =
         "Nu a fost gasit niciun tabel recunoscut in fisier. Incarca situatia de inventar generata de aplicatie (pagina Inventar).";
     public const string HeaderCode = "Cod produs";
+
+    // The share of the analysis done (percent) when pagesDone of pageCount pages have been read: the PDF is read and rendered first (5 %), the pages share the rest equally; 100 only when all are read.
+    public static int ProgressAfterPages(int pagesDone, int pageCount) =>
+        pageCount <= 0 ? 0 : Math.Clamp(5 + (int)Math.Round(95.0 * Math.Clamp(pagesDone, 0, pageCount) / pageCount), 0, 100);
 }
 
 public interface IInventoryPickupOcrService
 {
-    Task<InventoryPickupScanResult> ScanAsync(Stream pdfStream, CancellationToken cancellationToken = default);
+    // progress: the share of the analysis done, in percent (0-100), reported as the work goes (the page shows it while the scan is read).
+    Task<InventoryPickupScanResult> ScanAsync(Stream pdfStream, CancellationToken cancellationToken = default, IProgress<int>? progress = null);
 }
 
 // Reads a scanned copy of the situatia de inventar PDF (Components/Pages/Inventory.razor + InventoryPdfWriter):
@@ -92,8 +97,9 @@ public sealed class InventoryPickupOcrService : IInventoryPickupOcrService, IDis
         digitModel = new Lazy<InferenceSession>(() => new InferenceSession(EmbeddedResources.Read("Assets.Models.mnist-12.onnx")));
     }
 
-    public async Task<InventoryPickupScanResult> ScanAsync(Stream pdfStream, CancellationToken cancellationToken = default)
+    public async Task<InventoryPickupScanResult> ScanAsync(Stream pdfStream, CancellationToken cancellationToken = default, IProgress<int>? progress = null)
     {
+        progress?.Report(0);
         using var buffered = new MemoryStream();
         await pdfStream.CopyToAsync(buffered, cancellationToken).ConfigureAwait(false);
         if (buffered.Length == 0) throw new InventoryPickupOcrException(InventoryPickupOcrRules.UnreadableMessage);
@@ -116,6 +122,7 @@ public sealed class InventoryPickupOcrService : IInventoryPickupOcrService, IDis
         {
             if (pages.Count == 0) throw new InventoryPickupOcrException(InventoryPickupOcrRules.UnreadableMessage);
             if (pages.Count > InventoryPickupOcrRules.MaxPages) throw new InventoryPickupOcrException(InventoryPickupOcrRules.TooManyPagesMessage);
+            progress?.Report(InventoryPickupOcrRules.ProgressAfterPages(0, pages.Count));   // the pages are rendered: the rest of the work is the reading of each page
 
             var rows = new List<InventoryPickupScanRow>();
             var unreadablePages = new List<int>();
@@ -125,6 +132,7 @@ public sealed class InventoryPickupOcrService : IInventoryPickupOcrService, IDis
                 var pageRows = await ScanPageAsync(pages[pageIndex], pageIndex + 1, cancellationToken).ConfigureAwait(false);
                 if (pageRows.Count == 0) unreadablePages.Add(pageIndex + 1);
                 rows.AddRange(pageRows);
+                progress?.Report(InventoryPickupOcrRules.ProgressAfterPages(pageIndex + 1, pages.Count));
             }
             if (rows.Count == 0) throw new InventoryPickupOcrException(InventoryPickupOcrRules.NoTableFoundMessage);
             return new InventoryPickupScanResult(pages.Count, rows, unreadablePages);

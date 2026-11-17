@@ -3,6 +3,8 @@
 @* The gear above a table (PROP-0034): a small panel with the size of the text, of the header, of the images and of the icons of THIS table, saved per user in the database.
    A field left on "Din setările globale" takes the value of the user's global settings (Meniul contului -> Setări afișare); a value chosen here wins over the global one. *@
 
+@if (DisplayRules.ShowTableGear(global))
+{
 <span class="display-gear" @onkeydown="KeyDown">
     <button type="button" id="@($"gear-{Scope}")" class="gear-button" aria-haspopup="dialog" aria-expanded="@(open ? "true" : "false")" aria-label="Setări de afișare pentru @Label" title="Setări de afișare pentru @Label" @onclick="Toggle"></button>
     @if (open)
@@ -22,6 +24,7 @@
         </div>
     }
 </span>
+}
 
 @code {
     [Parameter, EditorRequired] public string Scope { get; set; } = "";

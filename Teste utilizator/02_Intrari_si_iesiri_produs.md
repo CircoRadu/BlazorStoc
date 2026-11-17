@@ -197,3 +197,10 @@ Neverificat încă: legarea de bonul de consum / storno (Task următor).
 | 2 | Deschide sectiunea "Istoricul modificarilor" la o miscare modificata | Insigna arata numarul; lista are data, utilizatorul, schimbarea si motivul | |
 | 3 | Apasa "Editeaza" din dreapta sus | Fereastra se inchide si se deschide editarea miscarii | |
 | 4 | O miscare stornata sau un utilizator fara drept de modificare | "Editeaza" lipseste; iconita "Vezi" ramane | |
+
+## Modificari de testat (17.11.2026) - PROP-0038 / PROP-0039
+**Ce s-a adaugat:** coloana "Furnizor / factura" are doua randuri (furnizor, apoi "Factura: nr" ca link, fara iconita cu lupa); coloana "Beneficiar/proiect" are doua randuri (beneficiar, apoi proiectul ca link). Doua ferestre noi, doar de citit.
+**Ce face acum:**
+1. Deschide mișcările unui produs cu intrări din factură (ex. NV5, filtru intrari / factura). Verifică furnizorul pe primul rând și "Factura: nr" pe al doilea; nu mai e iconita cu lupa la furnizor.
+2. Apasă "Factura: nr": se deschide fereastra cu furnizor (link), număr, dată, cine a preluat-o și intrările din factură; codul de produs este link spre mișcările produsului. Închide cu X sau cu "Închide".
+3. La o ieșire pe proiect, beneficiarul e pe primul rând; apasă proiectul: fereastra arată beneficiar (link), proiect (link) și echipamentele predate (cod produs link, bucăți).

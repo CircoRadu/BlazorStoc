@@ -4,6 +4,11 @@ Fluxul: Generare situatie inventar (PDF cu categoriile alese) -> tiparesti, comp
 
 ## Modificari de testat
 
+### 17.11.2026 - Preluare inventar: indicator de progres in procente (PROP-0033)
+**Ce s-a adaugat:** cat timp se analizeaza scanarea, pagina "Preluare inventar" arata procentul din analiza si o bara de progres.
+**Ce face acum:** langa "Se citeste fisierul..." apare procentul (de la 0% la 100%), care creste pe masura ce sunt citite paginile formularului; la 100% apar diferentele de stoc. Procentul vine din procesul de citire (OCR) si ajunge in pagina in timp ce acesta lucreaza.
+Pasi: Inventar -> Preluare inventar -> alege un formular PDF cu mai multe pagini -> apare procentul si bara; procentul nu scade si se opreste la 100% cand apare tabelul de diferente.
+
 ### 15.10.2026 - Inventarul ca modul (oprire fara efect asupra restului aplicatiei)
 
 **Verificat de agent 19.10.2026** (pe instanta de test, baza de test; vezi `docs/TESTE_RAMASE.md`, „Verificare completa a modulelor”).

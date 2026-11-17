@@ -35,6 +35,9 @@ public static partial class MariaExtendedChecks
                 "Elcomtur: the beneficiary with a positive balance is in the list of the owed ones, and the last import is told (date of the backup, firm)");
             Check(await balances.CountOwedAsync() == (await balances.GetOwedAsync()).Count && await balances.CountOwedAsync() >= 1, "Elcomtur: the number on the tab of the Notifications page is the number of beneficiaries with a positive balance");
             Check(await Events() == 1, "Elcomtur: the journal names the operation \"Preluare date Elcomtur\"");
+            var history = await balances.GetHistoryAsync(new DateOnly(2026, 10, 1));
+            Check(history.Count(point => point.DataDate == new DateOnly(2026, 10, 30)) == 1 && history.First(point => point.DataDate == new DateOnly(2026, 10, 30)).Total >= 11950m && history.First(point => point.DataDate == new DateOnly(2026, 10, 30)).OwedCount >= 1,
+                "Elcomtur: every import notes the total of the payments overdue with the date of the backup (one line per date and firm; the chart of the evolution reads it)");
             await service.DiscardAsync(id);
             await Rejects<ElcomturOperationException>(() => service.RunAsync(id, "firma1", apply: false), "Elcomtur: an uploaded file that was discarded is refused with a message");
             id = null;

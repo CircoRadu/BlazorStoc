@@ -1,0 +1,15 @@
+# Informațiile unei facturi
+Cautare: factura furnizor intrari informatii numar data
+
+Fereastra care se deschide din tabelul de intrări/ieșiri al unui produs când apeși pe „Factura: …”. Arată datele facturii și intrările preluate din ea; nu modifică nimic.
+
+## Elemente
+### Fereastra
+- Furnizor | link | Deschide pagina furnizorului. | sel: #invoice-info-facts
+- Număr factură, Data emiterii, Preluată de | informații | Datele facturii și cine a preluat-o. | sel: #invoice-info-facts
+- Intrări din această factură | tabel | Codul produsului (link spre mișcările produsului), bucățile și data fiecărei intrări. | sel: #invoice-info-entries
+- Închide | buton | Închide fereastra.
+
+## Flux: Cum văd ce s-a preluat dintr-o factură
+1. În coloana „Furnizor / factură” apasă pe „Factura: …”.
+2. Citești datele și lista intrărilor; apasă un cod de produs ca să-i vezi mișcările.
