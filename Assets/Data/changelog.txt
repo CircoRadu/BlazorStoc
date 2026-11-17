@@ -1,3 +1,7 @@
+## 0.5.90 | 17.11.2026
+### Funcționalități noi
+- PROP-0034 – Setări afișare pentru fiecare cont: pagina „Setări afișare” din meniul contului reglează mărimea titlurilor, a taburilor, a textului și antetului de tabel, a imaginilor și a iconițelor (80%–160%), cu presetările Compact, Normal și Mare. Deasupra catalogului de produse, roata de setări dă valori proprii tabelului, care înlocuiesc câmp cu câmp pe cele globale. Setările se salvează pe cont și se aplică pe orice dispozitiv; schema bazei: migrarea 90.
+
 ## 0.5.89 | 16.11.2026
 ### Funcționalități noi
 - În pagina unui produs, fiecare mișcare are iconița „Vezi”: fereastra arată toți parametrii mișcării, butonul „Editează” în dreapta sus și, într-o secțiune pliabilă, istoricul modificărilor cu numărul lor.
