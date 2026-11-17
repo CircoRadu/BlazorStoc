@@ -39,6 +39,13 @@ public sealed class MariaProjectRepository(IConfiguration configuration, IWebHos
         return result;
     }
 
+    // A project made by a mandatory type of Nomenclator -> Proiecte obligatorii: its name stays and it is not deleted on its own.
+    internal static async Task<bool> IsMandatoryAsync(MySqlConnection connection, MySqlTransaction? transaction, int projectId, CancellationToken token)
+    {
+        await using var command = Command(connection, transaction, "SELECT EXISTS(SELECT 1 FROM projects WHERE id=@id AND mandatory_type_id IS NOT NULL)", ("@id", projectId));
+        return Convert.ToBoolean(await command.ExecuteScalarAsync(token).ConfigureAwait(false));
+    }
+
     public async Task<Project?> GetAsync(int id, CancellationToken cancellationToken = default)
     {
         if (accessControl is not null) await accessControl.EnsureAnyPermissionAsync(cancellationToken).ConfigureAwait(false);
@@ -90,6 +97,8 @@ public sealed class MariaProjectRepository(IConfiguration configuration, IWebHos
             {
                 var current = await GetLockedAsync(connection, transaction, original.Id, cancellationToken).ConfigureAwait(false);
                 ProjectRules.CheckCurrent(current, original);
+                if (value.Name != current.Name && await IsMandatoryAsync(connection, transaction, original.Id, cancellationToken).ConfigureAwait(false))
+                    throw new ProjectOperationException(BeneficiaryProjectTypeRules.MandatoryProjectMessage);
                 ProjectRules.CheckBeneficiaryUnchanged(original, value.BeneficiaryId);
                 var beneficiaryName = await GetBeneficiaryNameAsync(connection, transaction, value.BeneficiaryId, cancellationToken).ConfigureAwait(false);
                 ProjectRules.CheckBeneficiaryExists(beneficiaryName is null ? null : new Beneficiary(value.BeneficiaryId, beneficiaryName, ""));
@@ -125,6 +134,9 @@ public sealed class MariaProjectRepository(IConfiguration configuration, IWebHos
         if (accessControl is not null) await accessControl.EnsureAsync("beneficiari.edit", cancellationToken).ConfigureAwait(false);
         var motif = ChangeReasonRules.Normalize(reason);
         if (ChangeReasonRules.ValidationError(motif) is { } reasonError) throw new ProjectOperationException(reasonError);
+        await using (var check = await MariaDb.OpenAsync(configuration, cancellationToken).ConfigureAwait(false))
+            if (await IsMandatoryAsync(check, null, original.Id, cancellationToken).ConfigureAwait(false))
+                throw new ProjectOperationException(BeneficiaryProjectTypeRules.MandatoryProjectMessage);
         var observations = await GetObservationsAsync(original.Id, cancellationToken).ConfigureAwait(false);
         var allFiles = new List<ProjectObservationFile>();
         foreach (var observation in observations)

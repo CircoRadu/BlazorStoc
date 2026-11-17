@@ -1,4 +1,4 @@
-﻿@page "/iesiri/multipla"
+@page "/iesiri/multipla"
 @attribute [Authorize(Policy = "perm:iesire-multipla.view")]
 @rendermode @(new InteractiveServerRenderMode(prerender: false))
 @using BlazorStoc.Services
@@ -53,9 +53,9 @@ else
                     <InputText id="op-reference" @bind-Value="common.Reference" maxlength="@StockMovementRules.MaxReferenceLength" /></label>
             </div>
             <ExitDestinationPicker @ref="picker" Prefix="op" Model="common" Beneficiaries="beneficiaries" Projects="projects" Vehicles="vehicles"
-                                   ShowSource="false" Disabled="busy || preview is not null" UseProject="useProject"
+                                   ShowSource="false" Disabled="busy || preview is not null"
                                    DestinationChanged="DestinationChangedAsync" BeneficiaryChanged="BeneficiaryChangedAsync"
-                                   ProjectToggled="ToggleProject" ProjectChanged="id => { common.ProjectId = id; return Task.CompletedTask; }" />
+                                   ProjectChanged="id => { common.ProjectId = id; return Task.CompletedTask; }" />
             <label class="movement-description" for="op-description">Descriere comună (se folosește la liniile fără descriere proprie)
                 <InputTextArea id="op-description" @bind-Value="common.Description" rows="2" maxlength="@StockMovementRules.MaxDescriptionLength" /></label>
 
@@ -255,13 +255,6 @@ else
             catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
             catch (Exception ex) { Logger.LogError("Project list loading failed ({ErrorType}).", ex.GetType().Name); }
         }
-    }
-
-    private Task ToggleProject(bool value)
-    {
-        useProject = value;
-        if (!value) common.ProjectId = null;
-        return Task.CompletedTask;
     }
 
     private async Task ProductChangedAsync(Line line, int? productId)

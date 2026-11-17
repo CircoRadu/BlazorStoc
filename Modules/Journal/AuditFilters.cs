@@ -27,7 +27,7 @@ public static class AuditFilterOptions
         (AuditEntities.UserTask, "Taskuri utilizatori"), (AuditEntities.Proposal, "Propuneri"),
         (AuditEntities.Journal, "Jurnalul (exporturi)"), (AuditEntities.MapEngine, "Furnizor hartă"), (AuditEntities.MapPinType, "Tipuri de pinuri hartă"),
         (AuditEntities.InvoiceTemplate, "Șabloane facturi"), (AuditEntities.Supplier, "Furnizori"), (AuditEntities.SupplierInvoice, "Facturi furnizori"),
-        (AuditEntities.SystemType, "Tipuri de sisteme"), (AuditEntities.RiskAnalyzer, "Analizori de risc"), (AuditEntities.OfferTemplate, "Șabloane oferte"),
+        (AuditEntities.SystemType, "Tipuri de sisteme"), (AuditEntities.BeneficiaryProjectType, "Proiecte obligatorii"), (AuditEntities.RiskAnalyzer, "Analizori de risc"), (AuditEntities.OfferTemplate, "Șabloane oferte"),
         (AuditEntities.UserType, "Tipuri de utilizatori"), (AuditEntities.Module, "Module"), (AuditEntities.Application, "Aplicație"),
         (AuditEntities.Database, "Baza de date (conexiune, port, conturi)"), (AuditEntities.ActivityImport, "Preluare ActivityApp"), (AuditEntities.Elcomtur, "Preluare Elcomtur"), (AuditEntities.EspImport, "Preluare stoc ESPStoc")
     ];
@@ -155,6 +155,9 @@ public static class AuditFilterOptions
         (AuditActions.CreateInstallerAdministrator, AuditActions.CreateInstallerAdministrator),
         (AuditActions.AddRiskAnalyzer, AuditActions.AddRiskAnalyzer), (AuditActions.EditRiskAnalyzer, AuditActions.EditRiskAnalyzer),
         (AuditActions.DeleteRiskAnalyzer, AuditActions.DeleteRiskAnalyzer),
+        (AuditActions.AddMandatoryProjectType, AuditActions.AddMandatoryProjectType), (AuditActions.RenameMandatoryProjectType, AuditActions.RenameMandatoryProjectType),
+        (AuditActions.ActivateMandatoryProjectType, AuditActions.ActivateMandatoryProjectType), (AuditActions.DeactivateMandatoryProjectType, AuditActions.DeactivateMandatoryProjectType),
+        (AuditActions.MoveMandatoryProjectType, AuditActions.MoveMandatoryProjectType), (AuditActions.EnsureMandatoryProjects, AuditActions.EnsureMandatoryProjects),
         (AuditActions.AddSystemType, AuditActions.AddSystemType), (AuditActions.RenameSystemType, AuditActions.RenameSystemType),
         (AuditActions.ActivateSystemType, AuditActions.ActivateSystemType), (AuditActions.DeactivateSystemType, AuditActions.DeactivateSystemType),
         (AuditActions.MoveSystemType, AuditActions.MoveSystemType), (AuditActions.AddSystemTypeAlias, AuditActions.AddSystemTypeAlias),

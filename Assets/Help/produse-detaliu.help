@@ -33,7 +33,7 @@ Pagina unui produs: datele lui, unde se află bucățile, rezervările și toate
 - Data mișcării * | câmp | Din calendar; nu poate fi în viitor.
 - Intrare, Ieșire | selecție | Tipul mișcării (în funcție de drepturile tale).
 - Proveniența intrării | selecție | „Intrare liberă” (cu motivul intrării libere și o referință opțională, eventual legată de o ieșire returnată), „Factură existentă” sau „Factură nouă (manual)”; la factură alegi factura și, opțional, cantitatea de pe factură.
-- Destinația ieșirii | selecție | Beneficiar (cu proiect opțional), Autovehicul, Vânzare generică sau Corecție stoc; sursa este depozitul sau o mașină. | img: negativ
+- Destinația ieșirii | selecție | Beneficiar (cu proiect obligatoriu), Autovehicul, Vânzare generică sau Corecție stoc; sursa este depozitul sau o mașină. | img: negativ
 - Componenta proiectului | alegere | Dacă mișcarea e pentru un proiect, o legi de o componentă a lui. | sel: .entry-component-choice
 - Descriere * | câmp | Descrierea mișcării (se propune una).
 - Referință | câmp | Aviz, bon sau număr de predare.

@@ -43,6 +43,8 @@ public sealed class MariaBeneficiaryRepository(
             await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
             var createdId = checked((int)command.LastInsertedId);
             await InsertPrimaryWorkPointAsync(connection, transaction, createdId, value, cancellationToken).ConfigureAwait(false);
+            // Every beneficiary has the projects of the mandatory types of Nomenclator -> Proiecte obligatorii.
+            await MariaBeneficiaryProjectTypeRepository.EnsureAsync(connection, transaction, createdId, cancellationToken).ConfigureAwait(false);
             return Build(createdId, value, 0);
         }, cancellationToken, value).ConfigureAwait(false);
         await AuditRecorder.RecordCreateAsync(auditTrail, accessControl, AuditEntities.Beneficiary, beneficiary.Id.ToString(),
@@ -121,8 +123,20 @@ public sealed class MariaBeneficiaryRepository(
                         "SELECT EXISTS(SELECT 1 FROM stock_movements WHERE beneficiary_id=@id)", ("@id", original.Id)))
                         BeneficiaryRules.CheckDelete(Convert.ToBoolean(await relations.ExecuteScalarAsync(token).ConfigureAwait(false)));
                     await using (var projects = Command(connection, transaction,
-                        "SELECT COUNT(*) FROM projects WHERE beneficiary_id=@id", ("@id", original.Id)))
+                        """
+                        SELECT COUNT(*) FROM projects p WHERE p.beneficiary_id=@id AND NOT (p.mandatory_type_id IS NOT NULL AND p.observations=''
+                            AND NOT EXISTS (SELECT 1 FROM stock_movements x WHERE x.project_id=p.id)
+                            AND NOT EXISTS (SELECT 1 FROM project_observations x WHERE x.project_id=p.id)
+                            AND NOT EXISTS (SELECT 1 FROM project_components x WHERE x.project_id=p.id)
+                            AND NOT EXISTS (SELECT 1 FROM offers x WHERE x.project_id=p.id)
+                            AND NOT EXISTS (SELECT 1 FROM project_reservations x WHERE x.project_id=p.id)
+                            AND NOT EXISTS (SELECT 1 FROM project_deadlines x WHERE x.project_id=p.id))
+                        """, ("@id", original.Id)))
                         BeneficiaryRules.CheckNoLiveProjects(Convert.ToInt32(await projects.ExecuteScalarAsync(token).ConfigureAwait(false)));
+                    // What is left are mandatory projects nobody used: they go with the beneficiary.
+                    await using (var unusedMandatory = Command(connection, transaction,
+                        "DELETE FROM projects WHERE beneficiary_id=@id AND mandatory_type_id IS NOT NULL", ("@id", original.Id)))
+                        await unusedMandatory.ExecuteNonQueryAsync(token).ConfigureAwait(false);
                     await using (var tasks = Command(connection, transaction,
                         "SELECT COUNT(*) FROM beneficiary_tasks WHERE beneficiary_id=@id", ("@id", original.Id)))
                         BeneficiaryRules.CheckNoTasks(Convert.ToInt32(await tasks.ExecuteScalarAsync(token).ConfigureAwait(false)));

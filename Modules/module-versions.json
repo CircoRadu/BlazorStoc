@@ -301,8 +301,8 @@
                                                  ]
                                  },
                     "Journal":  {
-                                    "version":  "1.6.4",
-                                    "hash":  "1b64c4bfe54e1aa615f1b8ee468e16fc9ee45c8b61ae23e8745bacc2c5f324af",
+                                    "version":  "1.7.0",
+                                    "hash":  "4cb69cfeabdf75688ee5fca4f570d6ca9d4ef08a49966a8bcd10760495817066",
                                     "history":  [
                                                     {
                                                         "version":  "1.0.0",
@@ -498,6 +498,11 @@
                                                         "version":  "1.6.4",
                                                         "date":  "16.11.2026",
                                                         "note":  "Filtrul de actiuni contine operatiile Invatare OCR (salvare corectii, invatare, ignorare, resetare)"
+                                                    },
+                                                    {
+                                                        "version":  "1.7.0",
+                                                        "date":  "17.11.2026",
+                                                        "note":  "Filtrul de jurnal cunoaste entitatea si actiunile tipurilor de proiecte obligatorii (Nomenclator -\u003e Proiecte obligatorii)"
                                                     }
                                                 ]
                                 },

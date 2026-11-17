@@ -228,7 +228,7 @@ public static class HelpChecks
         // New 07.11.2026: the popup of the menu entry "Raporteaza o eroare"; the picture is made on request (docs/HELP_DE_REGENERAT.md).
         "raportare-eroare",
         // New 07.11.2026: the tab "Componente mentenanta" of the Nomenclator; the picture is made on request (docs/HELP_DE_REGENERAT.md).
-        "nomenclator-componente-mentenanta",
+        "nomenclator-proiecte-obligatorii", "nomenclator-componente-mentenanta",
         // New 07.11.2026: the window of an addendum of a maintenance contract (not wired into the page yet); the description is completed with the components stage.
         "mentenanta-act-aditional",
         // New 09.11.2026: tasks of users on beneficiaries (module Taskuri); the pictures are made on request (docs/HELP_DE_REGENERAT.md).

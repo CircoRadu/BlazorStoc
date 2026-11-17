@@ -1,4 +1,4 @@
-﻿@page "/produse/{Id:int}"
+@page "/produse/{Id:int}"
 @page "/produse/{Id:int}/miscari"
 @attribute [Authorize(Policy = "perm:stoc.view")]
 @rendermode @(new InteractiveServerRenderMode(prerender: false))
@@ -122,12 +122,11 @@ else
                         @if (form.Kind == StockMovementKind.Exit)
                         {
                             <ExitDestinationPicker @ref="addPicker" Prefix="add" Model="form" Beneficiaries="beneficiaries" Projects="projects"
-                                                   Vehicles="vehicles" VehicleStocks="vehicleStocks" Disabled="saving" UseProject="useProject"
+                                                   Vehicles="vehicles" VehicleStocks="vehicleStocks" Disabled="saving"
                                                    AllowAdd="true" AddBeneficiaryRequested="AddBeneficiaryAsync" AddProjectRequested="AddProjectAsync"
                                                    DestinationChanged="() => DestinationChangedAsync(false)"
                                                    VehicleChanged="() => { ApplySuggestion(false); return Task.CompletedTask; }"
                                                    BeneficiaryChanged="id => SelectBeneficiaryAsync(form, id, false)"
-                                                   ProjectToggled="v => ToggleProject(form, v, false)"
                                                    ProjectChanged="id => SetProject(form, id)" />
                             @if (form.Destination == ExitDestination.Beneficiary && form.ProjectId is not null)
                             {
@@ -376,12 +375,11 @@ else
                             {
                             <div class="full-width">
                                 <ExitDestinationPicker @ref="editPicker" Prefix="edit" Model="editForm" Beneficiaries="beneficiaries" Projects="editProjects"
-                                                       Vehicles="vehicles" VehicleStocks="vehicleStocks" Disabled="editSaving" UseProject="editUseProject"
+                                                       Vehicles="vehicles" VehicleStocks="vehicleStocks" Disabled="editSaving"
                                                        EditingSourceVehicleId="editing.SourceVehicleId" EditingQuantity="editing.Quantity"
                                                        DestinationChanged="() => DestinationChangedAsync(true)"
                                                        VehicleChanged="() => { ApplySuggestion(true); return Task.CompletedTask; }"
                                                        BeneficiaryChanged="id => SelectBeneficiaryAsync(editForm, id, true)"
-                                                       ProjectToggled="v => ToggleProject(editForm, v, true)"
                                                        ProjectChanged="id => SetProject(editForm, id)" />
                             </div>
                             }

@@ -523,6 +523,8 @@ public static class StockMovementRules
         if (input.InvoiceQuantity is < 1 or > MaxQuantity) errors.Add("Cantitatea de pe factură trebuie să fie între 1 și " + MaxQuantity.ToString("N0", CultureInfo.InvariantCulture) + ".");
     }
 
+    public const string ProjectRequiredMessage = "Alege proiectul beneficiarului (ieșirile spre un beneficiar se fac întotdeauna pe un proiect).";
+
     // An exit has no invoice or free-entry reason; what else it needs depends on where it goes.
     private static void CheckExit(StockMovementInput input, bool allowVehicleTransfer, List<string> errors)
     {
@@ -538,7 +540,7 @@ public static class StockMovementRules
         {
             if (beneficiaryId is null or <= 0) errors.Add("Alege un beneficiar din listă.");
             if (projectId is not null && beneficiaryId is null) errors.Add("Alege beneficiarul înainte de proiect.");
-            if (projectId is <= 0) errors.Add("Alege un proiect din listă sau debifează opțiunea proiect.");
+            if (projectId is null or <= 0) errors.Add(ProjectRequiredMessage);
             if (vehicleId is not null) errors.Add("Vehiculul se poate alege numai pentru ieșirile spre autovehicul.");
         }
         else if (chosen == ExitDestination.Vehicle)

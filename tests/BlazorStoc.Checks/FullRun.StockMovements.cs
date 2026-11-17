@@ -43,6 +43,9 @@ public static partial class FullRun
             "Movement dates are displayed as dd.MM.yyyy while the legacy column keeps dd-MM-yyyy");
         Check(StockMovementRules.NormalizeDisplayDates("Data: 22-08-2022 → 01-03-2024; cod 99-99-2020; ref 122-08-2022") == "Data: 22.08.2022 → 01.03.2024; cod 99-99-2020; ref 122-08-2022"
               && StockMovementRules.NormalizeDisplayDates(null) == "", "Older journal texts show real dates as dd.MM.yyyy and leave other text untouched");
+        try { StockMovementRules.Validated(MovementInput(StockMovementKind.Exit, 1, "Spre beneficiar", beneficiaryId: 5), StockMovementKind.Exit, false); throw new Exception("An exit to a beneficiary without a project accepted"); }
+        catch (StockMovementOperationException exception) { Check(exception.Message.Contains(StockMovementRules.ProjectRequiredMessage, StringComparison.Ordinal), "An exit to a beneficiary needs a project (the project is no longer optional)"); }
+        Check(StockMovementRules.Validated(MovementInput(StockMovementKind.Exit, 1, "Spre beneficiar", beneficiaryId: 5, projectId: 9), StockMovementKind.Exit, false).ProjectId == 9, "An exit to a beneficiary with a project is accepted and keeps the project");
         try { StockMovementRules.Validated(MovementInput(StockMovementKind.Exit, 1, "  "), StockMovementKind.Exit, false); throw new Exception("Blank description accepted"); }
         catch (StockMovementOperationException) { Check(true, "Movement description is mandatory"); }
         try { StockMovementRules.Validated(MovementInput(StockMovementKind.Exit, 0), StockMovementKind.Exit, false); throw new Exception("Zero quantity accepted"); }

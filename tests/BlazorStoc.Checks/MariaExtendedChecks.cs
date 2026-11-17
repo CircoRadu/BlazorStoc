@@ -92,6 +92,7 @@ public static partial class MariaExtendedChecks
             await Section("Default notification templates: made once per event, existing and deleted ones left alone, journal", () => DefaultTemplatesAsync(configuration, admin, audit, probe));
             await Section("Offer templates: save, refuse, change, journal", () => OfferTemplatesAsync(configuration, admin, audit, probe));
             await Section("Project components: add, state, archive, reactivate", () => ProjectComponentsAsync(configuration, admin, audit, probe));
+            await Section("Mandatory beneficiary projects", () => MandatoryProjectsAsync(configuration, admin, audit, probe));
             await Section("System types: uniqueness, alternative names, deactivation, journal", () => SystemTypesAsync(configuration, admin, audit, probe));
             await Section("Storno, return, net consumption, consumption note", () => StornoReturnNoteAsync(configuration, admin, audit, probe));
             await Section("Exit operation: grouping, all or nothing, preview, repeated line", () => ExitOperationAsync(configuration, admin, audit, probe));

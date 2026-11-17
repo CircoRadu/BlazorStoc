@@ -85,12 +85,6 @@ public partial class ProductMovements
 
     private static void SetProject(StockMovementInput target, int? projectId) => target.ProjectId = projectId;
 
-    private void ToggleProject(StockMovementInput target, bool value, bool isEdit)
-    {
-        if (isEdit) editUseProject = value; else useProject = value;
-        if (!value) target.ProjectId = null;
-    }
-
     private async Task SelectBeneficiaryAsync(StockMovementInput target, int? beneficiaryId, bool isEdit)
     {
         target.BeneficiaryId = beneficiaryId; target.ProjectId = null;

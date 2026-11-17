@@ -8,7 +8,7 @@
     @if (open)
     {
         <span class="display-gear-backdrop" @onclick="Close"></span>
-        <div class="display-gear-panel" role="dialog" aria-label="Setări de afișare pentru @Label">
+        <div class="display-gear-panel" role="group" aria-label="Setări de afișare pentru @Label">
             <h3>Afișare: @Label</h3>
             <p class="form-note muted">Valorile alese aici se aplică numai acestui tabel și înlocuiesc setările globale.</p>
             <PercentSlider TableMode="true" Title="Text din tabel" AriaLabel="Mărimea textului din tabel" Value="table.TableText" Inherited="global.TableText" ValueChanged="v => Set(table with { TableText = v })" />

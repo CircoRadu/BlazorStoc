@@ -1,4 +1,4 @@
-﻿using BlazorStoc.Components;
+using BlazorStoc.Components;
 using BlazorStoc.Services;
 using BlazorStoc.Startup;
 using Microsoft.AspNetCore.Hosting.StaticWebAssets;
@@ -350,6 +350,9 @@ var statusOnly = args.Contains("--schema-status");
             var backfill = await WorkPointBackfill.EnsurePrimariesAsync(app.Configuration);
             if (backfill.Created + backfill.Promoted > 0 || backfill.EmptyAddress > 0)
                 app.Logger.LogInformation("Main work points: {Created} created, {Promoted} promoted from an additional point, {Empty} beneficiary(ies) without an address.", backfill.Created, backfill.Promoted, backfill.EmptyAddress);
+            // The projects of the mandatory types (Nomenclator -> Proiecte obligatorii) for the beneficiaries that exist (idempotent: makes only what is missing).
+            var mandatoryProjects = await new MariaBeneficiaryProjectTypeRepository(app.Configuration).EnsureProjectsAsync();
+            if (mandatoryProjects > 0) app.Logger.LogInformation("Mandatory projects: {Made} project(s) made for the existing beneficiaries.", mandatoryProjects);
         }
         // Exit codes of --migrate-schema (also used by the updater): 0 = schema current, 1 = columns still missing, 3 = an applied migration was edited (drift).
         if (migrateOnly) return report.MissingColumns.Count > 0 ? 1 : report.Drifted.Count > 0 ? 3 : 0;

@@ -277,10 +277,12 @@ public static partial class MariaExtendedChecks
         var beneficiary = await beneficiaries.CreateAsync(Legal($"Ext Out Beneficiar {suffix} SRL", "RO" + Random.Shared.Next(60000000, 69999999)));
         var car = await vehicles.CreateAsync(new VehicleInput { PlateNumber = "TS-94-" + Letters(), Description = "Ext iesiri", ItpExpiry = Expiry, InsuranceExpiry = Expiry, RovinietaExpiry = Expiry });
         var car2 = await vehicles.CreateAsync(new VehicleInput { PlateNumber = "TS-95-" + Letters(), Description = "Ext iesiri 2", ItpExpiry = Expiry, InsuranceExpiry = Expiry, RovinietaExpiry = Expiry });
+        // An exit to a beneficiary is always made on a project: the mandatory project every beneficiary has (Nomenclator -> Proiecte obligatorii).
+        var ownProject = (await new MariaProjectRepository(configuration, new TestWebHostEnvironment(Path.GetTempPath()), admin, audit).GetForBeneficiaryAsync(beneficiary.Id)).First();
         try
         {
             StockMovementInput Out(int quantity, string text, ExitDestination destination, Action<StockMovementInput>? change = null)
-            { var input = new StockMovementInput { Kind = StockMovementKind.Exit, Date = today, Quantity = quantity, Description = text, Destination = destination }; change?.Invoke(input); return input; }
+            { var input = new StockMovementInput { Kind = StockMovementKind.Exit, Date = today, Quantity = quantity, Description = text, Destination = destination, ProjectId = destination == ExitDestination.Beneficiary ? ownProject.Id : null }; change?.Invoke(input); return input; }
             async Task<bool> Journaled(string action, int id, string? detail = null) => (await audit.GetEventsAsync()).Any(item => item.TimestampUtc >= started && item.Action == action
                 && item.EntityId == id.ToString() && (detail is null || item.Details.Contains(detail)));
             await movements.CreateAsync(product.Id, new StockMovementInput { Kind = StockMovementKind.Entry, Date = today.AddDays(-2), Quantity = 40, Description = "Ext stoc initial" });
@@ -578,6 +580,8 @@ public static partial class MariaExtendedChecks
         var beneficiary = await beneficiaries.CreateAsync(Legal($"Ext Rez Client {suffix} SRL", "RO" + Random.Shared.Next(60000000, 69999999)));
         var first = await projects.CreateAsync(new ProjectInput { BeneficiaryId = beneficiary.Id, Name = $"Ext Rez Proiect A {suffix}" });
         var second = await projects.CreateAsync(new ProjectInput { BeneficiaryId = beneficiary.Id, Name = $"Ext Rez Proiect B {suffix}" });
+        // "No project" below means the mandatory project every beneficiary has: it holds no reservation.
+        var own = (await projects.GetForBeneficiaryAsync(beneficiary.Id)).First(item => item.Id != first.Id && item.Id != second.Id);
         var type = await types.CreateAsync($"Ext Rez Sistem {suffix}");
         try
         {
@@ -588,7 +592,7 @@ public static partial class MariaExtendedChecks
                 var input = new StockMovementInput
                 {
                     Kind = StockMovementKind.Exit, Date = today, Quantity = quantity, Description = "Ext rezervare iesire", Destination = ExitDestination.Beneficiary,
-                    BeneficiaryId = beneficiary.Id, ProjectId = project, Reference = "Aviz rez"
+                    BeneficiaryId = beneficiary.Id, ProjectId = project ?? own.Id, Reference = "Aviz rez"
                 };
                 change?.Invoke(input);
                 return input;

@@ -1,3 +1,8 @@
+## 0.5.92 | 17.11.2026
+### Diverse
+- Proiecte obligatorii ale beneficiarilor: în Nomenclator există tabul „Proiecte obligatorii”, cu tipurile de proiect pe care le are fiecare beneficiar (primul: „Reparații sisteme existente”). Beneficiarii existenți primesc proiectele la pornirea aplicației, cei noi la creare, iar un tip nou sau reactivat le creează la toți beneficiarii care nu îl au. Proiectul obligatoriu nu se redenumește și nu se șterge din pagina lui; un beneficiar care are doar proiecte obligatorii nefolosite se șterge împreună cu ele.
+- Ieșirea de stoc spre un beneficiar se face întotdeauna pe un proiect: comutatorul „Proiect” a dispărut (și din ieșirea multiplă), iar proiectul trebuie ales.
+
 ## 0.5.91 | 17.11.2026
 ### Funcționalități noi
 - PROP-0034 – Setări afișare extinse: pagina are 12 slidere de la 100% la 500% (titluri de pagină, text general și titluri de secțiuni, taburi, text/antet/imagini/iconițe din tabele, butoane, câmpuri de formular, meniul principal, bara de sus, ferestre), grupate în secțiuni pliabile, fiecare cu propria previzualizare, și presetările Normal, Mare și Foarte mare. Regulile se aplică tuturor elementelor de același fel din aplicație (inclusiv insignele din taburi și din titlurile de secțiune), iar roata de setări apare acum pe fiecare tabel de date, cu slidere proprii care înlocuiesc câmp cu câmp regulile globale.

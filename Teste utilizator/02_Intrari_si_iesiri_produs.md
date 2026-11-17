@@ -4,6 +4,11 @@ Fluxul: deschizi un produs -> pagina de miscari -> adaugi intrare sau iesire -> 
 
 ## Modificari de testat
 
+### 17.11.2026 - Iesirea spre beneficiar: proiectul este obligatoriu
+**Ce s-a adaugat:** la o iesire spre un beneficiar proiectul trebuie ales intotdeauna; comutatorul "Proiect" a fost scos (si din operatia de iesire multipla).
+**Ce face acum:** dupa ce alegi beneficiarul, lista de proiecte este mereu activa (fiecare beneficiar are cel putin proiectele obligatorii din Nomenclator, de exemplu "Reparatii sisteme existente"); fara proiect, salvarea este refuzata cu mesajul "Alege proiectul beneficiarului".
+Pasi: Produse -> un produs -> Intrari/iesiri -> Iesire -> destinatia Beneficiar -> alege beneficiarul -> alege proiectul "Reparatii sisteme existente" -> salveaza; reia fara sa alegi proiectul -> mesaj de refuz; la editarea unei iesiri mai vechi, facute fara proiect, trebuie sa alegi proiectul.
+
 ### 27.10.2026 - Produs cu parametri necompletati: blocat in toate operatiunile de stoc
 
 **Ce s-a adaugat:** pe pagina Intrari/Iesiri a unui produs caruia ii lipsesc parametri obligatori apare un banner „Produs blocat: parametri necompletati” cu lista parametrilor lipsa si butonul „Completeaza parametrii”; formularul de miscare nu se mai afiseaza. Iconita „Iesire rapida” din catalog e inactiva, iar in „Iesire din stoc / Iesire multipla” linia cu un astfel de produs arata avertisment si nu se poate continua.

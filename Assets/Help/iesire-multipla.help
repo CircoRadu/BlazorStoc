@@ -20,7 +20,7 @@ Un produs cu parametri necompletați este blocat: linia lui de ieșire arată un
 - Referință comună | câmp | Avizul, bonul sau numărul de predare, același pentru toate liniile (opțional).
 - Destinația ieșirii * | selecție | Beneficiar, Autovehicul, Vânzare generică sau Corecție stoc.
 - Beneficiar | listă | Apare la destinația Beneficiar: alegi beneficiarul din listă (căutare în ea). „+ Adaugă beneficiar” deschide formularul de beneficiar nou, dacă ai dreptul.
-- Proiect | comutator | La destinația Beneficiar, pornit îți permite să alegi și proiectul beneficiarului; „+ Adaugă proiect” creează unul nou. Când ai ales proiectul, fiecare linie poate fi legată de o componentă a proiectului (sau marcată ca în afara ofertei).
+- Proiect | listă | La destinația Beneficiar proiectul este obligatoriu (nu mai există comutator „Proiect”): îl alegi din proiectele beneficiarului, iar fiecare beneficiar are cel puțin proiectele obligatorii din Nomenclator; „+ Adaugă proiect” creează unul nou. Când ai ales proiectul, fiecare linie poate fi legată de o componentă a proiectului (sau marcată ca în afara ofertei).
 - Autovehicul | listă | Apare la destinația Autovehicul: produsul se mută în vehicul, iar stocul total nu se schimbă.
 - Descriere comună | câmp | Descrierea folosită la liniile care nu au una proprie.
 ### Tabelul de produse

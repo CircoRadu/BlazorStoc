@@ -54,6 +54,7 @@ public static class AuditEntities
     public const string SupplierInvoice = "FacturaFurnizor";
     // Nomenclator -> Tipuri de sisteme.
     public const string SystemType = "TipSistem";
+    public const string BeneficiaryProjectType = "TipProiectObligatoriu";
     public const string MaintenanceComponent = "ComponentaMentenanta";
     // Nomenclator -> Analizor de risc.
     public const string RiskAnalyzer = "AnalizorRisc";
@@ -410,6 +411,12 @@ public static class AuditActions
     public const string ChangeMaintenanceComponentFamily = "Schimbare familie componentă mentenanță";
     public const string AddMaintenanceComponentAlias = "Adăugare denumire alternativă componentă mentenanță";
     public const string RemoveMaintenanceComponentAlias = "Ștergere denumire alternativă componentă mentenanță";
+    public const string AddMandatoryProjectType = "Adăugare tip de proiect obligatoriu";
+    public const string RenameMandatoryProjectType = "Modificare denumire tip de proiect obligatoriu";
+    public const string ActivateMandatoryProjectType = "Activare tip de proiect obligatoriu";
+    public const string DeactivateMandatoryProjectType = "Dezactivare tip de proiect obligatoriu";
+    public const string MoveMandatoryProjectType = "Schimbare ordine tip de proiect obligatoriu";
+    public const string EnsureMandatoryProjects = "Creare proiecte obligatorii la beneficiari";
     public const string AddSystemType = "Adăugare tip de sistem";
     public const string RenameSystemType = "Modificare denumire tip de sistem";
     public const string ActivateSystemType = "Activare tip de sistem";
@@ -475,7 +482,7 @@ public static class AuditActions
             or CreateOfferTemplate or EditOfferTemplate or ActivateOfferTemplate or DeactivateOfferTemplate
             or AddProjectComponent or ChangeProjectComponentState or ArchiveProjectComponent or ReactivateProjectComponent or SetVehicleTarget or RemoveVehicleTarget or SetMinStock or RemoveMinStock or SetProjectDeadline or RemoveProjectDeadline or ReserveStock or ReduceReservation or ReleaseReservation or ReservationConsumed or ReservationReducedByExit or ReservationReleasedByComponent or ComponentExitReturned or ComponentExitLeft or ComponentExitMoved or ComponentExitConsumed
             or AddMaintenanceFamily or RenameMaintenanceFamily or ActivateMaintenanceFamily or DeactivateMaintenanceFamily or MoveMaintenanceFamily or AddMaintenanceComponent or RenameMaintenanceComponent or ActivateMaintenanceComponent or DeactivateMaintenanceComponent or MoveMaintenanceComponent or ChangeMaintenanceComponentFamily or AddMaintenanceComponentAlias or RemoveMaintenanceComponentAlias
-            or AddRiskAnalyzer or EditRiskAnalyzer or CreateInstallerAdministrator or AddSystemType or RenameSystemType or ActivateSystemType or DeactivateSystemType or MoveSystemType or AddSystemTypeAlias or RemoveSystemTypeAlias or DeleteAnafVersion or ActivateAnafVersion or EditAnafAuthSettings or ConnectAnafAuth or RefreshAnafAuth or DisconnectAnafAuth;
+            or AddRiskAnalyzer or EditRiskAnalyzer or CreateInstallerAdministrator or AddSystemType or RenameSystemType or ActivateSystemType or DeactivateSystemType or AddMandatoryProjectType or RenameMandatoryProjectType or ActivateMandatoryProjectType or DeactivateMandatoryProjectType or MoveMandatoryProjectType or EnsureMandatoryProjects or MoveSystemType or AddSystemTypeAlias or RemoveSystemTypeAlias or DeleteAnafVersion or ActivateAnafVersion or EditAnafAuthSettings or ConnectAnafAuth or RefreshAnafAuth or DisconnectAnafAuth;
 
     public static string Normalize(string? action) =>
         string.Equals(action, "Modificare", StringComparison.OrdinalIgnoreCase) ? Edit : action ?? string.Empty;
@@ -542,6 +549,7 @@ public static class AuditNavigation
         // The supplier page (its data and invoices). An invoice event stores the invoice id, which has no page of its own: plain text.
         [AuditEntities.Supplier] = SupplierNavigation.SupplierUrl,
         [AuditEntities.SystemType] = SystemTypeNavigation.PageUrl,
+        [AuditEntities.BeneficiaryProjectType] = _ => "/nomenclator?tab=proiecte-obligatorii",
         [AuditEntities.RiskAnalyzer] = RiskAnalyzerNavigation.PageUrl,
         [AuditEntities.OfferTemplate] = OfferNavigation.TemplateUrl
     };

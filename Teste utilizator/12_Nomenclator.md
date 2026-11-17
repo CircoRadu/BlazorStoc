@@ -4,6 +4,11 @@ Fluxul: Administrare -> Nomenclator (sau cardul de pe pagina principala) -> adau
 
 ## Modificari de testat
 
+### 17.11.2026 - Proiecte obligatorii ale beneficiarilor (tab nou in Nomenclator)
+**Ce s-a adaugat:** tabul "Proiecte obligatorii" din Nomenclator: lista tipurilor de proiect pe care le are fiecare beneficiar (primul tip: "Reparatii sisteme existente"); se pot adauga tipuri, redenumi, muta si dezactiva (nu se sterg).
+**Ce face acum:** fiecare beneficiar are cate un proiect pentru fiecare tip activ: beneficiarii existenti le primesc la pornirea aplicatiei, cei noi la creare, iar un tip nou sau reactivat creeaza proiectul la toti beneficiarii care nu il au. Proiectul obligatoriu nu se redenumeste si nu se sterge din pagina lui (observatiile se pot edita); un beneficiar care are doar proiecte obligatorii nefolosite se poate sterge cu ele.
+Pasi: Nomenclator -> Proiecte obligatorii -> adauga "Test obligatoriu" -> Beneficiari -> un beneficiar -> are proiectul "Test obligatoriu"; creeaza un beneficiar nou -> are proiectele din lista; dezactiveaza tipul -> beneficiarul nou creat dupa aceea nu mai primeste proiectul; incearca sa redenumesti sau sa stergi proiectul obligatoriu din pagina proiectului -> mesaj de refuz.
+
 ### 07.11.2026 - Tabul "Componente mentenanta"
 
 **Ce s-a adaugat:** tab nou in Nomenclator, "Componente mentenanta": familii (ex. Securitate fizica) si componente (discrete sau in familie), cu denumiri alternative, ordine, activ/inactiv si mutarea unei componente intre familii. Tabul "Cuvinte cheie mentenanta" ramane separat.
