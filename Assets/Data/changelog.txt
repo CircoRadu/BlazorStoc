@@ -1,3 +1,8 @@
+## 0.5.94 | 17.11.2026
+### Bugs
+- BUG-0051 – Roata de setări a tabelelor din cardurile pliabile (Categorii) stă în dreapta, prima dintre iconițele rândului, nu lângă mânerul de tragere din stânga.
+- BUG-0052 – Când titlul cardului are un text lung în dreapta, roata de setări trece deasupra antetului tabelului, la margine; regula se aplică tuturor tabelelor.
+
 ## 0.5.93 | 17.11.2026
 ### Funcționalități noi
 - PROP-0033 – Procent de progres la analiza scanării din Preluare inventar: în timp ce se citește documentul apare cât la sută s-a făcut.
