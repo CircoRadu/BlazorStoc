@@ -63,7 +63,7 @@
 }
 else if (busy)
 {
-    <div class="empty-state" role="status"><div class="spinner"></div><h3>Se citește factura…</h3><p>O pagină scanată poate dura câteva secunde.</p></div>
+    <div class="empty-state" role="status"><div class="spinner"></div><h3>Se citește factura…@if (readPercent >= 0) { <span id="invoice-read-percent" class="scan-percent">@readPercent%</span> }</h3>@if (readPercent >= 0) { <ProgressBar Percent="readPercent" Label="Progresul citirii facturii" /> }<p>O pagină scanată poate dura câteva secunde.</p></div>
 }
 else if (loadError is null && session is null)
 {

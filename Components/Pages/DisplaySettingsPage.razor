@@ -7,7 +7,7 @@
 <PageBoundary>
 
 <PageTitle>Setări afișare · BlazorStoc</PageTitle>
-<div class="page-heading"><div><p class="eyebrow">CONTUL MEU</p><h1>Setări afișare</h1><p class="muted">Mărimea elementelor vizuale din aplicație, numai pentru contul tău. Deschide o secțiune ca să vezi previzualizarea ei.</p></div></div>
+<div class="page-heading"><div><p class="eyebrow">CONTUL MEU</p><h1>Setări afișare</h1><p class="muted">Mărimea elementelor vizuale din aplicație, numai pentru contul tău. Modificările se văd mai întâi doar în previzualizările din secțiuni; ele se aplică în aplicație abia după „Aplică modificările”.</p></div></div>
 
 <section class="catalog" id="display-settings">
     <div class="catalog-heading"><h2>Reguli globale</h2></div>
@@ -16,23 +16,23 @@
         <div class="display-presets" role="group" aria-label="Presetări">
             @foreach (var (name, percent) in DisplayRules.Presets)
             {
-                <button type="button" class="refresh act-confirm" title="Setează toate valorile la @percent%" @onclick="() => SaveAsync(DisplayRules.Preset(percent) with { TableGear = global.TableGear })">@name</button>
+                <button type="button" class="refresh act-confirm" title="Setează toate valorile la @percent% (în previzualizare)" @onclick="() => draft = DisplayRules.Preset(percent) with { Palette = draft.Palette, TableGear = draft.TableGear }">@name</button>
             }
         </div>
         <div class="display-table-gear-toggle" id="display-table-gear">
-            <ToggleSwitch Id="display-table-gear-toggle" Value="DisplayRules.ShowTableGear(global)" ValueChanged="v => SaveAsync(global with { TableGear = v })" OnText="On" OffText="Off" AriaLabel="Arată buton particularizare tabel" />
+            <ToggleSwitch Id="display-table-gear-toggle" Value="DisplayRules.ShowTableGear(draft)" ValueChanged="v => draft = draft with { TableGear = v }" OnText="On" OffText="Off" AriaLabel="Arată buton particularizare tabel" />
             <span>Arată buton particularizare tabel</span>
             <small class="muted">Dacă e On, deasupra antetului fiecărui tabel, în dreapta sus, apare iconița cu setările individuale ale tabelului; dacă e Off, iconița este ascunsă. Setările făcute pentru un tabel se păstrează în ambele cazuri.</small>
         </div>
 
         <details class="display-section" id="display-section-text">
-            <summary>Titluri și text</summary>
+            <summary><span>Titluri și text</span><button type="button" class="refresh act-close display-section-reset" disabled="@(draft.Titles is null && draft.Text is null)" title="Readuce secțiunea la valorile implicite (în previzualizare, până aplici modificările)" @onclick="() => ResetText()" @onclick:preventDefault="true" @onclick:stopPropagation="true">Resetează</button></summary>
             <div class="display-section-body">
                 <div class="display-settings-grid">
-                    <PercentSlider Title="Titluri de pagină" AriaLabel="Mărimea titlurilor de pagină" Value="global.Titles" ValueChanged="v => SaveAsync(global with { Titles = v })" />
-                    <PercentSlider Title="Text general și titluri de secțiuni" AriaLabel="Mărimea textului general din pagini" Value="global.Text" ValueChanged="v => SaveAsync(global with { Text = v })" />
+                    <PercentSlider Title="Titluri de pagină" AriaLabel="Mărimea titlurilor de pagină" Value="draft.Titles" ValueChanged="v => { draft = draft with { Titles = v }; }" />
+                    <PercentSlider Title="Text general și titluri de secțiuni" AriaLabel="Mărimea textului general din pagini" Value="draft.Text" ValueChanged="v => { draft = draft with { Text = v }; }" />
                 </div>
-                <div class="display-sample" style="@sampleStyle">
+                <div class="display-sample" style="@sampleStyle" data-palette="@paletteOfDraft">
                     <h1 class="display-sample-heading">Titlu de pagină</h1>
                     <section class="catalog sample-card">
                         <div class="catalog-heading"><h2>Titlu de secțiune <span class="count-badge">3</span></h2><small>Actualizat la 17.11.2026 09:00</small></div>
@@ -44,125 +44,144 @@
                 </div>
             </div>
         </details>
-
         <details class="display-section" id="display-section-tabs">
-            <summary>Taburi</summary>
+            <summary><span>Taburi</span><button type="button" class="refresh act-close display-section-reset" disabled="@(draft.Tabs is null)" title="Readuce secțiunea la valorile implicite (în previzualizare, până aplici modificările)" @onclick="() => ResetTabs()" @onclick:preventDefault="true" @onclick:stopPropagation="true">Resetează</button></summary>
             <div class="display-section-body">
                 <div class="display-settings-grid">
-                    <PercentSlider Title="Text taburi" AriaLabel="Mărimea textului din taburi" Value="global.Tabs" ValueChanged="v => SaveAsync(global with { Tabs = v })" />
+                    <PercentSlider Title="Text taburi" AriaLabel="Mărimea textului din taburi" Value="draft.Tabs" ValueChanged="v => { draft = draft with { Tabs = v }; }" />
                 </div>
-                <div class="display-sample" style="@sampleStyle">
+                <div class="display-sample" style="@sampleStyle" data-palette="@paletteOfDraft">
                     <div class="settings-tabs" role="presentation"><span class="settings-tab active">Active <span class="count-badge">3</span></span><span class="settings-tab">Rezolvate <span class="count-badge">42</span></span><span class="settings-tab needs-attention">Tichete <span class="count-badge">5</span></span></div>
                 </div>
             </div>
         </details>
-
         <details class="display-section" id="display-section-tables">
-            <summary>Tabele</summary>
+            <summary><span>Tabele</span><button type="button" class="refresh act-close display-section-reset" disabled="@(draft.TableText is null && draft.HeaderText is null && draft.Images is null && draft.Icons is null)" title="Readuce secțiunea la valorile implicite (în previzualizare, până aplici modificările)" @onclick="() => ResetTables()" @onclick:preventDefault="true" @onclick:stopPropagation="true">Resetează</button></summary>
             <div class="display-section-body">
                 <div class="display-settings-grid">
-                    <PercentSlider Title="Text tabele" AriaLabel="Mărimea textului din tabele" Value="global.TableText" ValueChanged="v => SaveAsync(global with { TableText = v })" />
-                    <PercentSlider Title="Antet tabele" AriaLabel="Mărimea antetului tabelelor" Value="global.HeaderText" ValueChanged="v => SaveAsync(global with { HeaderText = v })" />
-                    <PercentSlider Title="Imagini din tabele" AriaLabel="Mărimea imaginilor din tabele" Value="global.Images" ValueChanged="v => SaveAsync(global with { Images = v })" />
-                    <PercentSlider Title="Iconițe din tabele" AriaLabel="Mărimea iconițelor din tabele" Value="global.Icons" ValueChanged="v => SaveAsync(global with { Icons = v })" />
+                    <PercentSlider Title="Text tabele" AriaLabel="Mărimea textului din tabele" Value="draft.TableText" ValueChanged="v => { draft = draft with { TableText = v }; }" />
+                    <PercentSlider Title="Antet tabele" AriaLabel="Mărimea antetului tabelelor" Value="draft.HeaderText" ValueChanged="v => { draft = draft with { HeaderText = v }; }" />
+                    <PercentSlider Title="Imagini din tabele" AriaLabel="Mărimea imaginilor din tabele" Value="draft.Images" ValueChanged="v => { draft = draft with { Images = v }; }" />
+                    <PercentSlider Title="Iconițe din tabele" AriaLabel="Mărimea iconițelor din tabele" Value="draft.Icons" ValueChanged="v => { draft = draft with { Icons = v }; }" />
                 </div>
-                <div class="display-sample" id="display-sample" style="@sampleStyle">
+                <div class="display-sample" id="display-sample" style="@sampleStyle" data-palette="@paletteOfDraft">
                     <div class="table-scroll"><table><thead><tr><th>COD PRODUS</th><th>CATEGORIE</th><th class="number">CANTITATE</th><th><span class="sr-only">Acțiuni</span></th></tr></thead>
                         <tbody><tr><td><div class="product-cell"><span class="product-thumbnail" aria-hidden="true"><img alt="" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 10'%3E%3Crect width='10' height='10' fill='%2399b8ae'/%3E%3C/svg%3E" /></span><div><span class="product-name">AC8001</span><small>Exemplu de produs pentru previzualizare</small></div></div></td><td>Incendiu</td><td class="number quantity">86 <small>buc.</small></td><td class="row-actions"><span class="row-icon edit" aria-hidden="true"></span></td></tr></tbody></table></div>
                 </div>
             </div>
         </details>
-
         <details class="display-section" id="display-section-controls">
-            <summary>Butoane și câmpuri</summary>
+            <summary><span>Butoane și câmpuri</span><button type="button" class="refresh act-close display-section-reset" disabled="@(draft.Buttons is null && draft.Fields is null)" title="Readuce secțiunea la valorile implicite (în previzualizare, până aplici modificările)" @onclick="() => ResetControls()" @onclick:preventDefault="true" @onclick:stopPropagation="true">Resetează</button></summary>
             <div class="display-section-body">
                 <div class="display-settings-grid">
-                    <PercentSlider Title="Butoane" AriaLabel="Mărimea butoanelor" Value="global.Buttons" ValueChanged="v => SaveAsync(global with { Buttons = v })" />
-                    <PercentSlider Title="Câmpuri de formular" AriaLabel="Mărimea câmpurilor de formular" Value="global.Fields" ValueChanged="v => SaveAsync(global with { Fields = v })" />
+                    <PercentSlider Title="Butoane" AriaLabel="Mărimea butoanelor" Value="draft.Buttons" ValueChanged="v => { draft = draft with { Buttons = v }; }" />
+                    <PercentSlider Title="Câmpuri de formular" AriaLabel="Mărimea câmpurilor de formular" Value="draft.Fields" ValueChanged="v => { draft = draft with { Fields = v }; }" />
                 </div>
-                <div class="display-sample" style="@sampleStyle">
+                <div class="display-sample" style="@sampleStyle" data-palette="@paletteOfDraft">
                     <div class="editor-actions"><button type="button" class="primary" tabindex="-1">Salvează</button><button type="button" class="refresh act-reload" tabindex="-1">Actualizează</button><button type="button" class="danger" tabindex="-1">Șterge</button></div>
                     <div class="editor-grid sample-row"><label>Câmp de text<input type="text" value="Exemplu" tabindex="-1" /></label><label>Listă de alegere<select tabindex="-1"><option>Prima opțiune</option><option>A doua opțiune</option></select></label></div>
                 </div>
             </div>
         </details>
-
         <details class="display-section" id="display-section-frame">
-            <summary>Meniul principal și bara de sus</summary>
+            <summary><span>Meniul principal și bara de sus</span><button type="button" class="refresh act-close display-section-reset" disabled="@(draft.Menu is null && draft.Topbar is null)" title="Readuce secțiunea la valorile implicite (în previzualizare, până aplici modificările)" @onclick="() => ResetFrame()" @onclick:preventDefault="true" @onclick:stopPropagation="true">Resetează</button></summary>
             <div class="display-section-body">
                 <div class="display-settings-grid">
-                    <PercentSlider Title="Meniul principal (stânga)" AriaLabel="Mărimea meniului principal" Value="global.Menu" ValueChanged="v => SaveAsync(global with { Menu = v })" />
-                    <PercentSlider Title="Bara de sus" AriaLabel="Mărimea barei de sus" Value="global.Topbar" ValueChanged="v => SaveAsync(global with { Topbar = v })" />
+                    <PercentSlider Title="Meniul principal (stânga)" AriaLabel="Mărimea meniului principal" Value="draft.Menu" ValueChanged="v => { draft = draft with { Menu = v }; }" />
+                    <PercentSlider Title="Bara de sus" AriaLabel="Mărimea barei de sus" Value="draft.Topbar" ValueChanged="v => { draft = draft with { Topbar = v }; }" />
                 </div>
-                <div class="display-sample" style="@sampleStyle">
+                <div class="display-sample" style="@sampleStyle" data-palette="@paletteOfDraft">
                     <div class="sample-topbar" aria-hidden="true"><span>Meniu principal › Produse › Stoc</span><span class="sample-pill">Sesiune autentificată</span></div>
                     <div class="sample-menu" aria-hidden="true"><a class="active"><span>▦</span> Produse</a><a><span>▥</span> Inventar</a><a><span>≡</span> Jurnal activitate</a></div>
                 </div>
             </div>
         </details>
-
         <details class="display-section" id="display-section-dialogs">
-            <summary>Ferestre</summary>
+            <summary><span>Ferestre</span><button type="button" class="refresh act-close display-section-reset" disabled="@(draft.Dialogs is null)" title="Readuce secțiunea la valorile implicite (în previzualizare, până aplici modificările)" @onclick="() => ResetDialogs()" @onclick:preventDefault="true" @onclick:stopPropagation="true">Resetează</button></summary>
             <div class="display-section-body">
                 <div class="display-settings-grid">
-                    <PercentSlider Title="Ferestre (dialoguri)" AriaLabel="Mărimea ferestrelor de dialog" Value="global.Dialogs" ValueChanged="v => SaveAsync(global with { Dialogs = v })" />
+                    <PercentSlider Title="Ferestre (dialoguri)" AriaLabel="Mărimea ferestrelor de dialog" Value="draft.Dialogs" ValueChanged="v => { draft = draft with { Dialogs = v }; }" />
                 </div>
-                <div class="display-sample" style="@sampleStyle">
+                <div class="display-sample" style="@sampleStyle" data-palette="@paletteOfDraft">
                     <div class="sample-dialog" aria-hidden="true"><h3>Confirmi ștergerea?</h3><p>Operația nu poate fi anulată.</p><div class="editor-actions"><button type="button" class="danger" tabindex="-1">Șterge</button><button type="button" class="refresh act-close" tabindex="-1">Renunță</button></div></div>
                 </div>
             </div>
         </details>
-
+        <details class="display-section" id="display-section-colors">
+            <summary><span>Culori (tema luminoasă)</span><button type="button" class="refresh act-close display-section-reset" disabled="@(draft.Palette is null)" title="Readuce secțiunea la valorile implicite (în previzualizare, până aplici modificările)" @onclick="() => ResetColors()" @onclick:preventDefault="true" @onclick:stopPropagation="true">Resetează</button></summary>
+            <div class="display-section-body">
+                <p class="form-note muted">Alege o paletă pentru tema luminoasă; toate sunt tonuri calme, apropiate de aspectul original. Tema întunecată nu se schimbă. Paleta se vede în mostre și se aplică în aplicație după „Aplică modificările”.</p>
+                <div class="palette-options" role="radiogroup" aria-label="Paleta de culori">
+                    @foreach (var option in DisplayRules.Palettes)
+                    {
+                        var selected = (draft.Palette ?? "") == option.Id;
+                        <button type="button" role="radio" aria-checked="@(selected ? "true" : "false")" class="palette-option @(selected ? "selected" : "")" data-palette="@(option.Id.Length == 0 ? "implicit" : option.Id)" title="Previzualizează paleta @option.Name" @onclick="() => draft = draft with { Palette = DisplayRules.KnownPalette(option.Id) }">
+                            <span class="palette-name">@option.Name</span>
+                            <span class="palette-mini" aria-hidden="true"><span class="palette-mini-button">Salvează</span><span class="palette-mini-tab">Tab</span><span class="palette-mini-chip">12</span></span>
+                        </button>
+                    }
+                </div>
+            </div>
+        </details>
         @if (!string.IsNullOrEmpty(error)) { <span class="validation-message" role="alert">@error</span> }
+        @if (Pending) { <p class="form-note display-pending" role="status">Ai modificări neaplicate: se văd doar în previzualizări.</p> }
         <div class="editor-actions">
-            <button type="button" class="refresh act-close" disabled="@(global.IsEmpty && !hasTables)" title="Șterge regulile globale și setările tuturor tabelelor: aplicația revine la aspectul implicit" @onclick="ResetAllAsync">Resetează tot</button>
+            <button type="button" class="primary" disabled="@(!Pending || busy)" title="@(Pending ? "Salvează modificările pe contul tău și le aplică în toată aplicația" : "Nu ai modificări de aplicat")" @onclick="ApplyAsync">Aplică modificările</button>
+            <button type="button" class="refresh act-close" disabled="@(draft.IsEmpty && !hasTables && saved.IsEmpty)" title="Readuce toate valorile la cele implicite, inclusiv setările proprii ale tabelelor (în previzualizare, până aplici modificările)" @onclick="ResetAll">Resetează tot</button>
         </div>
     </div>
 </section>
 </PageBoundary>
 
 @code {
-    private DisplaySettings global = new();
-    private bool hasTables;
-    private string error = "", sampleStyle = "";
+    private DisplaySettings saved = new(), draft = new();
+    private bool hasTables, clearTables, busy;
+    private string error = "";
+
+    // The preview follows the draft; the application follows what is saved.
+    private bool Pending => draft != saved || clearTables;
+    private string sampleStyle => DisplayRules.ToStyle(draft);
+    private string paletteOfDraft => string.IsNullOrEmpty(draft.Palette) ? "implicit" : draft.Palette;
 
     protected override async Task OnInitializedAsync() => await LoadAsync();
 
     private async Task LoadAsync()
     {
         var data = await Display.GetAsync();
-        global = data.Global;
+        saved = data.Global;
+        draft = saved;
+        clearTables = false;
         hasTables = data.Tables.Count > 0;
-        sampleStyle = DisplayRules.ToStyle(global);
     }
 
-    private async Task SaveAsync(DisplaySettings settings)
-    {
-        error = "";
-        global = settings;   // at once: a second change made before the save ends builds on this one
-        try { await Display.SaveAsync(DisplayRules.GlobalScope, settings); await LoadAsync(); await ApplyAsync(); }
-        catch (Exception exception) when (exception is not OperationCanceledException)
-        {
-            Logger.LogWarning("Global display settings were not saved ({ErrorType}).", exception.GetType().Name);
-            error = "Setările nu au putut fi salvate.";
-        }
-    }
+    private void ResetText() => draft = draft with { Titles = null, Text = null };
+    private void ResetTabs() => draft = draft with { Tabs = null };
+    private void ResetTables() => draft = draft with { TableText = null, HeaderText = null, Images = null, Icons = null };
+    private void ResetControls() => draft = draft with { Buttons = null, Fields = null };
+    private void ResetFrame() => draft = draft with { Menu = null, Topbar = null };
+    private void ResetDialogs() => draft = draft with { Dialogs = null };
+    private void ResetColors() => draft = draft with { Palette = null };
+    private void ResetAll() { draft = new(); clearTables = hasTables; }
 
-    private async Task ResetAllAsync()
-    {
-        error = "";
-        try { await Display.ClearAllAsync(); await LoadAsync(); await ApplyAsync(); }
-        catch (Exception exception) when (exception is not OperationCanceledException)
-        {
-            Logger.LogWarning("Display settings were not reset ({ErrorType}).", exception.GetType().Name);
-            error = "Setările nu au putut fi șterse.";
-        }
-    }
-
-    // The shell of the page (rendered by the layout) takes the new scale at once.
+    // Saves the draft on the account and puts it on the application (the shell of the page and the palette) at once.
     private async Task ApplyAsync()
     {
-        var pairs = sampleStyle.Split(';', StringSplitOptions.RemoveEmptyEntries).Select(part => part.Split(':', 2)).ToArray();
-        await JS.InvokeVoidAsync("displaySettings.apply", pairs.Select(pair => pair[0].Replace("--ui-", "")).ToArray(), pairs.Select(pair => pair[1]).ToArray());
+        error = "";
+        busy = true;
+        try
+        {
+            if (clearTables) await Display.ClearAllAsync();
+            await Display.SaveAsync(DisplayRules.GlobalScope, draft);
+            await LoadAsync();
+            var pairs = sampleStyle.Split(';', StringSplitOptions.RemoveEmptyEntries).Select(part => part.Split(':', 2)).ToArray();
+            await JS.InvokeVoidAsync("displaySettings.apply", pairs.Select(pair => pair[0].Replace("--ui-", "")).ToArray(), pairs.Select(pair => pair[1]).ToArray());
+            await JS.InvokeVoidAsync("themePalette.set", saved.Palette ?? "");
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            Logger.LogWarning("Display settings were not saved ({ErrorType}).", exception.GetType().Name);
+            error = "Setările nu au putut fi salvate.";
+        }
+        finally { busy = false; }
     }
 }

@@ -1,0 +1,8 @@
+@* The progress of a long operation in percent (Preluare inventar, PROP-0033; the same bar in the reading of invoices and offers). The look is the shared .scan-progress of wwwroot/app.css. *@
+<div class="scan-progress" role="progressbar" aria-label="@Label" aria-valuemin="0" aria-valuemax="100" aria-valuenow="@Clamped"><span style="@($"width:{Clamped}%")"></span></div>
+
+@code {
+    [Parameter] public int Percent { get; set; }
+    [Parameter] public string Label { get; set; } = "Progres";
+    private int Clamped => Math.Clamp(Percent, 0, 100);
+}

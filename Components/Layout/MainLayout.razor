@@ -12,7 +12,7 @@
 @inject NavigationManager Navigation
 @inject ILogger<MainLayout> Logger
 
-<div class="app-shell" style="@($"--sidebar-extra:{SidebarExtra()}px;{displayStyle}")">
+<div class="app-shell" data-palette="@palette" style="@($"--sidebar-extra:{SidebarExtra()}px;{displayStyle}")">
     <aside class="sidebar">
         <a class="brand" href="/"><span class="brand-icon">B</span><span>Blazor<span class="brand-light">Stoc</span><small>ESP · GESTIUNE</small></span></a>
         @if (productSection)
@@ -74,7 +74,7 @@
                 </ChildContent>
             </CollapsibleSection></Authorized></AuthorizeView>
             }
-            <AuthorizeView Policy="perm:categorii.view|beneficiari.view|furnizori.view|facturi.view|vehicule.view|elcomtur.import|nomenclator.view"><Authorized Context="menuSection"><CollapsibleSection Id="administration-menu"
+            <AuthorizeView Policy="perm:categorii.view|beneficiari.view|furnizori.view|facturi.view|vehicule.view|elcomtur.import|nomenclator.view|stoc.view"><Authorized Context="menuSection"><CollapsibleSection Id="administration-menu"
                                 RootClass="administration-menu"
                                 HeaderRowClass="collapsible-header"
                                 ToggleClass="@($"nav-item administration-parent {(administrationSection ? "active" : "")}")"
@@ -84,6 +84,7 @@
                 <ChildContent>
                     <AuthorizeView Policy="perm:categorii.view"><Authorized><NavLink href="/categorii" Match="NavLinkMatch.Prefix">Categorii</NavLink></Authorized></AuthorizeView>
                     <AuthorizeView Policy="perm:beneficiari.view"><Authorized><NavLink href="/beneficiari" Match="NavLinkMatch.Prefix">Beneficiari</NavLink></Authorized></AuthorizeView>
+                    <AuthorizeView Policy="perm:stoc.view"><Authorized><NavLink href="/bonuri-consum" Match="NavLinkMatch.Prefix">Bonuri de consum</NavLink></Authorized></AuthorizeView>
                     @if (Modules.IsAvailable(BlazorStoc.Modules.Suppliers.SuppliersModule.ModuleId))
                     {
                         <AuthorizeView Policy="perm:furnizori.view"><Authorized><NavLink href="/furnizori" Match="NavLinkMatch.Prefix">Furnizori</NavLink></Authorized></AuthorizeView>
@@ -146,11 +147,11 @@
     private readonly CancellationTokenSource lifetime = new();
 
     // The display scale chosen by the signed-in user (Setari afisare), put on the shell as CSS custom properties.
-    private string displayStyle = "";
+    private string displayStyle = "", palette = "";
 
     protected override async Task OnInitializedAsync()
     {
-        displayStyle = await Display.StyleAsync();
+        displayStyle = await Display.StyleAsync(); palette = (await Display.GetAsync()).Global.Palette ?? "";
         Navigation.LocationChanged += LocationChanged;
         // A module stopped or started again (Setări -> Module) changes the menu at once, not at the next navigation.
         Modules.Changed += ModulesChanged;

@@ -62,7 +62,8 @@ public partial class InvoicePickup
             DiscardSession();
             pick = []; finished = false; finalizeNotice = finalizeError = null; ResetInvoiceHeader();   // another file: nothing of the previous pickup applies
             await using var stream = file.OpenReadStream(InvoiceAnalysisRules.MaxFileSizeBytes, lifetime.Token);
-            session = await Analysis.AnalyzeAsync(stream, file.Name, lifetime.Token);
+            readPercent = 0;
+            session = await Analysis.AnalyzeAsync(stream, file.Name, lifetime.Token, new Progress<int>(value => { readPercent = value; _ = InvokeAsync(StateHasChanged); }));
             creatingTemplate = false;
             allTemplates = await Templates.GetAllAsync(lifetime.Token);
             suggestions = InvoiceTemplateSuggestions.Rank(allTemplates, session.Document);
@@ -92,7 +93,7 @@ public partial class InvoicePickup
             error = "Fișierul nu a putut fi citit. Încearcă din nou sau alt fișier.";
             ClearReading();
         }
-        finally { busy = false; }
+        finally { busy = false; readPercent = -1; }
     }
 
     // A template that the file was not matched with (made now, or chosen by hand from the whole list) is added to the proposals and used.

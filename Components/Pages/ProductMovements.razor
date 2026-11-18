@@ -116,7 +116,7 @@ else
                         </div>
                         @if (form.Kind == StockMovementKind.Entry)
                         {
-                            <EntryOriginPicker @ref="originPicker" Model="form" Disabled="saving" Changed="OriginChanged" ReturnableExits="returnables" />
+                            <EntryOriginPicker @ref="originPicker" Model="form" Disabled="saving" Changed="OriginChanged" AllowReturn="@stockIn" ProductId="Id" Vehicles="vehicles" VehicleStocks="vehicleStocks" />
                             <EntryComponentChoice @key="entryChoiceKey" ComponentId="form.ProjectComponentId" ComponentIdChanged="id => form.ProjectComponentId = id" ProductId="Id" Disabled="saving" />
                         }
                         @if (form.Kind == StockMovementKind.Exit)
@@ -293,10 +293,10 @@ else
                                     @if (m.InvoiceNumber is not null)
                                     {
                                         @if (m.SupplierId is { } supplierId && m.SupplierName is not null) { <div><a class="category-table-link" href="@SupplierNavigation.SupplierUrl(supplierId)">@m.SupplierName</a></div> }
-                                        @if (m.SupplierId is { } invoiceSupplierId) { <div><button type="button" class="audit-filter-link category-table-link invoice-info-link" title="Vezi informațiile facturii" @onclick="() => invoiceInfo = (invoiceSupplierId, m.InvoiceNumber!)">Factura: @m.InvoiceNumber</button></div> }
-                                        else { <div>Factura: @m.InvoiceNumber</div> }
+                                        @if (m.SupplierId is { } invoiceSupplierId) { <div><button type="button" class="audit-filter-link category-table-link invoice-info-link" title="Vezi informațiile facturii" @onclick="() => invoiceInfo = (invoiceSupplierId, m.InvoiceNumber!)">Factură: @m.InvoiceNumber</button></div> }
+                                        else { <div>Factură: @m.InvoiceNumber</div> }
                                     }
-                                    else if (m.Kind == StockMovementKind.Entry) { <span class="destination-label">Intrare liberă</span> }
+                                    else if (m.Kind == StockMovementKind.Entry) { <span class="destination-label">@(m.FreeType == FreeEntryType.ReturnFromProject ? "Retur din proiect" : "Intrare liberă")</span> }
                                 </td>
                                 <td>
                                     @if (m.BeneficiaryName is not null)
@@ -304,7 +304,7 @@ else
                                         <div><a class="category-table-link" href="@($"/beneficiari/{m.BeneficiaryId}")">@m.BeneficiaryName</a> <button type="button" class="audit-filter-link filter-hint" title="Filtrează după acest beneficiar" aria-label="Filtrează după acest beneficiar" @onclick="() => FilterByBeneficiaryAsync(m.BeneficiaryId!.Value)">⌕</button></div>
                                         @if (m.ProjectName is not null && m.ProjectId is { } infoProjectId) { <div><button type="button" class="audit-filter-link category-table-link project-info-link" title="Vezi informațiile proiectului" @onclick="() => projectInfo = (m.BeneficiaryId!.Value, m.BeneficiaryName!, infoProjectId, m.ProjectName)">@m.ProjectName</button></div> }
                                     }
-                                    else if (m.Destination is ExitDestination.GenericSale or ExitDestination.StockCorrection or ExitDestination.WarehouseReturn)
+                                    else if (m.Destination is ExitDestination.GenericSale or ExitDestination.StockCorrection or ExitDestination.OtherReason or ExitDestination.WarehouseReturn)
                                     {
                                         <button type="button" class="audit-filter-link destination-label" title="Filtrează după această destinație" @onclick="() => FilterByDestinationAsync(m.Destination!.Value)">@StockMovementRules.DestinationLabel(m.Destination.Value)</button>
                                     }
@@ -324,7 +324,6 @@ else
                                         }
                                         @if (m.Kind == StockMovementKind.Exit && m.OperationId is { } operationId)
                                         {
-                                            <a class="row-icon receipt" target="_blank" rel="noopener" href="@($"/api/iesiri/{operationId}/bon.pdf")" aria-label="Bonul de consum al operației @operationId" title="Bonul de consum al operației @operationId"></a>
                                             @if (!m.IsVoided && stockVoid)
                                             {
                                                 <button class="row-icon void" aria-label="Stornează operația @operationId" title="Stornează operația @operationId" @onclick="() => RequestVoid(m)"></button>

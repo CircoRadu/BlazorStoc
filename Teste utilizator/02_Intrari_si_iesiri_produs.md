@@ -204,3 +204,28 @@ Neverificat încă: legarea de bonul de consum / storno (Task următor).
 1. Deschide mișcările unui produs cu intrări din factură (ex. NV5, filtru intrari / factura). Verifică furnizorul pe primul rând și "Factura: nr" pe al doilea; nu mai e iconita cu lupa la furnizor.
 2. Apasă "Factura: nr": se deschide fereastra cu furnizor (link), număr, dată, cine a preluat-o și intrările din factură; codul de produs este link spre mișcările produsului. Închide cu X sau cu "Închide".
 3. La o ieșire pe proiect, beneficiarul e pe primul rând; apasă proiectul: fereastra arată beneficiar (link), proiect (link) și echipamentele predate (cod produs link, bucăți).
+
+## Modificari de testat - factura, buton spre proiect, coloane (18.11.2026, PROP-0039, PROP-0041, PROP-0042)
+
+**Ce s-a adaugat:** eticheta "Factura: nr"; butonul "Mergi la proiect" in fereastra proiectului; coloanele "Nr. crt." si "Subcategorie" inaintea codului de produs.
+**Ce face acum:** la o intrare cu factura, pe al doilea rand apare "Factura: nr" (link spre fereastra facturii); fereastra proiectului are butonul care o inchide si deschide pagina proiectului; tabelul echipamentelor si sectiunea Consum net din beneficiar au cele doua coloane noi.
+1. Intrari/iesiri produs: o intrare cu factura arata furnizorul pe un rand si "Factura: nr" pe al doilea; apasa-l.
+2. Apasa proiectul unei iesiri: in fereastra apasa "Mergi la proiect".
+3. Verifica coloanele in fereastra proiectului si in Beneficiar -> Consum net.
+
+## Modificari de testat - destinatia "Alt motiv" (18.11.2026)
+
+**Ce s-a adaugat:** a cincea destinatie a ieșirii, "Alt motiv", langa Beneficiar, Autovehicul, Vanzare generica si Corectie stoc.
+**Ce face acum:** o ieșire cu "Alt motiv" nu cere beneficiar, proiect sau vehicul; motivul se scrie in descriere; stocul scade ca la orice ieșire; in tabelul de miscari apare eticheta "Alt motiv" (filtrabila), iar in Jurnal actiunea "Ieșire alt motiv".
+1. Intrari/iesiri produs -> Iesire: alege "Alt motiv", scrie motivul in descriere, adauga: stocul scade, tabelul arata "Alt motiv".
+2. Iesire multipla: aceeasi optiune in destinatie; adauga mai multe produse.
+3. Jurnal: filtreaza dupa actiunea "Ieșire alt motiv".
+
+## Modificari de testat - tabul Retur la intrare (18.11.2026)
+
+**Ce s-a adaugat:** tab "Retur" langa Intrare libera / Factura, cu "Retur din" Beneficiar sau Vehicul; "Primit de la beneficiar / vehicul" a iesit din motivele intrarii libere.
+**Ce face acum:** returul din beneficiar cere beneficiarul si proiectul (doar proiectele unde produsul are cantitate), limiteaza cantitatea la cea din proiect, creste stocul cu o intrare pe produs si propune descrierea "Retur din proiectul X (beneficiar Y)" (o poti rescrie). Returul din vehicul muta produsul din vehicul in depozit (stocul total nu se schimba), limitat la cantitatea din vehicul.
+1. Produs aflat intr-un proiect (iesire spre beneficiar): Intrare -> Retur -> Beneficiar -> alege beneficiarul si proiectul; vezi "In proiect: N buc."; cantitate mai mare decat N este refuzata; cu N sau mai putin se salveaza si stocul creste.
+2. Retur -> Vehicul: apar doar vehiculele care au produsul; returneaza o cantitate: produsul trece in depozit, descrierea propusa se poate rescrie.
+3. Incearca sa storneaza o iesire dupa ce o parte s-a returnat din proiect si returul ar depasi ce ramane: este refuzat.
+4. Echipamente proiect: lista nete (nr. crt., subcategorie, cod, cantitate) si sectiunea "Istoric miscari" (inchisa implicit) cu iesirile si retururile in acelasi tabel.

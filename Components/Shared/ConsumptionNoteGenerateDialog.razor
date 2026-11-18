@@ -1,0 +1,53 @@
+@using BlazorStoc.Services
+@inject IConsumptionNoteRepository Notes
+@inject ILogger<ConsumptionNoteGenerateDialog> Logger
+@* Generates the consumption note of a project (on request, never automatically): the note takes the equipment handed over to the project at this moment. When the project already
+   has notes, the user chooses to keep them as inactive (traceability, the default) or to delete them. *@
+<AppDialog Title="@($"Bon de consum – {ProjectName}")" TitleId="note-generate-title" HelpTopic="bonuri-consum-generare" HelpAbout="Generarea bonului de consum" PanelClass="movement-dialog" OnClose="Cancelled">
+    <p>Se generează un bon de consum cu echipamentele predate proiectului <strong>@ProjectName</strong> (@BeneficiaryName) până acum, cu data fiecărei mișcări.</p>
+    @if (existing > 0)
+    {
+        <fieldset class="destination-group" disabled="@busy">
+            <legend>Bonurile anterioare ale proiectului (@existing)</legend>
+            <div class="destination-options">
+                <label><input type="radio" name="note-previous" id="note-previous-keep" checked="@(!deletePrevious)" @onchange="() => deletePrevious = false" /> Păstrează-le ca inactive</label>
+                <label><input type="radio" name="note-previous" id="note-previous-delete" checked="@deletePrevious" @onchange="() => deletePrevious = true" /> Șterge-le</label>
+            </div>
+        </fieldset>
+    }
+    @if (error is not null) { <div class="error-banner" role="alert">@error</div> }
+    <div class="editor-actions">
+        <button type="button" class="primary" id="note-generate-confirm" disabled="@busy" @onclick="GenerateAsync">@(busy ? "Se generează…" : "Generează bonul")</button>
+        <button type="button" class="refresh act-close" disabled="@busy" @onclick="Cancelled">Renunță</button>
+    </div>
+</AppDialog>
+
+@code {
+    [Parameter, EditorRequired] public int ProjectId { get; set; }
+    [Parameter] public string ProjectName { get; set; } = "";
+    [Parameter] public string BeneficiaryName { get; set; } = "";
+    // How many notes the project has already (any state): the choice is offered only when there are some.
+    [Parameter] public int ExistingNotes { get; set; }
+    [Parameter] public EventCallback<ConsumptionNoteGenerated> Generated { get; set; }
+    [Parameter] public EventCallback Cancelled { get; set; }
+
+    private int existing;
+    private bool busy, deletePrevious;
+    private string? error;
+
+    protected override void OnInitialized() => existing = ExistingNotes;
+
+    private async Task GenerateAsync()
+    {
+        if (busy) return;
+        busy = true; error = null;
+        try { await Generated.InvokeAsync(await Notes.GenerateAsync(ProjectId, deletePrevious)); }
+        catch (Exception exception) when (exception is ConsumptionNoteException or AccessDeniedException) { error = exception.Message; }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            Logger.LogError("Consumption note generation failed ({ErrorType}).", exception.GetType().Name);
+            error = "Bonul de consum nu a putut fi generat. Reîncearcă.";
+        }
+        finally { busy = false; }
+    }
+}

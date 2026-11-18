@@ -9,7 +9,7 @@ public enum StockMovementKind { Exit = 0, Entry = 1 }
 // Where an exit goes (required for every new exit). Exits recorded before this field existed have no destination.
 // Vehicle is a transfer into a vehicle: the product is moved, not used, so the total stock does not change.
 // WarehouseReturn brings pieces back from a vehicle into the warehouse (made from the vehicle page, never from the exit form).
-public enum ExitDestination { Beneficiary = 1, Vehicle = 2, GenericSale = 3, StockCorrection = 4, WarehouseReturn = 5 }
+public enum ExitDestination { Beneficiary = 1, Vehicle = 2, GenericSale = 3, StockCorrection = 4, WarehouseReturn = 5, OtherReason = 6 }
 
 // Quantity of a product held by one vehicle (transfers into it minus what was used from it).
 public sealed record VehicleStock(int VehicleId, string PlateNumber, string Description, int Quantity);
@@ -18,7 +18,7 @@ public sealed record VehicleStock(int VehicleId, string PlateNumber, string Desc
 public sealed record VehicleEquipment(int ProductId, string ProductCode, int Quantity);
 // Why an entry has no invoice. Only AwaitedInvoice is tracked (a notification waits for the invoice); the supplier is required for it and
 // optional for the other kinds.
-public enum FreeEntryType { AwaitedInvoice = 1, Adjustment = 2, FromBeneficiary = 3, Donation = 4, Other = 5 }
+public enum FreeEntryType { AwaitedInvoice = 1, Adjustment = 2, FromBeneficiary = 3, Donation = 4, Other = 5, ReturnFromProject = 6 }
 
 // Why an exit took more than the stock held (optional, never blocks): an entry not yet recorded, or a wrong stock in the database.
 public enum OverStockCause { UnrecordedEntry = 1, WrongStock = 2 }
@@ -26,7 +26,7 @@ public enum OverStockCause { UnrecordedEntry = 1, WrongStock = 2 }
 public sealed record VehicleTransferLine(int ProductId, int Quantity);
 // Moves products out of a vehicle: into another vehicle, or back into the warehouse when TargetVehicleId is null.
 // Lines null means every product the vehicle holds at the moment of the operation, with its whole quantity.
-public sealed record VehicleTransfer(int SourceVehicleId, int? TargetVehicleId, IReadOnlyList<VehicleTransferLine>? Lines = null);
+public sealed record VehicleTransfer(int SourceVehicleId, int? TargetVehicleId, IReadOnlyList<VehicleTransferLine>? Lines = null, string? Description = null, DateOnly? Date = null);
 
 public sealed record StockMovement(int Id, int ProductId, StockMovementKind Kind, int Quantity, DateOnly Date,
     string Description, int? BeneficiaryId, string? BeneficiaryName, int? ProjectId, string? ProjectName,
@@ -150,7 +150,7 @@ public sealed record ReturnableExit(int MovementId, int OperationId, DateOnly Da
     public int Remaining => Quantity - Returned;
 }
 // Consumption of a project or beneficiary per product: what left in exits to it minus what came back in returns.
-public sealed record NetConsumption(int ProductId, string ProductName, int Exited, int Returned)
+public sealed record NetConsumption(int ProductId, string ProductName, int Exited, int Returned, string Subcategory = "")
 {
     public int Net => Exited - Returned;
 }
@@ -255,6 +255,12 @@ public static class StockMovementRules
     public const string OperationMissingMessage = "Operația nu există sau a fost deja stornată.";
     public const string VoidHasReturnsMessage = "Operația are retururi legate de ea: nu se poate storna. Anulează mai întâi returul.";
     public static string VoidVehicleMessage(string plate) => $"Stornarea ar lăsa mașina {plate} cu stoc negativ (produsul a fost deja folosit din ea).";
+    public const string ReturnProjectRequiredMessage = "Alege proiectul din care se face returul.";
+    public const string ProjectNetNegativeMessage = "Operația ar lăsa proiectul cu retururi mai mari decât echipamentele predate. Anulează mai întâi returul.";
+    public static string ReturnFromProjectTooMuchMessage(int remaining) => $"Returul depășește cantitatea produsului rămasă în proiect ({remaining} buc.).";
+    // The description proposed by the tab Retur (the operator can keep it or write another reason).
+    public static string ProjectReturnDescription(string project, string beneficiary) => $"Retur din proiectul {project} (beneficiar {beneficiary})";
+    public static string VehicleReturnDescription(string plate) => $"Retur din vehiculul {plate}";
     public static string ReturnTooMuchMessage(int remaining) => $"Returul depășește cantitatea ieșită și nereturnată ({remaining} buc.).";
     public const string ComponentChoiceMessage = "Produsul apare în mai multe componente ale proiectului: alege componenta sau „în afara ofertei”.";
     public const string ComponentInvalidMessage = "Componenta aleasă nu aparține proiectului sau este scoasă din proiect.";
@@ -361,6 +367,7 @@ public static class StockMovementRules
         ExitDestination.GenericSale => AuditActions.GenericSale,
         ExitDestination.StockCorrection => AuditActions.StockCorrection,
         ExitDestination.WarehouseReturn => AuditActions.ReturnEquipment,
+        ExitDestination.OtherReason => AuditActions.ExitOtherReason,
         _ => AuditActions.Create
     };
     public const string AwaitedSupplierRequiredMessage = "Pentru o factură așteptată alege furnizorul.";
@@ -381,6 +388,7 @@ public static class StockMovementRules
         FreeEntryType.Adjustment => "Inventar / corecție în plus",
         FreeEntryType.FromBeneficiary => "Primit de la beneficiar / vehicul",
         FreeEntryType.Donation => "Donație",
+        FreeEntryType.ReturnFromProject => "Retur din proiect",
         _ => "Altul"
     };
     // What the table shows for an entry without invoice: "Intrare liberă" with its kind when known.
@@ -398,6 +406,7 @@ public static class StockMovementRules
         ExitDestination.Vehicle => "Autovehicul",
         ExitDestination.GenericSale => "Vânzare generică",
         ExitDestination.WarehouseReturn => "Restituire în depozit",
+        ExitDestination.OtherReason => "Alt motiv",
         _ => "Corecție stoc"
     };
 
@@ -509,7 +518,14 @@ public static class StockMovementRules
     // An entry has no beneficiary, project, destination or vehicle; its invoice or its free-entry reason and supplier are checked together.
     private static void CheckEntry(StockMovementInput input, List<string> errors)
     {
-        if (input.BeneficiaryId is not null || input.ProjectId is not null)
+        // A return from a project (the tab Retur) is the only entry that names a beneficiary and a project: what comes back is taken from the equipment of that project.
+        if (input.FreeType == FreeEntryType.ReturnFromProject && input.InvoiceId is null)
+        {
+            if (input.BeneficiaryId is null or <= 0) errors.Add("Alege beneficiarul de la care se face returul.");
+            if (input.ProjectId is null or <= 0) errors.Add(ReturnProjectRequiredMessage);
+            if (input.FreeSupplierId is not null) errors.Add("Un retur din proiect nu are furnizor.");
+        }
+        else if (input.BeneficiaryId is not null || input.ProjectId is not null)
             errors.Add("Beneficiarul și proiectul se pot alege numai la ieșire.");
         if (input.Destination is not null || input.VehicleId is not null || input.SourceVehicleId is not null)
             errors.Add("Destinația și sursa se pot alege numai la ieșire.");

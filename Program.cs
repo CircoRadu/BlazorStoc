@@ -150,13 +150,15 @@ app.MapGet("/health", async (IConfiguration configuration, CancellationToken tok
 }).AllowAnonymous();
 // Polled by every open page (wwwroot/maintenance-watch.js): tells an already-open tab that a backup/restore has
 // started or ended, so it can be moved to the waiting page and brought back. Carries no names or details.
-// Bon de consum / aviz de predare of an exit operation (opens in the browser's PDF viewer).
-app.MapGet("/api/iesiri/{operationId:int}/bon.pdf", async (int operationId, IStockMovementRepository movements, IConsumptionNotePdfWriter writer, CancellationToken token) =>
+// Bon de consum / aviz de predare of a project: a stored consumption note (opens in the browser's PDF viewer; ?descarca=1 offers it as a file).
+app.MapGet("/api/bonuri/{noteId:int}/bon.pdf", async (int noteId, bool? descarca, IConsumptionNoteRepository notes, IConsumptionNotePdfWriter writer, CancellationToken token) =>
 {
     try
     {
-        var operation = await movements.GetOperationAsync(operationId, token);
-        return operation is null ? Results.NotFound() : Results.File(writer.Write(operation, DateTime.Now), "application/pdf");
+        var note = await notes.GetAsync(noteId, token);
+        if (note is null) return Results.NotFound();
+        var bytes = writer.Write(note, DateTime.Now);
+        return descarca == true ? Results.File(bytes, "application/pdf", $"bon-consum-{noteId}.pdf") : Results.File(bytes, "application/pdf");
     }
     catch (AccessDeniedException) { return Results.Forbid(); }
 }).RequireAuthorization(PermissionPolicy.For("stoc.view"));

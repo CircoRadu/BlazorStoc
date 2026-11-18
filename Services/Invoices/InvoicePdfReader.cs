@@ -30,7 +30,7 @@ public sealed record InvoiceReadResult(InvoiceDocument Document, IReadOnlyList<b
 
 public interface IInvoicePdfReader
 {
-    Task<InvoiceReadResult> ReadAsync(Stream pdfStream, CancellationToken cancellationToken = default);
+    Task<InvoiceReadResult> ReadAsync(Stream pdfStream, CancellationToken cancellationToken = default, IProgress<int>? progress = null);
 }
 
 // Reads the words of an invoice PDF with their coordinates, page by page: a page with a text layer is read directly (PdfPig: exact
@@ -48,7 +48,7 @@ public sealed partial class InvoicePdfReader : IInvoicePdfReader, IInvoiceNumber
         language = File.Exists(Path.Combine(tessdataPath, "ron.traineddata")) ? "ron+eng" : "eng";
     }
 
-    public async Task<InvoiceReadResult> ReadAsync(Stream pdfStream, CancellationToken cancellationToken = default)
+    public async Task<InvoiceReadResult> ReadAsync(Stream pdfStream, CancellationToken cancellationToken = default, IProgress<int>? progress = null)
     {
         using var buffered = new MemoryStream();
         await pdfStream.CopyToAsync(buffered, cancellationToken).ConfigureAwait(false);
@@ -57,6 +57,7 @@ public sealed partial class InvoicePdfReader : IInvoicePdfReader, IInvoiceNumber
         var bytes = buffered.ToArray();
         if (!LooksLikePdf(bytes)) throw new InvoiceAnalysisException(InvoiceAnalysisRules.NotAPdfMessage);
 
+        progress?.Report(0);
         var textPages = ReadTextPages(bytes);
         if (textPages.Count > InvoiceAnalysisRules.MaxPages) throw new InvoiceAnalysisException(InvoiceAnalysisRules.TooManyPagesMessage);
 
@@ -65,6 +66,7 @@ public sealed partial class InvoicePdfReader : IInvoicePdfReader, IInvoiceNumber
         for (var index = 0; index < textPages.Count; index++)
         {
             cancellationToken.ThrowIfCancellationRequested();
+            progress?.Report(5 + 90 * index / textPages.Count);   // pages already read; the page in hand is the next step
             var textPage = textPages[index];
             using var preview = Render(bytes, index, InvoiceAnalysisRules.PreviewDpi);
             var previewPng = Encode(preview);
@@ -83,6 +85,7 @@ public sealed partial class InvoicePdfReader : IInvoicePdfReader, IInvoiceNumber
             else { previews.Add(previewPng); pages.Add(textPage); }
         }
         if (pages.All(page => page.Words.Count == 0)) throw new InvoiceAnalysisException(InvoiceAnalysisRules.NoWordsMessage);
+        progress?.Report(100);
         return new InvoiceReadResult(new InvoiceDocument(pages), previews, bytes);
     }
 

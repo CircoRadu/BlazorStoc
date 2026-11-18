@@ -15,6 +15,7 @@
 @inject IExpiryNotificationService NotificationService
 @inject TimeProvider Clock
 @inject ExitFormDraft ExitDraft
+@inject IConsumptionNoteRepository ConsumptionNoteStore
 @inject UnsavedChanges Guard
 @inject IAccessControl Access
 @using BlazorStoc.Modules.Elcomtur
@@ -57,6 +58,7 @@ else if (beneficiary is not null)
         </div>
     </div>
     @if (notice is not null) { <div class="success-banner" role="status">@notice</div> }
+    @if (noteProject is { } generating) { <ConsumptionNoteGenerateDialog @key="generating.Id" ProjectId="generating.Id" ProjectName="@generating.Name" BeneficiaryName="@beneficiary?.Name" ExistingNotes="noteProjectExisting" Generated="NoteGeneratedAsync" Cancelled="() => { noteProject = null; }" /> }
 
     @if (editingBeneficiary)
     {
@@ -199,16 +201,17 @@ else if (beneficiary is not null)
         }
         else
         {
-            <div class="table-scroll"><table><thead><tr><th>PROIECT</th><th>ULTIMA MODIFICARE</th></tr></thead><tbody>
+            <div class="table-scroll"><table><thead><tr><th>PROIECT</th><th>ULTIMA MODIFICARE</th>@if (canNotes) { <th><span class="sr-only">Acțiuni</span></th> }</tr></thead><tbody>
             @foreach (var project in PagedProjects)
             {
-                <tr @key="project.Id"><td><a class="category-table-link" data-restore-scroll href="@($"/proiecte/{project.Id}")"><strong>@project.Name</strong></a></td><td>@project.UpdatedAtUtc.ToLocalTime().ToString("dd.MM.yyyy HH:mm")</td></tr>
+                <tr @key="project.Id"><td><a class="category-table-link" data-restore-scroll href="@($"/proiecte/{project.Id}")"><strong>@project.Name</strong></a></td><td>@project.UpdatedAtUtc.ToLocalTime().ToString("dd.MM.yyyy HH:mm")</td>@if (canNotes) { <td class="row-actions">@if (projectsWithEquipment.Contains(project.Id)) { <button type="button" class="row-icon receipt" aria-label="Generează bon de consum pentru proiectul @project.Name" title="Generează bon de consum pentru proiectul @project.Name" @onclick="() => OpenGenerateNoteAsync(project)"></button> }</td> }</tr>
             }
             </tbody></table></div>
             <AuditPager Id="beneficiary-projects-page-size" Label="Proiecte pe pagină" PageSizes="pageSizes" PageSize="projectPageSize" Page="pageNumber" Total="FilteredProjects.Count" PageChanged="GoToPage" PageSizeChanged="value => { projectPageSize = value; pageNumber = 1; SyncState(); }" />
         }
     </details>
     </section>
+    @if (canNotes) { <ConsumptionNotesSection BeneficiaryId="Id" Refresh="notesRefresh" /> }
     </div>
 
     <div class="section-tab-panel" id="subpanel-bf-balanta" role="tabpanel" aria-labelledby="subtab-bf-balanta" data-tab="balanta" hidden="@(sectionTab != "balanta")">
@@ -255,7 +258,11 @@ else if (beneficiary is not null)
     private string? returnTo;
     private Beneficiary? beneficiary;
     private IReadOnlyList<Project> projects = Array.Empty<Project>();
-    private bool loading = true, projectsLoading, addingProject, editingBeneficiary, canManage, canMaintenance, canRisk;
+    private bool loading = true, projectsLoading, addingProject, editingBeneficiary, canManage, canMaintenance, canRisk, canNotes;
+    private int notesRefresh;
+    private IReadOnlySet<int> projectsWithEquipment = new HashSet<int>();   // the projects with equipment handed over: the others have no button to generate a note
+    private Project? noteProject;
+    private int noteProjectExisting;
     private string? error, notice, workPointError;
     // The additional work points; the main one is derived from the beneficiary itself (WorkPointRules.Primary).
     private static readonly IReadOnlyDictionary<string, Func<WorkPoint, IComparable?>> WorkPointSorts = new Dictionary<string, Func<WorkPoint, IComparable?>> { ["name"] = item => item.Name, ["address"] = item => item.Address, ["phone"] = item => item.Phone, ["contact"] = item => item.ContactPerson, ["description"] = item => item.Description };
@@ -367,11 +374,18 @@ else if (beneficiary is not null)
         });
     }
 
+    private async Task LoadNoteProjectsAsync()
+    {
+        try { projectsWithEquipment = canNotes ? await ConsumptionNoteStore.GetProjectsWithEquipmentAsync(Id, lifetime.Token) : new HashSet<int>(); }
+        catch (Exception exception) when (exception is not OperationCanceledException) { projectsWithEquipment = new HashSet<int>(); }
+    }
+
     private async Task RefreshProjectsAsync()
     {
         try
         {
             projects = await Projects.GetForBeneficiaryAsync(Id, lifetime.Token);
+            await LoadNoteProjectsAsync();
             if (pageNumber > TotalPages) { pageNumber = TotalPages; SyncState(); }
         }
         catch (OperationCanceledException) { }
@@ -386,6 +400,7 @@ else if (beneficiary is not null)
         {
             canManage = await Access.HasModuleWriteAsync("beneficiari", lifetime.Token);
             canMaintenance = await Access.HasModuleWriteAsync("mentenanta", lifetime.Token); canRisk = await Access.HasModuleWriteAsync("analize-risc", lifetime.Token);
+            canNotes = await Access.HasAsync("stoc.view", lifetime.Token);
             var all = await Beneficiaries.GetBeneficiariesAsync(lifetime.Token);
             beneficiary = all.FirstOrDefault(item => item.Id == Id);
             if (beneficiary is null) { error = "Beneficiarul solicitat nu mai există."; return; }
@@ -419,6 +434,7 @@ else if (beneficiary is not null)
         try
         {
             projects = await Projects.GetForBeneficiaryAsync(Id, lifetime.Token);
+            await LoadNoteProjectsAsync();
             if (pageNumber > TotalPages) { pageNumber = TotalPages; SyncState(); }
         }
         catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
@@ -426,6 +442,22 @@ else if (beneficiary is not null)
     }
 
     // The page only shows the beneficiary; the editor is opened by the explicit "Editează" action, never by arriving here.
+    // A consumption note is generated on request from the icon of a project (never automatically).
+    private async Task OpenGenerateNoteAsync(Project project)
+    {
+        notice = null;
+        try { noteProjectExisting = (await ConsumptionNoteStore.GetAllAsync(Id, project.Id, lifetime.Token)).Count; }
+        catch (Exception exception) when (exception is not OperationCanceledException) { noteProjectExisting = 0; }
+        noteProject = project;
+    }
+
+    private Task NoteGeneratedAsync(ConsumptionNoteGenerated result)
+    {
+        noteProject = null; notesRefresh++;
+        notice = $"Bonul de consum nr. {result.Note.Id} a fost generat" + (result.Deactivated > 0 ? $"; bonurile anterioare ale proiectului au rămas inactive ({result.Deactivated})." : result.Deleted > 0 ? $"; bonurile anterioare ale proiectului au fost șterse ({result.Deleted})." : ".");
+        return Task.CompletedTask;
+    }
+
     private Task OpenEditBeneficiaryAsync() { editingBeneficiary = true; beneficiaryEditorKey = Guid.NewGuid(); notice = null; return Task.CompletedTask; }
     private Task CloseEditBeneficiaryAsync() { editingBeneficiary = false; return Task.CompletedTask; }
     private async Task BeneficiarySavedAsync(Beneficiary saved)

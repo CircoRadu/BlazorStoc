@@ -311,6 +311,7 @@ public static class ComponentChecks
         entryContext.JSInterop.Mode = JSRuntimeMode.Loose;
         entryContext.Services.AddLogging();
         entryContext.Services.AddSingleton<ISupplierRepository>(memorySuppliers);
+        entryContext.Services.AddSingleton<IProjectEquipmentRepository>(new FakeProjectEquipment());
         entryContext.Services.AddSingleton<ISupplierInvoiceRepository>(new MemorySupplierInvoiceRepository(memorySuppliers));
         var entryModules = new BlazorStoc.Modules.ModuleRegistry();
         entryModules.Add(new BlazorStoc.Modules.Invoices.InvoicesModule(), new ServiceCollection(), new Microsoft.Extensions.Configuration.ConfigurationBuilder().Build());
@@ -319,9 +320,18 @@ public static class ComponentChecks
         var entryInput = new StockMovementInput { Kind = StockMovementKind.Entry, Date = DateOnly.FromDateTime(DateTime.Today) };
         var origin = entryContext.Render<Components.Shared.EntryOriginPicker>(parameters => parameters.Add(p => p.Model, entryInput));
         check(origin.FindAll("[role=tab]").Count == 3 && origin.Markup.Contains("Preia din PDF"), "Entry origin: three tabs and the separate button for the PDF pickup");
+        // The tab Retur (who may record entries): a fourth tab; the free reasons no longer offer "Primit de la beneficiar / vehicul" nor the return type.
+        var returnInput = new StockMovementInput { Kind = StockMovementKind.Entry, Date = DateOnly.FromDateTime(DateTime.Today) };
+        var withReturn = entryContext.Render<Components.Shared.EntryOriginPicker>(parameters => parameters.Add(p => p.Model, returnInput).Add(p => p.AllowReturn, true).Add(p => p.ProductId, 1));
+        check(withReturn.FindAll("[role=tab]").Count == 4 && withReturn.Find("#add-tab-return").TextContent.Trim() == "Retur" && !withReturn.Markup.Contains("Primit de la beneficiar") && !withReturn.Markup.Contains("Retur din proiect"),
+            "Entry origin: with the right to record entries the tab Retur is offered, and the free reasons do not include the returns");
+        withReturn.Find("#add-tab-return").Click();
+        check(returnInput.FreeType == FreeEntryType.ReturnFromProject && withReturn.Markup.Contains("Retur din *") && withReturn.Find("#add-return-beneficiary").HasAttribute("checked") && withReturn.Markup.Contains("nu există nimic de returnat"),
+            "Entry origin: the tab Retur starts with the return from a beneficiary and says when the product is in no project");
         using var pickupOutContext = new BunitContext();
         pickupOutContext.JSInterop.Mode = JSRuntimeMode.Loose;
         pickupOutContext.Services.AddLogging();
+        pickupOutContext.Services.AddSingleton<IProjectEquipmentRepository>(new FakeProjectEquipment());
         pickupOutContext.Services.AddSingleton<ISupplierRepository>(memorySuppliers);
         pickupOutContext.Services.AddSingleton<ISupplierInvoiceRepository>(new MemorySupplierInvoiceRepository(memorySuppliers));
         var outModules = new BlazorStoc.Modules.ModuleRegistry();
@@ -334,6 +344,7 @@ public static class ComponentChecks
         using var suppliersOutContext = new BunitContext();
         suppliersOutContext.JSInterop.Mode = JSRuntimeMode.Loose;
         suppliersOutContext.Services.AddLogging();
+        suppliersOutContext.Services.AddSingleton<IProjectEquipmentRepository>(new FakeProjectEquipment());
         suppliersOutContext.Services.AddSingleton<ISupplierRepository>(memorySuppliers);
         suppliersOutContext.Services.AddSingleton<ISupplierInvoiceRepository>(new MemorySupplierInvoiceRepository(memorySuppliers));
         var suppliersOut = new BlazorStoc.Modules.ModuleRegistry();

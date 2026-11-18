@@ -27,6 +27,28 @@
         });
     }
 
+    // Colour palette of the light theme (Setari afisare -> Culori): the account keeps it (the shell carries data-palette), this browser caches it so the first paint is right.
+    const paletteKey = "blazorstoc-palette";
+    let palette = storedPalette();
+    function storedPalette() { try { return localStorage.getItem(paletteKey) || ""; } catch (error) { return ""; } }
+    function enforcePalette() {
+        if (palette) { if (root.getAttribute("data-palette") !== palette) root.setAttribute("data-palette", palette); }
+        else if (root.hasAttribute("data-palette")) root.removeAttribute("data-palette");
+    }
+    function setPalette(id) {
+        palette = id || "";
+        try { if (palette) localStorage.setItem(paletteKey, palette); else localStorage.removeItem(paletteKey); } catch (error) { /* storage blocked */ }
+        enforcePalette();
+        // The shell of the page carries the palette rendered by the server (data-palette): left as it is, it keeps the old colours inside the application until the next page load.
+        const shell = document.querySelector(".app-shell");
+        if (shell && (shell.getAttribute("data-palette") || "") !== palette) shell.setAttribute("data-palette", palette);
+    }
+    function adoptPaletteOfAccount() {
+        const shell = document.querySelector(".app-shell");
+        if (shell && (shell.getAttribute("data-palette") || "") !== palette) setPalette(shell.getAttribute("data-palette") || "");
+    }
+    window.themePalette = { set: setPalette };
+
     function apply(theme) {
         chosen = theme;
         try { localStorage.setItem(key, theme); } catch (error) { /* storage blocked: the choice lasts until the page is closed */ }
@@ -38,11 +60,12 @@
         if (event.target instanceof Element && event.target.closest("[data-theme-toggle]")) { event.preventDefault(); apply(chosen === "dark" ? "light" : "dark"); }
     });
     // The attribute is written back at once when a navigation removes it.
-    new MutationObserver(() => { enforce(); reflect(); }).observe(root, { attributes: true, attributeFilter: ["data-theme"] });
+    new MutationObserver(() => { enforce(); enforcePalette(); reflect(); }).observe(root, { attributes: true, attributeFilter: ["data-theme", "data-palette"] });
     // The top bar is drawn again by Blazor (navigation, reconnection): the state of the button is written back.
     new MutationObserver(reflect).observe(document.body, { childList: true, subtree: true });
-    document.addEventListener("DOMContentLoaded", () => { enforce(); reflect(); });
-    if (window.Blazor && Blazor.addEventListener) Blazor.addEventListener("enhancedload", () => { enforce(); reflect(); });
+    document.addEventListener("DOMContentLoaded", () => { enforce(); adoptPaletteOfAccount(); enforcePalette(); reflect(); });
+    if (window.Blazor && Blazor.addEventListener) Blazor.addEventListener("enhancedload", () => { enforce(); adoptPaletteOfAccount(); enforcePalette(); reflect(); });
     enforce();
+    enforcePalette();
     reflect();
 })();

@@ -15,7 +15,7 @@ public static class HelpContents
         ("Inventar", ["inventar"]),
         ("Furnizori și facturi", ["furnizori", "facturi", "preluare-factura"]),
         ("Oferte", ["oferte"]),
-        ("Proiecte, beneficiari și puncte de lucru", ["proiecte", "beneficiari", "puncte-de-lucru"]),
+        ("Proiecte, beneficiari și puncte de lucru", ["proiecte", "beneficiari", "puncte-de-lucru", "bonuri-consum"]),
         ("Mentenanță", ["mentenanta"]),
         ("Analize de risc", ["analize-risc", "analizor-risc"]),
         ("Vehicule", ["vehicule"]),

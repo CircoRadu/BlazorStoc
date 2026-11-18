@@ -51,8 +51,16 @@ public static class DisplayChecks
         var data = new UserDisplayData(global, new Dictionary<string, DisplaySettings> { [DisplayRules.ProductsCatalogScope] = table });
         check(data.For(DisplayRules.ProductsCatalogScope).TableText == 150 && data.For("alt.tabel").TableText == 120, "Display: a table without settings of its own uses the global ones");
 
+        // Colour palettes of the light theme.
+        check(DisplayRules.KnownPalette("salvie") == "salvie" && DisplayRules.KnownPalette("nu-exista") is null && DisplayRules.KnownPalette("") is null && DisplayRules.KnownPalette(null) is null, "Display: only the known palettes are kept");
+        check(DisplayRules.Normalize(new DisplaySettings(Palette: "ceata")).Palette == "ceata" && DisplayRules.FromJson(DisplayRules.ToJson(new DisplaySettings(Palette: "lavanda"))).Palette == "lavanda" && !new DisplaySettings(Palette: "nisip").IsEmpty, "Display: the palette is kept in the settings and in the database");
+        check(DisplayRules.Merge(new DisplaySettings(Palette: "indigo"), new DisplaySettings(TableText: 150)).Palette == "indigo" && DisplayRules.Palettes[0].Id.Length == 0, "Display: the palette comes from the global rules only; the first option is the original look");
+        var palettesCss = StyleSheet("theme-palettes.css");
+        if (palettesCss is not null)
+            foreach (var palette in DisplayRules.Palettes.Where(palette => palette.Id.Length > 0))
+                check(palettesCss.Contains($"[data-palette=\"{palette.Id}\"]", StringComparison.Ordinal), $"Display: the stylesheet of palettes has the palette {palette.Id}");
         // The registry: every scale the settings can emit is applied by a rule of the stylesheet, and every kind of element has its global class (new elements only need the class).
-        var css = StyleSheet();
+        var css = StyleSheet("app.css");
         if (css is null) { check(true, "Display: the stylesheet was not found next to the tests (registry check skipped)"); return; }
         foreach (var name in new[] { "titles", "text", "tabs", "table", "header", "images", "icons", "buttons", "fields", "topbar", "dialogs", "menu" })
             check(css.Contains($"var(--ui-{name},", StringComparison.Ordinal), $"Display: the stylesheet applies the scale --ui-{name}");

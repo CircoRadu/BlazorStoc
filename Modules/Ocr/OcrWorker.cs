@@ -17,7 +17,7 @@ public static class OcrWorker
             {
                 case OcrOperations.InvoiceRead:
                 {
-                    var read = await new InvoicePdfReader(tessdata).ReadAsync(new MemoryStream(pdfBytes)).ConfigureAwait(false);
+                    var read = await new InvoicePdfReader(tessdata).ReadAsync(new MemoryStream(pdfBytes), CancellationToken.None, new FileProgress(Path.Combine(jobFolder, OcrFiles.Progress))).ConfigureAwait(false);
                     for (var index = 0; index < read.PagePreviews.Count; index++)
                         await File.WriteAllBytesAsync(Path.Combine(jobFolder, OcrFiles.Preview(index)), read.PagePreviews[index]).ConfigureAwait(false);
                     await WriteResultAsync(jobFolder, read.Document).ConfigureAwait(false);

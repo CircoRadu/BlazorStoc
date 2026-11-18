@@ -334,7 +334,7 @@ public static class ElcomturChecks
             "Elcomtur firm: shown by name when the automatic import knows the folder, else by the folder");
         // PROP-0038 / PROP-0039: the table of movements shows supplier and invoice on two rows (no magnifier), the invoice and the project open a window with their information.
         var movements = File.ReadAllText(Path.Combine(ProjectRoot(), "Components", "Pages", "ProductMovements.razor"));
-        check(movements.Contains(">Factura: @m.InvoiceNumber</button>", StringComparison.Ordinal) && movements.Contains("<InvoiceInfoDialog ", StringComparison.Ordinal) && !movements.Contains("title=\"Filtrează după acest furnizor\"", StringComparison.Ordinal)
+        check(movements.Contains(">Factură: @m.InvoiceNumber</button>", StringComparison.Ordinal) && movements.Contains("<InvoiceInfoDialog ", StringComparison.Ordinal) && !movements.Contains("title=\"Filtrează după acest furnizor\"", StringComparison.Ordinal)
               && movements.Contains("<ProjectInfoDialog ", StringComparison.Ordinal) && movements.Contains("project-info-link", StringComparison.Ordinal),
             "Movements table: supplier on the first row and \"Factura: nr\" on the second (opens the invoice window), the project opens its information window, no magnifier on the supplier");
         // PROP-0036: the periods of the chart of the evolution.

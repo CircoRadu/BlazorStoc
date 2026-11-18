@@ -1994,6 +1994,8 @@ td.row-actions > .row-toggle { margin-right:10px; }
    ============================================================================================================================================================ */
 .ui-scale-title, .workspace h1 { zoom:var(--ui-titles, 1); }
 .ui-scale-tab, .settings-tab, .settings-subtab, .invoice-page-tab { zoom:var(--ui-tabs, 1); }
+/* A bar of tabs never grows past the page: when the tabs (scaled by Text taburi) do not fit in one row they go on the next row, so the bar has the width of the cards and tables under it. */
+.settings-tabs, .settings-subtabs, .invoice-page-tabs { flex-wrap:wrap; row-gap:4px; }
 .ui-scale-header, th { zoom:var(--ui-header, 1); }
 .ui-scale-cell, td, tbody th, th[scope=row] { zoom:var(--ui-table, 1); }
 td, th { --ui-cell: var(--ui-table, 1); }
@@ -2013,8 +2015,8 @@ td, th { --ui-cell: var(--ui-table, 1); }
 
 /* The gear above a table and its small panel. */
 .display-gear { position:relative; display:inline-block; }
-.display-gear > .gear-button { position:relative; width:32px; height:32px; padding:0; border:1px solid var(--c-c9d6d2); border-radius:6px; background:var(--c-ffffff); color:var(--green); }
-.display-gear > .gear-button::before { content:""; position:absolute; inset:0; margin:auto; width:16px; height:16px; background:currentColor; -webkit-mask:var(--gear-shape) center/contain no-repeat; mask:var(--gear-shape) center/contain no-repeat; }
+.display-gear > .gear-button { position:relative; width:calc(32px * var(--ui-icons, 1)); height:calc(32px * var(--ui-icons, 1)); padding:0; border:1px solid var(--c-c9d6d2); border-radius:6px; background:var(--c-ffffff); color:var(--green); }
+.display-gear > .gear-button::before { content:""; position:absolute; inset:0; margin:auto; width:calc(16px * var(--ui-icons, 1)); height:calc(16px * var(--ui-icons, 1)); background:currentColor; -webkit-mask:var(--gear-shape) center/contain no-repeat; mask:var(--gear-shape) center/contain no-repeat; }
 .display-gear > .gear-button[aria-expanded=true], .display-gear > .gear-button:hover { background:var(--c-eaf4f0); border-color:var(--c-9fc9bd); }
 .display-gear, .table-gear-layer { --gear-shape:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='3'/%3E%3Cpath d='M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z'/%3E%3C/svg%3E"); }
 .display-gear-backdrop { position:fixed; inset:0; z-index:29; }
@@ -2038,6 +2040,8 @@ td, th { --ui-cell: var(--ui-table, 1); }
 .display-section > summary::before { content:"▸"; color:var(--green); transition:transform .15s; }
 .display-section[open] > summary::before { transform:rotate(90deg); }
 .display-section-body { padding:0 18px 18px; }
+.display-section-reset { margin-left:auto; height:30px; min-height:30px; padding:0 12px; font-size:12px; }
+.display-pending { margin:14px 0 0; color:var(--c-a78135); font-weight:600; }
 .sample-topbar { display:flex; align-items:center; justify-content:space-between; gap:12px; height:56px; padding:0 18px; border:1px solid var(--line); border-radius:8px; background:var(--c-ffffff); font-size:12px; color:var(--muted); margin-bottom:12px; }
 .sample-pill { padding:6px 12px; border-radius:6px; background:var(--c-eef3ef); font-size:11px; }
 .sample-menu { width:236px; max-width:100%; padding:10px; border:1px solid var(--line); border-radius:8px; background:var(--c-ffffff); }
@@ -2062,8 +2066,20 @@ td, th { --ui-cell: var(--ui-table, 1); }
 .settings-subtab.balance-ok.active { border-color:var(--green); }
 .settings-subtab.balance-ok .count-badge, .settings-subtab.balance-ok:not(.active) .count-badge { background:var(--green); color:var(--c-ffffff); }.table-gear-layer { position:fixed; inset:0; pointer-events:none; z-index:25; }
 .table-gear-button { position:fixed; width:28px; height:28px; padding:0; pointer-events:auto; opacity:.55; border:1px solid var(--c-c9d6d2); border-radius:6px; background:var(--c-ffffff); color:var(--green); cursor:pointer; }
+/* Colour palettes (Setari afisare -> Culori): each option carries its own palette (data-palette) and draws a small sample with its colours. */
+.palette-options { display:grid; grid-template-columns:repeat(auto-fill, minmax(190px, 1fr)); gap:12px; margin-top:6px; }
+.palette-option { display:flex; flex-direction:column; align-items:flex-start; gap:10px; padding:12px 14px; text-align:left; border:1px solid var(--c-e4eae8); border-radius:10px; background:var(--c-f5f7f6); color:var(--c-192d31); cursor:pointer; }
+.palette-option:hover { border-color:var(--c-9fc9bd); }
+.palette-option.selected { border-color:var(--c-13796a); box-shadow:0 0 0 1px var(--c-13796a); }
+.palette-name { font-size:13px; font-weight:650; }
+.palette-mini { display:flex; align-items:center; gap:8px; }
+.palette-mini-button { padding:6px 12px; border-radius:6px; background:var(--c-13796a); color:#fff; font-size:11px; font-weight:650; }
+.palette-mini-tab { padding:5px 10px; border-bottom:3px solid var(--c-13796a); color:var(--c-13796a); font-size:11px; font-weight:650; }
+.palette-mini-chip { padding:4px 8px; border-radius:5px; background:var(--c-eaf4f0); color:var(--c-13796a); font-size:11px; font-weight:700; }
+.table-gear-layer { position:fixed; inset:0; pointer-events:none; z-index:25; }
+.table-gear-button { position:fixed; width:calc(28px * var(--gear-scale, 1)); height:calc(28px * var(--gear-scale, 1)); padding:0; pointer-events:auto; opacity:.55; border:1px solid var(--c-c9d6d2); border-radius:6px; background:var(--c-ffffff); color:var(--green); cursor:pointer; }
 .table-gear-button:hover, .table-gear-button:focus-visible { opacity:1; background:var(--c-eaf4f0); border-color:var(--c-9fc9bd); }
-.table-gear-button::before { content:""; position:absolute; inset:0; margin:auto; width:14px; height:14px; background:currentColor; -webkit-mask:var(--gear-shape) center/contain no-repeat; mask:var(--gear-shape) center/contain no-repeat; }
+.table-gear-button::before { content:""; position:absolute; inset:0; margin:auto; width:calc(14px * var(--gear-scale, 1)); height:calc(14px * var(--gear-scale, 1)); background:currentColor; -webkit-mask:var(--gear-shape) center/contain no-repeat; mask:var(--gear-shape) center/contain no-repeat; }
 .table-gear-panel { position:fixed; right:auto; z-index:60; }
 .display-sample { margin-top:18px; }
 .display-sample .table-scroll { border:1px solid var(--line); border-radius:8px; }
@@ -2089,3 +2105,17 @@ td, th { --ui-cell: var(--ui-table, 1); }
 /* The strip of the gear of a table (BUG-0053): the page reserves it above the header of the table (JS adds .gear-reserved to the holder; the gear of the products table has its own strip). Off = no strip. */
 .gear-reserved { margin-top:37px; }
 .display-gear-strip { display:flex; justify-content:flex-end; align-items:center; height:28px; margin:6px 0 3px; }
+
+.category-management-card.is-closing .collapsible-details .row-icon { visibility:hidden; }
+/* PROP-0040: add a product to the open subcategory, left of the table gear. */
+.table-tools { display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; }
+.table-tools > .display-gear-strip { margin-left:auto; }
+.add-in-subcategory { display:inline-flex; align-items:center; gap:10px; margin:6px 0 3px 24px; padding:0; border:0; background:none; color:var(--green); font:inherit; font-weight:650; cursor:pointer; }
+.add-in-subcategory:hover:not(:disabled) .row-icon.add { background:var(--c-eaf4f0); border-color:var(--c-9fc9bd); }
+.add-in-subcategory:disabled { opacity:.5; cursor:default; }
+/* Consumption notes: icons download and print, the filters row of Administrare -> Bonuri de consum. */
+.row-icon.download { color:var(--c-4f6b73); --row-icon-shape:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 4v11M7 11l5 5 5-5'/%3E%3Cpath d='M5 20h14'/%3E%3C/svg%3E"); }
+.row-icon.print { color:var(--c-4f6b73); --row-icon-shape:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M7 9V3h10v6'/%3E%3Cpath d='M7 17H4v-7h16v7h-3'/%3E%3Cpath d='M7 14h10v7H7Z'/%3E%3C/svg%3E"); }
+.row-icon.download:hover, .row-icon.print:hover:not(:disabled) { background:var(--c-eaf4f0); border-color:var(--c-9fc9bd); }
+.consumption-notes-filters { display:grid; grid-template-columns:minmax(240px,2fr) minmax(200px,1fr) minmax(200px,1fr); gap:12px; align-items:end; }
+tr.inactive-row td { color:var(--muted); }

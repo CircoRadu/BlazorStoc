@@ -31,7 +31,7 @@ else
 @if (error is not null) { <div class="error-banner" role="alert">@error</div> }
 @if (success is not null)
 {
-    <div class="success-banner" role="status">@success@if (savedOperation is { } savedId) { <text> </text><a class="category-table-link" target="_blank" rel="noopener" href="@($"/api/iesiri/{savedId}/bon.pdf")">Deschide bonul de consum (PDF)</a> }</div>
+    <div class="success-banner" role="status">@success</div>
 }
 
 @if (loading)
@@ -184,7 +184,6 @@ else
     private List<Line> lines = [];
     private IReadOnlyList<ExitLinePreview>? preview;
     private string duplicateReason = "";
-    private int? savedOperation;
 
     private static StockMovementInput NewCommon() => new() { Kind = StockMovementKind.Exit, Date = StockMovementRules.Today, Destination = ExitDestination.Beneficiary };
 
@@ -302,7 +301,7 @@ else
     private async Task CheckAsync()
     {
         if (busy) return;
-        success = null; savedOperation = null; error = LocalError();
+        success = null; error = LocalError();
         if (error is not null) return;
         busy = true;
         try
@@ -328,7 +327,6 @@ else
         try
         {
             var result = await Movements.CreateExitOperationAsync(BuildLines(duplicates), lifetime.Token);
-            savedOperation = result.OperationId;
             success = $"Operația #{result.OperationId} a fost salvată: {result.Movements.Count} {(result.Movements.Count == 1 ? "ieșire" : "ieșiri")}.";
             preview = null; duplicateReason = "";
             common = NewCommon(); projects = []; useProject = false;

@@ -1,3 +1,36 @@
+## 0.6.1 | 18.11.2026
+### Diverse
+- Bonuri de consum: bonul nu se mai generează automat la fiecare ieșire; linkul din Ieșirea multiplă și iconița de bon de pe rândul mișcării au dispărut.
+- Fiecare proiect al unui beneficiar cu echipamente predate are iconița „Generează bon de consum”: bonul are câte un rând pe produs, cu cantitatea netă de acum (ieșiri minus retururi) și data ultimei ieșiri, se generează numai la apăsare și este legat de beneficiar și de proiect. La generare, bonurile anterioare ale proiectului rămân inactive (trasabilitate) sau se șterg, la alegere.
+- Bonurile nu se editează: se văd, se descarcă, se tipăresc sau se șterg, active sau inactive. În pagina beneficiarului, o secțiune pliabilă „Bonuri de consum” le afișează.
+- Pagina nouă Administrare → Bonuri de consum, cu toate bonurile din sistem, căutare care filtrează pe măsură ce scrii și alegere de beneficiar sau proiect. Acțiuni noi în Jurnal: Generare, Dezactivare și Ștergere bon de consum.
+- Actualizarea pornește cu zero bonuri de consum și cu numerotarea de la 1 (tabele noi).
+- Intrări/ieșiri produs: tab nou „Retur” la intrare, cu două opțiuni, Beneficiar și Vehicul. Returul din beneficiar cere proiectul și nu poate depăși cantitatea produsului din proiect; se înregistrează ca intrare pe produs, cu descriere explicită propusă (o poți rescrie). Returul din vehicul mută produsul din vehicul în depozit și nu poate depăși cantitatea din vehicul. „Primit de la beneficiar / vehicul” dispare din motivele intrării libere; retururile vechi rămân.
+- Echipamente proiect: produsele și cantitățile rezultă la deschiderea paginii din ieșirile spre proiect și retururile de pe proiect (nr. crt., subcategorie, cod produs, cantitate); o secțiune pliabilă, închisă implicit, păstrează istoricul mișcărilor proiectului, ieșiri și retururi în același tabel. O ieșire nu se mai poate storna, șterge sau micșora dacă retururile de pe proiect ar depăși ce rămâne.
+
+## 0.5.100 | 18.11.2026
+### Diverse
+- Ieșiri: destinație nouă „Alt motiv”, lângă Beneficiar, Autovehicul, Vânzare generică și Corecție stoc, în formularul de ieșire și în Ieșirea multiplă; nu cere beneficiar, proiect sau vehicul, motivul se scrie în descriere; în Jurnal apare ca „Ieșire alt motiv”.
+
+## 0.5.99 | 18.11.2026
+### Diverse
+- Setări afișare, Culori: tema aleasă se aplică imediat în toată aplicația după „Aplică modificările”, fără reîncărcarea paginii.
+
+## 0.5.98 | 18.11.2026
+### Diverse
+- Setări afișare, Culori: 6 palete noi, mai deschise, câte două pentru galben (Lămâie, Chihlimbar deschis), roșiatic (Coral, Zmeură pală) și verde (Primăvară, Măr verde); în total 20 de palete, pe lângă tema originală.
+
+## 0.5.97 | 18.11.2026
+### Functionalitati noi
+- PROP-0040 – Pe pagina de produse, când e aleasă o subcategorie, apare deasupra tabelului butonul „Adaugă produs în <subcategorie>", cu iconiță, pentru toate subcategoriile.
+- PROP-0041 – Fereastra proiectului (din Intrări/ieșiri) are butonul „Mergi la proiect", care o închide și deschide pagina proiectului.
+- PROP-0042 – Tabelul echipamentelor proiectului și secțiunea „Consum net" din beneficiar au coloanele „Nr. crt." și „Subcategorie" înaintea codului de produs.
+### Diverse
+- Setări afișare: secțiunea „Culori (tema luminoasă)" cu 14 palete calme (6 existente și 8 noi, pale: Mentă, Fistic, Gheață, Cer senin, Liliac, Trandafir pudrat, Piersică, Mușețel), pe lângă tema originală.
+- Indicator de progres în procente la citirea unui PDF de factură (Preluare factură și Șabloane facturi) și la încărcarea fișierului de ofertă (Preluare ofertă și Șabloane ofertă), ca la Preluare inventar.
+- Intrări/ieșiri produs: eticheta facturii este scrisă „Factură: nr" (PROP-0039).
+- La restrângerea unei categorii din Categorii și subcategorii, iconițele (rotița de parametri ș.a.) de pe rândurile subcategoriilor sunt ascunse înainte de colaps, deci nu mai rămâne pe ecran o iconiță fantomă peste categoria închisă.
+
 ## 0.5.96 | 17.11.2026
 ### Diverse
 - Pachet nou cu aceleași schimbări ca 0.5.95 (roata de setări a tabelelor în rând rezervat deasupra antetului, istoricul balanței Elcomtur), după republicarea de probă a aplicației.

@@ -65,9 +65,9 @@
             }
         </div>
     }
-    else if (Model.Destination is ExitDestination.GenericSale or ExitDestination.StockCorrection)
+    else if (Model.Destination is ExitDestination.GenericSale or ExitDestination.StockCorrection or ExitDestination.OtherReason)
     {
-        <small class="form-note">@(Model.Destination == ExitDestination.GenericSale ? "Vânzare fără beneficiar sau proiect." : "Corecție a stocului, fără beneficiar, proiect sau vehicul.")</small>
+        <small class="form-note">@(Model.Destination == ExitDestination.GenericSale ? "Vânzare fără beneficiar sau proiect." : Model.Destination == ExitDestination.OtherReason ? "Ieșire dintr-un alt motiv, fără beneficiar, proiect sau vehicul: scrie motivul în descriere." : "Corecție a stocului, fără beneficiar, proiect sau vehicul.")</small>
     }
 
     @if (ShowSource)
@@ -117,7 +117,7 @@
 
 @code {
     private static readonly ExitDestination[] Destinations =
-        [ExitDestination.Beneficiary, ExitDestination.Vehicle, ExitDestination.GenericSale, ExitDestination.StockCorrection];
+        [ExitDestination.Beneficiary, ExitDestination.Vehicle, ExitDestination.GenericSale, ExitDestination.StockCorrection, ExitDestination.OtherReason];
 
     [Parameter, EditorRequired] public string Prefix { get; set; } = "";
     [Parameter, EditorRequired] public StockMovementInput Model { get; set; } = new();

@@ -9,10 +9,12 @@
     <section class="catalog net-consumption" aria-label="Consum net">
         <details class="catalog-collapse" open="@StartOpen"><summary class="catalog-heading"><h2>Consum net <span>@rows.Count</span></h2><small>Ieșiri minus retururi legate de ele, pe produs</small></summary>
         <Paged Items="rows" Id="net-consumption-page-size" Context="pageRows">
-        <div class="table-scroll"><table><thead><tr><th>PRODUS</th><th class="number">IEȘIRI</th><th class="number">RETURURI</th><th class="number">CONSUM NET</th></tr></thead><tbody>
+        <div class="table-scroll"><table><thead><tr><th class="number">NR. CRT.</th><th>SUBCATEGORIE</th><th>PRODUS</th><th class="number">IEȘIRI</th><th class="number">RETURURI</th><th class="number">CONSUM NET</th></tr></thead><tbody>
         @foreach (var row in pageRows)
         {
             <tr @key="row.ProductId">
+                <td class="number">@(rows.ToList().IndexOf(row) + 1)</td>
+                <td>@row.Subcategory</td>
                 <td><a class="category-table-link" href="@StockMovementNavigation.ProductUrl(row.ProductId)"><strong>@row.ProductName</strong></a></td>
                 <td class="number">@row.Exited</td>
                 <td class="number">@row.Returned</td>

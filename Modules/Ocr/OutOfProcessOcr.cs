@@ -20,7 +20,7 @@ internal sealed class OutOfProcessInvoicePdfReader(OcrWorkerRunner runner, Modul
 {
     private static Exception Failed(string message) => new InvoiceAnalysisException(message);
 
-    public async Task<InvoiceReadResult> ReadAsync(Stream pdfStream, CancellationToken cancellationToken = default)
+    public async Task<InvoiceReadResult> ReadAsync(Stream pdfStream, CancellationToken cancellationToken = default, IProgress<int>? progress = null)
     {
         using var buffered = new MemoryStream();
         await pdfStream.CopyToAsync(buffered, cancellationToken).ConfigureAwait(false);
@@ -33,7 +33,7 @@ internal sealed class OutOfProcessInvoicePdfReader(OcrWorkerRunner runner, Modul
             var pictures = new List<byte[]>();
             for (var index = 0; File.Exists(Path.Combine(folder, OcrFiles.Preview(index))); index++) pictures.Add(File.ReadAllBytes(Path.Combine(folder, OcrFiles.Preview(index))));
             return (read, pictures);
-        }, cancellationToken), Failed).ConfigureAwait(false);
+        }, cancellationToken, progress), Failed).ConfigureAwait(false);
         return new InvoiceReadResult(document, previews, bytes);
     }
 
@@ -65,7 +65,7 @@ internal sealed class OutOfProcessInventoryPickupOcrService(OcrWorkerRunner runn
 // Stand-ins while the module is switched off or did not start: the pages that inject the readers are still created and say that recognition is out.
 internal sealed class UnavailableInvoicePdfReader : IInvoicePdfReader
 {
-    public Task<InvoiceReadResult> ReadAsync(Stream pdfStream, CancellationToken cancellationToken = default) =>
+    public Task<InvoiceReadResult> ReadAsync(Stream pdfStream, CancellationToken cancellationToken = default, IProgress<int>? progress = null) =>
         Task.FromException<InvoiceReadResult>(new InvoiceAnalysisException(OcrRules.UnavailableMessage));
 }
 

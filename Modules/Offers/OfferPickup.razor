@@ -47,6 +47,7 @@ else if (step == 1)
     <section class="catalog">
         <div class="catalog-heading"><h2>1. Fișierul ofertei</h2></div>
         <FileDropZone Id="offer-file" Accept=".xlsx" Disabled="busy" OnChange="FileChosenAsync" Text="Trage aici devizul-ofertă .xlsx sau alege-l" />
+        @if (busy && uploadPercent >= 0) { <div class="catalog-body" role="status"><p class="muted">Se încarcă fișierul… <span id="offer-upload-percent" class="scan-percent">@uploadPercent%</span></p><ProgressBar Percent="uploadPercent" Label="Progresul încărcării fișierului" /></div> }
         @if (workbook is not null)
         {
             @if (templates.Count == 0)
@@ -235,6 +236,7 @@ else if (step == 5)
     private static readonly (int, string)[] Steps = [(1, "Fișier"), (2, "Beneficiar"), (3, "Proiect"), (4, "Linii"), (5, "Rezumat")];
     private readonly CancellationTokenSource lifetime = new();
     private bool loading = true, busy, templateFits = true, recognizedByAlias, rememberAlias = true, newProject, addingBeneficiary;
+    private int uploadPercent = -1;   // the share of the chosen file already received (-1: no upload in progress)
     private int step = 1, maxStep = 1;
     private string? error;
     private string fileName = "", number = "", title = "", category = "", beneficiaryText = "", newProjectName = "";
@@ -309,7 +311,7 @@ else if (step == 5)
         catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
         catch (Exception ex) when (ex is OfferException or XlsxFormatException or AccessDeniedException or ProjectOperationException or ProjectComponentException) { error = ex.Message; }
         catch (Exception ex) { Logger.LogError("Offer pickup failed ({ErrorType}).", ex.GetType().Name); error = "Operația nu a putut fi făcută. Reîncearcă."; }
-        finally { busy = false; }
+        finally { busy = false; uploadPercent = -1; }
     }
 
     private Task FileChosenAsync(InputFileChangeEventArgs args) => Run(async () =>
@@ -318,7 +320,8 @@ else if (step == 5)
         if (!file.Name.EndsWith(".xlsx", StringComparison.OrdinalIgnoreCase)) throw new XlsxFormatException(XlsxReader.NotXlsxMessage);
         await using var input = file.OpenReadStream(MaxFileBytes, lifetime.Token);
         using var memory = new MemoryStream();
-        await input.CopyToAsync(memory, lifetime.Token);
+        await StreamProgress.CopyAsync(input, memory, file.Size, new Progress<int>(value => { uploadPercent = value; _ = InvokeAsync(StateHasChanged); }), lifetime.Token);
+        uploadPercent = -1;
         memory.Position = 0;
         workbook = XlsxReader.Read(memory);
         fileName = file.Name; maxStep = 1;

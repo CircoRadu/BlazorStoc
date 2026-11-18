@@ -1,0 +1,97 @@
+@using BlazorStoc.Services
+@inject IConsumptionNoteRepository Notes
+@inject IJSRuntime JS
+@inject ILogger<ConsumptionNotesTable> Logger
+@* The table of consumption notes (the beneficiary page and Administrare -> Bonuri de consum). A note is not edited: it is viewed, downloaded, printed or deleted
+   (every note, active or inactive). The icons are the only operations of a row. *@
+@if (error is not null) { <div class="error-banner" role="alert">@error</div> }
+@if (Items.Count == 0)
+{
+    <div class="empty-state compact"><p>@EmptyText</p></div>
+}
+else
+{
+    <Paged Items="Items" Id="@($"{IdPrefix}-page-size")" Context="pageRows" Sorts="Sorts" DefaultSortKey="number" DefaultDescending="true">
+        <div class="table-scroll"><table id="@($"{IdPrefix}-table")"><thead><tr>
+            <SortTh Key="number">NR. BON</SortTh><SortTh Key="date">DATA</SortTh>
+            @if (ShowBeneficiary) { <SortTh Key="beneficiary">BENEFICIAR</SortTh> }
+            <SortTh Key="project">PROIECT</SortTh><SortTh Key="state">STARE</SortTh><SortTh Key="lines">LINII</SortTh><SortTh Key="operator">OPERATOR</SortTh>
+            <th><span class="sr-only">Acțiuni</span></th></tr></thead><tbody>
+        @foreach (var note in pageRows)
+        {
+            <tr @key="note.Id" class="@(note.Active ? null : "inactive-row")">
+                <td><strong>@note.Id</strong></td>
+                <td>@StockMovementRules.DisplayDate(note.Date)</td>
+                @if (ShowBeneficiary) { <td><a class="category-table-link" href="@($"/beneficiari/{note.BeneficiaryId}")">@note.BeneficiaryName</a></td> }
+                <td><a class="category-table-link" href="@($"/proiecte/{note.ProjectId}")">@note.ProjectName</a></td>
+                <td><span class="stock-badge @(note.Active ? "" : "negative")">@(note.Active ? "Activ" : "Inactiv")</span></td>
+                <td class="number">@note.LineCount</td>
+                <td>@note.Operator</td>
+                <td class="row-actions">
+                    <a class="row-icon view" target="_blank" rel="noopener" href="@($"/api/bonuri/{note.Id}/bon.pdf")" aria-label="Vezi bonul de consum nr. @note.Id" title="Vezi bonul de consum nr. @note.Id"></a>
+                    <a class="row-icon download" href="@($"/api/bonuri/{note.Id}/bon.pdf?descarca=true")" download="@($"bon-consum-{note.Id}.pdf")" aria-label="Descarcă bonul de consum nr. @note.Id" title="Descarcă bonul de consum nr. @note.Id"></a>
+                    <button type="button" class="row-icon print" aria-label="Tipărește bonul de consum nr. @note.Id" title="Tipărește bonul de consum nr. @note.Id" @onclick="() => PrintAsync(note)"></button>
+                    <button type="button" class="row-icon delete" disabled="@busy" aria-label="Șterge bonul de consum nr. @note.Id" title="Șterge bonul de consum nr. @note.Id" @onclick="() => deleting = note"></button>
+                </td>
+            </tr>
+        }
+        </tbody></table></div>
+    </Paged>
+}
+@if (deleting is { } shown)
+{
+    <AppDialog PanelClass="delete-confirmation-dialog" TitleId="note-delete-title" Title="@($"Ștergi bonul de consum nr. {shown.Id}?")" OnClose="CancelDelete">
+        <p>Bonul de consum nr. @shown.Id (@shown.ProjectName, @StockMovementRules.DisplayDate(shown.Date)) se șterge definitiv; numărul lui nu se reutilizează. Operația se înregistrează în jurnal.</p>
+        <div class="editor-actions">
+            <button type="button" class="danger" id="note-delete-confirm" disabled="@busy" @onclick="ConfirmDeleteAsync">Șterge bonul</button>
+            <button type="button" class="refresh act-close" disabled="@busy" @onclick="CancelDelete">Renunță</button>
+        </div>
+    </AppDialog>
+}
+
+@code {
+    [Parameter, EditorRequired] public IReadOnlyList<ConsumptionNote> Items { get; set; } = [];
+    [Parameter] public bool ShowBeneficiary { get; set; }
+    [Parameter] public string IdPrefix { get; set; } = "consumption-notes";
+    [Parameter] public string EmptyText { get; set; } = "Nu există bonuri de consum.";
+    [Parameter] public EventCallback Changed { get; set; }
+
+    private ConsumptionNote? deleting;
+    private bool busy;
+    private string? error;
+
+    private static readonly IReadOnlyDictionary<string, Func<ConsumptionNote, IComparable?>> Sorts = new Dictionary<string, Func<ConsumptionNote, IComparable?>>
+    {
+        ["number"] = note => note.Id, ["date"] = note => note.Date, ["beneficiary"] = note => note.BeneficiaryName, ["project"] = note => note.ProjectName,
+        ["state"] = note => note.Active ? 0 : 1, ["lines"] = note => note.LineCount, ["operator"] = note => note.Operator
+    };
+
+    private async Task PrintAsync(ConsumptionNote note)
+    {
+        try { await JS.InvokeVoidAsync("consumptionNotes.print", $"/api/bonuri/{note.Id}/bon.pdf"); }
+        catch (JSException) { error = "Bonul nu a putut fi trimis la tipărire. Deschide-l și tipărește-l din vizualizator."; }
+    }
+
+    private void CancelDelete() { if (!busy) deleting = null; }
+
+    private async Task ConfirmDeleteAsync()
+    {
+        if (deleting is not { } note || busy) return;
+        busy = true; error = null;
+        try
+        {
+            await Notes.DeleteAsync(note.Id);
+            deleting = null;
+            await Changed.InvokeAsync();
+        }
+        catch (ConsumptionNoteException exception) { error = exception.Message; deleting = null; await Changed.InvokeAsync(); }
+        catch (AccessDeniedException exception) { error = exception.Message; deleting = null; }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            Logger.LogError("Consumption note deletion failed ({ErrorType}).", exception.GetType().Name);
+            error = "Bonul nu a putut fi șters. Reîncearcă.";
+            deleting = null;
+        }
+        finally { busy = false; }
+    }
+}

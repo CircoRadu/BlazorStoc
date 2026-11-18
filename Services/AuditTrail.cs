@@ -55,6 +55,7 @@ public static class AuditEntities
     // Nomenclator -> Tipuri de sisteme.
     public const string SystemType = "TipSistem";
     public const string BeneficiaryProjectType = "TipProiectObligatoriu";
+    public const string ConsumptionNote = "BonConsum";
     public const string MaintenanceComponent = "ComponentaMentenanta";
     // Nomenclator -> Analizor de risc.
     public const string RiskAnalyzer = "AnalizorRisc";
@@ -236,6 +237,7 @@ public static class AuditActions
     public const string ExitToVehicle = "Ieșire spre vehicul";
     public const string GenericSale = "Vânzare generică";
     public const string StockCorrection = "Corecție stoc";
+    public const string ExitOtherReason = "Ieșire alt motiv";
     public const string DuplicateExit = "Ieșire dublată (confirmat)";
     public const string ImportOffer = "Preluare ofertă";
     public const string ReviseOffer = "Revizie ofertă";
@@ -412,6 +414,9 @@ public static class AuditActions
     public const string AddMaintenanceComponentAlias = "Adăugare denumire alternativă componentă mentenanță";
     public const string RemoveMaintenanceComponentAlias = "Ștergere denumire alternativă componentă mentenanță";
     public const string AddMandatoryProjectType = "Adăugare tip de proiect obligatoriu";
+    public const string GenerateConsumptionNote = "Generare bon de consum";
+    public const string DeactivateConsumptionNote = "Dezactivare bon de consum";
+    public const string DeleteConsumptionNote = "Ștergere bon de consum";
     public const string RenameMandatoryProjectType = "Modificare denumire tip de proiect obligatoriu";
     public const string ActivateMandatoryProjectType = "Activare tip de proiect obligatoriu";
     public const string DeactivateMandatoryProjectType = "Dezactivare tip de proiect obligatoriu";
@@ -432,6 +437,7 @@ public static class AuditActions
     public const string ActivateAnafVersion = "Activare versiune configurație ANAF";
     public const string VoidExitOperation = "Stornare operație de ieșire";
     public const string ReturnFromBeneficiary = "Retur de la beneficiar";
+    public const string ReturnFromProject = "Retur din proiect";
     // The system records when a module is taken out of service after repeated failures and when it comes back; the administrator's "try again" is recorded under his name.
     public const string ModuleDisabled = "Oprire modul";
     public const string ModuleRecovered = "Revenire modul";
@@ -476,13 +482,13 @@ public static class AuditActions
             or CreateInvoiceTemplate or EditInvoiceTemplate or EditInvoiceTemplateDetails or ActivateInvoiceTemplate or DeactivateInvoiceTemplate or RenameInvoiceTemplateSupplier or LinkInvoiceTemplateSupplier
             or CreateSupplier or EditSupplier or RecheckSupplier or RecordSupplierInvoice or EditSupplierInvoiceNumber or EditSupplierInvoiceDate or MoveSupplierInvoice or AddSupplierAlias or RemoveSupplierAlias or LinkSupplierProductCode or ChangeSupplierProductCode
             or RecordFreeEntry or AttachEntryToInvoice or DetachEntryFromInvoice or DuplicateEntryOnInvoice or RegularizeNegativeStock or ExitOverStock
-            or ExitToBeneficiary or ExitToVehicle or GenericSale or StockCorrection or DuplicateExit or VoidExitOperation or ReturnFromBeneficiary
+            or ExitToBeneficiary or ExitToVehicle or GenericSale or StockCorrection or ExitOtherReason or DuplicateExit or VoidExitOperation or ReturnFromBeneficiary or ReturnFromProject
             or ImportOffer or ReviseOffer or LinkOfferLine or AddBeneficiaryAlias
             or CreateUserTask or EditUserTask or EditUserTaskDueDate or EditUserTaskPriority or MoveUserTask or ChangeUserTaskStatus or EditUserTaskNote or ReorderUserTasks or AcceptUserTask or AddUserTaskFile or DeleteUserTaskFile
             or CreateOfferTemplate or EditOfferTemplate or ActivateOfferTemplate or DeactivateOfferTemplate
             or AddProjectComponent or ChangeProjectComponentState or ArchiveProjectComponent or ReactivateProjectComponent or SetVehicleTarget or RemoveVehicleTarget or SetMinStock or RemoveMinStock or SetProjectDeadline or RemoveProjectDeadline or ReserveStock or ReduceReservation or ReleaseReservation or ReservationConsumed or ReservationReducedByExit or ReservationReleasedByComponent or ComponentExitReturned or ComponentExitLeft or ComponentExitMoved or ComponentExitConsumed
             or AddMaintenanceFamily or RenameMaintenanceFamily or ActivateMaintenanceFamily or DeactivateMaintenanceFamily or MoveMaintenanceFamily or AddMaintenanceComponent or RenameMaintenanceComponent or ActivateMaintenanceComponent or DeactivateMaintenanceComponent or MoveMaintenanceComponent or ChangeMaintenanceComponentFamily or AddMaintenanceComponentAlias or RemoveMaintenanceComponentAlias
-            or AddRiskAnalyzer or EditRiskAnalyzer or CreateInstallerAdministrator or AddSystemType or RenameSystemType or ActivateSystemType or DeactivateSystemType or AddMandatoryProjectType or RenameMandatoryProjectType or ActivateMandatoryProjectType or DeactivateMandatoryProjectType or MoveMandatoryProjectType or EnsureMandatoryProjects or MoveSystemType or AddSystemTypeAlias or RemoveSystemTypeAlias or DeleteAnafVersion or ActivateAnafVersion or EditAnafAuthSettings or ConnectAnafAuth or RefreshAnafAuth or DisconnectAnafAuth;
+            or GenerateConsumptionNote or AddRiskAnalyzer or EditRiskAnalyzer or CreateInstallerAdministrator or AddSystemType or RenameSystemType or ActivateSystemType or DeactivateSystemType or AddMandatoryProjectType or RenameMandatoryProjectType or ActivateMandatoryProjectType or DeactivateMandatoryProjectType or MoveMandatoryProjectType or EnsureMandatoryProjects or MoveSystemType or AddSystemTypeAlias or RemoveSystemTypeAlias or DeleteAnafVersion or ActivateAnafVersion or EditAnafAuthSettings or ConnectAnafAuth or RefreshAnafAuth or DisconnectAnafAuth;
 
     public static string Normalize(string? action) =>
         string.Equals(action, "Modificare", StringComparison.OrdinalIgnoreCase) ? Edit : action ?? string.Empty;
@@ -550,6 +556,7 @@ public static class AuditNavigation
         [AuditEntities.Supplier] = SupplierNavigation.SupplierUrl,
         [AuditEntities.SystemType] = SystemTypeNavigation.PageUrl,
         [AuditEntities.BeneficiaryProjectType] = _ => "/nomenclator?tab=proiecte-obligatorii",
+        [AuditEntities.ConsumptionNote] = _ => "/bonuri-consum",
         [AuditEntities.RiskAnalyzer] = RiskAnalyzerNavigation.PageUrl,
         [AuditEntities.OfferTemplate] = OfferNavigation.TemplateUrl
     };

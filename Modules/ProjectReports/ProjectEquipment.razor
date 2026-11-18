@@ -6,6 +6,7 @@
 @using BlazorStoc.Services
 @inject IProjectRepository Repository
 @inject IStockMovementRepository Movements
+@inject IProjectEquipmentRepository Equipment
 @inject ILogger<ProjectEquipment> Logger
 @implements IDisposable
 <PageBoundary>
@@ -23,35 +24,66 @@ else if (error is not null)
 else if (project is not null)
 {
     <a class="nav-back" href="@($"/proiecte/{Id}")"><span>←</span> @project.Name</a>
-    <div class="page-heading"><div><p class="eyebrow">PROIECT · @project.Name</p><h1>Echipamente</h1><p class="muted">Materiale și echipamente scoase din inventar pentru acest proiect.</p></div></div>
-    <NetConsumptionSection ProjectId="Id" />
-    <section class="catalog">
-        @if (movements.Count == 0)
+    <div class="page-heading"><div><p class="eyebrow">PROIECT · @project.Name</p><h1>Echipamente</h1><p class="muted">Produsele și cantitățile din proiect, așa cum rezultă acum din ieșirile spre proiect și din retururile de pe proiect.</p></div></div>
+    <section class="catalog" id="project-equipment-now">
+        <div class="catalog-heading"><h2>Echipamente în proiect <span class="count-badge">@equipment.Count</span></h2><small>Calculat la deschiderea paginii</small></div>
+        @if (equipment.Count == 0)
         {
             <div class="empty-state">
                 <span class="empty-icon">▦</span>
-                <h3>Nu există încă mișcări de ieșire asociate</h3>
-                <p>Ieșirile de stoc înregistrate cu acest proiect apar aici. Proiectul se alege din formularul de mișcare al unui produs, după selectarea beneficiarului.</p>
+                <h3>Proiectul nu are echipamente</h3>
+                <p>Ieșirile de stoc înregistrate cu acest proiect apar aici, minus retururile. Proiectul se alege din formularul de mișcare al unui produs, după selectarea beneficiarului.</p>
             </div>
         }
         else
         {
-            <div class="table-scroll"><table><thead><tr>
-                <th>COD PRODUS</th><th class="number">CANTITATE</th><th>DATA</th><th>OPERATOR</th><th>REFERINȚĂ</th>
-            </tr></thead><tbody>
-            @foreach (var movement in movements)
-            {
-                <tr @key="movement.Id">
-                    <td><a class="category-table-link" href="@StockMovementNavigation.ProductUrl(movement.ProductId)"><strong>@movement.ProductCode</strong></a></td>
-                    <td class="number">@movement.Quantity</td>
-                    <td>@StockMovementRules.DisplayDate(movement.Date)</td>
-                    <td>@movement.Operator</td>
-                    <td><a class="category-table-link" href="@StockMovementNavigation.MovementUrl(movement.Id)">Mișcarea nr. @movement.Id</a></td>
-                </tr>
-            }
-            </tbody></table></div>
-            <div class="table-footer"><span>@(movements.Count == 1 ? "1 ieșire asociată" : $"{movements.Count} ieșiri asociate") proiectului</span></div>
+            <Paged Items="equipment" Id="project-equipment-page-size" Context="pageRows" Sorts="EquipmentSorts" DefaultSortKey="product">
+                <div class="table-scroll"><table id="project-equipment-table"><thead><tr>
+                    <th class="number">NR. CRT.</th><SortTh Key="subcategory">SUBCATEGORIE</SortTh><SortTh Key="product">COD PRODUS</SortTh><SortTh Key="quantity" Class="number">CANTITATE</SortTh>
+                </tr></thead><tbody>
+                @foreach (var item in pageRows)
+                {
+                    <tr @key="item.ProductId">
+                        <td class="number">@(equipment.ToList().IndexOf(item) + 1)</td>
+                        <td>@item.Subcategory</td>
+                        <td><a class="category-table-link" href="@StockMovementNavigation.ProductUrl(item.ProductId)"><strong>@item.ProductName</strong></a></td>
+                        <td class="number"><strong>@item.Net</strong></td>
+                    </tr>
+                }
+                </tbody></table></div>
+            </Paged>
         }
+    </section>
+    <section class="catalog" id="project-equipment-history">
+        <details class="catalog-collapse"><summary class="catalog-heading"><h2>Istoric mișcări <span class="count-badge">@history.Count</span></h2><small>Ieșirile spre proiect și retururile de pe proiect</small></summary>
+            @if (history.Count == 0)
+            {
+                <div class="empty-state compact"><p>Nu există mișcări legate de acest proiect.</p></div>
+            }
+            else
+            {
+                <Paged Items="history" Id="project-history-page-size" Context="pageRows" Sorts="HistorySorts" DefaultSortKey="date" DefaultDescending="true">
+                    <div class="table-scroll"><table id="project-history-table"><thead><tr>
+                        <SortTh Key="date">DATA</SortTh><SortTh Key="kind">TIP</SortTh><SortTh Key="subcategory">SUBCATEGORIE</SortTh><SortTh Key="product">COD PRODUS</SortTh>
+                        <SortTh Key="quantity" Class="number">CANTITATE</SortTh><SortTh Key="operator">OPERATOR</SortTh><th>DESCRIERE</th><th>MIȘCARE</th>
+                    </tr></thead><tbody>
+                    @foreach (var entry in pageRows)
+                    {
+                        <tr @key="entry.Id" class="@(entry.Voided ? "voided" : null)">
+                            <td>@StockMovementRules.DisplayDate(entry.Date)</td>
+                            <td><span class="kind-label@(entry.IsReturn ? "in" : "out")">@ProjectEquipmentRules.KindLabel(entry.IsReturn)</span>@if (entry.Voided) { <span class="stock-badge negative"> stornat</span> }</td>
+                            <td>@entry.Subcategory</td>
+                            <td><a class="category-table-link" href="@StockMovementNavigation.ProductUrl(entry.ProductId)"><strong>@entry.ProductName</strong></a></td>
+                            <td class="number">@entry.Quantity</td>
+                            <td>@entry.Operator</td>
+                            <td class="movement-text">@entry.Description</td>
+                            <td><a class="category-table-link" href="@StockMovementNavigation.MovementUrl(entry.Id)">Mișcarea nr. @entry.Id</a></td>
+                        </tr>
+                    }
+                    </tbody></table></div>
+                </Paged>
+            }
+        </details>
     </section>
 }
 
@@ -60,10 +92,22 @@ else if (project is not null)
 @code {
     [Parameter] public int Id { get; set; }
     private Project? project;
-    private IReadOnlyList<ProjectStockMovement> movements = Array.Empty<ProjectStockMovement>();
+    private IReadOnlyList<NetConsumption> equipment = [];
+    private IReadOnlyList<ProjectMovementEntry> history = [];
     private bool loading = true;
     private string? error;
     private readonly CancellationTokenSource lifetime = new();
+
+    private static readonly IReadOnlyDictionary<string, Func<NetConsumption, IComparable?>> EquipmentSorts = new Dictionary<string, Func<NetConsumption, IComparable?>>
+    {
+        ["subcategory"] = item => item.Subcategory, ["product"] = item => item.ProductName, ["quantity"] = item => item.Net
+    };
+
+    private static readonly IReadOnlyDictionary<string, Func<ProjectMovementEntry, IComparable?>> HistorySorts = new Dictionary<string, Func<ProjectMovementEntry, IComparable?>>
+    {
+        ["date"] = entry => entry.Date, ["kind"] = entry => entry.IsReturn ? 1 : 0, ["subcategory"] = entry => entry.Subcategory, ["product"] = entry => entry.ProductName,
+        ["quantity"] = entry => entry.Quantity, ["operator"] = entry => entry.Operator
+    };
 
     protected override async Task OnInitializedAsync() => await LoadAsync();
 
@@ -79,8 +123,10 @@ else if (project is not null)
         try
         {
             project = await Repository.GetAsync(Id, lifetime.Token);
-            if (project is null) { error = "Proiectul solicitat nu mai există."; movements = Array.Empty<ProjectStockMovement>(); return; }
-            movements = await Movements.GetForProjectAsync(Id, lifetime.Token);
+            if (project is null) { error = "Proiectul solicitat nu mai există."; equipment = []; history = []; return; }
+            // The quantities are computed now, from the exits to the project and the returns from it; a product with nothing left is not shown.
+            equipment = (await Movements.GetNetConsumptionAsync(Id, null, lifetime.Token)).Where(item => item.Net > 0).OrderBy(item => item.ProductName, StringComparer.CurrentCultureIgnoreCase).ToList();
+            history = await Equipment.GetHistoryAsync(Id, lifetime.Token);
         }
         catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
         catch (AccessDeniedException exception) { error = exception.Message; }

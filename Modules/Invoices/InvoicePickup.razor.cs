@@ -177,6 +177,7 @@ public partial class InvoicePickup
     }
 
     private bool loading = true, busy, addMode;
+    private int readPercent = -1;   // the progress of reading a PDF (-1: no progress to show, e.g. an XML file)
     private string? loadError, error, notice, templateInfo;
     private string selectedId = "";
     private int currentPage = 1, separatorCounter;

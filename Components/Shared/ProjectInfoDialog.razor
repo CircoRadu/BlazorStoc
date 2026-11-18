@@ -1,6 +1,7 @@
 @using BlazorStoc.Services
 @inject IStockMovementRepository Movements
 @inject ILogger<ProjectInfoDialog> Logger
+@inject NavigationManager Navigation
 @* PROP-0038: the information of a project in a window (opened from the table of stock movements): beneficiary (link), project (link) and the equipment handed over to it
    (net of returns; the product codes are links to the movements of the product). Read only. *@
 <AppDialog Title="@($"Proiect {ProjectName}")" TitleId="project-info-title" HelpTopic="proiecte-informatii" HelpAbout="Informațiile proiectului" PanelClass="movement-dialog" OnClose="Closed">
@@ -14,14 +15,14 @@
     else if (items.Count == 0) { <p class="muted">Niciun echipament nu a fost predat pe acest proiect.</p> }
     else
     {
-        <div class="table-scroll"><table id="project-info-equipment"><thead><tr><th>COD PRODUS</th><th class="number">BUCĂȚI</th></tr></thead><tbody>
-            @foreach (var item in items)
+        <div class="table-scroll"><table id="project-info-equipment"><thead><tr><th class="number">NR. CRT.</th><th>SUBCATEGORIE</th><th>COD PRODUS</th><th class="number">BUCĂȚI</th></tr></thead><tbody>
+            @foreach (var (item, index) in items.Select((item, index) => (item, index)))
             {
-                <tr><td><a class="category-table-link" href="@($"/produse/{item.ProductId}/miscari")">@item.ProductName</a></td><td class="number">@item.Net</td></tr>
+                <tr><td class="number">@(index + 1)</td><td>@item.Subcategory</td><td><a class="category-table-link" href="@($"/produse/{item.ProductId}/miscari")">@item.ProductName</a></td><td class="number">@item.Net</td></tr>
             }
         </tbody></table></div>
     }
-    <div class="editor-actions"><button type="button" class="refresh act-close" @onclick="Closed">Închide</button></div>
+    <div class="editor-actions"><button type="button" class="refresh act-nav" id="project-info-go" @onclick="GoToProjectAsync">Mergi la proiect</button><button type="button" class="refresh act-close" @onclick="Closed">Închide</button></div>
 </AppDialog>
 
 @code {
@@ -31,6 +32,13 @@
     [Parameter] public string ProjectName { get; set; } = "";
     [Parameter] public EventCallback Closed { get; set; }
     private IReadOnlyList<NetConsumption> items = [];
+
+    // PROP-0041: closes the window and opens the project page of the beneficiary.
+    private async Task GoToProjectAsync()
+    {
+        await Closed.InvokeAsync();
+        Navigation.NavigateTo($"/proiecte/{ProjectId}");
+    }
     private bool loaded;
     private string? error;
 

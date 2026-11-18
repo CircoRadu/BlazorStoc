@@ -99,6 +99,12 @@ sealed class FakeInventoryProductRepository(IReadOnlyList<Product> products, IRe
 }
 
 
+sealed class FakeProjectEquipment : IProjectEquipmentRepository
+{
+    public Task<IReadOnlyList<ProjectMovementEntry>> GetHistoryAsync(int projectId, CancellationToken cancellationToken = default) => Task.FromResult<IReadOnlyList<ProjectMovementEntry>>([]);
+    public Task<IReadOnlyList<ProjectProductNet>> GetProductProjectsAsync(int productId, CancellationToken cancellationToken = default) => Task.FromResult<IReadOnlyList<ProjectProductNet>>([]);
+}
+
 sealed class FakeInventoryStockMovementRepository(IReadOnlyDictionary<int, int> inVehicles) : IStockMovementRepository
 {
     public Task<IReadOnlyDictionary<int, int>> GetQuantitiesInVehiclesAsync(CancellationToken cancellationToken = default) => Task.FromResult(inVehicles);

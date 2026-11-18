@@ -34,7 +34,7 @@ public partial class ProductMovements
     private int? beneficiaryFilter, vehicleFilter;
 
     private static readonly ExitDestination[] FilterDestinations =
-        [ExitDestination.Beneficiary, ExitDestination.Vehicle, ExitDestination.GenericSale, ExitDestination.StockCorrection, ExitDestination.WarehouseReturn];
+        [ExitDestination.Beneficiary, ExitDestination.Vehicle, ExitDestination.GenericSale, ExitDestination.StockCorrection, ExitDestination.OtherReason, ExitDestination.WarehouseReturn];
 
     private DuplicateExitWarningException? exitWarning;
     private ReservationWarningException? reservationWarning;
@@ -67,7 +67,6 @@ public partial class ProductMovements
     private StockMovement? editing, deleting, historyFor, voiding;
     private string voidReason = "", voidError = "";
     private bool voidBusy;
-    private IReadOnlyList<ReturnableExit> returnables = [];
     private StockMovementInput editForm = new();
     private bool editUseProject;
 

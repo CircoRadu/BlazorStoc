@@ -29,6 +29,12 @@
             section.open = false;
             return;
         }
+        // Closing a category: hide the row icons of its subcategory table first, so none stays painted while it collapses.
+        const card = section.closest(".category-management-card");
+        if (section.open && card) {
+            card.classList.add("is-closing");
+            setTimeout(() => card.classList.remove("is-closing"), 400);
+        }
         const intent = { section: summary.parentElement, at: performance.now() };
         userIntent = intent;
         // A handler that cancels the click (for example the leave guard) means no toggle follows.

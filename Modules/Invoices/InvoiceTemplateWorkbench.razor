@@ -48,7 +48,7 @@ else if (session is null || draft is null)
             <div class="demo-banner" role="status"><span aria-hidden="true">✎</span><div>Șablonul <strong>@EditTemplateName</strong> nu are o factură model salvată: încarcă o factură PDF a aceluiași furnizor. Elementele șablonului rămân la pozițiile salvate (fișierul nu este analizat decât dacă apeși „Analizează fișierul”), iar modificările se salvează în șablon (fișierul devine modelul).</div></div>
         }
         <FileDropZone Id="invoice-file" Accept=".pdf,application/pdf,.xml,text/xml,application/xml,.zip,application/zip,application/x-zip-compressed" Text="Alege factura PDF, XML sau ZIP" OnChange="OnFileAsync" Disabled="busy" />
-        @if (busy) { <div class="invoice-busy" role="status"><div class="spinner"></div><p class="muted">@(IsEditMode ? "Se deschide fișierul pentru șablon… (o pagină scanată poate dura câteva secunde)" : "Se analizează fișierul… (o pagină scanată poate dura câteva secunde)")</p></div> }
+        @if (busy) { <div class="invoice-busy" role="status"><div class="spinner"></div><p class="muted">@(IsEditMode ? "Se deschide fișierul pentru șablon… (o pagină scanată poate dura câteva secunde)" : "Se analizează fișierul… (o pagină scanată poate dura câteva secunde)")@if (readPercent >= 0) { <span id="template-read-percent" class="scan-percent">@readPercent%</span> }</p>@if (readPercent >= 0) { <ProgressBar Percent="readPercent" Label="Progresul citirii fișierului" /> }</div> }
         <p class="form-note">Sunt acceptate fișiere PDF de cel mult 20 MB și 30 de pagini. O factură XML (e-Factura UBL) sau arhiva ZIP descărcată din e-Factura (se caută în ea factura, nu semnătura) deschide editorul șablonului XML, cu fișierul ca probă.</p>
     </section>
 }

@@ -1,0 +1,21 @@
+# Bonuri de consum
+Ruta: /bonuri-consum
+Cautare: bon de consum aviz de predare proiect beneficiar generare sterge tipareste descarca inactiv
+
+Pagina din Administrare cu toate bonurile de consum din sistem. Un bon se generează din iconița de bon a unui proiect (pagina beneficiarului) și nu se modifică: se vede, se descarcă, se tipărește sau se șterge.
+
+## Elemente
+### Căutare
+- Căutare | câmp | Filtrează tabelul pe măsură ce scrii: număr, dată, beneficiar, CUI, proiect, stare, operator. | sel: #notes-search
+- Beneficiar | listă cu căutare | Alege un beneficiar; lista se restrânge pe măsură ce scrii. | sel: #notes-beneficiary
+- Proiect | listă cu căutare | Alege un proiect (doar ale beneficiarului ales, dacă ai ales unul). | sel: #notes-project
+### Tabel
+- Bonuri | tabel | Nr. bon, data, beneficiar, proiect, stare (Activ sau Inactiv), numărul de linii și operatorul. Antetele ordonează, iar paginarea alege câte rânduri se văd. | sel: #all-consumption-notes-table
+- Vezi, Descarcă, Tipărește | iconițe | Deschid bonul în PDF, îl descarcă sau îl trimit la tipărire; merg la fel pentru bonurile active și inactive.
+- Șterge | iconiță | Șterge definitiv bonul, după confirmare; numărul lui nu se reutilizează.
+
+## Flux: Cum generez un bon de consum
+1. Deschide beneficiarul și apasă iconița de bon de pe rândul proiectului.
+2. Dacă proiectul are deja bonuri, alege dacă rămân inactive sau se șterg.
+3. Apasă „Generează bonul”: bonul cuprinde echipamentele predate proiectului până acum, cu data fiecărei mișcări.
+4. Bonul apare în secțiunea „Bonuri de consum” a beneficiarului și în această pagină.

@@ -21,8 +21,8 @@ public static class InvoiceModuleChecks
         public Exception? Failure = new InvalidOperationException("analysis down");
         private Task<T> Fail<T>() { Calls++; return Failure is null ? Task.FromResult(default(T)!) : Task.FromException<T>(Failure); }
         private T FailSync<T>() { Calls++; return Failure is null ? default! : throw Failure; }
-        public Task<InvoiceAnalysisSession> AnalyzeAsync(Stream pdf, string fileName, CancellationToken cancellationToken = default) => Fail<InvoiceAnalysisSession>();
-        public Task<InvoiceAnalysisSession> OpenAsync(Stream pdf, string fileName, CancellationToken cancellationToken = default) => Fail<InvoiceAnalysisSession>();
+        public Task<InvoiceAnalysisSession> AnalyzeAsync(Stream pdf, string fileName, CancellationToken cancellationToken = default, IProgress<int>? progress = null) => Fail<InvoiceAnalysisSession>();
+        public Task<InvoiceAnalysisSession> OpenAsync(Stream pdf, string fileName, CancellationToken cancellationToken = default, IProgress<int>? progress = null) => Fail<InvoiceAnalysisSession>();
         public InvoiceAnalysisSession Analyze(Guid id) => FailSync<InvoiceAnalysisSession>();
         public InvoiceAnalysisSession? Get(Guid id) => FailSync<InvoiceAnalysisSession?>();
         public void Discard(Guid id) { }

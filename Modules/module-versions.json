@@ -255,8 +255,8 @@
                                                   ]
                                   },
                     "Invoices":  {
-                                     "version":  "1.2.0",
-                                     "hash":  "77aee552f180facca41a35acbce134fae58964a4832e5e513866777f6925f5ec",
+                                     "version":  "1.2.1",
+                                     "hash":  "428de634f5f9aa7bc5c674cffe0d66d249397e7b37f357d145842efafeb0bac3",
                                      "history":  [
                                                      {
                                                          "version":  "1.0.0",
@@ -302,12 +302,17 @@
                                                          "version":  "1.2.0",
                                                          "date":  "13.11.2026",
                                                          "note":  "Lista de sabloane salvate are pictograma de export: ZIP cu definitia sablonului si factura model, daca serverul o pastreaza"
+                                                     },
+                                                     {
+                                                         "version":  "1.2.1",
+                                                         "date":  "18.11.2026",
+                                                         "note":  "Progres de citire a PDF-ului (IProgress) in cititorul si serviciul de analiza al facturilor"
                                                      }
                                                  ]
                                  },
                     "Journal":  {
-                                    "version":  "1.7.0",
-                                    "hash":  "4cb69cfeabdf75688ee5fca4f570d6ca9d4ef08a49966a8bcd10760495817066",
+                                    "version":  "1.8.1",
+                                    "hash":  "c22e508585036d2b58f6b43c997e553b668629f917b28690307bcaa0736171b5",
                                     "history":  [
                                                     {
                                                         "version":  "1.0.0",
@@ -508,6 +513,16 @@
                                                         "version":  "1.7.0",
                                                         "date":  "17.11.2026",
                                                         "note":  "Filtrul de jurnal cunoaste entitatea si actiunile tipurilor de proiecte obligatorii (Nomenclator -\u003e Proiecte obligatorii)"
+                                                    },
+                                                    {
+                                                        "version":  "1.8.0",
+                                                        "date":  "18.11.2026",
+                                                        "note":  "Actiuni si entitate noi pentru bonurile de consum in filtrele jurnalului"
+                                                    },
+                                                    {
+                                                        "version":  "1.8.1",
+                                                        "date":  "18.11.2026",
+                                                        "note":  "Actiune noua in filtrele jurnalului: Retur din proiect"
                                                     }
                                                 ]
                                 },
@@ -754,8 +769,8 @@
                                                       ]
                                       },
                     "Ocr":  {
-                                "version":  "1.1.0",
-                                "hash":  "4d9c8c5495c76efc0461dbc64a4af12ecefa856afbdbddbed5d43bb965d6bae1",
+                                "version":  "1.1.1",
+                                "hash":  "231b2cd69d9e14bfbd83377dcc42eadfa3041f5b6d0664fe865b0ccb639255b9",
                                 "history":  [
                                                 {
                                                     "version":  "1.0.0",
@@ -766,12 +781,17 @@
                                                     "version":  "1.1.0",
                                                     "date":  "17.11.2026",
                                                     "note":  "Progresul analizei scanarii de inventar trece din procesul worker catre aplicatie (progress.txt in folderul lucrarii)"
+                                                },
+                                                {
+                                                    "version":  "1.1.1",
+                                                    "date":  "18.11.2026",
+                                                    "note":  "Progresul citirii facturii trece prin procesul OCR (progress.txt)"
                                                 }
                                             ]
                             },
                     "Offers":  {
-                                   "version":  "1.1.2",
-                                   "hash":  "b76c3365d47c663f9aa9c84c84b7d87f825a8f26ba77fd8a42a20ab6a97fa6bc",
+                                   "version":  "1.1.3",
+                                   "hash":  "4d0e7fe488b48de461633951f926443583185542d9b7319e2a6b35287169343d",
                                    "history":  [
                                                    {
                                                        "version":  "1.0.0",
@@ -792,6 +812,11 @@
                                                        "version":  "1.1.2",
                                                        "date":  "10.11.2026",
                                                        "note":  "Ferestrele folosesc componenta globala AppDialog (bara cu butoane deasupra panoului)"
+                                                   },
+                                                   {
+                                                       "version":  "1.1.3",
+                                                       "date":  "18.11.2026",
+                                                       "note":  "Indicator de progres la incarcarea fisierului de oferta"
                                                    }
                                                ]
                                },
@@ -817,13 +842,18 @@
                                                             ]
                                             },
                     "ProjectReports":  {
-                                           "version":  "1.0.0",
-                                           "hash":  "af9b7220f556e0d8b33d2cf4086d346f72a02a1201d1e53a88f85fd30daee05b",
+                                           "version":  "1.1.0",
+                                           "hash":  "6ff77060b91bbb70429f1d56b36cc18e7603c3645b6932df710dd9039724c0f4",
                                            "history":  [
                                                            {
                                                                "version":  "1.0.0",
                                                                "date":  "24.10.2026",
                                                                "note":  "Versiune de pornire (inceputul versionarii modulelor)"
+                                                           },
+                                                           {
+                                                               "version":  "1.1.0",
+                                                               "date":  "18.11.2026",
+                                                               "note":  "Pagina Echipamente proiect: tabel net si istoric pliabil al miscarilor (iesiri si retururi)"
                                                            }
                                                        ]
                                        },

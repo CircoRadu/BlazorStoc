@@ -1026,3 +1026,15 @@ Cerut de utilizator la 06.10.2026 (verificarea fluxului, apoi deciziile: facturi
 
 - Citirea unui formular nou aplica corectiile marcate Invatat (OcrCalibrationRules: cifra sub 90% incredere inlocuita daca invatata de >=2 ori, >=50% din ce s-a invatat pentru cifra si in top 3), rand marcat de verificat cu nota; Inventory 1.3.0
 - Verificari: grupurile structure, help, moduleversions, ocrlearning, ocrworker (196); MariaDB OCR learning (17); scanare reala cu captura cifrelor; browser pe pagina de preluare cu scan real si produse de test (citire, potrivire, selectie, dialog de confirmare)
+
+## Finalizat la 18.11.2026 10:11 - Teme de culori, progres facturi/oferte, PROP-0039/40/41/42 (versiunea 0.5.99)
+
+- Temele de culori aduse din BlazorStoc-rel: 20 de palete (6 mai deschise galben/rosiatic/verde), aplicate imediat prin themePalette.set si data-palette pe app-shell; ProgressBar si StreamProgress: progres la citirea PDF facturi (worker OCR cu FileProgress) si la incarcarea xlsx oferte; PROP-0039 text Factura, PROP-0040 buton Adauga produs in subcategorie, PROP-0041 Mergi la proiect, PROP-0042 coloane Nr. crt. si Subcategorie; fix iconite la colaps categorie,
+
+## Finalizat la 18.11.2026 11:40 - Bonuri de consum ale proiectelor (versiunea 0.6.1)
+
+- Bonul se genereaza doar la apasare din iconita proiectului (tabele consumption_notes si consumption_note_lines, migrarea 93, pornesc goale cu numerotarea de la 1); bonuri active/inactive/sterse, fara editare; sectiune pliabila in beneficiar si pagina Administrare -> Bonuri de consum (cautare dubla); bonul vechi pe operatie scos; jurnal cu actiuni proprii; PDF nou cu data miscarii; versiune noua 0.6.1 si regula de numerotare
+
+## Finalizat la 18.11.2026 12:25 - Tab Retur, echipamente proiect cu istoric, bon pe cantitatea neta (versiunea 0.6.1)
+
+- Retur din proiect (FreeEntryType.ReturnFromProject, intrare cu beneficiar si proiect, limitat la netul produsului pe proiect) si retur din vehicul (TransferFromVehicleAsync cu descriere si data); protectii la storno/stergere/modificare iesire; calcul net unic (iesiri minus retururi legate de iesiri minus retururi din proiect); IProjectEquipmentRepository (istoric, proiecte care au produsul); pagina Echipamente proiect cu lista neta si istoric pliabil; bonul de consum pe produs net cu data ultimei iesiri; butonul de bon doar pe proiecte cu echipamente

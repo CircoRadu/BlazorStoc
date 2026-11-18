@@ -162,3 +162,9 @@ Pasi:
 | 1 | Sablon nou din factura 682100.pdf (Telesystem) | CUI-ul pornit este RO22460883 si furnizorul e recunoscut | |
 | 2 | Scrie manual alt CUI in campul "CUI/CIF furnizor", apasa "Salveaza sablonul" | "CUI retinut" ramane valoarea scrisa; mesajele nu mai rescriu CUI-ul | |
 | 3 | CUI al unui furnizor care nu exista | Mesajul propune "+ Adauga furnizorul" | |
+
+## Modificari de testat - indicator de progres (18.11.2026)
+
+**Ce s-a adaugat:** procent si bara de progres la citirea unui PDF de factura.
+**Ce face acum:** in Preluare factura si Sabloane facturi, la alegerea unui PDF apare "Se citeste ... N%" cu bara, ca la Preluare inventar (XML si ZIP nu au bara).
+1. Alege o factura PDF scanata, cu mai multe pagini: procentul creste pe masura ce se citesc paginile.

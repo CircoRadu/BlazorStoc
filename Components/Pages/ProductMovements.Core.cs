@@ -192,7 +192,7 @@ public partial class ProductMovements
             pageData = await Movements.GetPageAsync(Id, CurrentQuery(), lifetime.Token);
             SyncState();
             stock = pageData.Stock; inVehicles = pageData.InVehicles;
-            if (canManage) { vehicleStocks = await Movements.GetVehicleStocksAsync(Id, lifetime.Token); returnables = await Movements.GetReturnableExitsAsync(Id, lifetime.Token); }
+            if (canManage) { vehicleStocks = await Movements.GetVehicleStocksAsync(Id, lifetime.Token); }
             var pages = TotalPages;
             if (pageNumber > pages) { pageNumber = pages; pageData = await Movements.GetPageAsync(Id, CurrentQuery(), lifetime.Token); }
             if (product is not null) product = product with { Quantity = stock };

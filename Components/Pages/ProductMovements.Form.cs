@@ -108,6 +108,16 @@ public partial class ProductMovements
         {
             if (form.Kind == StockMovementKind.Entry && stock < 0 && !await ApplyRegularizationAsync("Intrare înregistrată din pagina produsului")) return;
             if (form.Kind == StockMovementKind.Entry && originPicker is not null && await originPicker.PrepareAsync(lifetime.Token) is { } originError) { formError = originError; return; }
+            // A return from a vehicle is the move of the product from the vehicle to the warehouse (the stock does not change), with the description of the operator.
+            if (form.Kind == StockMovementKind.Entry && originPicker?.IsVehicleReturn == true && originPicker.ReturnVehicleId is { } returnVehicle)
+            {
+                await Movements.TransferFromVehicleAsync(new VehicleTransfer(returnVehicle, null, [new VehicleTransferLine(product.Id, form.Quantity!.Value)], form.Description, form.Date), lifetime.Token);
+                form.Description = ""; form.Quantity = null; addSuggestion = null; addTracker?.Rebase();
+                notice = "Returul din vehicul a fost înregistrat: produsul este din nou în depozit.";
+                pageNumber = 1; await LoadPageAsync();
+                await originPicker.RefreshAsync();
+                return;
+            }
             var result = await Movements.CreateAsync(product.Id, form, lifetime.Token);
             stock = result.Stock; product = product with { Quantity = stock };
             form.Description = ""; form.Quantity = null; addSuggestion = null; ApplySuggestion(false); addTracker?.Rebase();
@@ -128,7 +138,12 @@ public partial class ProductMovements
         finally { saving = false; }
     }
 
-    private void OriginChanged() { invoiceWarning = null; formError = null; }
+    private async Task OriginChanged()
+    {
+        invoiceWarning = null; formError = null;
+        // The tab Retur offers the vehicles that hold the product: the list is read when the tab is opened.
+        if (originPicker?.IsReturnTab == true) await EnsureVehiclesAsync();
+    }
 
     private async Task ConfirmDuplicateExitAsync()
     {

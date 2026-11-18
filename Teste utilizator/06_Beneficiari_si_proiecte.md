@@ -338,3 +338,15 @@ Pasi: Beneficiari -> un beneficiar cu balanta pozitiva (din Preluare date Elcomt
 |---|---|---|---|
 | 1 | Deschide un beneficiar cu un punct de lucru care are puncte arondate | In coloana Descriere, cate o linie "Arondat: nume" pentru fiecare | |
 | 2 | Adauga sau sterge un punct arondat | Liniile se actualizeaza | |
+
+## Modificari de testat - bonuri de consum (18.11.2026, versiunea 0.6.1)
+
+**Ce s-a adaugat:** iconita "Genereaza bon de consum" pe fiecare proiect al unui beneficiar; sectiunea pliabila "Bonuri de consum" in beneficiar; pagina Administrare -> Bonuri de consum. Bonul nu se mai genereaza automat la iesiri.
+**Ce face acum:** bonul se genereaza doar la apasare, cu echipamentele predate proiectului pana atunci (data fiecarei miscari in tabel), legat de beneficiar si de proiect. Bonurile nu se editeaza: se vad, se descarca, se tiparesc, se sterg.
+1. Beneficiar -> Proiecte: apasa iconita de bon a unui proiect cu echipamente predate; "Genereaza bonul": apare in sectiunea "Bonuri de consum" a beneficiarului.
+2. Genereaza al doilea bon pentru acelasi proiect: alege "Pastreaza-le ca inactive", apoi inca unul cu "Sterge-le": raman doar bonul nou.
+3. Pe un bon: vezi (PDF), descarca, tipareste, sterge (cu confirmare).
+4. Administrare -> Bonuri de consum: cautare dupa text, alegere beneficiar/proiect; Jurnal: actiunile "Generare/Dezactivare/Stergere bon de consum".
+5. Dupa actualizare: numarul primului bon este 1.
+6. Iconita de bon apare doar pe proiectele cu echipamente predate; un proiect cu o iesire de 10 bucati si un retur de 2 da un bon cu 8 (net), iar un proiect fara echipamente nu are iconita.
+7. Bonul de consum are un rand pe produs, cu cantitatea neta (iesiri minus retururi) si data ultimei iesiri; un retur de 2 dintr-o iesire de 10 da 8 pe bon.

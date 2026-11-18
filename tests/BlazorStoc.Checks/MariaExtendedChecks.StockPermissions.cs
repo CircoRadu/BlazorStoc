@@ -50,10 +50,6 @@ public static partial class MariaExtendedChecks
         await Rejects<AccessDeniedException>(() => As("stoc.intrare").VoidExitOperationAsync(1, "Ext stornare drepturi"), "Without \"Stornare / returnare\" an exit operation cannot be voided");
         await Rejects<AccessDeniedException>(() => As().GetPageAsync(product.Id, new StockMovementQuery()), "Without any stock or related view key the movements cannot be read");
         Check((await As("stoc.view").GetPageAsync(product.Id, new StockMovementQuery())).Stock == 10 && seeded.Movement.Id > 0, "With \"Vizualizare stoc\" the movements are read");
-        // The consumption note of a generic sale (no beneficiary, no project, no reference) is produced like any other.
-        var genericSale = await adminMovements.CreateAsync(product.Id, new StockMovementInput { Kind = StockMovementKind.Exit, Date = today, Quantity = 1, Description = "Ext vanzare generica", Destination = ExitDestination.GenericSale });
-        var saleOperation = await adminMovements.GetOperationAsync(genericSale.Movement.OperationId!.Value);
-        Check(saleOperation is not null && new ConsumptionNotePdfWriter().Write(saleOperation, DateTime.Now).Length > 500, "The consumption note of a generic sale can be read and written");
 
         // Parameters of a subcategory belong to editing the categories: adding or deleting alone is not enough.
         var group = (await products.GetGroupsAsync()).Single(item => item.Category == category && item.Subcategory == subcategory);

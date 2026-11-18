@@ -104,6 +104,8 @@ internal static class ServiceRegistration
         services.AddScoped<IProductPlacementReader, MariaProductPlacementReader>();
         services.AddScoped<ISystemTypeRepository, MariaSystemTypeRepository>();
         services.AddScoped<IBeneficiaryProjectTypeRepository, MariaBeneficiaryProjectTypeRepository>();
+        services.AddScoped<IConsumptionNoteRepository, MariaConsumptionNoteRepository>();
+        services.AddScoped<IProjectEquipmentRepository, MariaProjectEquipmentRepository>();
         services.AddScoped<IMaintenanceComponentRepository, MariaMaintenanceComponentRepository>();
         services.AddScoped<IProductMinStockRepository, MariaProductMinStockRepository>();
         services.AddScoped<IProjectDeadlineRepository, MariaProjectDeadlineRepository>();

@@ -945,3 +945,9 @@ Versiunea 0.5.87: ANAF cu sub-taburi (Preluare date firme, E-Factura) si ajutoru
 Invatare OCR la preluarea inventarului (etapele 1-3) (16.11.2026): Preluare end-to-end cu un scan real si produse reale (salvarea corectiilor din pagina de preluare) si etapa 4 (folosirea invatarii la citire)
 
 Invatare OCR etapa 4 si 5 (calibrare pe cifre, teste) (16.11.2026): Preluarea completa pana la salvarea corectiilor in browser nu a mers: backup-ul de siguranta nu ruleaza pe instanta de test, deci salvarea e acoperita doar de testul MariaDB
+
+Teme de culori, progres facturi/oferte, PROP-0039/40/41/42 (versiunea 0.5.99) (18.11.2026): Verificari: grupurile display, elcomtur, xml, offers, ocrworker, MariaDB consum net; pagina de test pentru palete si aplicare imediata
+
+Bonuri de consum ale proiectelor (versiunea 0.6.1) (18.11.2026): Verificari: grupurile notes, help, structure, moduleversions, package; MariaDB (generare, inactivare, stergere, jurnal); browser pe instanta de test (generare, eroare fara echipamente, cautare, stergere, PDF)
+
+Tab Retur, echipamente proiect cu istoric, bon pe cantitatea neta (versiunea 0.6.1) (18.11.2026): Verificari: MariaDB (retur din proiect, limite, jurnal, protectii storno/stergere, retur din vehicul cu descriere, bon net), reguli, grupurile notes/help/structure/moduleversions; browser pe instanta de test (tab Retur, descriere automata, retur salvat, echipamente si istoric)
