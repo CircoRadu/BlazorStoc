@@ -1045,3 +1045,9 @@ Cerut de utilizator la 06.10.2026 (verificarea fluxului, apoi deciziile: facturi
 - Unde sunt bucatile: doar Stoc total, Stoc depozit, Stoc masini (ProductWhere.razor).
 - Wizard Genereaza bon de consum (/consum/bon, ConsumptionNoteWizard.razor): fiecare proiect ales primeste bon numerotat in registrul existent (consumption_notes, fara migrare noua); bon total = ConsumptionNoteTotalWriter peste bonurile proiectelor; endpointuri /api/bonuri/arhiva.zip, toate.pdf, total.pdf; Descarca toate cu folder (File System Access) sau ZIP; helper unic de nume ConsumptionNoteFiles folosit si de tabelul de bonuri; meniu Produse, breadcrumb, topic help bon-consum.
 - Verificari: teste tintite (bonuri, MariaDB, help, structura, module, pachet); wizard in browser pe baza demo (un bon, separate, total).
+
+## Finalizat la 20.11.2026 15:42 - Eroare preluare factura EMPORIUM 827 cu sablon dintr-un scan
+
+- Cauza: (1) ancorele zonelor de coloana ale sablonului erau caractere OCR (| = -) care se potriveau cu zgomot din alt scan si dadeau zone cu sfarsit deasupra inceputului; (2) titlurile citite diferit de OCR nu se potriveau cu cele din sablon, motorul cadea pe pozitia absoluta a antetului din fisierul model si randurile 1-2 ramaneau deasupra.
+- Remediere in Services/Invoices/InvoiceTemplates.cs: ancorele fara litere/cifre nu mai sunt ancore (InvoiceTemplateEngine.HasContent, AnchorAbove/AnchorBelow le sar), zonele incoerente sunt respinse, iar coloanele fara eticheta potrivita se potrivesc dupa pozitie cu celulele antetului gasit in fisier.
+- Verificari: raportul corpus pe factura 827 cu sablonul exportat citeste cele 7 randuri (ca analiza automata); 3 teste noi in InvoiceChecks.cs; grupul pdf 223 verificari trecute; raportul corpus arata si zonele coloanelor.

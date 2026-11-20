@@ -1,3 +1,7 @@
+## 0.6.4 | 20.11.2026
+### Diverse
+- Preluarea unei facturi scanate cu un șablon făcut din alt scan nu mai pierde rândurile: când OCR-ul citește altfel titlurile coloanelor, coloanele se potrivesc cu antetul găsit după poziția lor, iar reperele fără litere sau cifre (linii și chenare citite ca „|” sau „=”) nu mai strică zonele coloanelor. Șabloanele existente nu trebuie refăcute.
+
 ## 0.6.3 | 20.11.2026
 ### Funcționalități noi
 - PROP-0043 · În Ieșirea multiplă, lângă câmpul Proiect este butonul „+ Proiect nou”: proiectul se creează într-o fereastră, fără să pierzi ce ai completat, și rămâne ales în formular.
