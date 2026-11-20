@@ -951,3 +951,5 @@ Teme de culori, progres facturi/oferte, PROP-0039/40/41/42 (versiunea 0.5.99) (1
 Bonuri de consum ale proiectelor (versiunea 0.6.1) (18.11.2026): Verificari: grupurile notes, help, structure, moduleversions, package; MariaDB (generare, inactivare, stergere, jurnal); browser pe instanta de test (generare, eroare fara echipamente, cautare, stergere, PDF)
 
 Tab Retur, echipamente proiect cu istoric, bon pe cantitatea neta (versiunea 0.6.1) (18.11.2026): Verificari: MariaDB (retur din proiect, limite, jurnal, protectii storno/stergere, retur din vehicul cu descriere, bon net), reguli, grupurile notes/help/structure/moduleversions; browser pe instanta de test (tab Retur, descriere automata, retur salvat, echipamente si istoric)
+
+PROP-0043, PROP-0044, PROP-0045 (versiunea 0.6.3) (20.11.2026): Descarca toate cu folder ales si tiparirea efectiva nu pot fi parcurse in browser headless; capturile de help pentru bon-consum sunt de facut (docs/HELP_DE_REGENERAT.md).

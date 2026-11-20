@@ -350,3 +350,13 @@ Pasi: Beneficiari -> un beneficiar cu balanta pozitiva (din Preluare date Elcomt
 5. Dupa actualizare: numarul primului bon este 1.
 6. Iconita de bon apare doar pe proiectele cu echipamente predate; un proiect cu o iesire de 10 bucati si un retur de 2 da un bon cu 8 (net), iar un proiect fara echipamente nu are iconita.
 7. Bonul de consum are un rand pe produs, cu cantitatea neta (iesiri minus retururi) si data ultimei iesiri; un retur de 2 dintr-o iesire de 10 da 8 pe bon.
+
+## Modificari de testat - Generare bon de consum, wizard (20.11.2026, PROP-0045)
+
+**Ce s-a adaugat:** Produse -> "Genereaza bon de consum" (pagina /consum/bon): wizard cu pasii Beneficiar, Proiecte, Tipul bonurilor (doar la mai multe proiecte). Fisierele PDF ale bonurilor se numesc peste tot "nr beneficiar proiect generat data ora".
+**Ce face acum:** pentru un proiect se genereaza bonul si se arata intr-o fereastra cu Descarca, Tipareste, Inchide. Pentru mai multe proiecte: bonuri separate (taburi pe proiect, Descarca toate in folder sau ZIP, Tipareste toate) sau un bon total cu sectiune pe proiect si total pe produs. Fiecare proiect primeste bon numerotat in Administrare -> Bonuri de consum; proiectele returnate integral apar dezactivate.
+1. Alege un beneficiar cu un singur proiect cu echipamente -> Inainte -> bifeaza proiectul -> Genereaza bon de consum: apare PDF-ul; Descarca bonul salveaza un fisier cu numele "nr beneficiar proiect generat data ora.pdf".
+2. Beneficiar cu doua proiecte: bifeaza ambele -> Inainte -> Bon separat -> Genereaza bonuri: doua taburi; Descarca toate bonurile (Chrome/Edge: alegi un folder; alt browser sau http in retea: se descarca un ZIP); Tipareste toate bonurile deschide o singura tiparire.
+3. Acelasi beneficiar, Un singur bon total: un singur PDF cu ambele proiecte si totalul pe produs; numele fisierului incepe cu primul si ultimul numar de bon.
+4. Un proiect ale carui echipamente au fost toate returnate apare dezactivat si nu poate fi ales.
+5. Breadcrumb-ul paginii arata Produse > Genereaza bon de consum; Administrare -> Bonuri de consum contine bonurile noi, iar iconita de descarcare de pe rand da fisierul cu acelasi nume.

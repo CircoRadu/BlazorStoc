@@ -29,7 +29,7 @@ else
                 <td>@note.Operator</td>
                 <td class="row-actions">
                     <a class="row-icon view" target="_blank" rel="noopener" href="@($"/api/bonuri/{note.Id}/bon.pdf")" aria-label="Vezi bonul de consum nr. @note.Id" title="Vezi bonul de consum nr. @note.Id"></a>
-                    <a class="row-icon download" href="@($"/api/bonuri/{note.Id}/bon.pdf?descarca=true")" download="@($"bon-consum-{note.Id}.pdf")" aria-label="Descarcă bonul de consum nr. @note.Id" title="Descarcă bonul de consum nr. @note.Id"></a>
+                    <a class="row-icon download" href="@ConsumptionNoteFiles.PdfUrl(note.Id, download: true)" download="@ConsumptionNoteFiles.FileName(note)" aria-label="Descarcă bonul de consum nr. @note.Id" title="Descarcă bonul de consum nr. @note.Id"></a>
                     <button type="button" class="row-icon print" aria-label="Tipărește bonul de consum nr. @note.Id" title="Tipărește bonul de consum nr. @note.Id" @onclick="() => PrintAsync(note)"></button>
                     <button type="button" class="row-icon delete" disabled="@busy" aria-label="Șterge bonul de consum nr. @note.Id" title="Șterge bonul de consum nr. @note.Id" @onclick="() => deleting = note"></button>
                 </td>

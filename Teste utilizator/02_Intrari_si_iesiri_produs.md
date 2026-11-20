@@ -229,3 +229,11 @@ Neverificat încă: legarea de bonul de consum / storno (Task următor).
 2. Retur -> Vehicul: apar doar vehiculele care au produsul; returneaza o cantitate: produsul trece in depozit, descrierea propusa se poate rescrie.
 3. Incearca sa storneaza o iesire dupa ce o parte s-a returnat din proiect si returul ar depasi ce ramane: este refuzat.
 4. Echipamente proiect: lista nete (nr. crt., subcategorie, cod, cantitate) si sectiunea "Istoric miscari" (inchisa implicit) cu iesirile si retururile in acelasi tabel.
+
+## Modificari de testat - Unde sunt bucatile si Iesire multipla cu proiect nou (20.11.2026)
+
+**Ce s-a adaugat:** (PROP-0044) cardul "Unde sunt bucatile" a unui produs arata doar Stoc total, Stoc depozit si Stoc masini (total); (PROP-0043) in Iesirea multipla, langa campul Proiect, butonul "+ Proiect nou".
+**Ce face acum:** cardul nu mai defalca pe masini si beneficiari. Butonul "+ Proiect nou" deschide formularul de proiect pentru beneficiarul ales, intr-o fereastra; dupa salvare proiectul apare in lista si este ales, iar ce ai completat in formular ramane.
+1. Produse -> un produs aflat si in masina si la un beneficiar -> Intrari/iesiri: cardul arata trei randuri (total, depozit, masini) si totalul = depozit + masini.
+2. Produse -> Iesire multipla -> destinatia Beneficiar -> alege beneficiarul -> "+ Proiect nou" -> scrie denumirea -> salveaza: proiectul este ales in camp, linia de produs completata inainte nu s-a pierdut.
+3. Fara beneficiar ales, butonul "+ Proiect nou" este dezactivat.

@@ -11,7 +11,7 @@ public static class HelpContents
     public static readonly (string Title, string[] Prefixes)[] Areas =
     [
         ("Început și acces", ["acasa", "autentificare", "acces-refuzat", "schimbare-parola"]),
-        ("Produse și stoc", ["produse", "iesire-multipla", "export-consum"]),
+        ("Produse și stoc", ["produse", "iesire-multipla", "export-consum", "bon-consum"]),
         ("Inventar", ["inventar"]),
         ("Furnizori și facturi", ["furnizori", "facturi", "preluare-factura"]),
         ("Oferte", ["oferte"]),

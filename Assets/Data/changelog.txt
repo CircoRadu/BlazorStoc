@@ -1,3 +1,15 @@
+## 0.6.3 | 20.11.2026
+### Funcționalități noi
+- PROP-0043 · În Ieșirea multiplă, lângă câmpul Proiect este butonul „+ Proiect nou”: proiectul se creează într-o fereastră, fără să pierzi ce ai completat, și rămâne ales în formular.
+- PROP-0044 · Cardul „Unde sunt bucățile” din Intrări/ieșiri arată acum doar stocul total, stocul din depozit și stocul din mașini (total), fără defalcarea pe destinații.
+- PROP-0045 · Meniul Produse are „Generează bon de consum”, un wizard: alegi beneficiarul, apoi proiectele cu echipamente (cele returnate integral apar dezactivate). Pentru un proiect bonul se vede într-o fereastră cu Descarcă, Tipărește și Închide. Pentru mai multe proiecte alegi bonuri separate (taburi pe proiect, cu „Descarcă toate bonurile”, într-un folder sau într-un ZIP, și „Tipărește toate bonurile”) sau un singur bon total.
+### Diverse
+- Fișierele PDF ale bonurilor de consum se numesc peste tot la fel: „număr beneficiar proiect generat data ora”, dintr-un singur loc din program.
+
+## 0.6.2 | 19.11.2026
+### Bugs
+- BUG-0054 · Butonul roșu de închidere din fereastra „Sesiuni deschise” nu mai rămâne fără efect: acum închide fereastra.
+
 ## 0.6.1 | 18.11.2026
 ### Diverse
 - Bonuri de consum: bonul nu se mai generează automat la fiecare ieșire; linkul din Ieșirea multiplă și iconița de bon de pe rândul mișcării au dispărut.

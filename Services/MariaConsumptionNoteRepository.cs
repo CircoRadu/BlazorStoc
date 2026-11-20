@@ -152,6 +152,23 @@ public sealed class MariaConsumptionNoteRepository(
         return result;
     }
 
+    public async Task<IReadOnlyList<ConsumptionProjectChoice>> GetProjectChoicesAsync(int beneficiaryId, CancellationToken cancellationToken = default)
+    {
+        await EnsureAsync(cancellationToken).ConfigureAwait(false);
+        await using var connection = await MariaDb.OpenAsync(configuration, cancellationToken).ConfigureAwait(false);
+        var projects = new List<(int Id, string Name)>();
+        await using (var command = Command(connection, null, """
+            SELECT DISTINCT e.project_id,pr.name FROM stock_movements e INNER JOIN projects pr ON pr.id=e.project_id
+            WHERE e.kind=0 AND e.voided_utc IS NULL AND e.destination=@destination AND e.beneficiary_id=@beneficiary AND e.project_id IS NOT NULL
+            """, ("@beneficiary", beneficiaryId), ("@destination", (int)ExitDestination.Beneficiary)))
+        await using (var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false))
+            while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false)) projects.Add((checked((int)reader.GetInt64(0)), reader.GetString(1)));
+        var result = new List<ConsumptionProjectChoice>();
+        foreach (var project in projects.OrderBy(item => item.Name, StringComparer.CurrentCultureIgnoreCase))
+            result.Add(new ConsumptionProjectChoice(project.Id, project.Name, (await ReadEquipmentAsync(connection, null, project.Id, cancellationToken).ConfigureAwait(false)).Sum(line => line.Quantity)));
+        return result;
+    }
+
     // The equipment of the project at this moment: one line per product with the quantity left at the project (exits minus returns) and the date of the last exit of that product.
     private static async Task<List<ConsumptionNoteLine>> ReadEquipmentAsync(MySqlConnection connection, MySqlTransaction? transaction, int projectId, CancellationToken token)
     {

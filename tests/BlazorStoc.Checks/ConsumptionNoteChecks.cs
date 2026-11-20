@@ -45,6 +45,27 @@ public static class ConsumptionNoteChecks
               && ConsumptionNoteRules.Matches(note, "24.10.2026") && ConsumptionNoteRules.Matches(note, "ro1234 admin") && ConsumptionNoteRules.Matches(note, "activ") && !ConsumptionNoteRules.Matches(note, "inactiv")
               && ConsumptionNoteRules.Matches(other, "inactiv elena") && !ConsumptionNoteRules.Matches(other, "industriale"),
             "Consumption notes: the search matches the number, the date, the beneficiary, the CUI, the project, the state and the operator, all words together");
+
+        // PROP-0045: the one helper that names the files, the total note and the merge for printing.
+        var generated = new DateTime(2026, 11, 20, 14, 5, 0);
+        check(ConsumptionNoteFiles.FileName(17, "Missys Guest House S.R.L.", "Hotel: etaj 1/2", generated) == "17 Missys Guest House S.R.L. Hotel etaj 1 2 generat 20.11.2026 14.05.pdf",
+            "Consumption note file: \"<nr> <beneficiar> <proiect> generat <data ora>.pdf\", the characters Windows refuses are replaced");
+        check(ConsumptionNoteFiles.FileName(3, new string('A', 200), null, generated).Length < 120 && ConsumptionNoteFiles.Part("  ?:*  ") == "-"
+              && ConsumptionNoteFiles.FileName(note) == ConsumptionNoteFiles.FileName(42, note.BeneficiaryName, note.ProjectName, ConsumptionNoteFiles.Local(note.CreatedUtc)),
+            "Consumption note file: a long name is shortened, an empty one gets a dash and a stored note is named by the same rule");
+        check(ConsumptionNoteFiles.ContentDisposition("7 Șantier x.pdf", attachment: true).Contains("filename*=UTF-8''7%20%C8%98antier%20x.pdf", StringComparison.Ordinal)
+              && ConsumptionNoteFiles.TotalFileName([note, note with { Id = 44, ProjectName = "Alt proiect" }], generated).StartsWith("42-44 Servicii Industriale SA toate proiectele generat", StringComparison.Ordinal),
+            "Consumption note file: the Content-Disposition carries the name with diacritics and a total note is named with the first and the last number");
+        var totalWriter = new ConsumptionNoteTotalWriter();
+        var second = note with { Id = 43, ProjectId = 10, ProjectName = "Proiect Beta" };
+        var totalBytes = totalWriter.Write([new ConsumptionNoteDetails(note, lines), new ConsumptionNoteDetails(second, [new ConsumptionNoteLine(1, new DateOnly(2026, 10, 25), 11, "Cameră IP exterior ăâîșț", "Camere IP", 2)])], generated);
+        var totalText = Words(totalBytes, out _);
+        check(totalText.Contains("Bon de consum total", StringComparison.Ordinal) && totalText.Contains("Proiect Beta", StringComparison.Ordinal) && totalText.Contains("Total general pe produs", StringComparison.Ordinal)
+              && totalText.Contains("42, 43", StringComparison.Ordinal),
+            "Consumption note: the total note has a section per project, the numbers of the notes and a grand total per product");
+        var merged = totalWriter.Merge([pdf, totalBytes]);
+        Words(merged, out var mergedPages); Words(totalBytes, out var totalPages);
+        check(mergedPages == pages + totalPages, "Consumption note: the merged PDF for printing keeps every page of every note");
         return Task.CompletedTask;
     }
 }

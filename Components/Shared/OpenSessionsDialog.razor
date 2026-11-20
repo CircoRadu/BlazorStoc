@@ -1,7 +1,7 @@
 @using BlazorStoc.Services
 @* Setari -> Baza de date -> Stare -> "Vezi sesiunile deschise": the open sessions with their details. Nothing is changed here; the list is given by the page and refreshed
    on request. *@
-<AppDialog TitleId="open-sessions-title" HelpTopic="setari-baza-sesiuni" HelpAbout="Sesiunile deschise" PanelClass="save-confirmation-dialog open-sessions-dialog" OnKeyDown="KeyDownAsync" OnClose="CloseConfirmedAsync"><TitleContent>Sesiuni deschise <span class="count-badge">@Sessions.Count</span></TitleContent><ChildContent>
+<AppDialog TitleId="open-sessions-title" HelpTopic="setari-baza-sesiuni" HelpAbout="Sesiunile deschise" PanelClass="save-confirmation-dialog open-sessions-dialog" OnKeyDown="KeyDownAsync" OnClose="() => Closed.InvokeAsync()"><TitleContent>Sesiuni deschise <span class="count-badge">@Sessions.Count</span></TitleContent><ChildContent>
         <p class="muted"><small>Sesiunile interactive ale aplicației în acest moment. Adresa și browserul apar după ce pagina sesiunii le raportează; o sesiune fără utilizator nu s-a autentificat.</small></p>
         @if (Sessions.Count == 0)
         {

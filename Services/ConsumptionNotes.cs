@@ -28,6 +28,14 @@ public interface IConsumptionNoteRepository
     Task DeleteAsync(int id, CancellationToken cancellationToken = default);
     // The projects of a beneficiary that have equipment handed over (net of returns above zero): only they can get a note, so only they show the button that generates it.
     Task<IReadOnlySet<int>> GetProjectsWithEquipmentAsync(int beneficiaryId, CancellationToken cancellationToken = default);
+    // The projects of a beneficiary that ever got equipment, with what is left at each (net of returns): the wizard "Generează bon de consum" shows the ones with nothing left disabled.
+    Task<IReadOnlyList<ConsumptionProjectChoice>> GetProjectChoicesAsync(int beneficiaryId, CancellationToken cancellationToken = default);
+}
+
+// One project of the wizard: Net = equipment still handed over; a project with nothing left (everything returned) is shown but cannot be chosen.
+public sealed record ConsumptionProjectChoice(int ProjectId, string Name, int Net)
+{
+    public bool Selectable => Net > 0;
 }
 
 public static class ConsumptionNoteRules

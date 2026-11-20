@@ -1038,3 +1038,10 @@ Cerut de utilizator la 06.10.2026 (verificarea fluxului, apoi deciziile: facturi
 ## Finalizat la 18.11.2026 12:25 - Tab Retur, echipamente proiect cu istoric, bon pe cantitatea neta (versiunea 0.6.1)
 
 - Retur din proiect (FreeEntryType.ReturnFromProject, intrare cu beneficiar si proiect, limitat la netul produsului pe proiect) si retur din vehicul (TransferFromVehicleAsync cu descriere si data); protectii la storno/stergere/modificare iesire; calcul net unic (iesiri minus retururi legate de iesiri minus retururi din proiect); IProjectEquipmentRepository (istoric, proiecte care au produsul); pagina Echipamente proiect cu lista neta si istoric pliabil; bonul de consum pe produs net cu data ultimei iesiri; butonul de bon doar pe proiecte cu echipamente
+
+## Finalizat la 20.11.2026 15:14 - PROP-0043, PROP-0044, PROP-0045 (versiunea 0.6.3)
+
+- Iesire multipla: buton + Proiect nou langa campul Proiect (popup cu ProjectEditor, proiectul creat se alege); fisiere ExitOperation.razor, ExitDestinationPicker.razor.
+- Unde sunt bucatile: doar Stoc total, Stoc depozit, Stoc masini (ProductWhere.razor).
+- Wizard Genereaza bon de consum (/consum/bon, ConsumptionNoteWizard.razor): fiecare proiect ales primeste bon numerotat in registrul existent (consumption_notes, fara migrare noua); bon total = ConsumptionNoteTotalWriter peste bonurile proiectelor; endpointuri /api/bonuri/arhiva.zip, toate.pdf, total.pdf; Descarca toate cu folder (File System Access) sau ZIP; helper unic de nume ConsumptionNoteFiles folosit si de tabelul de bonuri; meniu Produse, breadcrumb, topic help bon-consum.
+- Verificari: teste tintite (bonuri, MariaDB, help, structura, module, pachet); wizard in browser pe baza demo (un bon, separate, total).

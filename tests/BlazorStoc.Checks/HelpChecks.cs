@@ -217,6 +217,8 @@ public static class HelpChecks
         "propunere-modificare", "notificari-propuneri", "facturi-informatii", "proiecte-informatii", "bonuri-consum", "bonuri-consum-generare", "elcomtur-evolutie", "taskuri-noi", "actualizare-anunt",
         // The window was restructured on 27.10.2026 (three sections); the old picture was removed and is made again on request (docs/HELP_DE_REGENERAT.md), then the key leaves this list.
         "categorii-parametri", "schimbare-parola",
+        // Wizard "Generează bon de consum" (20.11.2026, PROP-0045): the pictures are made on request (docs/HELP_DE_REGENERAT.md), then the key leaves this list.
+        "bon-consum",
         // New 30.10.2026: the pictures are made on request (docs/HELP_DE_REGENERAT.md).
         "nomenclator-analizor-risc", "analizor-risc-editor", "beneficiari-fisiere",
         // New 06.11.2026: needs an ActivityApp connection to be photographed; the picture is made on request (docs/HELP_DE_REGENERAT.md).

@@ -34,10 +34,10 @@
             <SearchableSelect Id="@($"{Prefix}-project")" Label="Proiect" Placeholder="Alege proiectul beneficiarului…"
                               EmptyText="Niciun proiect găsit." Options="ProjectOptions" SelectedId="Model.ProjectId"
                               SelectedIdChanged="ProjectChanged" Disabled="@(Disabled || Model.BeneficiaryId is null)" />
-            @if (AllowAdd)
+            @if (AllowAdd || AllowAddProject)
             {
                 <button type="button" class="refresh act-confirm add-related" id="@($"{Prefix}-add-project")" disabled="@(Disabled || Model.BeneficiaryId is null)"
-                        @onclick="AddProjectRequested">+ Adaugă proiect</button>
+                        @onclick="AddProjectRequested">@(AllowAddProject ? "+ Proiect nou" : "+ Adaugă proiect")</button>
             }
             @if (Model.BeneficiaryId is not null && Projects.Count == 0) { <small class="form-note">Beneficiarul ales nu are proiecte: adaugă unul.</small> }
         </div>
@@ -138,6 +138,8 @@
     [Parameter] public EventCallback<int?> ProjectChanged { get; set; }
     // "Adaugă beneficiar" / "Adaugă proiect": the page keeps the typed form and opens the add form (only where offered).
     [Parameter] public bool AllowAdd { get; set; }
+    // Only the project button ("Proiect nou"), for a page that creates the project in a popup without leaving the form.
+    [Parameter] public bool AllowAddProject { get; set; }
     [Parameter] public EventCallback AddBeneficiaryRequested { get; set; }
     [Parameter] public EventCallback AddProjectRequested { get; set; }
     private bool sourceIsVehicle;

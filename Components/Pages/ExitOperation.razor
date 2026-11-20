@@ -54,6 +54,7 @@ else
             </div>
             <ExitDestinationPicker @ref="picker" Prefix="op" Model="common" Beneficiaries="beneficiaries" Projects="projects" Vehicles="vehicles"
                                    ShowSource="false" Disabled="busy || preview is not null"
+                                   AllowAddProject="true" AddProjectRequested="@(() => { addingProject = true; return Task.CompletedTask; })"
                                    DestinationChanged="DestinationChangedAsync" BeneficiaryChanged="BeneficiaryChangedAsync"
                                    ProjectChanged="id => { common.ProjectId = id; return Task.CompletedTask; }" />
             <label class="movement-description" for="op-description">Descriere comună (se folosește la liniile fără descriere proprie)
@@ -101,6 +102,13 @@ else
                 <button type="button" class="primary" @onclick="CheckAsync">@(busy ? "Se verifică…" : "Verifică și salvează")</button>
             </div>
         </fieldset>
+        @if (addingProject && common.BeneficiaryId is { } newProjectBeneficiary)
+        {
+            <AppDialog PanelClass="template-popup" LabelledBy="project-editor-title">
+                <ProjectEditor Original="null" FixedBeneficiaryId="newProjectBeneficiary" FixedBeneficiaryName="@beneficiaries.FirstOrDefault(b => b.Id == newProjectBeneficiary)?.Name"
+                               Saved="ProjectCreatedAsync" Closed="CloseAddProject" />
+            </AppDialog>
+        }
 
         @if (preview is not null)
         {
@@ -242,6 +250,22 @@ else
         if (common.Destination != ExitDestination.Beneficiary) { projects = []; useProject = false; }
         error = null;
         return Task.CompletedTask;
+    }
+
+    private bool addingProject;
+    private Task CloseAddProject() { addingProject = false; return Task.CompletedTask; }
+
+    // The project created in the popup joins the list and is selected; the typed exit form stays as it is.
+    private async Task ProjectCreatedAsync(Project created)
+    {
+        addingProject = false;
+        if (common.BeneficiaryId is { } beneficiaryId)
+        {
+            try { projects = await ProjectsRepository.GetForBeneficiaryAsync(beneficiaryId, lifetime.Token); }
+            catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+            catch (Exception ex) { Logger.LogError("Project list loading failed ({ErrorType}).", ex.GetType().Name); }
+        }
+        common.ProjectId = created.Id;
     }
 
     private async Task BeneficiaryChangedAsync(int? beneficiaryId)

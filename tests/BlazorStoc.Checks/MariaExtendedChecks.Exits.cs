@@ -550,6 +550,9 @@ public static partial class MariaExtendedChecks
             var notes = new MariaConsumptionNoteRepository(configuration, admin, audit);
             var withEquipment = await notes.GetProjectsWithEquipmentAsync(beneficiary.Id);
             Check(withEquipment.Contains(project.Id) && withEquipment.Count == 1, "Only the projects with equipment handed over (net of returns above zero) are offered a consumption note");
+            var choices = await notes.GetProjectChoicesAsync(beneficiary.Id);
+            Check(choices.Count == 1 && choices[0] is { Selectable: true } && choices[0].ProjectId == project.Id && choices[0].Net == 8 && choices[0].Name == project.Name,
+                "The wizard lists the projects of the beneficiary that got equipment, with what is left at each (net of returns)");
             var generated = await notes.GenerateAsync(project.Id, false);
             var details = (await notes.GetAsync(generated.Note.Id))!;
             var pdf = new ConsumptionNotePdfWriter().Write(details, DateTime.Now);

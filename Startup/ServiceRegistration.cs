@@ -110,6 +110,7 @@ internal static class ServiceRegistration
         services.AddScoped<IProductMinStockRepository, MariaProductMinStockRepository>();
         services.AddScoped<IProjectDeadlineRepository, MariaProjectDeadlineRepository>();
         services.AddSingleton<IConsumptionNotePdfWriter, ConsumptionNotePdfWriter>();
+        services.AddSingleton<IConsumptionNoteTotalWriter, ConsumptionNoteTotalWriter>();
         services.AddSingleton<IProductImageStore, FileProductImageStore>();
         services.AddSingleton<IWebHostEnvironmentTessdataPath, TessdataPath>();
         // IInventoryPickupOcrService and IInvoicePdfReader are registered by the Ocr module (Modules/Ocr): in a worker process or in-process (Ocr:Mode).

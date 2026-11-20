@@ -151,14 +151,67 @@ app.MapGet("/health", async (IConfiguration configuration, CancellationToken tok
 // Polled by every open page (wwwroot/maintenance-watch.js): tells an already-open tab that a backup/restore has
 // started or ended, so it can be moved to the waiting page and brought back. Carries no names or details.
 // Bon de consum / aviz de predare of a project: a stored consumption note (opens in the browser's PDF viewer; ?descarca=1 offers it as a file).
-app.MapGet("/api/bonuri/{noteId:int}/bon.pdf", async (int noteId, bool? descarca, IConsumptionNoteRepository notes, IConsumptionNotePdfWriter writer, CancellationToken token) =>
+// The names of the files come from ConsumptionNoteFiles, the one helper that names every downloaded note.
+app.MapGet("/api/bonuri/{noteId:int}/bon.pdf", async (int noteId, bool? descarca, HttpContext context, IConsumptionNoteRepository notes, IConsumptionNotePdfWriter writer, CancellationToken token) =>
 {
     try
     {
         var note = await notes.GetAsync(noteId, token);
         if (note is null) return Results.NotFound();
         var bytes = writer.Write(note, DateTime.Now);
-        return descarca == true ? Results.File(bytes, "application/pdf", $"bon-consum-{noteId}.pdf") : Results.File(bytes, "application/pdf");
+        context.Response.Headers.ContentDisposition = ConsumptionNoteFiles.ContentDisposition(ConsumptionNoteFiles.FileName(note.Note), attachment: descarca == true);
+        return Results.File(bytes, "application/pdf");
+    }
+    catch (AccessDeniedException) { return Results.Forbid(); }
+}).RequireAuthorization(PermissionPolicy.For("stoc.view"));
+// Several notes at once (wizard "Generează bon de consum"): a zip with one PDF per note, one PDF with all the notes (to print them together) and the total note of several projects.
+static int[] NoteIds(string ids) => ids.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).Select(item => int.TryParse(item, out var n) ? n : 0).Where(n => n > 0).Distinct().Take(200).ToArray();
+app.MapGet("/api/bonuri/arhiva.zip", async (string ids, HttpContext context, IConsumptionNoteRepository notes, IConsumptionNotePdfWriter writer, CancellationToken token) =>
+{
+    try
+    {
+        var numbers = NoteIds(ids);
+        if (numbers.Length == 0) return Results.BadRequest();
+        using var stream = new MemoryStream();
+        using (var archive = new System.IO.Compression.ZipArchive(stream, System.IO.Compression.ZipArchiveMode.Create, leaveOpen: true))
+            foreach (var number in numbers)
+            {
+                var note = await notes.GetAsync(number, token);
+                if (note is null) continue;
+                var entry = archive.CreateEntry(ConsumptionNoteFiles.FileName(note.Note), System.IO.Compression.CompressionLevel.Fastest);
+                await using var entryStream = entry.Open();
+                await entryStream.WriteAsync(writer.Write(note, DateTime.Now), token);
+            }
+        context.Response.Headers.ContentDisposition = ConsumptionNoteFiles.ContentDisposition(ConsumptionNoteFiles.ZipName(DateTime.Now), attachment: true);
+        return Results.File(stream.ToArray(), "application/zip");
+    }
+    catch (AccessDeniedException) { return Results.Forbid(); }
+}).RequireAuthorization(PermissionPolicy.For("stoc.view"));
+app.MapGet("/api/bonuri/toate.pdf", async (string ids, HttpContext context, IConsumptionNoteRepository notes, IConsumptionNotePdfWriter writer, IConsumptionNoteTotalWriter total, CancellationToken token) =>
+{
+    try
+    {
+        var documents = new List<byte[]>();
+        foreach (var number in NoteIds(ids))
+            if (await notes.GetAsync(number, token) is { } note) documents.Add(writer.Write(note, DateTime.Now));
+        if (documents.Count == 0) return Results.NotFound();
+        context.Response.Headers.ContentDisposition = ConsumptionNoteFiles.ContentDisposition(ConsumptionNoteFiles.MergedName(DateTime.Now), attachment: false);
+        return Results.File(total.Merge(documents), "application/pdf");
+    }
+    catch (AccessDeniedException) { return Results.Forbid(); }
+}).RequireAuthorization(PermissionPolicy.For("stoc.view"));
+app.MapGet("/api/bonuri/total.pdf", async (string ids, bool? descarca, HttpContext context, IConsumptionNoteRepository notes, IConsumptionNoteTotalWriter total, CancellationToken token) =>
+{
+    try
+    {
+        var details = new List<ConsumptionNoteDetails>();
+        foreach (var number in NoteIds(ids))
+            if (await notes.GetAsync(number, token) is { } note) details.Add(note);
+        if (details.Count == 0) return Results.NotFound();
+        if (details.Select(item => item.Note.BeneficiaryId).Distinct().Count() > 1) return Results.BadRequest();
+        var now = DateTime.Now;
+        context.Response.Headers.ContentDisposition = ConsumptionNoteFiles.ContentDisposition(ConsumptionNoteFiles.TotalFileName(details.Select(item => item.Note).ToArray(), now), attachment: descarca == true);
+        return Results.File(total.Write(details, now), "application/pdf");
     }
     catch (AccessDeniedException) { return Results.Forbid(); }
 }).RequireAuthorization(PermissionPolicy.For("stoc.view"));

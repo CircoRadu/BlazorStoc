@@ -1,0 +1,33 @@
+# Generează bon de consum
+Ruta: /consum/bon
+Cautare: bon consum wizard beneficiar proiect proiecte descarca tipareste zip pdf registru numar
+
+Wizardul generează bonurile de consum ale unui beneficiar, pe proiect (ieșiri minus retururi, doar cantități). Fiecare proiect ales primește un bon cu număr unic, păstrat în lista Bonuri de consum (Administrare); la mai multe proiecte poți cere și un bon total care le adună. Fișierul PDF se numește „număr beneficiar proiect generat data ora”.
+
+## Elemente
+### Pasul 1
+- Beneficiar | listă | Alegi beneficiarul căruia i s-a predat echipamentul.
+- Înainte | buton | Trece la proiectele beneficiarului.
+### Pasul 2
+- Alege | comutator | Bifează proiectul pentru care se generează bonul; un proiect returnat integral apare dezactivat.
+- Echipamente (buc.) | coloană | Câte bucăți au rămas predate proiectului după retururi.
+- Generează bon de consum | buton | Pentru un singur proiect, generează bonul și îl arată în fereastră.
+### Pasul 3 (doar pentru mai multe proiecte)
+- Bon separat pentru fiecare proiect | opțiune | Se generează câte un bon pentru fiecare proiect ales.
+- Un singur bon total | opțiune | Se generează câte un bon numerotat pentru fiecare proiect și un singur document total, cu secțiune pe proiect și total pe produs.
+### Fereastra bonurilor
+- Descarcă toate bonurile | buton | Salvează toate bonurile în folderul ales; dacă browserul nu permite alegerea folderului, descarcă o arhivă ZIP.
+- Tipărește toate bonurile | buton | Deschide tipărirea pentru toate bonurile deodată.
+- Taburile cu numele proiectelor | tab | Fiecare tab arată bonul unui proiect.
+- Descarcă bonul, Tipărește bonul | buton | Acționează asupra bonului din tabul curent.
+- Închide | buton | Închide fereastra.
+
+## Flux: Cum generez bonul unui proiect
+1. Alege beneficiarul și apasă „Înainte”.
+2. Alege proiectul și apasă „Generează bon de consum”.
+3. În fereastră descarcă sau tipărește bonul.
+
+## Flux: Cum generez bonuri pentru mai multe proiecte
+1. Alege beneficiarul, apoi mai multe proiecte, și apasă „Înainte”.
+2. Alege bonuri separate sau un bon total și apasă butonul de generare.
+3. Folosește „Descarcă toate bonurile” sau „Tipărește toate bonurile”.

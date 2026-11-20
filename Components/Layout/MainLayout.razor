@@ -55,7 +55,8 @@
                     <AuthorizeView Policy="perm:preluare-factura.view"><Authorized><NavLink href="/produse/preluare-factura" Match="NavLinkMatch.Prefix">Preluare factură</NavLink></Authorized></AuthorizeView>
                     }
                     <AuthorizeView Policy="perm:iesire-multipla.view"><Authorized><NavLink href="/iesiri/multipla" Match="NavLinkMatch.Prefix">Ieșire multiplă</NavLink></Authorized></AuthorizeView>
-                    @if (Modules.IsAvailable(BlazorStoc.Modules.ProjectReports.ProjectReportsModule.ModuleId)) { <AuthorizeView Policy="perm:export-consum.view"><Authorized><NavLink href="/consum" Match="NavLinkMatch.Prefix">Export consum</NavLink></Authorized></AuthorizeView> }
+                    @if (Modules.IsAvailable(BlazorStoc.Modules.ProjectReports.ProjectReportsModule.ModuleId)) { <AuthorizeView Policy="perm:export-consum.view"><Authorized><NavLink href="/consum" Match="NavLinkMatch.All">Export consum</NavLink></Authorized></AuthorizeView> }
+                    <AuthorizeView Policy="perm:stoc.view"><Authorized><NavLink href="/consum/bon" Match="NavLinkMatch.All">Generează bon de consum</NavLink></Authorized></AuthorizeView>
                 </ChildContent>
             </CollapsibleSection></Authorized></AuthorizeView>
             @if (Modules.IsAvailable(BlazorStoc.Modules.Inventory.InventoryModule.ModuleId))
