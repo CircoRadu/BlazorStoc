@@ -94,9 +94,7 @@ else if (loadError is null)
 
 @if (showPreview)
 {
-    <div class="delete-overlay" @onkeydown="PreviewKeyDownAsync">
-        <section class="delete-dialog pdf-preview-dialog" role="dialog" aria-modal="true" tabindex="-1" aria-labelledby="pdf-preview-title">
-            <div class="dialog-head"><h2 id="pdf-preview-title">Situația de inventar</h2><HelpButton Topic="inventar-previzualizare" About="Situația de inventar" /></div>
+    <AppDialog Title="Situația de inventar" TitleId="pdf-preview-title" HelpTopic="inventar-previzualizare" HelpAbout="Situația de inventar" PanelClass="pdf-preview-dialog" OnKeyDown="PreviewKeyDownAsync" OnClose="ClosePreviewAsync">
             <p class="muted">@previewFileName</p>
             <iframe class="pdf-preview-frame" @ref="previewFrame" title="Previzualizare situație de inventar"></iframe>
             @if (previewError is not null) { <div class="validation-message" role="alert">@previewError</div> }
@@ -105,8 +103,7 @@ else if (loadError is null)
                 <button type="button" class="refresh act-confirm" @onclick="SavePreviewAsync">Salvează</button>
                 <button type="button" class="danger" @onclick="ClosePreviewAsync">Închide</button>
             </div>
-        </section>
-    </div>
+    </AppDialog>
 }
 
 </PageBoundary>
@@ -151,7 +148,9 @@ else if (loadError is null)
     }
 
     private List<string> Categories => groups.Select(group => group.Category).Where(value => value.Length > 0)
-        .Distinct(StringComparer.OrdinalIgnoreCase).Order(StringComparer.CurrentCultureIgnoreCase).ToList();
+        .Distinct(StringComparer.OrdinalIgnoreCase).OrderBy(CategoryPlace).ThenBy(category => category, StringComparer.CurrentCultureIgnoreCase).ToList();
+    // The categories come in the order of the Stoc menu (the order of the tree of categories); a category the tree does not know goes last, alphabetically.
+    private int CategoryPlace(string category) => tree.ToList().FindIndex(node => string.Equals(node.Category, category, StringComparison.OrdinalIgnoreCase)) is var place and >= 0 ? place : int.MaxValue;
     private List<ProductGroup> Subcategories(string category) => groups
         .Where(group => string.Equals(group.Category, category, StringComparison.OrdinalIgnoreCase) && group.Subcategory.Length > 0)
         .OrderBy(group => tree.ToList().FindIndex(node => string.Equals(node.Category, group.Category, StringComparison.OrdinalIgnoreCase) && string.Equals(node.Name, group.Subcategory, StringComparison.OrdinalIgnoreCase)) is var place and >= 0 ? place : int.MaxValue)

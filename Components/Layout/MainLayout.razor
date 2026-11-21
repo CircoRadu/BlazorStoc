@@ -1,4 +1,4 @@
-﻿@inherits LayoutComponentBase
+@inherits LayoutComponentBase
 @implements IDisposable
 @using Microsoft.AspNetCore.WebUtilities
 @using BlazorStoc.Services
@@ -8,12 +8,15 @@
 @inject IOperationLockService OperationLock
 @inject IExpiryNotificationService Notifications
 @inject BlazorStoc.Modules.Tasks.IUserTaskAlerts TaskAlerts
+@inject IUserDisplayService Display
 @inject NavigationManager Navigation
 @inject ILogger<MainLayout> Logger
 
-<div class="app-shell" style="@($"--sidebar-extra:{SidebarExtra()}px")">
+<div class="app-shell" data-palette="@palette" style="@($"--sidebar-extra:{SidebarExtra()}px;{displayStyle}")">
     <aside class="sidebar">
         <a class="brand" href="/"><span class="brand-icon">B</span><span>Blazor<span class="brand-light">Stoc</span><small>ESP · GESTIUNE</small></span></a>
+        @* Dashboard is fixed: it stays at the top of the sidebar on every page, whatever menu is shown under it. *@
+        <NavLink class="nav-item nav-dashboard" href="/" Match="NavLinkMatch.All"><span>⌂</span> Dashboard <span class="nav-arrow">→</span></NavLink>
         @if (productSection)
         {
             <a class="nav-back" href="/"><span>←</span> Meniu principal</a>
@@ -40,7 +43,6 @@
         else
         {
             <p class="nav-label">SPAȚIU DE LUCRU</p>
-            <NavLink class="nav-item" href="/" Match="NavLinkMatch.All"><span>⌂</span> Pagina principală <span class="nav-arrow">→</span></NavLink>
             <AuthorizeView Policy="perm:stoc.view|preluare-factura.view|iesire-multipla.view|export-consum.view"><Authorized Context="menuSection"><CollapsibleSection Id="products-menu"
                                 RootClass="administration-menu"
                                 HeaderRowClass="collapsible-header"
@@ -49,12 +51,13 @@
                                 Expanded="@productsExpanded">
                 <Header><span>▦</span> Produse</Header>
                 <ChildContent>
-                    <AuthorizeView Policy="perm:stoc.view"><Authorized><a class="@(onStockPage ? "active" : "")" href="/produse">Stoc</a></Authorized></AuthorizeView>
+                    <AuthorizeView Policy="perm:stoc.view"><Authorized><a class="@(onStockPage ? "active" : "")" href="/produse"><span class="nav-child-icon" aria-hidden="true">@MenuCatalog.IconOf("produse.stoc")</span> Stoc</a></Authorized></AuthorizeView>
                     @if (Modules.IsAvailable(BlazorStoc.Modules.Invoices.InvoicesModule.ModuleId)) {
-                    <AuthorizeView Policy="perm:preluare-factura.view"><Authorized><NavLink href="/produse/preluare-factura" Match="NavLinkMatch.Prefix">Preluare factură</NavLink></Authorized></AuthorizeView>
+                    <AuthorizeView Policy="perm:preluare-factura.view"><Authorized><NavLink href="/produse/preluare-factura" Match="NavLinkMatch.Prefix"><span class="nav-child-icon" aria-hidden="true">@MenuCatalog.IconOf("produse.preluare-factura")</span> Preluare factură</NavLink></Authorized></AuthorizeView>
                     }
-                    <AuthorizeView Policy="perm:iesire-multipla.view"><Authorized><NavLink href="/iesiri/multipla" Match="NavLinkMatch.Prefix">Ieșire multiplă</NavLink></Authorized></AuthorizeView>
-                    @if (Modules.IsAvailable(BlazorStoc.Modules.ProjectReports.ProjectReportsModule.ModuleId)) { <AuthorizeView Policy="perm:export-consum.view"><Authorized><NavLink href="/consum" Match="NavLinkMatch.Prefix">Export consum</NavLink></Authorized></AuthorizeView> }
+                    <AuthorizeView Policy="perm:iesire-multipla.view"><Authorized><NavLink href="/iesiri/multipla" Match="NavLinkMatch.Prefix"><span class="nav-child-icon" aria-hidden="true">@MenuCatalog.IconOf("produse.iesire-multipla")</span> Ieșire multiplă</NavLink></Authorized></AuthorizeView>
+                    @if (Modules.IsAvailable(BlazorStoc.Modules.ProjectReports.ProjectReportsModule.ModuleId)) { <AuthorizeView Policy="perm:export-consum.view"><Authorized><NavLink href="/consum" Match="NavLinkMatch.All"><span class="nav-child-icon" aria-hidden="true">@MenuCatalog.IconOf("produse.export-consum")</span> Export consum</NavLink></Authorized></AuthorizeView> }
+                    <AuthorizeView Policy="perm:stoc.view"><Authorized><NavLink href="/consum/bon" Match="NavLinkMatch.All"><span class="nav-child-icon" aria-hidden="true">@MenuCatalog.IconOf("produse.bon-consum")</span> Generează bon de consum</NavLink></Authorized></AuthorizeView>
                 </ChildContent>
             </CollapsibleSection></Authorized></AuthorizeView>
             @if (Modules.IsAvailable(BlazorStoc.Modules.Inventory.InventoryModule.ModuleId))
@@ -67,12 +70,13 @@
                                 Expanded="@inventoryExpanded">
                 <Header><span>▥</span> Inventar</Header>
                 <ChildContent>
-                    <AuthorizeView Policy="perm:inventar.view"><Authorized><NavLink href="/inventar" Match="NavLinkMatch.All">Generare situație inventar</NavLink></Authorized></AuthorizeView>
-                    <AuthorizeView Policy="perm:inventar-preluare.view"><Authorized><NavLink href="/inventar/preluare" Match="NavLinkMatch.Prefix">Preluare inventar</NavLink></Authorized></AuthorizeView>
+                    <AuthorizeView Policy="perm:inventar.view"><Authorized><NavLink href="/inventar" Match="NavLinkMatch.All"><span class="nav-child-icon" aria-hidden="true">@MenuCatalog.IconOf("inventar.situatie")</span> Generare situație inventar</NavLink></Authorized></AuthorizeView>
+                    <AuthorizeView Policy="perm:inventar-preluare.view"><Authorized><NavLink href="/inventar/preluare" Match="NavLinkMatch.Prefix"><span class="nav-child-icon" aria-hidden="true">@MenuCatalog.IconOf("inventar.preluare")</span> Preluare inventar</NavLink></Authorized></AuthorizeView>
+                    <AuthorizeView Policy="perm:inventar-preluare.view"><Authorized><NavLink href="/inventar/invatare-ocr" Match="NavLinkMatch.Prefix"><span class="nav-child-icon" aria-hidden="true">@MenuCatalog.IconOf("inventar.ocr")</span> Învățare OCR</NavLink></Authorized></AuthorizeView>
                 </ChildContent>
             </CollapsibleSection></Authorized></AuthorizeView>
             }
-            <AuthorizeView Policy="perm:categorii.view|beneficiari.view|furnizori.view|facturi.view|vehicule.view|elcomtur.import|nomenclator.view"><Authorized Context="menuSection"><CollapsibleSection Id="administration-menu"
+            <AuthorizeView Policy="perm:categorii.view|beneficiari.view|furnizori.view|facturi.view|vehicule.view|elcomtur.import|nomenclator.view|stoc.view"><Authorized Context="menuSection"><CollapsibleSection Id="administration-menu"
                                 RootClass="administration-menu"
                                 HeaderRowClass="collapsible-header"
                                 ToggleClass="@($"nav-item administration-parent {(administrationSection ? "active" : "")}")"
@@ -80,17 +84,18 @@
                                 Expanded="@administrationExpanded">
                 <Header><span>⚙</span> Administrare</Header>
                 <ChildContent>
-                    <AuthorizeView Policy="perm:categorii.view"><Authorized><NavLink href="/categorii" Match="NavLinkMatch.Prefix">Categorii</NavLink></Authorized></AuthorizeView>
-                    <AuthorizeView Policy="perm:beneficiari.view"><Authorized><NavLink href="/beneficiari" Match="NavLinkMatch.Prefix">Beneficiari</NavLink></Authorized></AuthorizeView>
+                    <AuthorizeView Policy="perm:categorii.view"><Authorized><NavLink href="/categorii" Match="NavLinkMatch.Prefix"><span class="nav-child-icon" aria-hidden="true">@MenuCatalog.IconOf("administrare.categorii")</span> Categorii</NavLink></Authorized></AuthorizeView>
+                    <AuthorizeView Policy="perm:beneficiari.view"><Authorized><NavLink href="/beneficiari" Match="NavLinkMatch.Prefix"><span class="nav-child-icon" aria-hidden="true">@MenuCatalog.IconOf("administrare.beneficiari")</span> Beneficiari</NavLink></Authorized></AuthorizeView>
+                    <AuthorizeView Policy="perm:stoc.view"><Authorized><NavLink href="/bonuri-consum" Match="NavLinkMatch.Prefix"><span class="nav-child-icon" aria-hidden="true">@MenuCatalog.IconOf("administrare.bonuri-consum")</span> Bonuri de consum</NavLink></Authorized></AuthorizeView>
                     @if (Modules.IsAvailable(BlazorStoc.Modules.Suppliers.SuppliersModule.ModuleId))
                     {
-                        <AuthorizeView Policy="perm:furnizori.view"><Authorized><NavLink href="/furnizori" Match="NavLinkMatch.Prefix">Furnizori</NavLink></Authorized></AuthorizeView>
-                        <AuthorizeView Policy="perm:facturi.view"><Authorized><NavLink href="/facturi" Match="NavLinkMatch.Prefix">Facturi</NavLink></Authorized></AuthorizeView>
+                        <AuthorizeView Policy="perm:furnizori.view"><Authorized><NavLink href="/furnizori" Match="NavLinkMatch.Prefix"><span class="nav-child-icon" aria-hidden="true">@MenuCatalog.IconOf("administrare.furnizori")</span> Furnizori</NavLink></Authorized></AuthorizeView>
+                        <AuthorizeView Policy="perm:facturi.view"><Authorized><NavLink href="/facturi" Match="NavLinkMatch.Prefix"><span class="nav-child-icon" aria-hidden="true">@MenuCatalog.IconOf("administrare.facturi")</span> Facturi</NavLink></Authorized></AuthorizeView>
                     }
-                    @if (Modules.IsAvailable(BlazorStoc.Modules.Vehicles.VehiclesModule.ModuleId)) { <AuthorizeView Policy="perm:vehicule.view"><Authorized><NavLink href="/vehicule" Match="NavLinkMatch.Prefix">Vehicule</NavLink></Authorized></AuthorizeView> }
-                    @if (Modules.IsAvailable(BlazorStoc.Modules.Tasks.TasksModule.ModuleId)) { <AuthorizeView Policy="perm:taskuri.view"><Authorized><NavLink href="/taskuri/adauga" Match="NavLinkMatch.Prefix">Taskuri utilizator</NavLink></Authorized></AuthorizeView> }
-                    @if (Modules.IsAvailable(BlazorStoc.Modules.Elcomtur.ElcomturModule.ModuleId)) { <AuthorizeView Policy="perm:elcomtur.import"><Authorized><NavLink href="/preluare-elcomtur" Match="NavLinkMatch.Prefix">Preluare Elcomtur</NavLink></Authorized></AuthorizeView> }
-                    <AuthorizeView Policy="perm:nomenclator.view"><Authorized><NavLink href="/nomenclator" Match="NavLinkMatch.Prefix">Nomenclator</NavLink></Authorized></AuthorizeView>
+                    @if (Modules.IsAvailable(BlazorStoc.Modules.Vehicles.VehiclesModule.ModuleId)) { <AuthorizeView Policy="perm:vehicule.view"><Authorized><NavLink href="/vehicule" Match="NavLinkMatch.Prefix"><span class="nav-child-icon" aria-hidden="true">@MenuCatalog.IconOf("administrare.vehicule")</span> Vehicule</NavLink></Authorized></AuthorizeView> }
+                    @if (Modules.IsAvailable(BlazorStoc.Modules.Tasks.TasksModule.ModuleId)) { <AuthorizeView Policy="perm:taskuri.view"><Authorized><NavLink href="/taskuri/adauga" Match="NavLinkMatch.Prefix"><span class="nav-child-icon" aria-hidden="true">@MenuCatalog.IconOf("administrare.taskuri")</span> Taskuri utilizator</NavLink></Authorized></AuthorizeView> }
+                    @if (Modules.IsAvailable(BlazorStoc.Modules.Elcomtur.ElcomturModule.ModuleId)) { <AuthorizeView Policy="perm:elcomtur.import"><Authorized><NavLink href="/preluare-elcomtur" Match="NavLinkMatch.Prefix"><span class="nav-child-icon" aria-hidden="true">@MenuCatalog.IconOf("administrare.elcomtur")</span> Preluare Elcomtur</NavLink></Authorized></AuthorizeView> }
+                    <AuthorizeView Policy="perm:nomenclator.view"><Authorized><NavLink href="/nomenclator" Match="NavLinkMatch.Prefix"><span class="nav-child-icon" aria-hidden="true">@MenuCatalog.IconOf("administrare.nomenclator")</span> Nomenclator</NavLink></Authorized></AuthorizeView>
                 </ChildContent>
             </CollapsibleSection></Authorized></AuthorizeView>
             @foreach (var module in Modules.NavItems())
@@ -102,20 +107,21 @@
             <AuthorizeView Policy="perm:notificari.view"><Authorized><NavLink class="@($"nav-item{(alertCount > 0 ? " nav-alert" : "")}")" href="/notificari" Match="NavLinkMatch.Prefix" data-notification-nav><span>✉</span> Notificări <span class="nav-triangle" data-notification-triangle role="img" aria-label="Notificări noi" hidden="@(alertCount <= 0)">⚠</span><span class="nav-arrow">→</span></NavLink></Authorized></AuthorizeView>
             }
             @if (Modules.IsAvailable(BlazorStoc.Modules.Journal.JournalModule.ModuleId)) { <AuthorizeView Policy="perm:jurnal.view"><Authorized><NavLink class="nav-item" href="/jurnal" Match="NavLinkMatch.Prefix"><span>≡</span> Jurnal activitate <span class="nav-arrow">→</span></NavLink></Authorized></AuthorizeView> }
-            <AuthorizeView Policy="perm:setari-facturi.view|setari-anaf.view|setari-notificari.view|setari-harta.view|setari-backup.view|setari-module.view|setari-jurnal.view|setari-bug-raport.view|setari-actualizare.view|setari-import-activityapp.view|setari-import-elcomtur.view|utilizatori.view|tipuri-utilizatori.view"><Authorized><NavLink class="nav-item" href="/setari" Match="NavLinkMatch.Prefix"><span>☰</span> Setări <span class="nav-arrow">→</span></NavLink></Authorized></AuthorizeView>@if (Modules.IsAvailable(BlazorStoc.Modules.BugReports.BugReportsModule.ModuleId)) { <a class="nav-item" href="#raport-eroare" id="nav-bug" data-bug-open aria-haspopup="dialog"><span>⚑</span> Raportează o eroare <span class="nav-arrow">→</span></a> }@if (Modules.IsAvailable(BlazorStoc.Modules.Proposals.ProposalsModule.ModuleId)) { <a class="nav-item" href="#propune-modificare" id="nav-proposal" data-proposal-open aria-haspopup="dialog"><span>✎</span> Propune o modificare <span class="nav-arrow">→</span></a> }<a class="nav-item" href="#ajutor" id="nav-help" data-help-index aria-haspopup="dialog"><span>?</span> Ajutor <span class="nav-arrow">→</span></a>
+            <AuthorizeView Policy="perm:setari-facturi.view|setari-anaf.view|setari-notificari.view|setari-harta.view|setari-backup.view|setari-module.view|setari-jurnal.view|setari-bug-raport.view|setari-actualizare.view|setari-import-activityapp.view|setari-import-elcomtur.view|setari-import-espstoc.view|utilizatori.view|tipuri-utilizatori.view"><Authorized><NavLink class="nav-item" href="/setari" Match="NavLinkMatch.Prefix"><span>☰</span> Setări <span class="nav-arrow">→</span></NavLink></Authorized></AuthorizeView><a class="nav-item" href="#ajutor" id="nav-help" data-help-index aria-haspopup="dialog"><span>?</span> Ajutor <span class="nav-arrow">→</span></a>
         }
         <div class="sidebar-bottom"><span class="status-dot"></span> Versiunea @BlazorStoc.Services.AppVersion.Current <p>Gestiune produse</p><small>BlazorStoc · MariaDB</small></div>
     </aside>
-    <div class="main-shell"><header class="topbar">@RouteTrail()<div class="topbar-actions"><span class="mode-pill">Sesiune autentificată</span><button type="button" class="help-icon" data-help-open aria-haspopup="dialog" aria-label="Ajutor pentru această fereastră" title="Ajutor pentru această fereastră"></button><button type="button" class="theme-toggle" data-theme-toggle aria-pressed="false" aria-label="Treci la tema întunecată" title="Treci la tema întunecată"></button><AccountMenu @rendermode="@(new InteractiveServerRenderMode(prerender: true))" /><span class="avatar">ES</span></div></header>
+    <div class="main-shell"><header class="topbar">@RouteTrail()<div class="topbar-actions"><AuthorizeView Policy="perm:setari-bug-raport.view"><Authorized Context="devAccess"><a class="topbar-report" href="/setari?tab=dezvoltare" id="nav-development" title="Pagina de dezvoltare (Setări → Dezvoltare)"><span aria-hidden="true">⚑</span> Dezvoltare</a><AuthorizeView Policy="perm:setari-actualizare.view"><Authorized><a class="topbar-report" href="/setari?tab=actualizare" id="nav-update" title="Actualizează aplicația (Setări → Actualizare)"><span aria-hidden="true">↻</span> Actualizează aplicația</a></Authorized></AuthorizeView></Authorized></AuthorizeView>@if (Modules.IsAvailable(BlazorStoc.Modules.BugReports.BugReportsModule.ModuleId)) { <a class="topbar-report" href="#raport-eroare" id="nav-bug" data-bug-open aria-haspopup="dialog" title="Raportează o eroare (cu captura paginii)"><span aria-hidden="true">⚑</span> Raportează o eroare</a> }@if (Modules.IsAvailable(BlazorStoc.Modules.Proposals.ProposalsModule.ModuleId)) { <a class="topbar-report" href="#propune-modificare" id="nav-proposal" data-proposal-open aria-haspopup="dialog" title="Propune o modificare (cu captura paginii)"><span aria-hidden="true">✎</span> Propune o modificare</a> }<span class="mode-pill">Sesiune autentificată</span><button type="button" class="help-icon" data-help-open aria-haspopup="dialog" aria-label="Ajutor pentru această fereastră" title="Ajutor pentru această fereastră"></button><button type="button" class="theme-toggle" data-theme-toggle aria-pressed="false" aria-label="Treci la tema întunecată" title="Treci la tema întunecată"></button><AccountMenu @rendermode="@(new InteractiveServerRenderMode(prerender: true))" /><span class="avatar">ES</span></div></header>
         @if (activeOperation is not null && !onRestorePage && !onWaitingPage)
         {
             <div class="error-banner" role="alert" id="maintenance-banner">
                 Backup/restaurare in curs (@activeOperation.OperatorName) - datele pot fi temporar indisponibile. Reveniti mai tarziu.
             </div>
         }
-        <main class="workspace"><UpdateBanner @rendermode="@(new InteractiveServerRenderMode(prerender: false))" /><ModuleAlertBanner @rendermode="@(new InteractiveServerRenderMode(prerender: false))" /><SessionTracker @rendermode="@(new InteractiveServerRenderMode(prerender: false))" />@Body</main></div>
+        <main class="workspace"><UpdateBanner @rendermode="@(new InteractiveServerRenderMode(prerender: false))" /><UpdateNoticeDialog @rendermode="@(new InteractiveServerRenderMode(prerender: false))" /><ModuleAlertBanner @rendermode="@(new InteractiveServerRenderMode(prerender: false))" /><SessionTracker @rendermode="@(new InteractiveServerRenderMode(prerender: false))" /><BlazorStoc.Modules.Tasks.NewTasksGate @rendermode="@(new InteractiveServerRenderMode(prerender: false))" /><BlazorStoc.Modules.Announcements.AnnouncementPopup @rendermode="@(new InteractiveServerRenderMode(prerender: false))" />@Body</main></div>
 </div>
-<dialog id="logout-dialog" class="delete-dialog logout-dialog" aria-labelledby="logout-title" aria-describedby="logout-description">
+<TableGearHost @rendermode="@(new InteractiveServerRenderMode(prerender: false))" />
+<AppDialog Native="true" Id="logout-dialog" PanelClass="logout-dialog" LabelledBy="logout-title" DescribedBy="logout-description" ShowModuleActions="false">
     <form method="post" action="/Account/Logout">
         <AntiforgeryToken />
         <h2 id="logout-title">Închizi sesiunea?</h2>
@@ -125,7 +131,7 @@
             <button type="button" class="primary" data-logout-cancel autofocus>Anulează deconectarea</button>
         </div>
     </form>
-</dialog>
+</AppDialog>
 @if (Modules.IsAvailable(BlazorStoc.Modules.BugReports.BugReportsModule.ModuleId)) { <BugReportDialog @rendermode="@(new InteractiveServerRenderMode(prerender: false))" /> }
 @if (Modules.IsAvailable(BlazorStoc.Modules.Proposals.ProposalsModule.ModuleId)) { <BlazorStoc.Modules.Proposals.ProposalDialog @rendermode="@(new InteractiveServerRenderMode(prerender: false))" /> }
 <div id="blazor-error-ui" role="alert">Conexiunea cu aplicația a fost întreruptă. Dacă aplicația se repornește singură, durează câteva secunde. <a href="" class="reload">Reîncarcă pagina</a><a class="dismiss" title="Închide" aria-label="Închide">×</a></div>
@@ -142,8 +148,12 @@
     private int alertCount;
     private readonly CancellationTokenSource lifetime = new();
 
+    // The display scale chosen by the signed-in user (Setari afisare), put on the shell as CSS custom properties.
+    private string displayStyle = "", palette = "";
+
     protected override async Task OnInitializedAsync()
     {
+        displayStyle = await Display.StyleAsync(); palette = (await Display.GetAsync()).Global.Palette ?? "";
         Navigation.LocationChanged += LocationChanged;
         // A module stopped or started again (Setări -> Module) changes the menu at once, not at the next navigation.
         Modules.Changed += ModulesChanged;
@@ -182,6 +192,7 @@
 
     private void LocationChanged(object? sender, Microsoft.AspNetCore.Components.Routing.LocationChangedEventArgs args)
     {
+        closedNodes.Clear();
         RefreshNavigationAsync().FireAndForget(Logger, "layout navigation refresh");
     }
 
@@ -295,10 +306,13 @@
         }
         return names;
     }
-    private bool IsNodeOpen(SubcategoryNode node) => openNodes.Contains(NodeKey(node)) || SelectedBranch().Contains(node.Name);
+    // Nodes of the selected branch that the user closed by pressing them; cleared when the address changes.
+    private readonly HashSet<string> closedNodes = new(StringComparer.Ordinal);
+    private bool IsNodeOpen(SubcategoryNode node) => openNodes.Contains(NodeKey(node)) || (SelectedBranch().Contains(node.Name) && !closedNodes.Contains(NodeKey(node)));
     private void SetNodeOpen(SubcategoryNode node, bool open)
     {
-        if (open) openNodes.Add(NodeKey(node)); else { openNodes.Remove(NodeKey(node)); }
+        if (open) { openNodes.Add(NodeKey(node)); closedNodes.Remove(NodeKey(node)); }
+        else { openNodes.Remove(NodeKey(node)); closedNodes.Add(NodeKey(node)); }
     }
 
     private RenderFragment<(string Category, string? Parent)> Nodes => scope => @<text>

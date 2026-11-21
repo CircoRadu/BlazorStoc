@@ -9,21 +9,17 @@
 
 @if (adding || editing is not null)
 {
-    <div class="delete-overlay">
-        <div class="delete-dialog template-popup" role="dialog" aria-modal="true" tabindex="-1" aria-labelledby="contract-editor-title">
+    <AppDialog PanelClass="template-popup" LabelledBy="contract-editor-title">
             <ServiceContractEditor @key="editorKey" BeneficiaryId="BeneficiaryId" WorkPoints="WorkPoints" Contracts="Contracts" Original="editing"
                                    Saved="SavedAsync" Closed="CloseEditorAsync" />
-        </div>
-    </div>
+    </AppDialog>
 }
 
 @if (addendumFor is not null)
 {
-    <div class="delete-overlay">
-        <div class="delete-dialog template-popup" role="dialog" aria-modal="true" tabindex="-1" aria-labelledby="addendum-editor-title">
+    <AppDialog PanelClass="template-popup" LabelledBy="addendum-editor-title">
             <ServiceContractAddendumEditor @key="addendumKey" Details="addendumFor" WorkPoints="WorkPoints" Contracts="Contracts" Saved="AddendumSavedAsync" Closed="CloseAddendumAsync" />
-        </div>
-    </div>
+    </AppDialog>
 }
 
 @if (addendumAction is not null)
@@ -55,8 +51,9 @@
     }
     else
     {
-        <div class="table-scroll"><table><thead><tr><th>CONTRACT</th><th>EXPIRĂ</th><th>STARE</th><th>CICLICITATE</th><th>COMPONENTE</th><th class="number">PUNCTE</th><th>URMĂTOAREA SCADENȚĂ</th>@if (CanManage) { <th></th> }</tr></thead><tbody>
-        @foreach (var details in Visible)
+        <Paged Items="Visible" Id="service-contracts-size" Context="pageRows" Sorts="Sorts">
+        <div class="table-scroll"><table><thead><tr><SortTh Key="label">CONTRACT</SortTh><SortTh Key="until">EXPIRĂ</SortTh><SortTh Key="state">STARE</SortTh><SortTh Key="cycle">CICLICITATE</SortTh><th>COMPONENTE</th><SortTh Key="points" Class="number">PUNCTE</SortTh><SortTh Key="due">URMĂTOAREA SCADENȚĂ</SortTh>@if (CanManage) { <th></th> }</tr></thead><tbody>
+        @foreach (var details in pageRows)
         {
             var contract = details.Contract;
             var expired = ServiceDueRules.IsExpired(contract, Today);
@@ -131,6 +128,7 @@
             }
         }
         </tbody></table></div>
+        </Paged>
     }
 </details>
 </section>
@@ -164,6 +162,7 @@
 
     private DateOnly Today => DateOnly.FromDateTime(Clock.GetLocalNow().DateTime);
     private int OffCount => Contracts.Count(item => !item.Contract.IsActive);
+    private static readonly IReadOnlyDictionary<string, Func<ServiceContractDetails, IComparable?>> Sorts = new Dictionary<string, Func<ServiceContractDetails, IComparable?>> { ["label"] = item => item.Contract.Label, ["until"] = item => item.Contract.ValidUntil, ["state"] = item => item.Contract.IsActive ? 0 : 1, ["cycle"] = item => item.Contract.CycleMonths, ["points"] = item => item.Points.Count, ["due"] = item => item.NextDue };
     private IReadOnlyList<ServiceContractDetails> Visible => Contracts.Where(item => item.Contract.IsActive || showOff).ToList();
     private bool Locked => busy || adding || editing is not null || activation is not null || addendumFor is not null || addendumAction is not null;
 
@@ -251,6 +250,14 @@
     private static string Shorten(string text) => text.Length <= 60 ? text : text[..60] + "…";
 
     private void Toggle(int contractId) { if (!expanded.Remove(contractId)) expanded.Add(contractId); }
+
+    // Called by the parent when the tile "Adaugă contract de mentenanță" of the main page brought the user to this beneficiary.
+    public void StartAdd()
+    {
+        if (!CanManage || Locked) return;
+        OpenAdd();
+        StateHasChanged();
+    }
 
     private void OpenAdd() { adding = true; editing = null; editorKey = Guid.NewGuid(); notice = error = null; }
     private void OpenEdit(ServiceContractDetails details) { adding = false; editing = details; editorKey = Guid.NewGuid(); notice = error = null; }

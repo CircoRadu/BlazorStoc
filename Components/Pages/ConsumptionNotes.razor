@@ -1,0 +1,76 @@
+@page "/bonuri-consum"
+@attribute [Authorize(Policy = "perm:stoc.view")]
+@rendermode @(new InteractiveServerRenderMode(prerender: false))
+@using BlazorStoc.Services
+@inject IConsumptionNoteRepository Notes
+@inject ILogger<ConsumptionNotes> Logger
+@implements IDisposable
+<PageBoundary>
+
+<PageTitle>Bonuri de consum · BlazorStoc</PageTitle>
+<div class="page-heading"><div><p class="eyebrow">ADMINISTRARE</p><h1>Bonuri de consum</h1><p class="muted">Toate bonurile de consum din sistem, active și inactive. Un bon se generează din iconița de bon a unui proiect, în pagina beneficiarului.</p></div>
+    <div class="heading-actions"><button class="refresh act-reload" disabled="@loading" @onclick="LoadAsync"><span>↻</span> @(loading ? "Se încarcă…" : "Actualizează")</button></div></div>
+@if (error is not null) { <div class="error-banner" role="alert">@error <button class="primary" @onclick="LoadAsync">Reîncearcă</button></div> }
+
+<section class="catalog">
+    <div class="catalog-heading"><h2>Bonuri de consum <span class="count-badge">@Filtered.Count</span></h2><small>@(all.Count == Filtered.Count ? $"{all.Count} în total" : $"{Filtered.Count} din {all.Count}")</small></div>
+    <div class="filters consumption-notes-filters">
+        <label class="search-box"><span>⌕</span><input id="notes-search" aria-label="Caută bonuri de consum" placeholder="Caută după număr, dată, beneficiar, proiect, operator…" @bind="query" @bind:event="oninput" /></label>
+        <SearchableSelect Id="notes-beneficiary" Label="Beneficiar" Placeholder="Alege sau caută beneficiarul…" EmptyText="Niciun beneficiar găsit." Options="BeneficiaryOptions"
+                          SelectedId="beneficiaryId" SelectedIdChanged="BeneficiaryChanged" />
+        <SearchableSelect Id="notes-project" Label="Proiect" Placeholder="Alege sau caută proiectul…" EmptyText="Niciun proiect găsit." Options="ProjectOptions"
+                          SelectedId="projectId" SelectedIdChanged="id => projectId = id" />
+    </div>
+    @if (loading) { <div class="empty-state" role="status"><div class="spinner"></div><h3>Se încarcă bonurile</h3></div> }
+    else { <ConsumptionNotesTable Items="Filtered" ShowBeneficiary="true" IdPrefix="all-consumption-notes" EmptyText="@(all.Count == 0 ? "Nu există bonuri de consum." : "Niciun bon nu corespunde căutării.")" Changed="LoadAsync" /> }
+</section>
+
+</PageBoundary>
+
+@code {
+    private readonly CancellationTokenSource lifetime = new();
+    private IReadOnlyList<ConsumptionNote> all = [];
+    private bool loading = true;
+    private string? error;
+    private string query = "";
+    private int? beneficiaryId, projectId;
+
+    protected override Task OnInitializedAsync() => LoadAsync();
+
+    private IReadOnlyList<ConsumptionNote> Filtered => all
+        .Where(note => (beneficiaryId is null || note.BeneficiaryId == beneficiaryId) && (projectId is null || note.ProjectId == projectId) && ConsumptionNoteRules.Matches(note, query))
+        .ToList();
+
+    private IReadOnlyList<SelectOption> BeneficiaryOptions => all.GroupBy(note => note.BeneficiaryId)
+        .Select(group => new SelectOption(group.Key, group.First().BeneficiaryName, group.First().BeneficiaryCui)).OrderBy(option => option.Text, StringComparer.CurrentCultureIgnoreCase).ToArray();
+
+    private IReadOnlyList<SelectOption> ProjectOptions => all.Where(note => beneficiaryId is null || note.BeneficiaryId == beneficiaryId).GroupBy(note => note.ProjectId)
+        .Select(group => new SelectOption(group.Key, group.First().ProjectName, beneficiaryId is null ? group.First().BeneficiaryName : "")).OrderBy(option => option.Text, StringComparer.CurrentCultureIgnoreCase).ToArray();
+
+    private void BeneficiaryChanged(int? id)
+    {
+        beneficiaryId = id;
+        if (projectId is { } project && id is not null && !all.Any(note => note.ProjectId == project && note.BeneficiaryId == id)) projectId = null;
+    }
+
+    private async Task LoadAsync()
+    {
+        loading = true; error = null;
+        try
+        {
+            all = await Notes.GetAllAsync(null, null, lifetime.Token);
+            if (beneficiaryId is { } b && all.All(note => note.BeneficiaryId != b)) beneficiaryId = null;
+            if (projectId is { } p && all.All(note => note.ProjectId != p)) projectId = null;
+        }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (AccessDeniedException exception) { error = exception.Message; }
+        catch (Exception exception)
+        {
+            Logger.LogWarning("The consumption notes could not be read ({ErrorType}).", exception.GetType().Name);
+            error = "Bonurile de consum nu au putut fi citite.";
+        }
+        finally { loading = false; }
+    }
+
+    public void Dispose() { lifetime.Cancel(); lifetime.Dispose(); }
+}

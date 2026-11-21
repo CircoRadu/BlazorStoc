@@ -4,8 +4,7 @@
 @implements IDisposable
 
 @* Administrators only. Step 1: the new value and what it does to the products that use the old one (nothing is written); step 2: the reason and the confirmation. *@
-<div class="delete-overlay">
-    <section class="delete-dialog parameter-value-dialog" role="dialog" aria-modal="true" aria-labelledby="@TitleId">
+<AppDialog PanelClass="parameter-value-dialog" LabelledBy="@TitleId">
         <h2 id="@TitleId">Modifici valoarea parametrului? – @Parameter.Name: @Parameter.Display(Value.Value)</h2>
         @if (!confirming)
         {
@@ -45,8 +44,7 @@
                 <button type="button" class="refresh act-close" disabled="@busy" @onclick="() => Closed.InvokeAsync()">Anulează</button>
             </div>
         }
-    </section>
-</div>
+</AppDialog>
 
 @code {
     [Parameter, EditorRequired] public SubcategoryParameter Parameter { get; set; } = null!;

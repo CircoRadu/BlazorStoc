@@ -14,11 +14,14 @@ public static class DatabaseSettingsRegistration
         services.AddSingleton<CircuitCounter>();
         services.AddSingleton<OpenSessionRegistry>();
         services.AddScoped<CircuitHolder>();
+        services.AddScoped<ForcedDialogGate>();
         services.AddScoped<CircuitHandler, CircuitCountHandler>();
         services.AddScoped<IDatabaseSettingsService>(provider => new DatabaseSettingsService(provider.GetRequiredService<IConfiguration>(),
             provider.GetRequiredService<IDataProtectionProvider>(), provider.GetRequiredService<IAccessControl>(), provider.GetRequiredService<IAuditTrail>(),
             provider.GetRequiredService<IOperationLockService>(), provider.GetRequiredService<AppHostingInfo>(), provider.GetRequiredService<ILogger<DatabaseSettingsService>>(),
             authenticator: provider.GetService<IUserAuthenticator>()));
+        services.AddScoped<IDiskUsageService>(provider => new DiskUsageService(provider.GetRequiredService<IConfiguration>(), provider.GetRequiredService<IAccessControl>(),
+            provider.GetRequiredService<IDatabaseStatusService>(), provider.GetRequiredService<IHostEnvironment>()));
         services.AddScoped<IDatabaseStatusService>(provider => new DatabaseStatusService(provider.GetRequiredService<IConfiguration>(), provider.GetRequiredService<IAccessControl>(),
             provider.GetRequiredService<MariaSchemaMigrator>(), provider.GetRequiredService<AppHostingInfo>(), provider.GetRequiredService<CircuitCounter>(),
             provider.GetRequiredService<IServer>(), provider.GetRequiredService<IHostEnvironment>(), provider.GetRequiredService<OpenSessionRegistry>(), provider.GetRequiredService<IAuditTrail>()));

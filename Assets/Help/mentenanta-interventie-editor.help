@@ -1,10 +1,12 @@
 # Formularul de intervenție
 Cautare: interventie formular mentenanta la cerere punct de lucru data observatii scadenta urmatoare baza fotografii
-Captura: formular | /beneficiari | click Panoramic Hotel; wait 3000; click Înregistrează intervenție; wait 900; select #intervention-point = Receptie; wait 900; height 1500 | Formularul de intervenție
-Captura: veche | /beneficiari | click Panoramic Hotel; wait 3000; click Înregistrează intervenție; wait 900; select #intervention-point = Receptie; wait 900; type .editor-grid input.pick-date-native=2026-08-01; wait 1000; height 1500 | Intervenție mai veche decât ultima de mentenanță
-Captura: editare | /beneficiari | click Panoramic Hotel; wait 3000; jsclick sel:button[aria-label*='Editează intervenția']; wait 1000; height 2300 | Editarea unei intervenții, cu fotografii
+Captura: formular | /beneficiari | click Panoramic Hotel; wait 3000; click sel:#subtab-bf-mentenanta; wait 1500; click Înregistrează intervenție; wait 900; select #intervention-point = Receptie; wait 900; height 1500 | Formularul de intervenție
+Captura: veche | /beneficiari | click Panoramic Hotel; wait 3000; click sel:#subtab-bf-mentenanta; wait 1500; click Înregistrează intervenție; wait 900; select #intervention-point = Receptie; wait 900; type .editor-grid input.pick-date-native=2026-08-01; wait 1000; height 1500 | Intervenție mai veche decât ultima de mentenanță
+Captura: editare | /beneficiari | click Panoramic Hotel; wait 3000; click sel:#subtab-bf-mentenanta; wait 1500; jsclick sel:button[aria-label*='Editează intervenția']; wait 1000; height 2300 | Editarea unei intervenții, cu fotografii
 
 Formularul pentru o intervenție nouă sau pentru editarea uneia existente. Se deschide în fișa beneficiarului (sau din hartă, cu punctul ales). Fotografiile se adaugă după înregistrare.
+
+**Fel intervenție**: La o intervenție care nu a mutat scadența poți alege Mentenanță / La cerere.
 
 ## Elemente
 ### Câmpuri
@@ -21,6 +23,8 @@ Formularul pentru o intervenție nouă sau pentru editarea uneia existente. Se d
 ### Butoane
 - Înregistrează intervenția / Salvează modificările | buton | Salvează intervenția.
 - Anulează, Închide | buton | Închid formularul; dacă ai modificat ceva, ești întrebat dacă renunți.
+### Noutăți
+- Componente acoperite | secțiune | Obligatorie sub un contract complet.
 
 ## Flux: Cum înregistrez o intervenție de mentenanță
 1. Alege „Mentenanță (din contract)”, punctul și data efectuării.

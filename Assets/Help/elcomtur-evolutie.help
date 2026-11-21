@@ -1,0 +1,15 @@
+# Evoluția balanței restante
+Cautare: elcomtur balanta evolutie grafic total plati restante preluari
+
+Fereastra se deschide din Notificări → Balanțe restante, cu butonul „Arată evoluție balanță”. Arată, ca bare verticale, totalul plăților restante notat la fiecare preluare din backup-ul Elcomtur. Nu modifică nimic.
+
+## Elemente
+### Fereastra
+- Perioada | butoane | „Anul curent”, „Ultimele 6 luni” sau „Ultimele 3 luni”: se afișează doar preluările din perioada aleasă. | sel: .evolution-periods
+- Graficul | grafic | O bară pentru fiecare preluare, cu valoarea deasupra și data backup-ului dedesubt. Roșu: totalul a crescut față de preluarea dinainte; verde: a scăzut; gri: prima bară afișată. | sel: #elcomtur-evolution-chart
+- Închide | buton | Închide fereastra.
+
+## Flux: Cum văd cum evoluează balanța
+1. Deschide Notificări → Balanțe restante.
+2. Apasă „Arată evoluție balanță” de sub „Total plăți restante”.
+3. Alege perioada; treci cu mouse-ul peste o bară ca să vezi și numărul de beneficiari cu plăți restante.

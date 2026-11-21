@@ -4,6 +4,11 @@ Fluxul: deschizi un produs -> pagina de miscari -> adaugi intrare sau iesire -> 
 
 ## Modificari de testat
 
+### 17.11.2026 - Iesirea spre beneficiar: proiectul este obligatoriu
+**Ce s-a adaugat:** la o iesire spre un beneficiar proiectul trebuie ales intotdeauna; comutatorul "Proiect" a fost scos (si din operatia de iesire multipla).
+**Ce face acum:** dupa ce alegi beneficiarul, lista de proiecte este mereu activa (fiecare beneficiar are cel putin proiectele obligatorii din Nomenclator, de exemplu "Reparatii sisteme existente"); fara proiect, salvarea este refuzata cu mesajul "Alege proiectul beneficiarului".
+Pasi: Produse -> un produs -> Intrari/iesiri -> Iesire -> destinatia Beneficiar -> alege beneficiarul -> alege proiectul "Reparatii sisteme existente" -> salveaza; reia fara sa alegi proiectul -> mesaj de refuz; la editarea unei iesiri mai vechi, facute fara proiect, trebuie sa alegi proiectul.
+
 ### 27.10.2026 - Produs cu parametri necompletati: blocat in toate operatiunile de stoc
 
 **Ce s-a adaugat:** pe pagina Intrari/Iesiri a unui produs caruia ii lipsesc parametri obligatori apare un banner „Produs blocat: parametri necompletati” cu lista parametrilor lipsa si butonul „Completeaza parametrii”; formularul de miscare nu se mai afiseaza. Iconita „Iesire rapida” din catalog e inactiva, iar in „Iesire din stoc / Iesire multipla” linia cu un astfel de produs arata avertisment si nu se poate continua.
@@ -179,3 +184,56 @@ Neverificat încă: legarea de bonul de consum / storno (Task următor).
 
 - Formularul de iesire (Referinta, panoul de iesire repetata, nota de depasire) pe latime de telefon: fara depasiri orizontale.
 - Filtrele noi se aseaza pe mai multe randuri.
+
+## Modificari de testat - fereastra "Vezi" a unei miscari (16.11.2026, versiunea 0.5.88)
+
+**Ce s-a adaugat:** iconita "Vezi" pe fiecare rand de miscare, cu o fereastra de detalii.
+
+**Ce face acum:** fereastra arata toti parametrii miscarii, butonul "Editeaza" in dreapta sus si, intr-o sectiune pliabila inchisa implicit, istoricul modificarilor cu insigna numarului de modificari.
+
+| Pas | Ce faci | Ce trebuie sa vezi | OK |
+|---|---|---|---|
+| 1 | Produse -> un produs -> Intrari/iesiri; apasa iconita "Vezi" de pe un rand | Se deschide fereastra cu data, tipul, bucatile, descrierea, provenienta/destinatia, creat de/la | |
+| 2 | Deschide sectiunea "Istoricul modificarilor" la o miscare modificata | Insigna arata numarul; lista are data, utilizatorul, schimbarea si motivul | |
+| 3 | Apasa "Editeaza" din dreapta sus | Fereastra se inchide si se deschide editarea miscarii | |
+| 4 | O miscare stornata sau un utilizator fara drept de modificare | "Editeaza" lipseste; iconita "Vezi" ramane | |
+
+## Modificari de testat (17.11.2026) - PROP-0038 / PROP-0039
+**Ce s-a adaugat:** coloana "Furnizor / factura" are doua randuri (furnizor, apoi "Factura: nr" ca link, fara iconita cu lupa); coloana "Beneficiar/proiect" are doua randuri (beneficiar, apoi proiectul ca link). Doua ferestre noi, doar de citit.
+**Ce face acum:**
+1. Deschide mișcările unui produs cu intrări din factură (ex. NV5, filtru intrari / factura). Verifică furnizorul pe primul rând și "Factura: nr" pe al doilea; nu mai e iconita cu lupa la furnizor.
+2. Apasă "Factura: nr": se deschide fereastra cu furnizor (link), număr, dată, cine a preluat-o și intrările din factură; codul de produs este link spre mișcările produsului. Închide cu X sau cu "Închide".
+3. La o ieșire pe proiect, beneficiarul e pe primul rând; apasă proiectul: fereastra arată beneficiar (link), proiect (link) și echipamentele predate (cod produs link, bucăți).
+
+## Modificari de testat - factura, buton spre proiect, coloane (18.11.2026, PROP-0039, PROP-0041, PROP-0042)
+
+**Ce s-a adaugat:** eticheta "Factura: nr"; butonul "Mergi la proiect" in fereastra proiectului; coloanele "Nr. crt." si "Subcategorie" inaintea codului de produs.
+**Ce face acum:** la o intrare cu factura, pe al doilea rand apare "Factura: nr" (link spre fereastra facturii); fereastra proiectului are butonul care o inchide si deschide pagina proiectului; tabelul echipamentelor si sectiunea Consum net din beneficiar au cele doua coloane noi.
+1. Intrari/iesiri produs: o intrare cu factura arata furnizorul pe un rand si "Factura: nr" pe al doilea; apasa-l.
+2. Apasa proiectul unei iesiri: in fereastra apasa "Mergi la proiect".
+3. Verifica coloanele in fereastra proiectului si in Beneficiar -> Consum net.
+
+## Modificari de testat - destinatia "Alt motiv" (18.11.2026)
+
+**Ce s-a adaugat:** a cincea destinatie a ieșirii, "Alt motiv", langa Beneficiar, Autovehicul, Vanzare generica si Corectie stoc.
+**Ce face acum:** o ieșire cu "Alt motiv" nu cere beneficiar, proiect sau vehicul; motivul se scrie in descriere; stocul scade ca la orice ieșire; in tabelul de miscari apare eticheta "Alt motiv" (filtrabila), iar in Jurnal actiunea "Ieșire alt motiv".
+1. Intrari/iesiri produs -> Iesire: alege "Alt motiv", scrie motivul in descriere, adauga: stocul scade, tabelul arata "Alt motiv".
+2. Iesire multipla: aceeasi optiune in destinatie; adauga mai multe produse.
+3. Jurnal: filtreaza dupa actiunea "Ieșire alt motiv".
+
+## Modificari de testat - tabul Retur la intrare (18.11.2026)
+
+**Ce s-a adaugat:** tab "Retur" langa Intrare libera / Factura, cu "Retur din" Beneficiar sau Vehicul; "Primit de la beneficiar / vehicul" a iesit din motivele intrarii libere.
+**Ce face acum:** returul din beneficiar cere beneficiarul si proiectul (doar proiectele unde produsul are cantitate), limiteaza cantitatea la cea din proiect, creste stocul cu o intrare pe produs si propune descrierea "Retur din proiectul X (beneficiar Y)" (o poti rescrie). Returul din vehicul muta produsul din vehicul in depozit (stocul total nu se schimba), limitat la cantitatea din vehicul.
+1. Produs aflat intr-un proiect (iesire spre beneficiar): Intrare -> Retur -> Beneficiar -> alege beneficiarul si proiectul; vezi "In proiect: N buc."; cantitate mai mare decat N este refuzata; cu N sau mai putin se salveaza si stocul creste.
+2. Retur -> Vehicul: apar doar vehiculele care au produsul; returneaza o cantitate: produsul trece in depozit, descrierea propusa se poate rescrie.
+3. Incearca sa storneaza o iesire dupa ce o parte s-a returnat din proiect si returul ar depasi ce ramane: este refuzat.
+4. Echipamente proiect: lista nete (nr. crt., subcategorie, cod, cantitate) si sectiunea "Istoric miscari" (inchisa implicit) cu iesirile si retururile in acelasi tabel.
+
+## Modificari de testat - Unde sunt bucatile si Iesire multipla cu proiect nou (20.11.2026)
+
+**Ce s-a adaugat:** (PROP-0044) cardul "Unde sunt bucatile" a unui produs arata doar Stoc total, Stoc depozit si Stoc masini (total); (PROP-0043) in Iesirea multipla, langa campul Proiect, butonul "+ Proiect nou".
+**Ce face acum:** cardul nu mai defalca pe masini si beneficiari. Butonul "+ Proiect nou" deschide formularul de proiect pentru beneficiarul ales, intr-o fereastra; dupa salvare proiectul apare in lista si este ales, iar ce ai completat in formular ramane.
+1. Produse -> un produs aflat si in masina si la un beneficiar -> Intrari/iesiri: cardul arata trei randuri (total, depozit, masini) si totalul = depozit + masini.
+2. Produse -> Iesire multipla -> destinatia Beneficiar -> alege beneficiarul -> "+ Proiect nou" -> scrie denumirea -> salveaza: proiectul este ales in camp, linia de produs completata inainte nu s-a pierdut.
+3. Fara beneficiar ales, butonul "+ Proiect nou" este dezactivat.

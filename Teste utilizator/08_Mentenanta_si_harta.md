@@ -85,6 +85,10 @@ Pasi:
 1. La un punct cu alte puncte la aceeasi locatie, apasa unul din lista: popup-ul trece la acel punct.
 2. Ecran ingust: popup-ul incape fara depasire orizontala.
 
+### 10.11.2026 - Tichete decise cat timp Mentenanta e oprita (Maintenance 1.11.1)
+
+**Ce face acum:** Mentenanta are un worker care, la fiecare minut cat modulul ruleaza, inregistreaza interventiile tichetelor ActivityApp decise cat timp era oprita, in ordinea datelor efectuate; scadentele contractelor urmeaza ultimele tichete preluate. Pasii sunt in 18_Preluare_tichete_ActivityApp.md (modificari 10.11.2026).
+
 ## Verificari ramase (fara modificari recente; detalii in docs/TESTE_RAMASE.md, sectiunile N7-N27)
 
 | Pas | Ce faci | Ce trebuie sa vezi | Rezultat |
@@ -99,3 +103,12 @@ Pasi:
 ## Fluxul de baza
 
 1. Punct nou -> contract activ -> interventie -> apare pe harta si in notificari.
+
+## Modificari de testat - pini pentru puncte arondate pe harta (11.11.2026)
+
+| Pas | Ce faci | Ce trebuie sa vezi | Rezultat |
+|---|---|---|---|
+| 1 | Adauga un punct arondat cu coordonate la un punct de lucru, deschide Harta mentenantei | Pin separat (patrat albastru-gri), legenda "Puncte de lucru arondate" | |
+| 2 | Pozitioneaza mouse-ul / apasa pe pin | Titlu "Beneficiar · Punct de lucru · Punct arondat"; panou cu adresa, coordonate, telefon, contact si link la fisa beneficiarului | |
+| 3 | Seteaza filtrul de scadenta / contract / perioada | Pinii punctelor arondate dispar (nu au scadenta sau contract) | |
+| 4 | Importul ActivityApp cu un punct al carui nume seamana cu un punct arondat | In Setari -> Preluare ActivityApp, lista problemelor deschise: "De verificat: punct asemanator cu un punct arondat"; importul continua | |

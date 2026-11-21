@@ -6,6 +6,8 @@ Captura: fizica | /beneficiari | click Adaugă beneficiar; click Persoană fizic
 
 Formularul pentru un beneficiar nou sau pentru editarea unuia existent. Se deschide deasupra listei sau fișei beneficiarului (și ca fereastră peste altă pagină, de exemplu la preluarea unei oferte).
 
+Telefonul nu mai este obligatoriu. Adăugarea unui beneficiar se face într-o fereastră peste pagină.
+
 ## Elemente
 ### Tipul
 - Tip beneficiar | selecție | Persoană fizică sau Persoană juridică; schimbă câmpurile formularului.

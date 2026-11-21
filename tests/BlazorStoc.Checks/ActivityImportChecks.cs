@@ -38,9 +38,41 @@ public static class ActivityImportChecks
         ActivityFieldSettingsChecks.Run(check);
         await ActivityImportPanelChecks.RunAsync(check);
         await ActivityKeywordsPanelChecks.RunAsync(check);
+        await TakeNowAsync(check);
         await BeneficiaryChecksSectionChecks.RunAsync(check);
         await PagedChecks.RunAsync(check);
         await LiveAsync(check);
+        await StructureLiveAsync(check);
+    }
+
+    // Against the permanent test database of the ActivityApp structure (tools\load-activityapp-test-db.ps1: every table of a real backup, Windows authentication), only when
+    // ACTIVITYAPP_STRUCTURE_SERVER names the server (ACTIVITYAPP_STRUCTURE_DATABASE, default ActivityApp_test): the real structure matches the contract, a column of any readable kind is read
+    // as a free field (the number, the date and the flag as the application writes them) and the example ticket comes with the CUI of the client. Skipped (no check) when the variable is absent.
+    private static async Task StructureLiveAsync(Action<bool, string> check)
+    {
+        var server = Environment.GetEnvironmentVariable("ACTIVITYAPP_STRUCTURE_SERVER");
+        if (string.IsNullOrWhiteSpace(server)) return;
+        var database = Environment.GetEnvironmentVariable("ACTIVITYAPP_STRUCTURE_DATABASE") ?? "ActivityApp_test";
+        var source = new SqlActivitySource();
+        var connection = new ActivityConnection(server, 1433, database, "", "", Integrated: true);
+        var ping = await source.PingAsync(connection, CancellationToken.None);
+        check(ping.Ok, "Activity structure (real copy): the test database opens");
+        var actual = await source.ReadStructureAsync(connection, CancellationToken.None);
+        var extras = new[] { new ActivityExtraField("Tickete", "ID", "ID Ticket", "both"), new ActivityExtraField("Tickete", "DataTicket", "Data tichet", "both"), new ActivityExtraField("Tickete", "Logat", "Logat", "both"), new ActivityExtraField("EvenimenteAgent", "EndTime", "Data inchidere", "notes") };
+        var map = ActivityFieldMap.Create(new Dictionary<string, string>(), null, null, extras, out _)!;
+        var report = ActivityStructureChecker.Check(actual, null, map);
+        check(report.Status != StructureStatus.Changed && report.Extras.Count == 4 && ActivityFieldMap.ReadableColumns(actual, "Tickete").Count > 20 && ActivityFieldMap.ReadableColumns(actual, "EvenimenteAgent").Count > 20,
+            "Activity structure (real copy): the structure of ActivityApp matches the contract and its number, date and flag columns can be free fields");
+        var types = await source.ReadTypesAsync(connection, report, CancellationToken.None);
+        var typeIds = types.Where(type => (type.Resolved ?? 0) > 0).Select(type => type.Id).ToList();
+        var tickets = await source.ReadTicketsAsync(connection, report, typeIds, new DateTime(2025, 1, 1), null, 50, CancellationToken.None);
+        var first = tickets.FirstOrDefault(ticket => ticket.Extras is not null);
+        check(first?.Extras is { } read && read["x:Tickete.ID"] == first.Id.ToString() && System.Text.RegularExpressions.Regex.IsMatch(read["x:Tickete.DataTicket"], @"^\d\d\.\d\d\.\d{4} \d\d:\d\d:\d\d$"),
+            "Activity structure (real copy): a free field on a number column and on a date column is read as the application writes it");
+        var view = await source.ReadTicketSampleAsync(connection, actual, report, typeIds, null, CancellationToken.None);
+        check(view is not null && view.Tables.Select(table => table.Table).SequenceEqual(["Tickete", "EvenimenteAgent", "Client"]) && view.Tables[2].Columns.Single().Column == "CodFiscal" && view.Tables[0].Columns.Any(column => column.OtherKind)
+            && ActivityTicketSampleRules.Preview(view, map).Notes.Contains("ID Ticket: " + view.TicketId, StringComparison.Ordinal),
+            "Activity structure (real copy): the example ticket has the lists of the ticket, of the event and of the client (its CUI), and the notes write description: value");
     }
 
     // Against a real SQL Server, only when ACTIVITYIMPORT_TEST_SERVER (and _DATABASE) name a database with the tables of the contract (the local SQLEXPRESS with a small copy):
@@ -143,7 +175,7 @@ public static class ActivityImportChecks
 
     private static void FieldMap(Action<bool, string> check, IReadOnlyList<ActivityColumn> full)
     {
-        var withNew = new List<ActivityColumn>([.. full, new("Tickete", "Detalii", "nvarchar"), new("Tickete", "Valoare", "int")]);
+        var withNew = new List<ActivityColumn>([.. full, new("Tickete", "Detalii", "nvarchar"), new("Tickete", "Valoare", "int"), new("Tickete", "Fisier", "varbinary")]);
         var map = ActivityFieldMap.Create(new Dictionary<string, string> { ["Tickete.DescriptionInternal"] = "Detalii", ["Tickete.Subject"] = "Subject", ["Tickete.ProcesatDe"] = "" }, out var error);
         check(error is null && map is not null && map.Columns.Count == 1 && map.Columns["Tickete.DescriptionInternal"] == "Detalii" && map.ToJson() == "{\"Tickete.DescriptionInternal\":\"Detalii\"}"
             && ActivityFieldMap.FromJson(map.ToJson()).Columns["Tickete.DescriptionInternal"] == "Detalii" && ActivityFieldMap.Create(new Dictionary<string, string>(), out _)!.ToJson() == "",
@@ -158,10 +190,28 @@ public static class ActivityImportChecks
         var gone = ActivityStructureChecker.Check(full, null, map);
         check(gone.Status == StructureStatus.Partial && gone.Issues.Single() is { Required: false } issue && issue.Problem.StartsWith("coloana aleasă", StringComparison.Ordinal) && gone.Physical("Tickete", "DescriptionInternal") == "DescriptionInternal"
             && gone.BlockedEntities.Count == 0, "Activity import: a chosen column that is gone is reported and the default stays in use (the run itself stops on it)");
-        var notText = ActivityFieldMap.Create(new Dictionary<string, string> { ["Tickete.Subject"] = "Valoare" }, out _);
-        check(ActivityStructureChecker.Check(withNew, null, notText).Issues.Single().Problem.Contains("nu are text", StringComparison.Ordinal)
+        var notText = ActivityFieldMap.Create(new Dictionary<string, string> { ["Tickete.ProcesatDe"] = "Valoare", ["Tickete.Subject"] = "Fisier" }, out _);
+        check(ActivityStructureChecker.Check(withNew, null, notText).Issues.Count(issue => issue.Problem.Contains("nu poate fi citită ca text", StringComparison.Ordinal)) == 2
             && ActivityFieldMap.TextColumns(withNew, "tickete").Contains("Detalii") && !ActivityFieldMap.TextColumns(withNew, "Tickete").Contains("Valoare") && !ActivityFieldMap.TextColumns(withNew, "Tickete").Contains("ID"),
-            "Activity import: a column without text is refused, and only text columns of the table are offered");
+            "Activity import: a column that cannot be read as text is refused for the executor, the title and the others, and only text columns of the table are offered for them");
+        // BUG-0023: the title and the number can be read from a column of any readable kind (number, date, flag), the other pieces only from text.
+        var numberFromNumber = ActivityFieldMap.Create(new Dictionary<string, string> { ["Tickete.NumeTicket"] = "Valoare", ["Tickete.Subject"] = "Valoare" }, null, null, null, null, true, out _);
+        var anyKind = ActivityStructureChecker.Check(withNew, null, numberFromNumber);
+        check(anyKind.Status == StructureStatus.Ok && anyKind.Physical("Tickete", "NumeTicket") == "Valoare" && anyKind.Physical("Tickete", "Subject") == "Valoare"
+            && ActivityFieldMap.ReadableColumns(withNew, "Tickete").Contains("Valoare") && !ActivityFieldMap.ReadableColumns(withNew, "Tickete").Contains("Fisier"),
+            "Activity import: the title and the number can be read from a number column (shown as text); a binary column is never offered");
+        var withDates = new List<ActivityColumn>([.. withNew, new("EvenimenteAgent", "Terminat", "datetime2")]);
+        var endFromDate = ActivityFieldMap.Create(new Dictionary<string, string> { ["EvenimenteAgent.EndTime"] = "Terminat" }, null, null, null, null, true, out _);
+        var endFromText = ActivityFieldMap.Create(new Dictionary<string, string> { ["EvenimenteAgent.EndTime"] = "DescriptionInternal" }, null, null, null, null, true, out _);
+        check(ActivityStructureChecker.Check(withDates, null, endFromDate).Physical("EvenimenteAgent", "EndTime") == "Terminat" && ActivityStructureChecker.Check(withDates, null, endFromText).Issues.Any(issue => issue.Problem.Contains("nu poate fi citită ca text", StringComparison.Ordinal))
+            && ActivityFieldMap.ChoiceColumns(withDates, ActivityFieldMap.FinishedField) is var dateColumns && dateColumns.Contains("EndTime") && dateColumns.Contains("Terminat") && !dateColumns.Contains("DescriptionInternal"),
+            "Activity import: the end of the event can be read from another date column; a text column is refused and only date columns are offered for it");
+        var chosenDefault = ActivityFieldMap.Create(new Dictionary<string, string>(), null, null, null, null, true, out _)!;
+        var roundTrip = ActivityFieldMap.FromJson(chosenDefault.ToJson());
+        check(chosenDefault.NumberChosen && chosenDefault.ToJson().Length > 0 && roundTrip.NumberChosen && !ActivityFieldMap.FromJson("").NumberChosen && !ActivityFieldMap.Empty.NumberChosen
+            && ActivityFieldMap.FromJson("{\"Tickete.DescriptionInternal\":\"Detalii\"}").NumberChosen && ActivityFieldMap.FromJson("{\"v\":2,\"columns\":{},\"off\":[\"report\"],\"targets\":{},\"extras\":[]}").NumberChosen
+            && !ActivityFieldMap.Create(new Dictionary<string, string>(), out _)!.NumberChosen,
+            "Activity import: the number has no default: only settings saved with a chosen number (or saved before this rule) count as chosen, unsaved settings do not");
         check(ActivityStructureChecker.Check(full, null, ActivityFieldMap.Empty).Fingerprint == ActivityStructureChecker.Check(full).Fingerprint && map!.Describe().Contains("Detalii", StringComparison.Ordinal),
             "Activity import: the map does not change the fingerprint of the structure");
     }
@@ -327,7 +377,7 @@ public static class ActivityImportChecks
         check(ActivityTicketPlanner.SplitReport("Nu merge", "Am reinstalat tot") is ("Nu merge", "Am reinstalat tot"), "Activity import (tickets): a report the operator rewrote is the resolution as a whole");
         check(ActivityTicketPlanner.SplitReport("", "Raport") is ("", "Raport") && ActivityTicketPlanner.SplitReport("Problema", "") is ("Problema", ""), "Activity import (tickets): with no problem the report is the resolution; with no report there is no resolution");
         var notes = ActivityTicketPlanner.Notes("T-9", "Internet", "Nu merge", "Router nou", "Ion");
-        check(notes == "Preluat din ActivityApp, tichet T-9: Internet\nProblema: Nu merge\nRezolvare: Router nou\nExecutant: Ion", "Activity import (tickets): the notes tell the ticket, the problem, the resolution and the executor");
+        check(notes == "Preluat din ActivityApp\n\n**Titlul tichetului**: Internet\n\n**Numarul tichetului**: T-9\n\n**Problema**: Nu merge\n\n**Rezolvare**: Router nou\n\n**Executant**: Ion", "Activity import (tickets): the notes tell the ticket, the problem, the resolution and the executor");
         check(ActivityTicketPlanner.Notes("T", "t", new string('x', 5000), "", "").Length == 2000 && ActivityTicketPlanner.Notes("T", "t", new string('x', 5000), "", "").EndsWith('…'), "Activity import (tickets): notes longer than the 2000 characters of an intervention are cut (the whole text stays in the source detail)");
 
         var locals = new Dictionary<int, IReadOnlyList<WorkPoint>>
@@ -350,7 +400,7 @@ public static class ActivityImportChecks
         var routerWords = new Dictionary<long, IReadOnlyList<string>> { [4] = ["router"] };
         var plans = ActivityTicketPlanner.Plan(tickets, destinations, map, locals, new DateOnly(2026, 10, 23), routerWords);
         TicketPlan T(long id) => plans.Single(plan => plan.SourceId == id);
-        check(T(10) is { Action: PlanAction.Create, BeneficiaryId: 7, WorkPointId: 70 } && T(10).PerformedOn == new DateOnly(2026, 3, 2) && T(10).Notes.Contains("Rezolvare: S-a schimbat routerul", StringComparison.Ordinal),
+        check(T(10) is { Action: PlanAction.Create, BeneficiaryId: 7, WorkPointId: 70 } && T(10).PerformedOn == new DateOnly(2026, 3, 2) && T(10).Notes.Contains("**Rezolvare**: S-a schimbat routerul", StringComparison.Ordinal),
             "Activity import (tickets): a resolved ticket goes to the queue to validate, for the main point of its client's beneficiary, dated by the end of the event");
         check(T(11) is { Action: PlanAction.Create, WorkPointId: 71 }, "Activity import (tickets): the work point of the ticket is used when it was tied and belongs to the beneficiary");
         check(T(14).WorkPointId == 70 && T(20).WorkPointId == 80, "Activity import (tickets): a tied point of another beneficiary is not used; the main point is");
@@ -487,6 +537,10 @@ public static class ActivityImportChecks
             && alerts[0].Values[ActivityImportAlertSource.DetailsName].Contains("nu a răspuns", StringComparison.Ordinal) && alerts[1].Values[ActivityImportAlertSource.DetailsName].Contains("2 coloane", StringComparison.Ordinal)
             && alerts[2].Values[ActivityImportAlertSource.DetailsName].Contains("5 probleme", StringComparison.Ordinal) && alerts.All(item => item.Url == (item.ObjectId == ActivityImportAlertSource.IssuesId ? ActivityImportAlertSource.IssuesUrl : "/setari?tab=preluare-activityapp") && item.Expiry == DateOnly.FromDateTime(since.ToLocalTime())),
             "Activity alerts: one notification per lasting condition (sync failing, structure changed, open problems, new types), on the day it began, with the cause");
+        var changed = ActivityImportAlertSource.Instances(new ActivityImportAlertState(null, "", 0, since, 1, null, 0, null, null, "", MariaActivityImportAlertReader.DescribeStructure(
+            [new("Tickete", "Descriere", "tickete", "coloana lipsește", "text", "—", true), new("Parteneri", "Nume", "parteneri", "alt tip de date", "text", "int", false)])))[0].Values[ActivityImportAlertSource.DetailsName];
+        check(changed.Contains("Tickete.Descriere: coloana lipsește", StringComparison.Ordinal) && changed.Contains("Parteneri.Nume: alt tip de date (așteptat text, găsit int)", StringComparison.Ordinal) && changed.IndexOf("Tickete.Descriere", StringComparison.Ordinal) < changed.IndexOf("Parteneri.Nume", StringComparison.Ordinal),
+            "Activity alerts: the structure notification says what changed, the needed columns first, with what was expected and found");
         check(ActivityImportAlertSource.Instances(new ActivityImportAlertState(null, "", 0, null, 0, since, 0, null)).Count == 0, "Activity alerts: open problems that were all resolved no longer raise the notification");
         var source = new ActivityImportAlertSource(null!);
         check(source.Key == "sistem.preluare-activityapp" && source.Category == "Sistem" && source.DefaultThresholdDays == 0 && source.DefaultSubject.Contains("<problema preluare>", StringComparison.Ordinal)
@@ -509,6 +563,49 @@ public static class ActivityImportChecks
         check(source.Contains("LOCK_TIMEOUT", StringComparison.Ordinal) && source.Contains("READ UNCOMMITTED", StringComparison.Ordinal),
             "Activity import: the session waits little for a lock and reads without shared locks (it cannot hold up the users of ActivityApp)");
         check(!source.Contains("SqlBulkCopy", StringComparison.Ordinal) && !source.Contains("BeginTransaction", StringComparison.Ordinal), "Activity import: the source never writes (no bulk copy, no transaction)");
+    }
+
+    // "Preia din ActivityApp" (no server needed): the percentage of the progress, the right beneficiari.add, the wiring of the services, the exact journal action and the module that is out.
+    private sealed class FixedAccess(bool allowed) : IAccessControl
+    {
+        public Task<bool> IsAdministratorAsync(CancellationToken cancellationToken = default) => Task.FromResult(allowed);
+        public Task<bool> CanManageProductsAsync(CancellationToken cancellationToken = default) => Task.FromResult(allowed);
+        public Task<bool> CanManageBeneficiariesAsync(CancellationToken cancellationToken = default) => Task.FromResult(allowed);
+        public Task<string?> GetUsernameAsync(CancellationToken cancellationToken = default) => Task.FromResult<string?>("test");
+        public Task EnsureAdministratorAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
+        public Task EnsureProductOperatorAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
+        public Task EnsureBeneficiaryOperatorAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
+        public Task<bool> HasAsync(string permission, CancellationToken cancellationToken = default) => Task.FromResult(allowed && permission == "beneficiari.add");
+    }
+
+    private static async Task TakeNowAsync(Action<bool, string> check)
+    {
+        check(new PartnerTakeProgress("x", 40, 120).Percent == 33 && new PartnerTakeProgress("x", 0, 0).Percent == 0 && new PartnerTakeProgress("x", 150, 120).Percent == 100,
+            "Take from ActivityApp: the progress is a percentage of what is done, 0 while the total is not known, never above 100");
+        var wired = new ServiceCollection();
+        new ActivityImportModule().Register(wired, new ConfigurationBuilder().Build());
+        var unavailable = new ServiceCollection();
+        new ActivityImportModule().RegisterUnavailable(unavailable);
+        check(wired.Any(d => d.ServiceType == typeof(IBeneficiaryTakeService) && d.Lifetime == ServiceLifetime.Scoped) && wired.Any(d => d.ServiceType == typeof(IBeneficiarySyncOnOpen) && d.Lifetime == ServiceLifetime.Singleton)
+            && !unavailable.Any(d => d.ServiceType == typeof(IBeneficiaryTakeService) || d.ServiceType == typeof(IBeneficiarySyncOnOpen)),
+            "Take from ActivityApp: the module registers the button service and the open-page service; while it is not started the pages find neither and show no button");
+        check(AuditFilterOptions.Actions.Any(item => item.Value == AuditActions.TakeActivityPartnersManual) && AuditActions.TakeActivityPartnersManual.Contains("manuală", StringComparison.Ordinal),
+            "Take from ActivityApp: the taking on request has its own exact journal action, in the filter of the journal");
+        var registry = new ModuleRegistry();
+        registry.Add(new ActivityImportModule(), new ServiceCollection(), new ConfigurationBuilder().Build());
+        await using var provider = new ServiceCollection().BuildServiceProvider();
+        var scopes = provider.GetRequiredService<IServiceScopeFactory>();
+        var denied = new BeneficiaryTakeService(scopes, registry, new FixedAccess(false), null!);
+        var refused = false;
+        try { await denied.TakeAsync(null); } catch (AccessDeniedException) { refused = true; }
+        check(!await denied.CanTakeAsync() && refused, "Take from ActivityApp: without the right to add beneficiaries there is no button and the taking is refused");
+        var out_ = new ModuleRegistry();
+        out_.Add(new ActivityImportModule(), new ServiceCollection(), new ConfigurationBuilder().Build());
+        for (var index = 0; index < ModuleRegistry.FailureThreshold; index++) out_.ReportFailure(ActivityImportModule.ModuleId, new InvalidOperationException("x"));
+        var paused = new BeneficiaryTakeService(scopes, out_, new FixedAccess(true), null!);
+        var pausedResult = await paused.TakeAsync(null);
+        check(!await paused.CanTakeAsync() && !pausedResult.Completed && !string.IsNullOrEmpty(pausedResult.Message) && !await new PartnerSyncOnOpen(scopes, out_, Microsoft.Extensions.Logging.Abstractions.NullLogger<PartnerSyncOnOpen>.Instance).RequestAsync(),
+            "Take from ActivityApp: while the module is out the button is hidden, the taking says so, and the open-page taking does nothing");
     }
 
     private static void Wiring(Action<bool, string> check)

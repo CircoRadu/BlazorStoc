@@ -1,8 +1,6 @@
 @using BlazorStoc.Services
 
-<div class="delete-overlay">
-    <section class="delete-dialog delete-confirmation-dialog" role="dialog" aria-modal="true"
-             aria-labelledby="@TitleId" aria-describedby="@DescriptionId">
+<AppDialog PanelClass="delete-confirmation-dialog" LabelledBy="@TitleId" DescribedBy="@DescriptionId" OnClose="CancelAsync">
         @if (step == DeleteStep.Reason)
         {
             <h2 id="@TitleId">@Title@(string.IsNullOrWhiteSpace(ObjectLabel) ? "" : " – " + ObjectLabel)</h2>
@@ -62,8 +60,7 @@
                 <button type="button" class="refresh act-close" disabled="@Busy" @onclick="CancelAsync">Anulează</button>
             </div>
         }
-    </section>
-</div>
+</AppDialog>
 
 @code {
     [Parameter, EditorRequired] public string Title { get; set; } = string.Empty;

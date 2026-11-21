@@ -85,6 +85,32 @@ public static class ComponentChecks
         var editing = context.Render<ProductEditor>(parameters => parameters.Add(p => p.Original, existing).Add(p => p.Groups, stale));
         check(editing.Find("#product-image-search").GetAttribute("href") == "https://www.google.com/search?tbm=isch&q=" + Uri.EscapeDataString(existing.Name.Trim()),
             "Product form: the picture search by code is offered when editing an existing product too");
+        // Categories and subcategories are made without leaving the edit: the button opens the categories window over the form (the same one the form of a new product has), and closing it
+        // keeps what was typed. A form of its own, because closing the window reads the categories again (the selection may be corrected).
+        var categoryEdit = context.Render<ProductEditor>(parameters => parameters.Add(p => p.Original, existing).Add(p => p.Groups, stale));
+        var createCategory = categoryEdit.FindAll("button").FirstOrDefault(button => button.TextContent.Contains("Adaugă categorie / subcategorie", StringComparison.Ordinal));
+        check(createCategory is not null && categoryEdit.FindAll("iframe.categories-frame").Count == 0,
+            "Product edit: the categories window can be opened from the form of an existing product (no trip to the categories page)");
+        categoryEdit.Find("#product-description").Input("Text care nu trebuie pierdut");
+        createCategory!.Click();
+        check(categoryEdit.FindAll("iframe.categories-frame").Count == 1, "Product edit: the categories window opens over the form");
+        categoryEdit.FindAll("button").First(button => button.TextContent.Contains("Gata, înapoi la produs", StringComparison.Ordinal)).Click();
+        categoryEdit.WaitForAssertion(() => { if (categoryEdit.FindAll("iframe.categories-frame").Count != 0) throw new Exception("pending"); }, TimeSpan.FromSeconds(5));
+        check((categoryEdit.Find("#product-description").TextContent + categoryEdit.Find("#product-description").GetAttribute("value")).Contains("Text care nu trebuie pierdut", StringComparison.Ordinal),
+            "Product edit: closing the categories window keeps what was typed in the form");        // The field "Factura" of the entry form is a list searched while typing (like "Furnizor"): the options carry the number and the date as text to search, and the placeholder says what is missing.
+        var chooseInvoices = new[]
+        {
+            new SupplierInvoice(1, 5, "EMPORIUM SRL", "EMPTM26-811", new DateOnly(2026, 11, 12), "test", DateTime.UtcNow, 2),
+            new SupplierInvoice(2, 5, "EMPORIUM SRL", "A-77", new DateOnly(2026, 10, 3), "test", DateTime.UtcNow, 0)
+        };
+        var invoiceOptions = InvoiceChoice.Options(chooseInvoices);
+        check(invoiceOptions.Count == 2 && invoiceOptions[0].Text == "EMPTM26-811 din 12.11.2026 (2 intrări)" && invoiceOptions[1].Text == "A-77 din 03.10.2026 (0 intrări)",
+            "Invoice choice: each option shows the number, the date and how many entries the invoice has");
+        check(SearchableSelectRules.Filter(invoiceOptions, "811").Select(option => option.Id).SequenceEqual([1]) && SearchableSelectRules.Filter(invoiceOptions, "a-77").Select(option => option.Id).SequenceEqual([2])
+              && SearchableSelectRules.Filter(invoiceOptions, "03.10").Select(option => option.Id).SequenceEqual([2]) && SearchableSelectRules.Filter(invoiceOptions, "").Count == 2 && SearchableSelectRules.Filter(invoiceOptions, "zzz").Count == 0,
+            "Invoice choice: typing narrows the invoices by number or date, while the field is typed in");
+        check(InvoiceChoice.Placeholder(null, 0) == "Alege întâi furnizorul" && InvoiceChoice.Placeholder(5, 0) == "Furnizorul nu are facturi" && InvoiceChoice.Placeholder(5, 2) == "Caută sau alege factura…",
+            "Invoice choice: the placeholder says to choose the supplier first, that the supplier has no invoices, or to search");
         // The reason of an edit: radio buttons between the summary generated from the changes (one change on a line, following the form) and the user's own text.
         string Auto(IRenderedComponent<ProductEditor> cut) => cut.Find("#product-change-reason-auto").GetAttribute("value") ?? "";
         var radios = editing.FindAll("input[type=radio][name='product-change-reason-mode']");
@@ -285,6 +311,7 @@ public static class ComponentChecks
         entryContext.JSInterop.Mode = JSRuntimeMode.Loose;
         entryContext.Services.AddLogging();
         entryContext.Services.AddSingleton<ISupplierRepository>(memorySuppliers);
+        entryContext.Services.AddSingleton<IProjectEquipmentRepository>(new FakeProjectEquipment());
         entryContext.Services.AddSingleton<ISupplierInvoiceRepository>(new MemorySupplierInvoiceRepository(memorySuppliers));
         var entryModules = new BlazorStoc.Modules.ModuleRegistry();
         entryModules.Add(new BlazorStoc.Modules.Invoices.InvoicesModule(), new ServiceCollection(), new Microsoft.Extensions.Configuration.ConfigurationBuilder().Build());
@@ -293,9 +320,18 @@ public static class ComponentChecks
         var entryInput = new StockMovementInput { Kind = StockMovementKind.Entry, Date = DateOnly.FromDateTime(DateTime.Today) };
         var origin = entryContext.Render<Components.Shared.EntryOriginPicker>(parameters => parameters.Add(p => p.Model, entryInput));
         check(origin.FindAll("[role=tab]").Count == 3 && origin.Markup.Contains("Preia din PDF"), "Entry origin: three tabs and the separate button for the PDF pickup");
+        // The tab Retur (who may record entries): a fourth tab; the free reasons no longer offer "Primit de la beneficiar / vehicul" nor the return type.
+        var returnInput = new StockMovementInput { Kind = StockMovementKind.Entry, Date = DateOnly.FromDateTime(DateTime.Today) };
+        var withReturn = entryContext.Render<Components.Shared.EntryOriginPicker>(parameters => parameters.Add(p => p.Model, returnInput).Add(p => p.AllowReturn, true).Add(p => p.ProductId, 1));
+        check(withReturn.FindAll("[role=tab]").Count == 4 && withReturn.Find("#add-tab-return").TextContent.Trim() == "Retur" && !withReturn.Markup.Contains("Primit de la beneficiar") && !withReturn.Markup.Contains("Retur din proiect"),
+            "Entry origin: with the right to record entries the tab Retur is offered, and the free reasons do not include the returns");
+        withReturn.Find("#add-tab-return").Click();
+        check(returnInput.FreeType == FreeEntryType.ReturnFromProject && withReturn.Markup.Contains("Retur din *") && withReturn.Find("#add-return-beneficiary").HasAttribute("checked") && withReturn.Markup.Contains("nu există nimic de returnat"),
+            "Entry origin: the tab Retur starts with the return from a beneficiary and says when the product is in no project");
         using var pickupOutContext = new BunitContext();
         pickupOutContext.JSInterop.Mode = JSRuntimeMode.Loose;
         pickupOutContext.Services.AddLogging();
+        pickupOutContext.Services.AddSingleton<IProjectEquipmentRepository>(new FakeProjectEquipment());
         pickupOutContext.Services.AddSingleton<ISupplierRepository>(memorySuppliers);
         pickupOutContext.Services.AddSingleton<ISupplierInvoiceRepository>(new MemorySupplierInvoiceRepository(memorySuppliers));
         var outModules = new BlazorStoc.Modules.ModuleRegistry();
@@ -308,6 +344,7 @@ public static class ComponentChecks
         using var suppliersOutContext = new BunitContext();
         suppliersOutContext.JSInterop.Mode = JSRuntimeMode.Loose;
         suppliersOutContext.Services.AddLogging();
+        suppliersOutContext.Services.AddSingleton<IProjectEquipmentRepository>(new FakeProjectEquipment());
         suppliersOutContext.Services.AddSingleton<ISupplierRepository>(memorySuppliers);
         suppliersOutContext.Services.AddSingleton<ISupplierInvoiceRepository>(new MemorySupplierInvoiceRepository(memorySuppliers));
         var suppliersOut = new BlazorStoc.Modules.ModuleRegistry();

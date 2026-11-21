@@ -1,0 +1,41 @@
+# Setări · Anunțuri
+Ruta: /setari
+Tab: Anunțuri
+Cautare: anunturi anunt editor formatare poze imagini previzualizare draft publica republica arhivat obligatoriu audienta utilizatori selectati zip incarca valabil pana
+
+Secțiune pentru administratori și dezvoltatori (cheia „Setări: Anunțuri”). Aici scrii anunțurile pe care le văd utilizatorii într-o fereastră după autentificare. Un anunț poate fi general (utilizatorul poate opri afișarea lor) sau obligatoriu (apare la fiecare autentificare până când utilizatorul apasă „Am citit”). Pagina are editorul, un tabel cu toate anunțurile și două opțiuni de început: „Creare anunț” și „Încarcă anunț”.
+
+## Elemente
+### Începutul paginii
+- Creare anunț | buton | Deschide editorul gol pentru un anunț nou. | sel: #announcement-new
+- Încarcă anunț | buton | Primește o arhivă ZIP (anunt.json, continut.html și folderul imagini) și o deschide în editor ca draft nou; nu publică nimic. Utilizatorii inexistenți sau pozele nepotrivite sunt raportate. | sel: #announcement-upload
+### Editorul
+- Titlu | câmp | Titlul anunțului (cel mult 200 de caractere). | sel: #announcement-title
+- Bara de formatare | buton | Aldin, cursiv, subliniat, titluri, liste, link, culoare, aliniere și poză; pozele se pot lipi și direct în text. | sel: #announcement-toolbar
+- Text | câmp | Conținutul formatat. La salvare serverul îl curăță: rămân doar formatările permise. | sel: #announcement-body
+- Obligatoriu | comutator | Un anunț obligatoriu apare la fiecare autentificare până când utilizatorul apasă „Am citit”. | sel: #announcement-mandatory
+- Audiența | câmp | „Toți utilizatorii” sau „Utilizatori selectați”, cu căutare în lista de utilizatori. | sel: #announcement-audience
+- Valabil până | câmp | Data (dd.mm.yyyy) după care anunțul nu se mai arată; gol = fără sfârșit. | sel: #announcement-until
+- Previzualizează | buton | Arată anunțul în aceeași fereastră ca utilizatorii, cu conținutul curent. | sel: #announcement-preview
+- Salvează ca draft | buton | Păstrează anunțul fără să-l publice; la un anunț deja publicat salvează modificările fără să-l republice. | sel: #announcement-save
+- Publică | buton | Publică anunțul; la un anunț publicat înainte, toți cei vizați îl primesc din nou. | sel: #announcement-publish
+### Tabelul de anunțuri
+- Tabelul | tabel | Titlu, tip, audiență, stare, valabilitate, câți l-au văzut sau citit; ordonabil din antet și paginat. | sel: #announcements-table
+- Cine a citit | iconita:view | Doar la un anunț obligatoriu, în coloana „Văzut / citit”: deschide lista utilizatorilor care au apăsat „Am citit”, cu data și ora. La un anunț general coloana arată doar câți l-au văzut.
+- Vizualizează | iconita:view | Arată anunțul ca utilizatorii.
+- Modifică / republică | iconita:edit | Deschide anunțul în editor; la „Publică” este republicat.
+- Republică fără modificări | iconita:renew | Publică din nou anunțul așa cum e salvat, fără să-l deschizi în editor: toți cei vizați îl primesc din nou. Nu se poate la un draft (se activează din coloana Activ).
+- Descarcă ca ZIP | iconita:export | Descarcă anunțul în formatul ZIP de încărcare.
+- Activ (coloană) | comutator | On activează anunțul așa cum e salvat (un draft, unul arhivat sau expirat) și îl trimite din nou celor vizați; Off îl dezactivează (arhivează). La un anunț cu data „Valabil până” trecută activarea cere întâi modificarea datei.
+- Șterge definitiv | iconita:delete | Șterge anunțul, pozele și starea „văzut” (cu confirmare).
+
+## Flux: Cum public un anunț
+1. Apasă „Creare anunț” sau „Încarcă anunț”.
+2. Scrie titlul și textul, adaugă poze, alege tipul, audiența și, dacă vrei, „Valabil până”.
+3. Apasă „Previzualizează” ca să vezi ce primesc utilizatorii.
+4. Apasă „Publică” (sau „Salvează ca draft” ca să continui mai târziu).
+
+## Flux: Cum republic un anunț
+1. În tabel apasă iconița de modificare de pe anunț.
+2. Modifică textul sau data „Valabil până”.
+3. Apasă „Publică”: toți cei vizați îl primesc din nou.

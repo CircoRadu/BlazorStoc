@@ -44,6 +44,7 @@ else
             <dt>Nume afișat</dt><dd>@user.DisplayName</dd>
             <dt>Tip utilizator</dt><dd><span class="role-badge @(user.Role == AccessRoles.Administrator ? "admin" : "limited")">@(user.TypeName.Length > 0 ? user.TypeName : user.Role)</span></dd>
             <dt>Stare</dt><dd><span class="stock-badge @(user.IsActive ? "positive" : "zero")">@(user.IsActive ? "Activ" : "Inactiv")</span></dd>
+            <dt>Dezvoltator</dt><dd id="user-developer"><ToggleSwitch Id="user-developer-switch" Value="user.IsDeveloper" ValueChanged="SetDeveloperAsync" Disabled="@(!canEdit || developerBusy)" AriaLabel="Dezvoltator" OnText="Dezvoltator" OffText="Nu este dezvoltator" /> <small class="muted">Doar dezvoltatorii văd Dezvoltare (Setări) și filele Bugs și Propuneri din Notificări; drepturile se pot revoca de aici.</small></dd>
         </dl>
         <p class="muted">Parola nu este afișată și nu poate fi recuperată.@(user.MustChangePassword ? " Utilizatorul trebuie să aleagă o parolă nouă la prima autentificare (parola actuală a fost stabilită de un administrator)." : "")</p>
     </section>
@@ -140,6 +141,22 @@ else
         DateTime.TryParse(utc, null, System.Globalization.DateTimeStyles.RoundtripKind, out var value) ? value.ToLocalTime().ToString("dd.MM.yyyy HH:mm") : "—";
 
     // Arriving on this page only shows the account; editing starts from the explicit "Editează" action.
+    private bool developerBusy;
+    private async Task SetDeveloperAsync(bool on)
+    {
+        if (user is null || developerBusy) return;
+        developerBusy = true; notice = null; error = null;
+        try
+        {
+            user = await Repository.SetDeveloperAsync(user, on, lifetime.Token);
+            notice = on ? "Contul este acum dezvoltator." : "Dreptul de dezvoltator a fost revocat.";
+        }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (Exception exception) when (exception is UserOperationException or AccessDeniedException) { notice = null; error = exception.Message; await LoadAsync(); }
+        catch (Exception exception) { Logger.LogError("Developer flag failed ({ErrorType}).", exception.GetType().Name); error = "Modificarea nu a putut fi salvată."; }
+        finally { developerBusy = false; }
+    }
+
     private Task OpenEditorAsync() { editing = true; editorKey = Guid.NewGuid(); notice = null; return Task.CompletedTask; }
     private Task CloseEditorAsync() { editing = false; return Task.CompletedTask; }
     private Task UserSavedAsync(WebUser saved)

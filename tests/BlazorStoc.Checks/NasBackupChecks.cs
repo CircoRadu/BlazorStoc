@@ -49,8 +49,8 @@ public static class NasBackupChecks
             "NAS backup: path and account are required only when the copy is on");
         check(BackupSettingsRules.Validate(new(false, "xx", 2, false, 1)) is null && BackupSettingsRules.Validate(new(true, "25:99", 2, false, 30)) is not null
               && BackupSettingsRules.Validate(new(true, "03:30", 2, true, 30)) is null && BackupSettingsRules.Validate(new(false, "02:00", 0, false, 30)) is not null
-              && BackupSettingsRules.Validate(new(false, "02:00", 31, false, 30)) is not null && BackupSettingsRules.Validate(new(false, "02:00", 2, true, 6)) is not null
-              && BackupSettingsRules.Validate(new(false, "02:00", 2, true, 7)) is null,
+              && BackupSettingsRules.Validate(new(false, "02:00", 31, false, 30)) is not null && BackupSettingsRules.Validate(new(false, "02:00", 2, true, 3)) is not null
+              && BackupSettingsRules.Validate(new(false, "02:00", 2, true, 4)) is null,
             "Backup settings: the time is required only when the schedule is on, the age is 1-30 days, the retention is at least 7 days");
         check(NasBackupRules.ConnectionMessage(1326).Contains("parola") && NasBackupRules.ConnectionMessage(53).Contains("găsită") && NasBackupRules.ConnectionMessage(9999).Contains("9999"),
             "NAS backup: network error codes become messages in words");

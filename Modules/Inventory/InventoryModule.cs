@@ -11,7 +11,7 @@ public sealed class InventoryModule : IModule
 
     public string Id => ModuleId;
     public string Name => "Inventar";
-    public Version Version { get; } = new(1, 1, 0);
+    public Version Version { get; } = new(1, 4, 1);
     // The menu section (two entries: report and take-over) stays in MainLayout and is shown only while the module works; the permission modules are inventar and inventar-preluare.
     public IReadOnlyList<ModuleNavItem> Nav { get; } = [];
 
@@ -22,6 +22,8 @@ public sealed class InventoryModule : IModule
         services.AddSingleton<IInventoryPdfWriter, InventoryPdfWriter>();
         services.AddScoped<IInventoryPickupBuilder>(provider => new GuardedInventoryPickupBuilder(
             ActivatorUtilities.CreateInstance<InventoryPickupBuilder>(provider), provider.GetRequiredService<ModuleRegistry>()));
+        services.AddScoped<IOcrLearningService>(provider => new GuardedOcrLearningService(
+            ActivatorUtilities.CreateInstance<MariaOcrLearningService>(provider), provider.GetRequiredService<ModuleRegistry>()));
         services.AddScoped<IInventoryPickupApplier>(provider => new GuardedInventoryPickupApplier(
             ActivatorUtilities.CreateInstance<InventoryPickupApplier>(provider), provider.GetRequiredService<ModuleRegistry>()));
     }

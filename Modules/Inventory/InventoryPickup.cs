@@ -7,7 +7,8 @@ namespace BlazorStoc.Services;
 // the UI before sending, which is why it travels as plain data here rather than being folded into a computed
 // Difference up front - the page recomputes Difference after every correction (subtask 1.3).
 public sealed record InventoryPickupLine(int? ProductId, string RawCode, string? ProductName, string? Category,
-    string? Subcategory, int? CurrentStock, int? RecognizedValue, bool Uncertain, int? Number = null)
+    string? Subcategory, int? CurrentStock, int? RecognizedValue, bool Uncertain, int? Number = null,
+    int? OriginalValue = null, IReadOnlyList<InventoryPickupDigit>? Digits = null, byte[]? CellPng = null, int CellWidth = 0, int CellHeight = 0, int Page = 0, string? LearnedNote = null)
 {
     // Number: the row's printed "Nr. crt." read from the scan - shown before the code to ease matching paper against
     // screen, never stored.
@@ -83,7 +84,7 @@ public interface IInventoryPickupBuilder
 // Matches OCR-scanned rows against the live catalogue and computes the warehouse-stock difference for each,
 // using the same "in depozit" value (excludes vehicles) the situatia de inventar PDF itself was built from
 // (InventoryReportBuilder), since "Valoare reala" is what the user physically counted in the warehouse.
-public sealed class InventoryPickupBuilder(IProductRepository products, IStockMovementRepository movements) : IInventoryPickupBuilder
+public sealed class InventoryPickupBuilder(IProductRepository products, IStockMovementRepository movements, ISubcategoryTree? tree = null) : IInventoryPickupBuilder
 {
     public async Task<InventoryPickupReview> BuildAsync(IReadOnlyList<InventoryPickupScanRow> rows, CancellationToken cancellationToken = default)
     {
@@ -100,18 +101,31 @@ public sealed class InventoryPickupBuilder(IProductRepository products, IStockMo
             var product = InventoryPickupRules.MatchProduct(row.RawCode, allProducts);
             if (product is null)
             {
-                notFound.Add(new InventoryPickupLine(null, row.RawCode, null, null, null, null, row.RecognizedValue, row.Uncertain, row.Number));
+                notFound.Add(new InventoryPickupLine(null, row.RawCode, null, null, null, null, row.RecognizedValue, row.Uncertain, row.Number, row.RecognizedValue, row.Digits, row.CellPng, row.CellWidth, row.CellHeight, row.Page, row.LearnedNote));
                 continue;
             }
             var warehouseStock = StockMovementRules.WarehouseStock(product.Quantity, inVehicles.GetValueOrDefault(product.Id));
             var line = new InventoryPickupLine(product.Id, row.RawCode, product.Name, product.Category, product.Subcategory,
-                warehouseStock, row.RecognizedValue, row.Uncertain, row.Number);
+                warehouseStock, row.RecognizedValue, row.Uncertain, row.Number, row.RecognizedValue, row.Digits, row.CellPng, row.CellWidth, row.CellHeight, row.Page, row.LearnedNote);
             // Only rows with an actual difference need a decision from the user; an exact, confident match to the
             // current stock has nothing to correct (subtask 1.3). An uncertain read always needs a look, even if
             // the (possibly wrong) recognized value happens to equal the current stock.
             if (line.Uncertain || line.Difference != 0) lines.Add(line);
         }
-        return new InventoryPickupReview(lines, notFound);
+
+        // Same order as the "Situatia de inventar" report (InventoryReportBuilder): categories alphabetically, subcategories in the
+        // order of the tree (then by name), and inside a subcategory the negative stock first, then by product name.
+        var nodes = tree is null ? [] : await tree.GetTreeAsync(cancellationToken).ConfigureAwait(false);
+        var place = new Dictionary<string, int>(StringComparer.Ordinal);
+        for (var index = 0; index < nodes.Count; index++) place[InventoryRules.Key(nodes[index].Category, nodes[index].Name)] = index;
+        var ordered = lines
+            .OrderBy(line => line.Category ?? "", StringComparer.CurrentCultureIgnoreCase)
+            .ThenBy(line => place.GetValueOrDefault(InventoryRules.Key(line.Category ?? "", line.Subcategory ?? ""), int.MaxValue))
+            .ThenBy(line => line.Subcategory ?? "", StringComparer.CurrentCultureIgnoreCase)
+            .ThenBy(line => line.CurrentStock < 0 ? 0 : 1)
+            .ThenBy(line => line.ProductName ?? "", StringComparer.OrdinalIgnoreCase)
+            .ToList();
+        return new InventoryPickupReview(ordered, notFound);
     }
 }
 

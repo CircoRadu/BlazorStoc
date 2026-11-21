@@ -22,7 +22,7 @@
                 <button type="button" class="refresh act-reload" disabled="@busy" @onclick="RefreshAsync">Actualizează</button>
             </div>
             @if (!db.Reachable) { <div class="error-banner" role="alert">@db.Problem</div> }
-            <h3>Baza de date</h3>
+            <details class="db-collapse"><summary>Baza de date</summary>
             <div class="table-scroll">
                 <table class="database-facts">
                     <tbody>
@@ -41,9 +41,10 @@
                     </tbody>
                 </table>
             </div>
+            </details>
             @if (db.Reachable)
             {
-                <h3>Schema</h3>
+                <details class="db-collapse"><summary>Schema</summary>
                 <div class="table-scroll">
                     <table class="database-facts">
                         <tbody>
@@ -55,11 +56,12 @@
                         </tbody>
                     </table>
                 </div>
+                </details>
             }
         }
         @if (application is { } app)
         {
-            <h3>Aplicația</h3>
+            <details class="db-collapse"><summary>Aplicația</summary>
             <div class="table-scroll">
                 <table class="database-facts">
                     <tbody>
@@ -73,6 +75,7 @@
                     </tbody>
                 </table>
             </div>
+            </details>
         }
     }
     </div>

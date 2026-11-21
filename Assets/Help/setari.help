@@ -6,10 +6,12 @@ Captura: subsectiuni | /setari | click Backup; wait 1200 | Secțiunea Backup, cu
 
 Configurările aplicației, rezervate administratorului; un utilizator fără acest rol ajunge doar la șabloanele de facturi (le creează și le modifică). Setările sunt un panou cu un tile pentru fiecare secțiune; fiecare tile are o iconiță, titlul secțiunii și o scurtă descriere; fiecare secțiune are propriul ajutor: apasă „?” după ce ai deschis secțiunea.
 
+**Autentificatoare**: Pentru fiecare cont: asocierea cu cod QR, revocarea, reactivarea, codurile de recuperare (fereastra „Coduri de recuperare” are buton „Salvează codurile (.txt)”) și deblocarea.
+
 ## Elemente
 ### Secțiunile (tile-uri)
-- Preluare ActivityApp | tile | Conexiunea la ActivityApp, tichetele preluate, corespondența câmpurilor și programarea importului.
-- Preluare date ANAF | tile | Configurarea interogării serviciului public ANAF ([[setari-anaf]]).
+- Preluare date ActivityApp | tile | Conexiunea la ActivityApp, tichetele preluate, corespondența câmpurilor și programarea importului ([[setari-preluare-activityapp]]).
+- ANAF | tile | Preluarea datelor firmelor din serviciul public ANAF și autentificarea aplicației în ANAF pentru facturi ([[setari-anaf]]).
 - Notificări | tile | Șabloanele de notificări și setările lor ([[setari-notificari-sabloane]], [[setari-notificari-setari]]).
 - Hartă | tile | Furnizorul și aspectul hărții de mentenanță ([[setari-harta-motor]], [[setari-harta-overlay]]).
 - Facturi | tile | Șabloanele de citire a facturilor ([[setari-facturi-generare]], [[setari-facturi-sabloane]]).
@@ -21,6 +23,12 @@ Configurările aplicației, rezervate administratorului; un utilizator fără ac
 - Bază de date | tile | Starea serverului bazei de date și conexiunea aplicației la el ([[setari-baza-stare]], [[setari-baza-conexiune]]); apare numai conturilor cu nivelul Administrator.
 - Toate setările | buton | Din interiorul unei secțiuni te întoarce la tile-urile cu toate secțiunile. | img: subsectiuni | sel: #settings-back
 - Subsecțiunile | filă | Unele secțiuni au subsecțiuni, afișate sub numele secțiunii deschise. | img: subsectiuni | sel: .settings-subtab
+### Secțiuni adăugate
+- Preluare date Elcomtur | tile | Preluarea automată, zilnică, a backup-ului Elcomtur de pe un director (NAS): firma preluată, ora verificării și alerta de backup lipsă.
+- Preluare stoc ESPStoc | tile | Preluarea stocului din aplicația veche ESPStoc și stabilirea punctului zero al gestiunii.
+- Dezvoltare | tile | Rapoartele de eroare și propunerile de modificări trimise de utilizatori; tile-ul și sub-filele Erori și Propuneri arată numărul celor nerezolvate / active. Se vede numai dezvoltatorilor.
+- Catalog | tile | Adâncimea maximă a arborelui de subcategorii (1–15, implicit 10); doar administrator.
+- Autentificare | tile | Autentificarea în doi pași din exterior: modul, rețeaua internă și tabelul autentificatoarelor; doar administrator.
 
 ## Flux: Cum găsesc o setare
 1. Alege tile-ul secțiunii potrivite din pagina Setări; „‹ Toate setările” te readuce la tile-uri.

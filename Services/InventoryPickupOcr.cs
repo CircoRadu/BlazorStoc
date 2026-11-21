@@ -13,7 +13,11 @@ namespace BlazorStoc.Services;
 // page can show them for the user to inspect and correct (TODO.md Task 1, decizia privind selectia implicita).
 // Number is the row's printed "Nr. crt." (its running number inside the subcategory table), null on forms without that
 // column or when it could not be settled; it is display-only and is never stored.
-public sealed record InventoryPickupScanRow(int Page, string RawCode, int? RecognizedValue, bool Uncertain, int? Number = null);
+// Digits / CellPng / CellWidth / CellHeight are the learning material of the handwritten cell (Modules/Inventory/OcrLearning.cs): one entry per digit blob read (its box inside the cell, the
+// classifier's top choices and its 28x28 input as PNG) and the cell picture itself. They are null / 0 for a row without a handwritten value read.
+public sealed record InventoryPickupDigit(int Digit, double Confidence, string Top3, int X, int Y, int Width, int Height, byte[] Png);
+public sealed record InventoryPickupScanRow(int Page, string RawCode, int? RecognizedValue, bool Uncertain, int? Number = null,
+    IReadOnlyList<InventoryPickupDigit>? Digits = null, byte[]? CellPng = null, int CellWidth = 0, int CellHeight = 0, string? LearnedNote = null);
 public sealed record InventoryPickupScanResult(int PageCount, IReadOnlyList<InventoryPickupScanRow> Rows, IReadOnlyList<int> UnreadablePages);
 
 public sealed class InventoryPickupOcrException(string message) : Exception(message), BlazorStoc.Modules.IExpectedAnswer;
@@ -29,11 +33,16 @@ public static class InventoryPickupOcrRules
     public const string NoTableFoundMessage =
         "Nu a fost gasit niciun tabel recunoscut in fisier. Incarca situatia de inventar generata de aplicatie (pagina Inventar).";
     public const string HeaderCode = "Cod produs";
+
+    // The share of the analysis done (percent) when pagesDone of pageCount pages have been read: the PDF is read and rendered first (5 %), the pages share the rest equally; 100 only when all are read.
+    public static int ProgressAfterPages(int pagesDone, int pageCount) =>
+        pageCount <= 0 ? 0 : Math.Clamp(5 + (int)Math.Round(95.0 * Math.Clamp(pagesDone, 0, pageCount) / pageCount), 0, 100);
 }
 
 public interface IInventoryPickupOcrService
 {
-    Task<InventoryPickupScanResult> ScanAsync(Stream pdfStream, CancellationToken cancellationToken = default);
+    // progress: the share of the analysis done, in percent (0-100), reported as the work goes (the page shows it while the scan is read).
+    Task<InventoryPickupScanResult> ScanAsync(Stream pdfStream, CancellationToken cancellationToken = default, IProgress<int>? progress = null);
 }
 
 // Reads a scanned copy of the situatia de inventar PDF (Components/Pages/Inventory.razor + InventoryPdfWriter):
@@ -88,8 +97,9 @@ public sealed class InventoryPickupOcrService : IInventoryPickupOcrService, IDis
         digitModel = new Lazy<InferenceSession>(() => new InferenceSession(EmbeddedResources.Read("Assets.Models.mnist-12.onnx")));
     }
 
-    public async Task<InventoryPickupScanResult> ScanAsync(Stream pdfStream, CancellationToken cancellationToken = default)
+    public async Task<InventoryPickupScanResult> ScanAsync(Stream pdfStream, CancellationToken cancellationToken = default, IProgress<int>? progress = null)
     {
+        progress?.Report(0);
         using var buffered = new MemoryStream();
         await pdfStream.CopyToAsync(buffered, cancellationToken).ConfigureAwait(false);
         if (buffered.Length == 0) throw new InventoryPickupOcrException(InventoryPickupOcrRules.UnreadableMessage);
@@ -112,6 +122,7 @@ public sealed class InventoryPickupOcrService : IInventoryPickupOcrService, IDis
         {
             if (pages.Count == 0) throw new InventoryPickupOcrException(InventoryPickupOcrRules.UnreadableMessage);
             if (pages.Count > InventoryPickupOcrRules.MaxPages) throw new InventoryPickupOcrException(InventoryPickupOcrRules.TooManyPagesMessage);
+            progress?.Report(InventoryPickupOcrRules.ProgressAfterPages(0, pages.Count));   // the pages are rendered: the rest of the work is the reading of each page
 
             var rows = new List<InventoryPickupScanRow>();
             var unreadablePages = new List<int>();
@@ -121,6 +132,7 @@ public sealed class InventoryPickupOcrService : IInventoryPickupOcrService, IDis
                 var pageRows = await ScanPageAsync(pages[pageIndex], pageIndex + 1, cancellationToken).ConfigureAwait(false);
                 if (pageRows.Count == 0) unreadablePages.Add(pageIndex + 1);
                 rows.AddRange(pageRows);
+                progress?.Report(InventoryPickupOcrRules.ProgressAfterPages(pageIndex + 1, pages.Count));
             }
             if (rows.Count == 0) throw new InventoryPickupOcrException(InventoryPickupOcrRules.NoTableFoundMessage);
             return new InventoryPickupScanResult(pages.Count, rows, unreadablePages);
@@ -133,7 +145,14 @@ public sealed class InventoryPickupOcrService : IInventoryPickupOcrService, IDis
 
     // One data row read from the page before its "Nr. crt." is settled (see SettleNumbers): Block numbers the tables of
     // the page (a table starts at its "Cod produs" header row) and Index is the row's position inside its table.
-    internal sealed record PendingRow(int Block, int Index, string Code, int? Value, bool Uncertain, int? PrintedNumber);
+    internal sealed record PendingRow(int Block, int Index, string Code, int? Value, bool Uncertain, int? PrintedNumber,
+        IReadOnlyList<InventoryPickupDigit>? Digits = null, byte[]? CellPng = null, int CellWidth = 0, int CellHeight = 0, string? LearnedNote = null);
+
+    // What reading one handwritten cell produced: whether it has ink, the number read, whether the reading is unsure and the digits it is made of.
+    internal sealed record HandRead(bool HasInk, int? Value, bool Uncertain, IReadOnlyList<InventoryPickupDigit> Digits)
+    {
+        public static HandRead Empty { get; } = new(false, null, false, []);
+    }
 
     // The page as the table reading needs it: upright (deskewed), with its contrast stretched when the ink is faint, and a black-and-white copy.
     private sealed class PreparedPage(Mat deskewed, Mat? stretched, Mat binary) : IDisposable
@@ -210,7 +229,7 @@ public sealed class InventoryPickupOcrService : IInventoryPickupOcrService, IDis
     private static List<GridLine> FindPageGridLines(PreparedPage prepared, InventoryTableColumns columns, double scale, bool debug)
     {
         var gray = prepared.Gray;
-        var gridLines = FindGridLines(prepared.Binary);
+        var gridLines = NormalizeLineExtents(FindGridLines(prepared.Binary), gray.Cols);
         var legacyLeft = ToPixel(columns.NumberX, scale, gray.Cols);
         var legacyRight = ToPixel(columns.RightEdge, scale, gray.Cols);
         if (gridLines.Count < 2)
@@ -309,8 +328,11 @@ public sealed class InventoryPickupOcrService : IInventoryPickupOcrService, IDis
             indexInBlock++;
             if (code.Length == 0) { realCell.Dispose(); continue; }
 
-            var (hasInk, value, uncertain) = ReadHandwrittenWithContrast(realCell, debug);
+            var hand = ReadHandwrittenWithContrast(realCell, debug);
+            var (hasInk, value, uncertain) = (hand.HasInk, hand.Value, hand.Uncertain);
             if (debug) Console.WriteLine($"[debug] {top}-{bottom}: hasInk={hasInk} value={value} uncertain={uncertain}");
+            var cellPng = hasInk ? realCell.ImEncode(".png") : null;
+            int cellWidth = realCell.Cols, cellHeight = realCell.Rows;
             realCell.Dispose();
             if (!hasInk) continue; // empty cell: "neinventariat", no row at all (subtask 1.2)
 
@@ -322,7 +344,7 @@ public sealed class InventoryPickupOcrService : IInventoryPickupOcrService, IDis
                 if (numberCell is not null) printedNumber = await ReadPrintedNumberAsync(numberCell, cancellationToken).ConfigureAwait(false);
                 if (debug) Console.WriteLine($"[debug] {top}-{bottom}: printed number={printedNumber?.ToString() ?? "?"} (index {indexInBlock} in table {blockNumber})");
             }
-            pending.Add(new PendingRow(blockNumber, indexInBlock, code, value, uncertain, printedNumber));
+            pending.Add(new PendingRow(blockNumber, indexInBlock, code, value, uncertain, printedNumber, hand.Digits, cellPng, cellWidth, cellHeight));
         }
         return hasNumberColumn;
     }
@@ -340,7 +362,8 @@ public sealed class InventoryPickupOcrService : IInventoryPickupOcrService, IDis
                 .OrderByDescending(offsetGroup => offsetGroup.Count()).ThenBy(offsetGroup => offsetGroup.Key)
                 .First().Key);
         return pending.Select(row => new InventoryPickupScanRow(pageNumber, row.Code, row.Value, row.Uncertain,
-            hasNumberColumn && offsets.TryGetValue(row.Block, out var offset) && row.Index + offset > 0 ? row.Index + offset : null)).ToList();
+            hasNumberColumn && offsets.TryGetValue(row.Block, out var offset) && row.Index + offset > 0 ? row.Index + offset : null,
+            row.Digits, row.CellPng, row.CellWidth, row.CellHeight)).ToList();
     }
     internal static Mat ToGrayMat(SKBitmap bitmap)
     {
@@ -408,7 +431,7 @@ public sealed class InventoryPickupOcrService : IInventoryPickupOcrService, IDis
     private static int ToPixel(double points, double scale, int max) => Math.Clamp((int)Math.Round(points * scale), 0, max - 1);
 
     // A grid rule line found in the page: its row (y) and horizontal extent.
-    private sealed record GridLine(int Y, int Left, int Right);
+    internal sealed record GridLine(int Y, int Left, int Right);
 
     // The table grid is read from the scan itself, not from the generated PDF's geometry, because a printed-then-
     // scanned page rarely lands on those coordinates (printer scaling, feed offset - a real Konica Minolta scan of
@@ -454,6 +477,20 @@ public sealed class InventoryPickupOcrService : IInventoryPickupOcrService, IDis
         }
         if (runStart >= 0) Flush(runStart, previous);
         return lines;
+    }
+
+    // A rule of the table can come out shorter than its neighbours (a pen stroke or a speck of dirt breaks it near an end, so only its longest stretch
+    // is kept: x=304 instead of ~216 on a real scan). Its row then fails the border test and the two rows next to it were silently dropped from the
+    // review. A line that stops short of the usual left/right edge of the page's rules is therefore taken out to that edge; the vertical
+    // borders are still checked per row, so a band that really has no table borders stays "between tables".
+    internal static List<GridLine> NormalizeLineExtents(List<GridLine> lines, int pageWidth)
+    {
+        if (lines.Count < 3) return lines;
+        var usualLeft = lines.Select(line => line.Left).Order().ElementAt(lines.Count / 2);
+        var usualRight = lines.Select(line => line.Right).Order().ElementAt(lines.Count / 2);
+        // A break can be as wide as a handwritten number crossing the rule (right end cut at x=1454 of 2281 on a real scan), so there is no tolerance:
+        // every rule long enough to count as one is taken out to the usual edges.
+        return lines.Select(line => new GridLine(line.Y, Math.Min(line.Left, usualLeft), Math.Max(line.Right, usualRight))).ToList();
     }
 
     // Longest stretch of non-zero entries, bridging gaps of up to maxGap zeros (a scanned rule has small breaks).
@@ -639,7 +676,7 @@ public sealed class InventoryPickupOcrService : IInventoryPickupOcrService, IDis
     // Reads a handwritten cell; when the read is unsure (or a faint pen left nothing readable) it is retried once on a
     // contrast-stretched copy of the cell, and the retry is kept when it is at least as good (a confident reading
     // beats an uncertain one). A very faint cell is stretched up front. A cell with no contrast at all stays empty.
-    private (bool HasInk, int? Value, bool Uncertain) ReadHandwrittenWithContrast(Mat cell, bool debug)
+    private HandRead ReadHandwrittenWithContrast(Mat cell, bool debug)
     {
         var first = ReadHandwrittenNumber(cell);
         var contrast = InkContrast(cell);
@@ -700,12 +737,12 @@ public sealed class InventoryPickupOcrService : IInventoryPickupOcrService, IDis
     // HasInk distinguishes a genuinely empty cell (no row at all - subtask 1.2's "neinventariat") from one that
     // has handwriting but could not be read with confidence (still returned as an uncertain row - subtask 1.2/1.3
     // - never silently dropped just because segmentation or classification struggled).
-    private (bool HasInk, int? Value, bool Uncertain) ReadHandwrittenNumber(Mat cell, bool thickenStrokes = false)
+    private HandRead ReadHandwrittenNumber(Mat cell, bool thickenStrokes = false)
     {
         using var binary = new Mat();
         Cv2.Threshold(cell, binary, 0, 255, ThresholdTypes.BinaryInv | ThresholdTypes.Otsu);
         var cellArea = cell.Rows * cell.Cols;
-        if (Cv2.CountNonZero(binary) < cellArea * 0.001) return (false, null, false); // no ink at all: not counted yet
+        if (Cv2.CountNonZero(binary) < cellArea * 0.001) return HandRead.Empty; // no ink at all: not counted yet
         Cv2.MorphologyEx(binary, binary, MorphTypes.Close, Cv2.GetStructuringElement(MorphShapes.Rect, new Size(3, 3)));
         // Pencil and dry-pen strokes are thin and break into fragments: thickening joins them into one stroke per digit.
         if (thickenStrokes) Cv2.Dilate(binary, binary, Cv2.GetStructuringElement(MorphShapes.Ellipse, new Size(3, 3)));
@@ -731,24 +768,27 @@ public sealed class InventoryPickupOcrService : IInventoryPickupOcrService, IDis
             if (box.Height < cell.Rows * 0.3 || box.Height > cell.Rows * 0.98) continue;
             blobs.Add((box, centroids.At<double>(label, 0)));
         }
-        if (blobs.Count == 0) return (true, null, true); // ink present but nothing segmentable: needs a look
+        if (blobs.Count == 0) return new HandRead(true, null, true, []); // ink present but nothing segmentable: needs a look
 
         blobs.Sort((a, b) => a.CentroidX.CompareTo(b.CentroidX));
         var digitsText = "";
         var uncertain = false;
+        var digits = new List<InventoryPickupDigit>();
         foreach (var blob in blobs)
         {
             using var digitMat = new Mat(binary, blob.Box);
-            var (digit, confidence) = ClassifyDigit(digitMat);
+            var (digit, confidence, top3, png) = ClassifyDigit(digitMat);
             if (confidence < DigitConfidenceThreshold) uncertain = true;
             digitsText += digit.ToString(System.Globalization.CultureInfo.InvariantCulture);
+            digits.Add(new InventoryPickupDigit(digit, Math.Round(confidence, 4), top3, blob.Box.X, blob.Box.Y, blob.Box.Width, blob.Box.Height, png));
         }
-        return int.TryParse(digitsText, out var value) ? (true, value, uncertain) : (true, null, true);
+        return int.TryParse(digitsText, out var value) ? new HandRead(true, value, uncertain, digits) : new HandRead(true, null, true, digits);
     }
 
     // Resizes an isolated digit blob into the 28x28, [0,1], white-ink-on-black-background input the embedded
     // ONNX Model Zoo "mnist-12" model expects (see its model card for the exact preprocessing).
-    private (int Digit, double Confidence) ClassifyDigit(Mat digitBinary)
+    // Top3 lists the three most probable digits as "digit:probability" (for the learning list); Png is the 28x28 classifier input.
+    private (int Digit, double Confidence, string Top3, byte[] Png) ClassifyDigit(Mat digitBinary)
     {
         var side = Math.Max(digitBinary.Rows, digitBinary.Cols);
         var square = Mat.Zeros(side, side, MatType.CV_8UC1).ToMat();
@@ -773,7 +813,9 @@ public sealed class InventoryPickupOcrService : IInventoryPickupOcrService, IDis
         var best = 0;
         for (var i = 1; i < probabilities.Length; i++)
             if (probabilities[i] > probabilities[best]) best = i;
-        return (best, probabilities[best]);
+        var top3 = string.Join(',', Enumerable.Range(0, probabilities.Length).OrderByDescending(i => probabilities[i]).Take(3)
+            .Select(i => $"{i}:{probabilities[i].ToString("0.00", System.Globalization.CultureInfo.InvariantCulture)}"));
+        return (best, probabilities[best], top3, resized.ImEncode(".png"));
     }
 
     private static float[] Softmax(float[] logits)

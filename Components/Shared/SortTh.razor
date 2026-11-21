@@ -1,0 +1,20 @@
+@* A column header of a table paged with Paged that can order the table: a click orders ascending, again descending, a third time back to the original order. Without a Paged around it, or when
+   Paged has no sort for Key, it is a plain header cell. The look comes from the table header rule (wwwroot/app.css, tokens --th-*). *@
+@{
+    var sortable = Sort is not null && Sort.CanSort(Key);
+    var direction = sortable ? Sort!.DirectionOf(Key) : null;
+}
+@if (!sortable) { <th class="@Class" scope="col">@ChildContent</th> }
+else
+{
+    <th class="@Class" scope="col" aria-sort="@(direction ?? "none")">
+        <button type="button" class="sort-header @(direction is null ? "" : "active")" data-sort="@Key" title="Ordonează după această coloană" @onclick="() => Sort!.ToggleAsync(Key)">@ChildContent <span class="sort-arrow" aria-hidden="true">@(direction == "ascending" ? "▲" : direction == "descending" ? "▼" : "↕")</span></button>
+    </th>
+}
+
+@code {
+    [CascadingParameter] public IPagedSort? Sort { get; set; }
+    [Parameter, EditorRequired] public string Key { get; set; } = "";
+    [Parameter] public string? Class { get; set; }
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+}

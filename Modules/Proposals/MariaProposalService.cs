@@ -7,7 +7,7 @@ using MySqlConnector;
 
 namespace BlazorStoc.Modules.Proposals;
 
-public sealed class MariaProposalService(IConfiguration configuration, IAccessControl access, IAuditTrail audit) : IProposalService
+public sealed class MariaProposalService(IConfiguration configuration, IAccessControl access, IAuditTrail audit, IChangeFeed? changeFeed = null, ChangeOrigin? origin = null) : IProposalService
 {
     private const string Columns = """
         p.id, p.number, p.kind, p.area_route, p.area_title, p.title, p.description, p.benefit, p.wanted_importance, p.state, p.user_name, p.user_role, p.app_version, p.implemented_version,
@@ -99,6 +99,7 @@ public sealed class MariaProposalService(IConfiguration configuration, IAccessCo
         }
         await AuditRecorder.RecordActionAsync(audit, access, AuditEntities.Proposal, AuditActions.CreateProposal, id.ToString(CultureInfo.InvariantCulture), ProposalRules.Number(id),
             $"Tip: {input.Kind}; importanță: {input.WantedImportance}; zona: {Trim(input.AreaTitle, 100)}; imagini: {images.Count}; titlu: {Trim(title, 120)}", "", cancellationToken).ConfigureAwait(false);
+        Publish(AuditActions.CreateProposal, id);
         return (await GetAsync(id, cancellationToken).ConfigureAwait(false))!;
     }
 
@@ -318,7 +319,96 @@ public sealed class MariaProposalService(IConfiguration configuration, IAccessCo
                 AuditDetails.Changes([new AuditChange("Stare", before.State, state), new AuditChange("Implementată în versiunea", before.ImplementedVersion, implementedVersion)]), "", cancellationToken).ConfigureAwait(false);
         }
         if (note.Length > 0) await AddNoteAsync(proposalId, note, cancellationToken).ConfigureAwait(false);
+        Publish(AuditActions.ChangeProposalState, proposalId);
         return (await GetAsync(proposalId, cancellationToken).ConfigureAwait(false))!;
+    }
+
+    public async Task<Proposal> UpdateContentAsync(int proposalId, string title, string description, string benefit, IReadOnlyList<ReportImage> addedImages, CancellationToken cancellationToken = default)
+    {
+        await access.EnsureAsync("setari-propuneri.edit", cancellationToken).ConfigureAwait(false);
+        title = (title ?? "").Trim();
+        description = (description ?? "").Trim();
+        if (title.Length == 0) throw new ProposalException("Scrie un titlu scurt al problemei.");
+        if (title.Length > ProposalRules.MaxTitle) throw new ProposalException($"Titlul poate avea cel mult {ProposalRules.MaxTitle} de caractere.");
+        if (description.Length == 0) throw new ProposalException("Descrierea nu poate fi goală.");
+        if (description.Length > ProposalRules.MaxDescription) throw new ProposalException($"Descrierea poate avea cel mult {ProposalRules.MaxDescription:N0} de caractere.");
+        benefit = (benefit ?? "").Trim();
+        if (benefit.Length > ProposalRules.MaxBenefit) throw new ProposalException($"Motivarea poate avea cel mult {ProposalRules.MaxBenefit:N0} de caractere.");
+        var before = await GetAsync(proposalId, cancellationToken).ConfigureAwait(false) ?? throw new ProposalException("Propunerea nu mai există.");
+        addedImages ??= [];
+        if (before.FileCount + addedImages.Count > ReportImageRules.MaxImages) throw new ProposalException($"O propunere poate avea cel mult {ReportImageRules.MaxImages} imagini (acum are {before.FileCount}).");
+        var images = new List<(ReportImage Image, string Type)>();
+        foreach (var image in addedImages)
+        {
+            if (image.Content.Length == 0 || image.Content.Length > ReportImageRules.MaxImageBytes)
+                throw new ProposalException($"Imaginea „{image.FileName}” trebuie să aibă cel mult {ReportImageRules.MaxImageBytes / 1024 / 1024} MB.");
+            var type = ReportImageRules.DetectImageType(image.Content) ?? throw new ProposalException($"Fișierul „{image.FileName}” nu este o imagine (PNG, JPEG, GIF sau WebP).");
+            images.Add((image, type));
+        }
+        var user = await access.GetUsernameAsync(cancellationToken).ConfigureAwait(false) ?? "";
+        var now = DateTime.UtcNow;
+        await using (var connection = await MariaDb.OpenAsync(configuration, cancellationToken).ConfigureAwait(false))
+        await using (var transaction = await connection.BeginTransactionAsync(cancellationToken).ConfigureAwait(false))
+        {
+            await using (var update = new MySqlCommand("UPDATE proposals SET title=@title, description=@description, benefit=@benefit, updated_by=@by, updated_utc=@now WHERE id=@id", connection, transaction))
+            {
+                update.Parameters.AddWithValue("@title", title);
+                update.Parameters.AddWithValue("@description", description);
+                update.Parameters.AddWithValue("@benefit", benefit);
+                update.Parameters.AddWithValue("@by", user);
+                update.Parameters.AddWithValue("@now", MariaTimeText.Format(now));
+                update.Parameters.AddWithValue("@id", proposalId);
+                await update.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
+            }
+            var index = before.FileCount;
+            foreach (var (image, type) in images)
+            {
+                index++;
+                await using var file = new MySqlCommand("""
+                    INSERT INTO proposal_files (proposal_id, kind, file_name, content_type, size_bytes, content, created_utc) VALUES (@proposal,@kind,@name,@type,@size,@content,@now)
+                    """, connection, transaction);
+                file.Parameters.AddWithValue("@proposal", proposalId);
+                file.Parameters.AddWithValue("@kind", image.Kind is ReportImageRules.KindScreenshot or ReportImageRules.KindFile ? image.Kind : ReportImageRules.KindPasted);
+                file.Parameters.AddWithValue("@name", ReportImageRules.SafeName(image.FileName, $"imagine-{index}{ReportImageRules.Extension(type)}"));
+                file.Parameters.AddWithValue("@type", type);
+                file.Parameters.AddWithValue("@size", image.Content.Length);
+                file.Parameters.AddWithValue("@content", image.Content);
+                file.Parameters.AddWithValue("@now", MariaTimeText.Format(now));
+                await file.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
+            }
+            await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
+        }
+        if (before.Title != title || before.Description != description || before.Benefit != benefit || images.Count > 0)
+        {
+            var changes = new List<AuditChange>();
+            if (before.Title != title) changes.Add(new AuditChange("Titlu", before.Title, title));
+            if (before.Description != description) changes.Add(new AuditChange("Descriere", Trim(before.Description, 200), Trim(description, 200)));
+            if (before.Benefit != benefit) changes.Add(new AuditChange("Motivare", Trim(before.Benefit, 200), Trim(benefit, 200)));
+            if (images.Count > 0) changes.Add(new AuditChange("Imagini adăugate", "0", images.Count.ToString(CultureInfo.InvariantCulture)));
+            await AuditRecorder.RecordActionAsync(audit, access, AuditEntities.Proposal, AuditActions.EditProposalContent, proposalId.ToString(CultureInfo.InvariantCulture), before.Number,
+                AuditDetails.Changes([.. changes]), "", cancellationToken).ConfigureAwait(false);
+        }
+        Publish(AuditActions.EditProposalContent, proposalId);
+        return (await GetAsync(proposalId, cancellationToken).ConfigureAwait(false))!;
+    }
+
+    public async Task<int> DeleteClosedAsync(CancellationToken cancellationToken = default)
+    {
+        await access.EnsureAsync("setari-propuneri.edit", cancellationToken).ConfigureAwait(false);
+        int deleted;
+        await using (var connection = await MariaDb.OpenAsync(configuration, cancellationToken).ConfigureAwait(false))
+        await using (var command = new MySqlCommand("DELETE FROM proposals WHERE state IN (@s1,@s2,@s3)", connection))
+        {
+            command.Parameters.AddWithValue("@s1", ProposalRules.ClosedStates[0]);
+            command.Parameters.AddWithValue("@s2", ProposalRules.ClosedStates[1]);
+            command.Parameters.AddWithValue("@s3", ProposalRules.ClosedStates[2]);
+            deleted = await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
+        }
+        if (deleted > 0)
+            await AuditRecorder.RecordActionAsync(audit, access, AuditEntities.Proposal, AuditActions.DeleteAllClosedProposals, "*", "propuneri închise",
+                $"Propuneri șterse: {deleted}", "", cancellationToken).ConfigureAwait(false);
+        Publish(AuditActions.DeleteAllClosedProposals, 0);
+        return deleted;
     }
 
     public async Task DeleteAsync(int proposalId, CancellationToken cancellationToken = default)
@@ -333,6 +423,20 @@ public sealed class MariaProposalService(IConfiguration configuration, IAccessCo
         }
         await AuditRecorder.RecordActionAsync(audit, access, AuditEntities.Proposal, AuditActions.DeleteProposal, proposalId.ToString(CultureInfo.InvariantCulture), before.Number,
             $"Titlu: {Trim(before.Title, 120)}; autor: {before.UserName}; stare: {before.State}", "", cancellationToken).ConfigureAwait(false);
+        Publish(AuditActions.DeleteProposal, proposalId);
+    }
+
+    // The tab badges and the open lists of the other sessions follow (the identifiers only).
+    private void Publish(string action, int id) =>
+        changeFeed?.Publish(new ChangeEvent(AuditEntities.Proposal, action, id.ToString(CultureInfo.InvariantCulture), origin?.Id ?? Guid.Empty, DateTime.UtcNow));
+
+    public async Task<int> CountOpenAsync(CancellationToken cancellationToken = default)
+    {
+        if (!await access.HasAsync("setari-propuneri.view", cancellationToken).ConfigureAwait(false)) return 0;
+        await using var connection = await MariaDb.OpenAsync(configuration, cancellationToken).ConfigureAwait(false);
+        await using var command = new MySqlCommand("SELECT COUNT(*) FROM proposals WHERE state NOT IN (@s1, @s2, @s3)", connection);
+        for (var index = 0; index < ProposalRules.ClosedStates.Count; index++) command.Parameters.AddWithValue("@s" + (index + 1), ProposalRules.ClosedStates[index]);
+        return Convert.ToInt32(await command.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false), CultureInfo.InvariantCulture);
     }
 
     public async Task MarkSeenAsync(int proposalId, CancellationToken cancellationToken = default)
@@ -348,12 +452,14 @@ public sealed class MariaProposalService(IConfiguration configuration, IAccessCo
 
     public async Task<IReadOnlyList<ProposalAlert>> GetAlertsAsync(CancellationToken cancellationToken = default)
     {
+        // The tab Propuneri of Notificari is for developers only (PROP-0013): an account that is not a developer gets nothing, not even the answers on its own proposals.        if (!await access.HasAsync("setari-propuneri.view", cancellationToken).ConfigureAwait(false)) return [];
+        if (!await access.HasAsync("setari-propuneri.view", cancellationToken).ConfigureAwait(false)) return [];
         var user = await access.GetUsernameAsync(cancellationToken).ConfigureAwait(false);
         if (string.IsNullOrEmpty(user)) return [];
         var alerts = new List<ProposalAlert>();
         await using var connection = await MariaDb.OpenAsync(configuration, cancellationToken).ConfigureAwait(false);
         // The author: the state changed or the administrator answered after the author last opened the proposal.
-        await using (var mine = new MySqlCommand($"SELECT {Columns} FROM proposals p WHERE p.user_name=@user AND p.updated_utc<>'' AND p.updated_utc>p.author_seen_utc ORDER BY p.updated_utc DESC LIMIT 100", connection))
+        await using (var mine = new MySqlCommand($"SELECT {Columns} FROM proposals p WHERE p.user_name=@user AND p.updated_utc<>'' AND p.updated_utc>p.author_seen_utc AND p.state NOT IN ('Implementată','Amânată','Respinsă') ORDER BY p.updated_utc DESC LIMIT 100", connection))
         {
             mine.Parameters.AddWithValue("@user", user);
             foreach (var proposal in await ReadAllAsync(mine, cancellationToken).ConfigureAwait(false))

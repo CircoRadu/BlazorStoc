@@ -261,3 +261,144 @@ Pasi: Notificari -> Tichete de validat -> Arata tichetele discardate -> iconita 
 | 6 | Journal activitate | "Vizualizare tichet exemplu ActivityApp" pentru fiecare tichet deschis, cu numarul tichetului (fara continut) | |
 | 7 | In ActivityApp se adauga/scoate o coloana din Tickete sau EvenimenteAgent, apoi ruleaza o sincronizare | Notificarea "Structura tichetelor" cu lista modificarilor; in sectiunea 6 apare bannerul cu aceeasi lista | |
 | 8 | Verifica corespondenta (cu tichetul exemplu), apasa "Corespondenta verificata" | Bannerul si notificarea dispar; Jurnal: "Confirmare structura tichete ActivityApp" | |
+
+## Modificari de testat - preluarea tichetelor separata de Mentenanta si tichet exemplu usor (10.11.2026, ActivityImport 0.14.1, Maintenance 1.11.1, migrarea 84)
+
+**Ce s-a adaugat:** decizia pe un tichet (Mentenanta / La cerere) se pastreaza ca rezultat (tabelul activity_ticket_outcomes) si tichetul iese din coada indiferent daca modulul Mentenanta ruleaza; un worker al Mentenantei inregistreaza interventiile; in Tichet exemplu coloanele au butonul "Alege..." in loc de o lista pe fiecare rand.
+**Ce face acum:** cu Mentenanta oprita, tichetele se preiau si se valideaza in continuare, iar scadentele nu se muta; la pornirea Mentenantei interventiile se inregistreaza in ordinea datelor si scadentele urmeaza ultimele tichete; fereastra Tichet exemplu se deruleaza usor si de pe alt calculator.
+
+| Nr | Pasi | Asteptat | Rezultat |
+|---|---|---|---|
+| 1 | Setari -> Module: opreste Mentenanta. Mentenanta -> Validare tichete (sau Notificari): valideaza un tichet ca Mentenanta | Tichetul iese din coada; mesajul "N tichete decise asteapta inregistrarea in Mentenanta"; scadenta contractului NU se muta; Jurnal "Preluare tichet ActivityApp ca mentenanta" cu "Inregistrare in Mentenanta: in asteptare" | |
+| 2 | Ruleaza o sincronizare ActivityApp | Tichetul validat nu mai este propus din nou | |
+| 3 | Porneste Mentenanta si asteapta cel mult un minut | Mesajul dispare; intervenia apare la beneficiar, scadenta contractului se muta cu ciclul fata de data efectuarii; tichetul apare legat de interventie | |
+| 4 | Valideaza mai multe tichete cu Mentenanta oprita, date diferite, apoi porneste modulul | Scadenta ramane cea data de cel mai recent tichet | |
+| 5 | Cu Mentenanta pornita valideaza un tichet | Interventia apare imediat, ca inainte | |
+| 6 | Setari -> Preluare ActivityApp -> Tichet exemplu | Fiecare coloana cu text are butonul "Alege..."; la clic apare lista doar pe acel rand; dupa alegere revine butonul; derularea e fluida si de pe alt calculator | |
+
+
+## Modificari de testat - corespondenta tichet cu mutare, camp nou, sumar si suspendarea importului (10.11.2026, ActivityImport 0.15.0)
+
+**Ce s-a adaugat:** in Tichet exemplu alegerea se face cu "Tichet - nume" / "Eveniment - nume"; o informatie are o singura coloana si alegerea unei coloane deja asignate o muta; "Camp suplimentar nou" are fereastra proprie (nume repetabil, fara limita de campuri); sumarul din finalul ferestrei arata coloana sursa; importul se suspenda cand structura tichetelor se schimba.
+**Ce face acum:** corespondenta se modifica direct din fereastra cu mesaj despre ce s-a mutat; dupa o schimbare in ActivityApp (coloana noua, dispareuta sau cu alt tip) preluarea tichetelor se opreste, apare notificarea cu lista schimbarilor si se reia dupa "Corespondenta verificata".
+
+| Nr | Pasi | Asteptat | Rezultat |
+|---|---|---|---|
+| 1 | Setari -> Preluare ActivityApp -> Deschide un tichet exemplu; la o coloana apasa Alege... | Lista: "Tichet - Titlul tichetului", ..., campurile suplimentare existente, "+ Camp suplimentar nou..."; pentru EvenimenteAgent apare "Eveniment - ..." | |
+| 2 | Alege pentru "Numarul tichetului" coloana pe care o citeste titlul | Mesaj: titlul a trecut pe coloana numarului; sumarul de la final arata noile coloane sursa | |
+| 3 | La o coloana alege "+ Camp suplimentar nou...", scrie un nume deja folosit | Fereastra cere nume si destinatie; campul se adauga; apar doua campuri cu acelasi nume | |
+| 4 | Adauga peste 10 campuri suplimentare | Nu exista limita; lista are paginare | |
+| 5 | Alege un camp suplimentar existent pentru alta coloana | Campul se muta pe coloana aleasa, cu mesaj | |
+| 6 | Deruleaza la sfarsitul ferestrei | Sumar: informatie, citita din, valoare, merge in; apoi observatiile intervenției | |
+| 7 | In ActivityApp (test) adauga o coloana in Tickete, apoi ruleaza sincronizarea | Preluarea tichetelor nu mai preia nimic; Notificari: "Structura tichetelor..." cu coloanele noi; Jurnal: "Suspendare preluare ActivityApp: structura schimbata" o singura data | |
+| 8 | Setari -> Preluare ActivityApp -> "Corespondenta verificata", apoi sincronizare | Preluarea se reia, tichetele ramase se preiau in ordinea datelor, notificarea dispare | |
+
+## Modificari de testat - sablonarea preluarii tichetului (11.11.2026, versiunea 0.5.72, BUG-0017)
+
+**Ce s-a adaugat:** fereastra "Tichet exemplu" (Setari -> Preluare ActivityApp, sectiunea 6) are listele pliabile Tichet / Eveniment / Client cu toate coloanele, fiecare cu comutatorul "Folosit" (oprit implicit), lista "Folosite" cu descriere, rol, destinatie si detasare, coloane de orice tip (numar, data, da/nu) ca campuri libere si CUI-ul clientului mereu preluat.
+**Ce face acum:** o coloana pornita intra in lista "Folosite"; observatiile tichetului arata "descriere: valoare"; sumarul si observatiile se actualizeaza imediat; titlul, numarul si CUI-ul clientului nu pot fi detasate.
+
+1. Deschide Setari -> Preluare ActivityApp -> sectiunea 6 -> "Deschide tichetul exemplu". Verifica cele trei liste pliabile (Tichet, Eveniment, Client) si ca toate comutatoarele "Folosit" sunt oprite, in afara de titlu, numar si CUI.
+2. Porneste "Folosit" la o coloana numerica (ex. IDClient) si la una de data (ex. StartTime): apar in "Folosite" si in observatii ca "IDClient: ...", "StartTime: 02.11.2026 12:30:00".
+3. Schimba descrierea in lista "Folosite" (ex. "ID client"): observatiile arata "ID client: valoare".
+4. La o coloana text alege alt rol din lista "Rol" (ex. Problema): informatia se muta pe coloana, cu mesaj; "Detaseaza" (cosul) scoate coloana din folosite.
+5. Inchide fereastra, "Salveaza corespondenta", reincarca pagina: campurile libere si rolurile s-au pastrat.
+
+## Modificari de testat - titlul si numarul tichetului din orice coloana (11.11.2026, BUG-0019)
+
+
+
+**Ce s-a adaugat:** in fereastra "Tichet exemplu", pe randurile "Titlul tichetului" si "Numarul tichetului" din lista "Folosite", coloana din care se citesc se alege dintr-o lista; rolurile "Titlul/Numarul tichetului" apar si in lista "Rol" a coloanelor text.
+
+**Ce face acum:** titlul si numarul se pot citi din orice coloana text a tichetului (nu doar Subject si NumeTicket).
+
+
+
+| Pas | Ce faci | Ce trebuie sa vezi | OK |
+
+|---|---|---|---|
+
+| 1 | "Tichet exemplu" -> lista "Folosite", randul "Numarul tichetului" -> alege alta coloana in "Citit din" | Mesajul "Tichet – NumeTicket → ...", valoarea din coloana noua apare in sumar si in observatii; randul ramane fara cos (nedetasabil) | |
+
+| 2 | La "Titlul tichetului" alege coloana folosita acum de numar | Numarul trece pe coloana lasata libera de titlu, cu mesaj | |
+
+| 3 | La o coloana text, in "Rol", alege "Numarul tichetului" | Coloana devine numarul; coloana veche se elibereaza | |
+
+| 4 | Salveaza corespondenta si reincarca pagina | Alegerile pentru titlu si numar s-au pastrat | |
+
+## Modificari de testat - numarul tichetului obligatoriu si fereastra flotanta (12.11.2026, ActivityImport 0.18.0, BUG-0023)
+
+**Ce s-a adaugat:** in fereastra "Tichet exemplu", blocul "Coloane obligatorii" (titlul si numarul tichetului se aleg din orice coloana a tichetului: text, numar sau data), numarul tichetului fara valoare implicita si obligatoriu pentru salvare, fereastra flotanta "Cum arata tichetul preluat".
+
+**Ce face acum:** alegi tu coloana numarului; corespondenta nu se salveaza fara ea. Sumarul si observatiile intervenitiei stau intr-o fereastra separata, care se actualizeaza la fiecare schimbare. Titlul, numarul si CUI-ul nu se mai aleg din lista "Folosite".
+
+| Pas | Ce faci | Ce trebuie sa vezi | OK |
+|---|---|---|---|
+| 1 | Setari -> Preluare ActivityApp -> "Deschide un tichet exemplu" | Sus apare "Coloane obligatorii" cu Numarul, Titlul si CUI client; in dreapta, fereastra "Cum arata tichetul preluat" | |
+| 2 | Daca numarul nu a fost ales: priveste randul "Numarul tichetului" si butonul "Salveaza corespondenta" | "- alege coloana -" si mesajul rosu; butonul este dezactivat si are explicatie | |
+| 3 | Alege pentru numar o coloana numerica (de exemplu ID) | Valoarea apare in coloana "Valoare", iar in fereastra flotanta numarul tichetului se schimba pe loc | |
+| 4 | Alege pentru titlu alta coloana | Titlul si observatiile din fereastra flotanta se actualizeaza imediat | |
+| 5 | Muta fereastra flotanta (trage de bara ei), redimensioneaz-o, apasa "Ascunde", apoi "Arata fereastra ..." din bloc | Fereastra se muta, se redimensioneaza, dispare si reapare | |
+| 6 | Inchide fereastra, apasa "Salveaza corespondenta", reincarca pagina | Alegerea numarului si a titlului s-a pastrat, iar butonul de salvare este activ | |
+
+## Modificari de testat - informatii obligatorii noi si observatii ordonate (12.11.2026, ActivityImport 0.19.0, BUG-0024)
+
+**Ce s-a adaugat:** in "Coloane obligatorii": ID ticket, ID eveniment si "Data finalizarii evenimentului" (data interventiei, aleasa dintr-o coloana de tip data); observatiile interventiei in format "eticheta (aldin): valoare" cu rand liber intre campuri; ordinea campurilor din observatii prin tragere; bara de butoane proprie pentru fiecare dintre cele doua ferestre.
+
+**Ce face acum:** campurile obligatorii (titlu, numar, ID ticket, ID eveniment, data finalizarii) sunt mereu primele in observatii; celelalte urmeaza ordinea din lista "Folosite", pe care o schimbi tragand randurile. Observatiile deja existente nu se schimba.
+
+| Pas | Ce faci | Ce trebuie sa vezi | OK |
+|---|---|---|---|
+| 1 | Deschide un tichet exemplu | In "Coloane obligatorii": Numar, Titlu, Data finalizarii (cu lista de coloane de tip data), ID ticket, ID eveniment si CUI | |
+| 2 | La "Data finalizarii" alege alta coloana de tip data | Valoarea si fereastra "Cum arata tichetul preluat" se schimba pe loc | |
+| 3 | In "Folosite" trage un rand optional peste altul | Randul isi schimba locul, mesajul "Ordinea in observatii s-a schimbat" apare, iar observatiile din fereastra flotanta urmeaza ordinea | |
+| 4 | Incearca sa tragi un rand obligatoriu sau sa lasi un rand pe unul obligatoriu | Nu se intampla nimic; obligatoriile raman primele | |
+| 5 | In fereastra flotanta priveste observatiile | Fiecare camp: eticheta aldina, doua puncte, valoare; rand liber intre campuri | |
+| 6 | Salveaza corespondenta, preia un tichet, deschide intervenția in Mentenanta | Observatiile au aceeasi ordine; etichetele sunt aldine in detaliu, iar in tabel apar fara asteriscuri | |
+| 7 | Deschide din nou "Tichet exemplu" | Butoanele Raporteaza/Propune/inchide stau deasupra ferestrei principale, iar fereastra flotanta are propriul buton de inchidere | |
+
+## Modificari de testat - vizualizarea tichetului de validat (12.11.2026, ActivityImport 0.19.2)
+
+**Ce s-a adaugat:** fereastra "Vizualizeaza tichetul" din "Evenimente de validat" arata si numarul, ID ticket, ID eveniment, data finalizarii, campurile extra alese in setari si observatiile intervenitiei.
+
+**Ce face acum:** fereastra foloseste corespondentele din setari (campurile oprite ramin ascunse); observatiile sunt cele care se vor scrie la preluare.
+
+| Pas | Ce faci | Ce trebuie sa vezi | OK |
+|---|---|---|---|
+| 1 | Evenimente de validat -> iconita "Vizualizeaza tichetul" | Beneficiar, punct, data, numar, ID-uri, data finalizarii, campurile din setari si "Observatiile intervenitiei" cu etichete aldine | |
+| 2 | Opreste un camp in setari si redeschide fereastra | Campul oprit nu mai apare | |
+
+## Modificari de testat - lista de tichete discardate colapsabila (12.11.2026, ActivityImport 0.19.3, PROP-0018)
+
+**Ce s-a adaugat:** "Tichete discardate" din Notificari -> Tichete de validat este un container care se deschide si se inchide.
+
+**Ce face acum:** la intrarea pe pagina este inchis; apasa pe titlu ca sa-l deschizi si "Arata tichetele discardate" ca sa incarci lista.
+
+| Pas | Ce faci | Ce trebuie sa vezi | OK |
+|---|---|---|---|
+| 1 | Notificari -> Tichete de validat | "Tichete discardate" apare inchis, doar cu titlul | |
+| 2 | Apasa pe titlu | Se deschide: butonul de incarcare si lista | |
+| 3 | Apasa din nou pe titlu | Se inchide | |
+
+## Modificari de testat - notificarile de validat duc la pagina de preluare (12.11.2026, ActivityImport 0.19.5, BUG-0028)
+
+**Ce s-a adaugat:** "Deschide obiectul" din notificarile "evenimente ActivityApp de validat" si "beneficiari de verificat" duce in Notificari, la tab-ul coresunzator.
+
+**Ce face acum:** merge si cu modulul Mentenanta oprit.
+
+| Pas | Ce faci | Ce trebuie sa vezi | OK |
+|---|---|---|---|
+| 1 | Opreste modulul Mentenanta; in Notificari -> Active deschide notificarea de tichete de validat si apasa "Deschide obiectul" | Esti dus la Notificari, tab "Tichete de validat"; fara eroare de modul oprit | |
+| 2 | Aceeasi operatie pentru notificarea beneficiarilor de verificat | Tab-ul "Beneficiari de validat" | |
+
+## Modificari de testat - ordonarea prin tragere a campurilor din observatii (12.11.2026, BUG-0031)
+
+**Ce s-a adaugat:** tragerea unui rand din "Folosite" (Tichet exemplu) peste altul schimba ordinea; mutarea se face in browser, nu mai depinde de serverul aplicatiei la fiecare miscare.
+
+**Ce face acum:** randul tras se pune inaintea randului pe care il lasi; peste un rand obligatoriu nu se poate lasa.
+
+| Pas | Ce faci | Ce trebuie sa vezi | OK |
+|---|---|---|---|
+| 1 | In "Folosite" trage un rand optional peste altul | Linie verde deasupra randului tinta cat tragi; la lasare randul isi schimba locul | |
+| 2 | Priveste observatiile din fereastra flotanta | Urmeaza noua ordine | |
+| 3 | Incearca sa lasi randul peste unul obligatoriu | Nu se intampla nimic | |

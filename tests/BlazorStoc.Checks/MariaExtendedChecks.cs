@@ -34,6 +34,7 @@ public static partial class MariaExtendedChecks
             await Section("Vehicles: concurrency, expiry journal, archive", () => VehiclesAsync(configuration, admin, audit, probe));
             await Section("Product locks: contention, takeover, forced release", () => LocksAsync(configuration, admin, audit, probe));
             await Section("Work points: main point, description, coordinates, photos, archive, backfill", () => WorkPointsAsync(configuration, admin, audit, probe, assets));
+            await Section("Attached work points: name and address or GPS, last location kept, unique name, archive with the work point and the beneficiary, search data, journal", () => AttachedWorkPointsAsync(configuration, admin, audit, probe));
             await Section("Maintenance contracts: coverage, one active contract per point, On/Off, moves, archive", () => ServiceContractsAsync(configuration, admin, audit, probe));
             await Section("Maintenance components nomenclator: families, components, alternative names, order, administrators only, journal", () => MaintenanceComponentsAsync(configuration, admin, audit, probe));
             await Section("Maintenance contract units: reference date, families and components On/Off, frozen contracts, notifications tab, archive", () => ContractUnitsAsync(configuration, admin, audit, probe));
@@ -47,8 +48,11 @@ public static partial class MariaExtendedChecks
             await Section("Elcomtur automatic import: directory, mask, firm, integrity, retention, schedule, notifications", () => ElcomturAutoAsync(configuration, admin, audit, probe));
             await Section("Beneficiary files: free files, listing with sections, rename without extension, delete, journal", () => BeneficiaryFilesAsync(configuration, admin, audit, probe));
             await Section("User tasks: creation, access of the user, taking over, status, files, moves, alerts, warning days, deletion, journal", () => UserTasksAsync(configuration, admin, audit, probe));
+            await Section("Announcements: drafts, publishing, audience, seen and read, preference, republishing, expiry, ZIP, pictures, journal", () => AnnouncementsAsync(configuration, admin, audit, probe));
+            await Section("Dashboard: arrangement per user, tiles, labels, spaces, tiles per row", () => DashboardAsync(configuration, admin, audit, probe));
             await Section("User types: system types, catalog permissions, seeding, assignment", () => UserTypesAsync(configuration, admin, audit, probe));
             await Section("Stock permissions: each kind of movement asks for its own key", () => StockPermissionsAsync(configuration, admin, audit));
+            await Section("OCR learning: corrections of the inventory take-over, list, decisions (administrator), reset, journal", () => OcrLearningAsync(configuration, admin, audit, probe));
             await Section("Module state: modules stopped by hand are saved, put back at restart, journal", () => ModuleStateAsync(configuration, admin, audit, probe));
             await Section("Activity import: settings with encrypted password, test, structure state, ticket types, journal, administrator only", () => ActivityImportAsync(configuration, admin, audit, probe));
             await Section("Activity import partners: simulation, application, ties, problems, journal, administrator only", () => ActivityPartnersAsync(configuration, admin, audit, probe));
@@ -90,6 +94,7 @@ public static partial class MariaExtendedChecks
             await Section("Default notification templates: made once per event, existing and deleted ones left alone, journal", () => DefaultTemplatesAsync(configuration, admin, audit, probe));
             await Section("Offer templates: save, refuse, change, journal", () => OfferTemplatesAsync(configuration, admin, audit, probe));
             await Section("Project components: add, state, archive, reactivate", () => ProjectComponentsAsync(configuration, admin, audit, probe));
+            await Section("Mandatory beneficiary projects", () => MandatoryProjectsAsync(configuration, admin, audit, probe));
             await Section("System types: uniqueness, alternative names, deactivation, journal", () => SystemTypesAsync(configuration, admin, audit, probe));
             await Section("Storno, return, net consumption, consumption note", () => StornoReturnNoteAsync(configuration, admin, audit, probe));
             await Section("Exit operation: grouping, all or nothing, preview, repeated line", () => ExitOperationAsync(configuration, admin, audit, probe));

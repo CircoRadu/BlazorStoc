@@ -1,0 +1,31 @@
+# Învățare OCR
+Ruta: /inventar/invatare-ocr
+Cautare: invatare ocr corectii cifre citite gresit preluare inventar formular scanat confuzie ignora reseteaza
+
+La preluarea inventarului, valorile scrise de mână sunt citite cifră cu cifră. Când corectezi o valoare înainte de a trimite modificările în stoc, aplicația salvează diferența dintre ce a citit OCR-ul și ce ai trimis tu. Aici vezi aceste corecții, cu captura din formularul scanat, și alegi (doar administratorul) din care dintre ele învață citirea.
+
+## Elemente
+### Filtre
+- Stare | listă | Nou, Învățat sau Ignorat; „Toate” arată toate corecțiile.
+- Tip | listă | „Cifră” = aceeași lungime a numărului înainte și după corectare, câte o corecție pentru fiecare cifră diferită; „Segmentare” = numărul de cifre diferă sau nu s-a citit nimic, fără etichetă pe cifre.
+- Confuzie (citit → corect) | listă | Perechea cifră citită → cifră corectă (de exemplu 4 → 1), cu numărul de apariții.
+### Acțiuni (administrator)
+- Selectează toate de pe pagină | comutator | Selectează sau deselectează corecțiile de pe pagina curentă.
+- Învață din selecție | buton | Marchează selecția ca „Învățat”; se învață doar din corecțiile de tip cifră.
+- Ignoră selecția | buton | Marchează selecția ca „Ignorat” (de exemplu când valoarea a fost schimbată intenționat, nu dintr-o eroare de citire).
+- Marchează nou | buton | Readuce selecția în starea „Nou”.
+- Resetează învățarea | buton | După confirmare, toate corecțiile învățate redevin noi (citirea revine la modelul de bază).
+### Tabelul corecțiilor
+- Captură din formular | coloană | Celula „Valoare reală” din formularul scanat; cifra problematică este încadrată cu roșu.
+- Citit de OCR | coloană | Valoarea citită automat.
+- Corectat | coloană | Valoarea trimisă în stoc de utilizator.
+- Cifră | coloană | Cifra citită → cifra corectă și poziția ei în număr, de la stânga.
+- Probabilități | coloană | Primele trei variante ale clasificatorului pentru cifra respectivă (cifră:probabilitate).
+- Stare | coloană | Nou, Învățat sau Ignorat.
+
+## Flux: Cum aleg din ce învață citirea
+1. Preia inventarele ca de obicei; corecțiile se salvează automat la fiecare preluare confirmată.
+2. Deschide „Învățare OCR” (din meniul Inventar sau din antetul paginii de preluare).
+3. Filtrează după confuzie (de exemplu 1 → 4) și verifică în captură că cifra a fost într-adevăr citită greșit.
+4. Selectează corecțiile bune și apasă „Învață din selecție”; pe celelalte le ignori.
+Nota: decizia se salvează global și se jurnalizează. La citirea unui formular nou, o cifră nesigură este înlocuită cu cea pusă de obicei de utilizator (doar din corecțiile „Învățat”, minimum 2, cel puțin jumătate din cele învățate pentru acea cifră, iar înlocuitorul trebuie să fie printre primele trei variante ale clasificatorului); rândul rămâne „de verificat” și arată „↻ din învățare”. „Resetează învățarea” readuce citirea la modelul de bază.

@@ -65,3 +65,9 @@ Cunoscut: proiectul nou si componenta se creeaza chiar la „Preia oferta”, im
 | 4 | Fara beneficiar ales, apasa „Pasul urmator” | Nu avanseaza; mesaj „alege beneficiarul” | |
 | 5 | La pasul 5 apasa „Preia oferta” | Oferta se preia, cercurile devin toate bifate, mesaj de succes | |
 | 6 | Tema dark (comutator sus) | Cercurile, linia dintre ele si bara de jos au culori din tema dark | |
+
+## Modificari de testat - progresul incarcarii fisierului (18.11.2026)
+
+**Ce s-a adaugat:** procent si bara la incarcarea fisierului .xlsx de oferta (si de proba la sabloane).
+**Ce face acum:** la alegerea fisierului apare "Se incarca fisierul... N%" cu bara, pana se citeste.
+1. Alege un fisier .xlsx mare de oferta: bara urca pana la 100% apoi apare continutul.

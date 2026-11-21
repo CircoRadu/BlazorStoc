@@ -83,6 +83,9 @@ internal static class ServiceRegistration
     {
         services.AddScoped<IUserRepository, MariaUserRepository>();
         services.AddScoped<IOwnAccountService, OwnAccountService>();
+        services.AddScoped<IUserDisplayRepository, MariaUserDisplayRepository>();
+        services.AddScoped<IUserDashboardRepository, MariaUserDashboardRepository>();
+        services.AddScoped<IUserDisplayService, UserDisplayService>();
         services.AddScoped<IUserTypeRepository, MariaUserTypeRepository>();
         services.AddScoped<IUserAuthenticator>(provider => (IUserAuthenticator)provider.GetRequiredService<IUserRepository>());
         return services;
@@ -101,10 +104,14 @@ internal static class ServiceRegistration
         services.AddScoped<IReservationRepository, MariaReservationRepository>();
         services.AddScoped<IProductPlacementReader, MariaProductPlacementReader>();
         services.AddScoped<ISystemTypeRepository, MariaSystemTypeRepository>();
+        services.AddScoped<IBeneficiaryProjectTypeRepository, MariaBeneficiaryProjectTypeRepository>();
+        services.AddScoped<IConsumptionNoteRepository, MariaConsumptionNoteRepository>();
+        services.AddScoped<IProjectEquipmentRepository, MariaProjectEquipmentRepository>();
         services.AddScoped<IMaintenanceComponentRepository, MariaMaintenanceComponentRepository>();
         services.AddScoped<IProductMinStockRepository, MariaProductMinStockRepository>();
         services.AddScoped<IProjectDeadlineRepository, MariaProjectDeadlineRepository>();
         services.AddSingleton<IConsumptionNotePdfWriter, ConsumptionNotePdfWriter>();
+        services.AddSingleton<IConsumptionNoteTotalWriter, ConsumptionNoteTotalWriter>();
         services.AddSingleton<IProductImageStore, FileProductImageStore>();
         services.AddSingleton<IWebHostEnvironmentTessdataPath, TessdataPath>();
         // IInventoryPickupOcrService and IInvoicePdfReader are registered by the Ocr module (Modules/Ocr): in a worker process or in-process (Ocr:Mode).
@@ -142,11 +149,13 @@ internal static class ServiceRegistration
         registry.Add(new MaintenanceModule(), services, configuration);
         registry.Add(new RiskAnalysesModule(), services, configuration);
         registry.Add(new ElcomturModule(), services, configuration);
+        registry.Add(new BlazorStoc.Modules.EspImport.EspImportModule(), services, configuration);
         registry.Add(new JournalModule(), services, configuration);
         registry.Add(new ProjectObservationsModule(), services, configuration);
         registry.Add(new BlazorStoc.Modules.BugReports.BugReportsModule(), services, configuration);
         registry.Add(new BlazorStoc.Modules.Proposals.ProposalsModule(), services, configuration);
         registry.Add(new BlazorStoc.Modules.Tasks.TasksModule(), services, configuration);
+        registry.Add(new BlazorStoc.Modules.Announcements.AnnouncementsModule(), services, configuration);
         return services;
     }
 
@@ -154,8 +163,10 @@ internal static class ServiceRegistration
     public static IServiceCollection AddMaintenanceServices(this IServiceCollection services, IConfiguration configuration)
     {
         services.AddScoped<IWorkPointRepository, MariaWorkPointRepository>();
+        services.AddScoped<IAttachedWorkPointRepository, MariaAttachedWorkPointRepository>();
         services.AddScoped<IServicePhotoStore, MariaServicePhotoStore>();
         services.AddScoped<IEntityFileStore, MariaEntityFileStore>();
+        services.AddScoped<EntityFileChanges>();
         return services;
     }
 
@@ -194,6 +205,7 @@ internal static class ServiceRegistration
         // application when Backup:Mode is InProcess. Here stay the lock, the settings of the schedule and of the share, the retention and the daily schedule.
         services.AddScoped<INasBackupSettingsRepository, MariaNasBackupStore>();
         services.AddScoped<IBackupSettingsRepository, MariaBackupSettingsStore>();
+        services.AddScoped<IBackupDownloadService, BackupDownloadService>();
         services.AddScoped<IBackupRetentionService, BackupRetentionService>();
         services.AddHostedService<BackupScheduler>();
         return services;

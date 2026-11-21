@@ -5,6 +5,7 @@ Captura: pagina | /mentenanta |  | Mentenanța
 
 Scadențele punctelor de lucru acoperite de contracte active și registrul intervențiilor. Intervențiile și contractele se gestionează din fișa beneficiarului. Fereastra are două secțiuni: **Scadențe** și **Registru intervenții**.
 
+
 ## Elemente
 ### Antet
 - ⌖ Harta | link | Deschide harta punctelor de lucru ([[mentenanta-harta]]).
@@ -19,6 +20,9 @@ Scadențele punctelor de lucru acoperite de contracte active și registrul inter
 - Punct de lucru | coloană | Numele și adresa punctului.
 - Contract | coloană | Contractul care acoperă punctul; „Expirat” dacă data lui de expirare a trecut.
 - Ciclicitate | coloană | La câte luni se repetă intervenția (a punctului sau a contractului).
+### Noutăți
+- Evenimente de validat | filă | Lista de validare a tichetelor ActivityApp, pentru operatorii cu permisiunea „Validare tichete ActivityApp”. Mesaje: „N tichete decise așteaptă înregistrarea în Mentenanță” și „refuzate”; decizia pe un tichet merge și cu modulul Mentenanță oprit.
+- Scadențe pe componente | text | Sub data punctului apar chip-uri cu scadența fiecărei componente.
 
 ## Flux: Cum văd ce intervenții urmează
 1. Deschide secțiunea „Scadențe”; lista este ordonată după scadență.

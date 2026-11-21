@@ -21,7 +21,8 @@
 
 @if (addingBeneficiary)
 {
-    <div class="delete-overlay"><div class="delete-dialog template-popup" role="dialog" aria-modal="true" tabindex="-1" aria-labelledby="beneficiary-editor-title"><BeneficiaryEditor Saved="BeneficiaryAddedAsync" Closed="CloseBeneficiaryAsync" /></div></div>
+    <AppDialog PanelClass="template-popup" LabelledBy="beneficiary-editor-title"><BeneficiaryEditor Saved="BeneficiaryAddedAsync" Closed="CloseBeneficiaryAsync" />
+    </AppDialog>
 }
 
 @if (canAdd)
@@ -34,6 +35,7 @@
                 <div class="task-beneficiary-pick">
                     <SearchableSelect Id="task-beneficiary" Label="Beneficiar *" Placeholder="Caută beneficiarul după nume sau CUI…" EmptyText="Niciun beneficiar găsit."
                                       Options="BeneficiaryOptions" SelectedId="@chosenId" SelectedIdChanged="BeneficiaryChosen" Disabled="loading" />
+                    <ActivityTakeButton OnTaken="ReloadBeneficiariesAsync" />
                     <button type="button" class="refresh act-confirm" disabled="@(!canAddBeneficiary || loading)"
                             title="@(canAddBeneficiary ? "Adaugă un beneficiar nou" : "Nu ai dreptul să adaugi beneficiari")" @onclick="() => addingBeneficiary = true">+ Adaugă beneficiar</button>
                 </div>
@@ -48,22 +50,27 @@
 @* The new task is written in a popup: Save closes it, and closing it after something was typed asks first (the tracker of the form). *@
 @if (chosen is not null)
 {
-    <div class="delete-overlay"><div class="delete-dialog template-popup" role="dialog" aria-modal="true" tabindex="-1" aria-labelledby="task-editor-title">
+    <AppDialog PanelClass="template-popup" LabelledBy="task-editor-title">
         <TaskForm @key="formKey" BeneficiaryId="chosen.Id" BeneficiaryName="@chosen.Name" Saved="TaskSavedAsync" Closed="TaskFormClosedAsync" />
-    </div></div>
+    </AppDialog>
 }
 
 <section class="catalog">
     <div class="catalog-heading"><h2>Taskuri utilizatori</h2><small>Taskurile active și cele finalizate, ale tuturor utilizatorilor</small></div>
-    <TaskTables @ref="tables" BeneficiaryId="0" OpenTaskId="@(TaskId ?? 0)" />
+    <UserTaskTabs @ref="tables" OpenTaskId="@(TaskId ?? 0)" />
 </section>
 
 </PageBoundary>
 
+<BeneficiarySyncOnOpen OnNewBeneficiaries="ReloadBeneficiariesAsync" />
+
 @code {
+    // Beneficiaries entered in ActivityApp a moment ago are taken in the background after the page opened; the list is loaded again when there are new ones.
+    private async Task ReloadBeneficiariesAsync() { if (!canAdd) return; try { await LoadBeneficiariesAsync(); } catch (Exception) { } StateHasChanged(); }
+
     [SupplyParameterFromQuery(Name = "task")] public int? TaskId { get; set; }
 
-    private TaskTables? tables;
+    private UserTaskTabs? tables;
     private IReadOnlyList<Beneficiary> beneficiaries = Array.Empty<Beneficiary>();
     private Beneficiary? chosen;
     private int? chosenId;

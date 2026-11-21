@@ -51,6 +51,7 @@ data = await new DemoProductRepository().GetProductsAsync();
             ["reasons"] = () => { ReasonSummaryChecks.Run(Check); return Task.CompletedTask; },
             ["notes"] = () => ConsumptionNoteChecks.RunAsync(Check),
             ["nas"] = () => NasBackupChecks.RunAsync(Check),
+            ["backupdownload"] = async () => { await BackupDownloadChecks.RunAsync(Check); BackupDownloadTableChecks.Run(Check); },
             ["backupassets"] = () => BackupAssetsChecks.RunAsync(Check),
             ["dbsettings"] = () => DatabaseSettingsChecks.RunAsync(Check),
             ["robustness"] = () => RobustnessChecks.RunAsync(Check),
@@ -62,10 +63,20 @@ data = await new DemoProductRepository().GetProductsAsync();
             ["parameters"] = () => ParameterChecks.RunAsync(Check),
             ["moduleversions"] = () => ModuleVersionChecks.RunAsync(Check),
             ["activityimport"] = () => ActivityImportChecks.RunAsync(Check),
+            ["dashboard"] = () => DashboardChecks.RunAsync(Check),
+            ["announcements"] = () => AnnouncementChecks.RunAsync(Check),
+            ["espimport"] = () => EspImportChecks.RunAsync(Check),
+            ["attachedpoints"] = () => AttachedWorkPointChecks.RunAsync(Check),
+            ["usertasks"] = async () => { await UserTaskTabsChecks.RunAsync(Check); await NewTasksGateChecks.RunAsync(Check); },
+            ["devbadge"] = () => DevelopmentBadgeChecks.RunAsync(Check),
+            ["popupscript"] = () => PopupScriptChecks.RunAsync(Check),
+            ["appdialog"] = () => PopupScriptChecks.RunAsync(Check),
             ["elcomtur"] = () => ElcomturChecks.RunAsync(Check),
             ["ocrworker"] = () => OcrWorkerChecks.RunAsync(Check),
+            ["ocrlearning"] = async () => { OcrLearningChecks.Run(Check); await OcrLearningChecks.ScanAsync(Check); },
             ["backupworker"] = () => BackupWorkerChecks.RunAsync(Check),
-            ["runtracking"] = () => RunTrackingChecks.RunAsync(Check)
+            ["runtracking"] = () => RunTrackingChecks.RunAsync(Check),
+            ["display"] = () => { DisplayChecks.Run(Check); return Task.CompletedTask; }
         };
         var selectedGroups = (Environment.GetEnvironmentVariable("CHECKS_ONLY") ?? "").Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList();
         if (Environment.GetEnvironmentVariable("INVOICE_CHECKS_ONLY") == "1") selectedGroups.Add("invoices");

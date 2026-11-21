@@ -122,7 +122,7 @@ else
                         else if (item.MovesDue) { <span>@StockMovementRules.DisplayDate(item.PlannedDue!.Value) → <strong>@StockMovementRules.DisplayDate(item.NextDueSet!.Value)</strong><br /><small class="muted">@ServiceInterventionRules.BasisLabel(item.Basis!.Value)</small></span> }
                         else { <small class="muted">Nu a modificat scadența</small> }
                     </td>
-                    <td class="work-point-description" title="@item.Notes">@item.Notes</td>
+                    <td class="work-point-description" title="@NotesMarkup.Plain(item.Notes)">@NotesMarkup.Plain(item.Notes)</td>
                     <td class="number">@(row.PhotoCount > 0 ? row.PhotoCount.ToString() : "")</td>
                 </tr>
             }

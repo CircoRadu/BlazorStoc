@@ -10,7 +10,7 @@
    passwords are never shown after they are typed, and a password or a pass phrase that is asked twice says at once whether the two coincide. *@
 
 <section class="catalog database-accounts">
-    <div class="catalog-heading"><h2>Conturile bazei de date</h2><small>Cele patru conturi fixe ale aplicației; aici se schimbă doar parolele lor.</small></div>
+    <details class="catalog-collapse"><summary class="catalog-heading"><h2>Conturile bazei de date</h2><small>Cele patru conturi fixe ale aplicației; aici se schimbă doar parolele lor.</small></summary>
     <div class="catalog-body">
     @if (loading) { <div class="empty-state" role="status"><div class="spinner"></div><h3>Se încarcă</h3></div> }
     else
@@ -80,6 +80,7 @@
         <p class="muted"><small>Un cont își schimbă singur parola (conexiunea se face cu parola curentă), deci schimbarea nu cere contul de administrare al serverului; acela se folosește numai la resetare și la export. Parolele se păstrează criptat, în fișierul de configurare al aplicației, în afara repository-ului.</small></p>
     }
     </div>
+</details>
 </section>
 
 @if (mode != Mode.None)

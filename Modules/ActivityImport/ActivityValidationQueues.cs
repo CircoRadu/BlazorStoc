@@ -11,7 +11,19 @@ public sealed class MariaValidationQueues(IConfiguration configuration, IAccessC
         var canBeneficiaries = await access.HasAsync("beneficiari.validare", cancellationToken).ConfigureAwait(false);
         var tickets = canTickets ? (await MariaActivityReviewService.ReadPendingAsync(configuration, cancellationToken).ConfigureAwait(false)).Count : 0;
         var beneficiaries = canBeneficiaries ? (await MariaBeneficiaryCheckService.ReadPendingAsync(configuration, cancellationToken).ConfigureAwait(false)).Count : 0;
-        return new(tickets, beneficiaries, canTickets, canBeneficiaries);
+        // The open problems of the import (the tab "Probleme import" shows their number, also when it is 0).
+        var issues = 0;
+        if (canTickets || canBeneficiaries)
+        {
+            try
+            {
+                await using var connection = await MariaDb.OpenAsync(configuration, cancellationToken).ConfigureAwait(false);
+                await using var count = new MySqlConnector.MySqlCommand("SELECT COUNT(*) FROM activity_import_issues WHERE resolved = 0", connection);
+                issues = Convert.ToInt32(await count.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false));
+            }
+            catch (Exception exception) when (exception is not OperationCanceledException) { issues = 0; }
+        }
+        return new(tickets, beneficiaries, canTickets, canBeneficiaries, issues);
     }
 }
 

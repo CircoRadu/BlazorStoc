@@ -219,6 +219,27 @@ public static class InvoiceChecks
             zoneDraft.Columns.ForEach(column => { column.TopAnchor = "text care nu exista"; column.BottomAnchor = "alt text care nu exista"; });
             check(InvoiceTemplateEngine.Apply(zoneDraft.ToDefinition(zoneDocument), zoneDocument).Rows.Count == zoneInvoice.Rows.Count,
                 "Invoice templates: a zone whose anchor elements are not in the file is automatic (the whole table is read), never a fixed position");
+
+            // PROP/eroare preluare factura EMPORIUM 827 (20.11.2026): the anchors of a template made from a scan were rule characters ("|", "=") that the OCR read; in another scan they
+            // matched any noise and made zones that end over where they start (no row was read). Such an anchor is no anchor.
+            var noiseDraft = InvoiceTemplateDraft.FromAnalysis(zoneAnalysis);
+            noiseDraft.Columns.ForEach(column => { column.TopAnchor = "="; column.BottomAnchor = "|"; column.Top = zoneAnalysis.Table!.HeaderBottom - 3; column.Bottom = rowsOnPage[^1].Bottom + 400; });
+            var noiseHeaderY = zoneAnalysis.Table!.HeaderBottom - 6;
+            var noisyPage = zonePage with { Words = [.. zonePage.Words, .. noiseDraft.Columns.Select((column, index) => zonePage.Words[0] with { Text = index % 2 == 0 ? "|" : "=", X = column.Left + 1, Y = noiseHeaderY, Width = 1, Height = 8, Order = 9000 + index })] };
+            var noisyDocument = new InvoiceDocument([noisyPage]);
+            check(InvoiceTemplateEngine.Apply(noiseDraft.ToDefinition(noisyDocument), noisyDocument).Rows.Count == zoneInvoice.Rows.Count,
+                "Invoice templates: an anchor made only of rule characters (\"|\", \"=\") is not an anchor: the zone is automatic and every row is read");
+            check(!InvoiceTemplateEngine.HasContent("|") && !InvoiceTemplateEngine.HasContent(" = — ") && InvoiceTemplateEngine.HasContent("TATEA. |") && InvoiceTemplateEngine.HasContent("1"),
+                "Invoice templates: a text counts as an anchor only when it has a letter or a digit");
+
+            // The same invoice scanned again: the headings are read differently (so their text is not the template's) and the table starts lower. The header of this file is found by
+            // where the columns are, so the rows start under it (not under the header position of the file the template was made from).
+            var scanDefinition = InvoiceTemplateDraft.FromAnalysis(zoneAnalysis).ToDefinition(zoneDocument);
+            var headerBottom = zoneAnalysis.Table!.HeaderBottom;
+            var rescan = new InvoiceDocument([.. zoneDocument.Pages.Select(page => page with { Words = [.. page.Words.Select(word =>
+                word with { Y = word.Y + 41, Text = word.Y < headerBottom && word.Y > zoneAnalysis.Table!.HeaderTop - 1 ? "|" + word.Text + "|" : word.Text })] })]);
+            check(Names(InvoiceTemplateEngine.Apply(scanDefinition, rescan)).Split('|').Length >= zoneInvoice.Rows.Count,
+                "Invoice templates: when the headings of a new scan are read differently from the template's, the columns are matched to the header cells by position and no row above the old header position is lost");
         }
 
         {

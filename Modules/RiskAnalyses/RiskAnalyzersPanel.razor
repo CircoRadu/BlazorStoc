@@ -23,8 +23,8 @@
     }
     else
     {
-        <Paged Items="items" Id="risk-analyzers-size" Context="pageRows">
-        <div class="table-scroll"><table id="risk-analyzers-table"><thead><tr><th>DENUMIRE</th><th>OBSERVAȚII</th><th>ANALIZE</th><th></th></tr></thead><tbody>
+        <Paged Items="items" Id="risk-analyzers-size" Context="pageRows" Sorts="Sorts">
+        <div class="table-scroll"><table id="risk-analyzers-table"><thead><tr><SortTh Key="name">DENUMIRE</SortTh><SortTh Key="notes">OBSERVAȚII</SortTh><SortTh Key="used">ANALIZE</SortTh><th></th></tr></thead><tbody>
         @foreach (var item in pageRows)
         {
             <tr @key="item.Id" id="@($"risk-analyzer-{item.Id}")">
@@ -56,6 +56,7 @@
 @code {
     private readonly CancellationTokenSource lifetime = new();
     private List<RiskAnalyzer> items = [];
+    private static readonly IReadOnlyDictionary<string, Func<RiskAnalyzer, IComparable?>> Sorts = new Dictionary<string, Func<RiskAnalyzer, IComparable?>> { ["name"] = item => item.Name, ["notes"] = item => item.Notes, ["used"] = item => item.UsedBy };
     private bool loading = true, busy, adding, canAdd, canEdit, canDelete;
     private string? error, notice, deleteError;
     private RiskAnalyzer? editing, deleting;

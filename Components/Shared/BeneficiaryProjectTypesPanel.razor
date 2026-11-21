@@ -1,0 +1,121 @@
+@inject IBeneficiaryProjectTypeRepository Repository
+@inject ILogger<BeneficiaryProjectTypesPanel> Logger
+@implements IDisposable
+@* Nomenclator -> Proiecte obligatorii: the types of project every beneficiary has. Each active type gives each beneficiary one project with the name of the type; a type is not deleted, it is deactivated. *@
+
+<p class="muted" style="margin:16px 0 8px">Tipurile de proiect pe care îl are fiecare beneficiar (de exemplu „Reparații sisteme existente”). Un tip activ creează automat un proiect cu denumirea lui la toți beneficiarii care nu îl au, iar beneficiarii noi îl primesc la creare. Proiectul obligatoriu nu se redenumește și nu se șterge din pagina beneficiarului; un tip nu se șterge, se dezactivează (proiectele deja create rămân, nu se mai creează altele).</p>
+@if (error is not null) { <div class="error-banner" role="alert">@error</div> }
+@if (notice is not null) { <div class="success-banner" role="status">@notice</div> }
+
+<section class="catalog">
+    <div class="catalog-heading"><h2>Proiecte obligatorii <span class="count-badge">@types.Count</span></h2></div>
+    <form class="filters" @onsubmit="AddAsync" @onsubmit:preventDefault>
+        <label class="search-box"><span>＋</span><input aria-label="Denumirea tipului nou de proiect" placeholder="Denumirea unui tip nou de proiect obligatoriu…" maxlength="@BeneficiaryProjectTypeRules.NameMaximumLength" disabled="@busy" @bind="newName" @bind:event="oninput" /></label>
+        <button type="submit" class="primary" disabled="@(busy || string.IsNullOrWhiteSpace(newName))">Adaugă tipul</button>
+    </form>
+    @if (loading)
+    {
+        <div class="empty-state" role="status"><div class="spinner"></div><h3>Se încarcă</h3></div>
+    }
+    else if (types.Count == 0)
+    {
+        <div class="empty-state"><span class="empty-icon">▦</span><h3>Nu există tipuri de proiecte obligatorii</h3><p>Adaugă primul tip de mai sus.</p></div>
+    }
+    else
+    {
+        <div class="table-scroll"><table class="system-types"><thead><tr><th>ORDINE</th><th>DENUMIRE</th><th>STARE</th></tr></thead><tbody>
+        @for (var index = 0; index < types.Count; index++)
+        {
+            var type = types[index];
+            var position = index;
+            <tr @key="type.Id" class="@(type.Active ? "" : "inactive-row")" id="@($"mandatory-project-type-{type.Id}")">
+                <td>
+                    <button type="button" class="row-icon up" aria-label="@($"Mută {type.Name} mai sus")" disabled="@(busy || position == 0)" @onclick="() => MoveAsync(type, -1)" title="@($"Mută {type.Name} mai sus")"></button>
+                    <button type="button" class="row-icon down" aria-label="@($"Mută {type.Name} mai jos")" disabled="@(busy || position == types.Count - 1)" @onclick="() => MoveAsync(type, 1)" title="@($"Mută {type.Name} mai jos")"></button>
+                </td>
+                <td>
+                    @if (renamingId == type.Id)
+                    {
+                        <form @onsubmit="() => RenameAsync(type)" @onsubmit:preventDefault>
+                            <input aria-label="@($"Denumirea nouă a tipului {type.Name}")" maxlength="@BeneficiaryProjectTypeRules.NameMaximumLength" disabled="@busy" @bind="renameText" @bind:event="oninput" />
+                            <button type="submit" class="row-icon check" disabled="@busy" aria-label="@($"Salvează denumirea tipului {type.Name}")" title="Salvează denumirea"></button>
+                            <button type="button" class="row-icon close" disabled="@busy" aria-label="Renunță la redenumire" title="Renunță" @onclick="() => renamingId = null"></button>
+                        </form>
+                    }
+                    else
+                    {
+                        <strong>@type.Name</strong>
+                        <button type="button" class="row-icon edit" aria-label="@($"Redenumește {type.Name}")" disabled="@busy" @onclick="() => StartRename(type)" title="@($"Redenumește {type.Name}")"></button>
+                    }
+                </td>
+                <td><ToggleSwitch Compact Value="type.Active" ValueChanged="value => SetActiveAsync(type, value)" Disabled="busy" AriaLabel="@($"Activ: {type.Name}")" /></td>
+            </tr>
+        }
+        </tbody></table></div>
+    }
+</section>
+
+@code {
+    private readonly CancellationTokenSource lifetime = new();
+    private List<BeneficiaryProjectType> types = [];
+    private bool loading = true, busy;
+    private string? error, notice;
+    private string newName = "";
+    private int? renamingId;
+    private string renameText = "";
+
+    protected override async Task OnInitializedAsync()
+    {
+        await RunAsync(async () => { types = [.. await Repository.GetAllAsync(lifetime.Token)]; }, null);
+        loading = false;
+    }
+
+    private void Replace(BeneficiaryProjectType updated)
+    {
+        var index = types.FindIndex(type => type.Id == updated.Id);
+        if (index >= 0) types[index] = updated; else types.Add(updated);
+    }
+
+    // Runs one operation: busy while it runs, the message of a refused operation (or a stale version) is shown, the list is reloaded after a stale version.
+    private async Task RunAsync(Func<Task> operation, string? success)
+    {
+        if (busy) return;
+        busy = true; error = null; notice = null;
+        try { await operation(); notice = success; }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (Exception ex) when (ex is BeneficiaryProjectTypeOperationException or AccessDeniedException)
+        {
+            error = ex.Message;
+            if (ex.Message == BeneficiaryProjectTypeRules.StaleMessage) { try { types = [.. await Repository.GetAllAsync(lifetime.Token)]; } catch (Exception) { } }
+        }
+        catch (Exception ex) { Logger.LogError("Mandatory project type operation failed ({ErrorType}).", ex.GetType().Name); error = "Operația nu a putut fi salvată. Reîncarcă pagina și reîncearcă."; }
+        finally { busy = false; }
+    }
+
+    private Task AddAsync() => RunAsync(async () =>
+    {
+        var created = await Repository.CreateAsync(newName, lifetime.Token);
+        types.Add(created); newName = "";
+    }, "Tipul a fost adăugat; proiectul a fost creat la beneficiarii care nu îl aveau.");
+
+    private void StartRename(BeneficiaryProjectType type) { renamingId = type.Id; renameText = type.Name; error = null; notice = null; }
+
+    private Task RenameAsync(BeneficiaryProjectType type) => RunAsync(async () =>
+    {
+        Replace(await Repository.RenameAsync(type, renameText, lifetime.Token));
+        renamingId = null;
+    }, "Denumirea a fost modificată (proiectele deja create păstrează denumirea veche).");
+
+    private Task SetActiveAsync(BeneficiaryProjectType type, bool active) => RunAsync(async () =>
+    {
+        Replace(await Repository.SetActiveAsync(type, active, lifetime.Token));
+    }, active ? "Tipul a fost activat; proiectul a fost creat la beneficiarii care nu îl aveau." : "Tipul a fost dezactivat: nu se mai creează proiecte noi din el.");
+
+    private Task MoveAsync(BeneficiaryProjectType type, int direction) => RunAsync(async () =>
+    {
+        await Repository.MoveAsync(type, direction, lifetime.Token);
+        types = [.. await Repository.GetAllAsync(lifetime.Token)];
+    }, null);
+
+    public void Dispose() { lifetime.Cancel(); lifetime.Dispose(); }
+}

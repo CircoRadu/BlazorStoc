@@ -10,5 +10,9 @@ window.blazorStocOpenSection = title => {
     const details = heading && heading.closest('details');
     if (!details) return;
     details.open = true;
+    // On a page with tabs (the beneficiary sheet) the tab of the section is selected first.
+    const panel = details.closest('.section-tab-panel');
+    const tab = panel && document.querySelector('[data-tab-target="' + panel.dataset.tab + '"]');
+    if (tab && panel.hidden) { tab.click(); setTimeout(() => details.scrollIntoView({ block: 'start' }), 250); return; }
     details.scrollIntoView({ block: 'start' });
 };

@@ -4,6 +4,8 @@ Cautare: taskurile mele task utilizator activ finalizat preia preluare stare ter
 
 Pagina taskurilor primite de la administrator, din meniul numelui tău din bara de sus. Taskurile nefinalizate sunt în fila „Active”, cele finalizate în fila „Finalizate”.
 
+Lista se ordonează după prioritate; ordinea ta proprie se stabilește trăgând rândurile de mâner, iar numărul curent apare pe rând. Comutatorul „Ascunde taskurile finalizate” ascunde taskurile terminate.
+
 ## Elemente
 ### Lista de taskuri
 - Active | filă | Orice task care nu este finalizat; un task nou apare pe fond roșu până îl preiei.

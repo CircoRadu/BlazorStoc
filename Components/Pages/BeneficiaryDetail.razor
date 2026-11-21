@@ -1,4 +1,4 @@
-﻿@page "/beneficiari/{Id:int}"
+@page "/beneficiari/{Id:int}"
 @attribute [Authorize(Policy = "perm:beneficiari.view")]
 @rendermode @(new InteractiveServerRenderMode(prerender: false))
 @using BlazorStoc.Services
@@ -6,6 +6,8 @@
 @inject IBeneficiaryRepository Beneficiaries
 @inject IProjectRepository Projects
 @inject IWorkPointRepository WorkPointStore
+@inject IAttachedWorkPointRepository AttachedStore
+@inject IBeneficiaryCheckService OriginChecks
 @inject IServicePhotoStore PhotoStore
 @inject IServiceContractRepository ContractStore
 @inject IRiskAnalysisRepository RiskStore
@@ -13,8 +15,11 @@
 @inject IExpiryNotificationService NotificationService
 @inject TimeProvider Clock
 @inject ExitFormDraft ExitDraft
+@inject IConsumptionNoteRepository ConsumptionNoteStore
 @inject UnsavedChanges Guard
 @inject IAccessControl Access
+@using BlazorStoc.Modules.Elcomtur
+@inject IElcomturBalanceRepository ElcomturBalances
 @inject NavigationManager Navigation
 @inject IJSRuntime JS
 @inject IChangeFeed ChangeFeed
@@ -39,7 +44,7 @@ else if (error is not null)
 else if (beneficiary is not null)
 {
     <div class="page-heading">
-        <div><p class="eyebrow">BENEFICIAR</p><h1>@beneficiary.Name</h1><p class="muted">@(beneficiary.IsIndividual ? "Persoană fizică" : $"CUI {beneficiary.Cui}")@(beneficiary.Address.Length > 0 ? $" · {beneficiary.Address}" : "")@(beneficiary.Phone.Length > 0 ? $" · tel. {beneficiary.Phone}" : "")</p>
+        <div><p class="eyebrow">BENEFICIAR</p><h1>@beneficiary.Name</h1><p class="muted">@(beneficiary.IsIndividual ? "Persoană fizică" : $"CUI {beneficiary.Cui}")@(beneficiary.Address.Length > 0 ? $" · {beneficiary.Address}" : "")@(beneficiary.Phone.Length > 0 ? $" · tel. {beneficiary.Phone}" : "")</p>@if (origin is not null) { <p class="muted origin-note" id="beneficiary-origin">@origin.Text</p> }
             @if (!beneficiary.IsIndividual && (beneficiary.RegistryNumber.Length > 0 || beneficiary.PostalCode.Length > 0 || beneficiary.CaenCode.Length > 0))
             {
                 <p class="muted">@string.Join(" · ", new[] { beneficiary.RegistryNumber.Length > 0 ? $"Reg. Com. {beneficiary.RegistryNumber}" : null, beneficiary.PostalCode.Length > 0 ? $"Cod poștal {beneficiary.PostalCode}" : null, beneficiary.CaenCode.Length > 0 ? $"CAEN {beneficiary.CaenCode}" : null }.Where(part => part is not null))</p>
@@ -53,6 +58,7 @@ else if (beneficiary is not null)
         </div>
     </div>
     @if (notice is not null) { <div class="success-banner" role="status">@notice</div> }
+    @if (noteProject is { } generating) { <ConsumptionNoteGenerateDialog @key="generating.Id" ProjectId="generating.Id" ProjectName="@generating.Name" BeneficiaryName="@beneficiary?.Name" ExistingNotes="noteProjectExisting" Generated="NoteGeneratedAsync" Cancelled="() => { noteProject = null; }" /> }
 
     @if (editingBeneficiary)
     {
@@ -61,36 +67,67 @@ else if (beneficiary is not null)
 
     @if (addingProject)
     {
-        <div class="delete-overlay">
-            <div class="delete-dialog template-popup" role="dialog" aria-modal="true" tabindex="-1" aria-labelledby="project-editor-title">
+        <AppDialog PanelClass="template-popup" LabelledBy="project-editor-title">
                 <ProjectEditor @key="editorKey" Original="null" FixedBeneficiaryId="Id" FixedBeneficiaryName="@beneficiary.Name"
                                Saved="ProjectSavedAsync" Closed="CloseAddProjectAsync" />
-            </div>
-        </div>
+        </AppDialog>
     }
 
     @if (addingWorkPoint || editingWorkPoint is not null)
     {
-        <div class="delete-overlay">
-            <div class="delete-dialog template-popup" role="dialog" aria-modal="true" tabindex="-1" aria-labelledby="work-point-editor-title">
+        <AppDialog PanelClass="template-popup" LabelledBy="work-point-editor-title">
                 <WorkPointEditor @key="workPointEditorKey" BeneficiaryId="Id" Original="editingWorkPoint"
                                  Saved="WorkPointSavedAsync" Closed="CloseWorkPointEditorAsync" PhotosChanged="ReloadPhotoCountsAsync" />
-            </div>
-        </div>
+        </AppDialog>
     }
 
+    @if (filesWorkPoint is { } filesPoint)
+    {
+        <AppDialog PanelClass="template-popup" LabelledBy="work-point-files-title" OnClose="CloseWorkPointFiles">
+            <section class="product-editor">
+                <div class="catalog-heading dialog-head"><h2 id="work-point-files-title">Fișiere – @filesPoint.Name</h2><HelpButton Topic="beneficiari-fisiere" About="Fișierele punctului de lucru" /></div>
+                <EntityFilesPanel OwnerKind="@EntityFileOwners.WorkPoint" OwnerId="filesPoint.Id" />
+                <div class="editor-actions"><button type="button" class="danger" @onclick="CloseWorkPointFiles">Închide</button></div>
+            </section>
+        </AppDialog>
+    }
+
+    @if (attachedListFor is { } attachedParent)
+    {
+        <AppDialog PanelClass="template-popup" LabelledBy="attached-list-title">
+            <AttachedWorkPointsList @key="attachedParent.Id" Parent="attachedParent" Items="AttachedOf(attachedParent.Id)" CanManage="permEdit" AddRequested="OpenAddAttached" EditRequested="OpenEditAttached"
+                                    Changed="ReloadAttachedAsync" Closed="CloseAttachedList" />
+        </AppDialog>
+    }
+    @if (attachedListFor is { } editorParent && (attachedAdding || attachedEditing is not null))
+    {
+        <AppDialog PanelClass="template-popup" BackdropClass="front" LabelledBy="attached-editor-title">
+            <AttachedWorkPointEditor @key="attachedEditorKey" Parent="editorParent" Original="attachedEditing" Saved="AttachedSavedAsync" Closed="CloseAttachedEditor" />
+        </AppDialog>
+    }
+
+    <div class="settings-subtabs" role="tablist" aria-label="Secțiunile fișei beneficiarului">
+        @foreach (var (tabId, tabTitle) in SectionTabs)
+        {
+            var current = tabId;
+            <button type="button" role="tab" id="subtab-bf-@tabId" data-tab-target="@tabId" class="settings-subtab @(sectionTab == tabId ? "active" : "") @BalanceTabClass(tabId)" aria-selected="@(sectionTab == tabId ? "true" : "false")" aria-controls="subpanel-bf-@tabId" tabindex="@(sectionTab == tabId ? 0 : -1)" @onclick="() => sectionTab = current">@tabTitle@if (tabId == "balanta" && tabBalance is not null) { <span class="count-badge" id="balance-tab-badge" title="@(tabBalance.IsOwed ? "Plăți restante" : "Fără plăți restante")">@ElcomturFormat.Money(tabBalance.Balance)</span> }@if (tabId == "proiecte") { <span class="count-badge" id="projects-tab-badge" title="Numărul de proiecte">@projects.Count</span> }</button>
+        }
+    </div>
+
+    <div class="section-tab-panel" id="subpanel-bf-puncte" role="tabpanel" aria-labelledby="subtab-bf-puncte" data-tab="puncte" hidden="@(sectionTab != "puncte")">
     <section class="catalog">
         <details class="catalog-collapse"><summary class="catalog-heading"><h2>Puncte de lucru <span>@workPoints.Count</span></h2>
             @if (canManage) { <button class="refresh act-confirm" disabled="@(addingWorkPoint || editingWorkPoint is not null || editingBeneficiary)" @onclick="OpenAddWorkPoint">+ Adaugă punct de lucru</button> }
         </summary>
         @if (workPointError is not null) { <div class="error-banner" role="alert">@workPointError</div> }
-        <Paged Items="workPoints" Id="work-points-page-size" Context="pageRows">
-        <div class="table-scroll"><table><thead><tr><th>NUME</th><th>ADRESĂ</th><th>TELEFON</th><th>PERSOANĂ DE CONTACT</th><th>DESCRIERE</th><th>COORDONATE</th><th class="number">FOTO</th><th>MENTENANȚĂ</th><th>ANALIZĂ DE RISC</th>@if (canManage) { <th></th> }</tr></thead><tbody>
+        <Paged Items="workPoints" Id="work-points-page-size" Context="pageRows" Sorts="WorkPointSorts">
+        <div class="table-scroll"><table><thead><tr><SortTh Key="name">NUME</SortTh><SortTh Key="address">ADRESĂ</SortTh><SortTh Key="phone">TELEFON</SortTh><SortTh Key="contact">PERSOANĂ DE CONTACT</SortTh><SortTh Key="description">DESCRIERE</SortTh><th>COORDONATE</th><th>ARONDATE</th><th class="number">FOTO</th><th>MENTENANȚĂ</th><th>ANALIZĂ DE RISC</th>@if (canManage) { <th></th> }</tr></thead><tbody>
             @foreach (var workPoint in pageRows)
             {
                 <tr @key="workPoint.Id"><td><strong>@workPoint.Name</strong>@if (workPoint.IsPrimary) { <span class="anaf-source ok work-point-badge">Principal</span> }</td><td>@workPoint.Address</td><td>@workPoint.Phone</td><td>@workPoint.ContactPerson</td>
-                    <td class="work-point-description" title="@workPoint.Description">@workPoint.Description</td>
+                    <td class="work-point-description" title="@DescriptionTitle(workPoint)">@ShownDescription(workPoint.Description)@foreach (var attachedName in AttachedNames(workPoint)) { <div class="work-point-attached-line">Arondat: @attachedName</div> }</td>
                     <td>@(workPoint.HasCoordinates ? WorkPointCoordinates.Format(workPoint.Latitude, workPoint.Longitude) : "")</td>
+                    <td class="attached-cell">@if (workPoint.Id > 0) { var attachedCount = AttachedOf(workPoint.Id).Count; <button type="button" class="attached-open" id="attached-open-@workPoint.Id" disabled="@(addingWorkPoint || editingWorkPoint is not null || editingBeneficiary)" title="Puncte de lucru arondate la @workPoint.Name" aria-label="Puncte de lucru arondate la @workPoint.Name: @attachedCount" @onclick="() => OpenAttachedList(workPoint)">@(attachedCount == 0 ? (canManage ? "+ Arondate" : "") : $"Arondate ({attachedCount})")</button> }</td>
                     <td class="number">@(photoCounts.TryGetValue(workPoint.Id, out var photoCount) ? photoCount.ToString() : "")</td>
                     <td>@{ var coverage = ActiveCoverage(workPoint.Id); }@if (coverage is { } covered) { <span>@covered.Contract.Label</span><text> </text><span class="due-chip @ServiceDueRules.CssClass(ServiceDueRules.State(covered.Point.NextDue, Today, thresholdDays))">@StockMovementRules.DisplayDate(covered.Point.NextDue)</span> } else if (InOffContract(workPoint.Id)) { <span class="contract-state off">Contract Off</span> }</td>
                     <td>@RiskAnalysisCell(workPoint)</td>
@@ -103,6 +140,9 @@ else if (beneficiary is not null)
                             }
                             else
                             {
+                                @if (permAdd) { <button class="row-icon project" disabled="@WorkPointRowsLocked" aria-label="Adaugă proiect pentru @beneficiary.Name (din punctul de lucru @workPoint.Name)" title="Adaugă proiect pentru @beneficiary.Name (din punctul de lucru @workPoint.Name)" @onclick="OpenAddProjectAsync"></button> }
+                                @if (canRisk && Modules.IsAvailable(RiskAnalysesModule.ModuleId)) { <button class="row-icon risk" disabled="@WorkPointRowsLocked" aria-label="Adaugă analiză de risc la punctul de lucru @workPoint.Name" title="Adaugă analiză de risc la punctul de lucru @workPoint.Name" @onclick="() => riskSection?.OpenAddFor(workPoint.Id)"></button> }
+                                @if (permEdit) { <button class="row-icon files" disabled="@WorkPointRowsLocked" aria-label="Adaugă fișiere la punctul de lucru @workPoint.Name" title="Adaugă fișiere la punctul de lucru @workPoint.Name" @onclick="() => filesWorkPoint = workPoint"></button> }
                                 @if (permEdit) { <button class="row-icon edit" disabled="@(workPointBusy || addingWorkPoint || editingWorkPoint is not null || editingBeneficiary)" aria-label="Editează punctul de lucru @workPoint.Name" title="Editează punctul de lucru @workPoint.Name" @onclick="() => OpenEditWorkPoint(workPoint)"></button> }
                                 @if (!workPoint.IsPrimary)
                                 {
@@ -121,21 +161,31 @@ else if (beneficiary is not null)
         </Paged>
     </details>
     </section>
+    </div>
 
+    <div class="section-tab-panel" id="subpanel-bf-consum" role="tabpanel" aria-labelledby="subtab-bf-consum" data-tab="consum" hidden="@(sectionTab != "consum")">
     <NetConsumptionSection BeneficiaryId="Id" StartOpen="false" />
+    </div>
 
-    <ModuleGate ModuleId="@BlazorStoc.Modules.Maintenance.MaintenanceModule.ModuleId" Section="Contracte de mentenanță"><ServiceContractsSection BeneficiaryId="Id" BeneficiaryName="@beneficiary.Name" WorkPoints="workPoints" Contracts="contracts" CanManage="canMaintenance" ThresholdDays="thresholdDays" Changed="ReloadContractsAsync" />
+    <div class="section-tab-panel" id="subpanel-bf-mentenanta" role="tabpanel" aria-labelledby="subtab-bf-mentenanta" data-tab="mentenanta" hidden="@(sectionTab != "mentenanta")">
+    <ModuleGate ModuleId="@BlazorStoc.Modules.Maintenance.MaintenanceModule.ModuleId" Section="Contracte de mentenanță"><ServiceContractsSection @ref="contractSection" BeneficiaryId="Id" BeneficiaryName="@beneficiary.Name" WorkPoints="workPoints" Contracts="contracts" CanManage="canMaintenance" ThresholdDays="thresholdDays" Changed="ReloadContractsAsync" />
 
     <ServiceInterventionsSection BeneficiaryId="Id" BeneficiaryName="@beneficiary.Name" WorkPoints="workPoints" Contracts="contracts" CanManage="canMaintenance" OpenForWorkPointId="AddInterventionPoint ?? 0" Changed="ReloadContractsAsync" /></ModuleGate>
+    </div>
 
-    <ModuleGate ModuleId="@BlazorStoc.Modules.Elcomtur.ElcomturModule.ModuleId" Notice="false"><ElcomturBalanceSection BeneficiaryId="Id" StartOpen="BalanceRequested" /></ModuleGate>
+    <div class="section-tab-panel" id="subpanel-bf-analize" role="tabpanel" aria-labelledby="subtab-bf-analize" data-tab="analize" hidden="@(sectionTab != "analize")">
+    <ModuleGate ModuleId="@RiskAnalysesModule.ModuleId" Section="Analize de risc"><RiskAnalysesSection @ref="riskSection" BeneficiaryId="Id" StartOpen="false" Views="riskAnalyses" WorkPoints="workPoints" CanManage="canRisk" ThresholdDays="riskThresholdDays" Changed="ReloadRiskAnalysesAsync" /></ModuleGate>
+    </div>
 
-    <ModuleGate ModuleId="@RiskAnalysesModule.ModuleId" Section="Analize de risc"><RiskAnalysesSection BeneficiaryId="Id" StartOpen="false" Views="riskAnalyses" WorkPoints="workPoints" CanManage="canRisk" ThresholdDays="riskThresholdDays" Changed="ReloadRiskAnalysesAsync" /></ModuleGate>
-
+    <div class="section-tab-panel" id="subpanel-bf-taskuri" role="tabpanel" aria-labelledby="subtab-bf-taskuri" data-tab="taskuri" hidden="@(sectionTab != "taskuri")">
     <ModuleGate ModuleId="@BlazorStoc.Modules.Tasks.TasksModule.ModuleId" Notice="false"><AuthorizeView Policy="perm:taskuri.view"><Authorized><BlazorStoc.Modules.Tasks.UserTasksSection BeneficiaryId="Id" BeneficiaryName="@beneficiary.Name" /></Authorized></AuthorizeView></ModuleGate>
+    </div>
 
+    <div class="section-tab-panel" id="subpanel-bf-fisiere" role="tabpanel" aria-labelledby="subtab-bf-fisiere" data-tab="fisiere" hidden="@(sectionTab != "fisiere")">
     <BeneficiaryFilesSection BeneficiaryId="Id" />
+    </div>
 
+    <div class="section-tab-panel" id="subpanel-bf-proiecte" role="tabpanel" aria-labelledby="subtab-bf-proiecte" data-tab="proiecte" hidden="@(sectionTab != "proiecte")">
     <section class="catalog">
         <details class="catalog-collapse"><summary class="catalog-heading"><h2>Proiecte <span>@FilteredProjects.Count</span></h2>
             @if (permAdd) { <button class="primary" disabled="@(addingProject || editingBeneficiary)" @onclick="OpenAddProjectAsync">+ Adaugă proiect</button> }
@@ -151,16 +201,23 @@ else if (beneficiary is not null)
         }
         else
         {
-            <div class="table-scroll"><table><thead><tr><th>PROIECT</th><th>ULTIMA MODIFICARE</th></tr></thead><tbody>
+            <div class="table-scroll"><table><thead><tr><th>PROIECT</th><th>ULTIMA MODIFICARE</th>@if (canNotes) { <th><span class="sr-only">Acțiuni</span></th> }</tr></thead><tbody>
             @foreach (var project in PagedProjects)
             {
-                <tr @key="project.Id"><td><a class="category-table-link" data-restore-scroll href="@($"/proiecte/{project.Id}")"><strong>@project.Name</strong></a></td><td>@project.UpdatedAtUtc.ToLocalTime().ToString("dd.MM.yyyy HH:mm")</td></tr>
+                <tr @key="project.Id"><td><a class="category-table-link" data-restore-scroll href="@($"/proiecte/{project.Id}")"><strong>@project.Name</strong></a></td><td>@project.UpdatedAtUtc.ToLocalTime().ToString("dd.MM.yyyy HH:mm")</td>@if (canNotes) { <td class="row-actions">@if (projectsWithEquipment.Contains(project.Id)) { <button type="button" class="row-icon receipt" aria-label="Generează bon de consum pentru proiectul @project.Name" title="Generează bon de consum pentru proiectul @project.Name" @onclick="() => OpenGenerateNoteAsync(project)"></button> }</td> }</tr>
             }
             </tbody></table></div>
             <AuditPager Id="beneficiary-projects-page-size" Label="Proiecte pe pagină" PageSizes="pageSizes" PageSize="projectPageSize" Page="pageNumber" Total="FilteredProjects.Count" PageChanged="GoToPage" PageSizeChanged="value => { projectPageSize = value; pageNumber = 1; SyncState(); }" />
         }
     </details>
     </section>
+    @if (canNotes) { <ConsumptionNotesSection BeneficiaryId="Id" Refresh="notesRefresh" /> }
+    </div>
+
+    <div class="section-tab-panel" id="subpanel-bf-balanta" role="tabpanel" aria-labelledby="subtab-bf-balanta" data-tab="balanta" hidden="@(sectionTab != "balanta")">
+    <ModuleGate ModuleId="@BlazorStoc.Modules.Elcomtur.ElcomturModule.ModuleId" Notice="false"><ElcomturBalanceSection BeneficiaryId="Id" StartOpen="BalanceRequested" /></ModuleGate>
+    </div>
+
 }
 
 </PageBoundary>
@@ -178,18 +235,41 @@ else if (beneficiary is not null)
     [SupplyParameterFromQuery(Name = BeneficiaryProjectListState.PageParameter)] public int? PageParameter { get; set; }
     // /beneficiari/<id>?adauga-proiect=1&inapoi=<page>: opened from a form (the exit form of a product) that continues afterwards.
     [SupplyParameterFromQuery(Name = "adauga-proiect")] public string? AddProjectFlag { get; set; }
+    // /beneficiari/<id>?actiune=adauga-punct|adauga-contract|adauga-analiza|adauga-proiect: the tiles of the main page that need a beneficiary (chosen first on the page of the beneficiaries).
+    [SupplyParameterFromQuery(Name = MenuCatalog.ActionQuery)] public string? ActionParameter { get; set; }
+    private string? pendingSectionAction;
+    private ServiceContractsSection? contractSection;
     // ?balanta=1: opened from the Balante restante tab of the Notifications page; the Elcomtur balance section opens and is brought into view.
     [SupplyParameterFromQuery(Name = "balanta")] public string? BalanceFlag { get; set; }
     private bool BalanceRequested => BalanceFlag == "1";
+    // BUG-0045: the tab "Balanță Elcomtur" shows the balance in its badge and its colour (red for a positive balance, green for zero or less) also when it is not the open one.
+    // Nothing is shown when there is no balance to show: the module is off, the user may not see balances, or the last import had no client for the beneficiary.
+    private BeneficiaryBalance? tabBalance;
+    private string BalanceTabClass(string tabId) => tabId != "balanta" || tabBalance is null ? "" : tabBalance.IsOwed ? "balance-due" : "balance-ok";
+
+    private async Task<BeneficiaryBalance?> ReadTabBalanceAsync()
+    {
+        try { return await ElcomturBalances.GetAsync(Id, lifetime.Token); }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { return null; }
+        catch (Exception exception) { Logger.LogDebug("The balance for the tab could not be read ({ErrorType}).", exception.GetType().Name); return null; }
+    }
+    // BUG-0038: the sections of the page are tabs (scripts/section-tabs.js keeps their <details> open); the balance of Elcomtur is the last one.
+    private static readonly (string Id, string Title)[] SectionTabs = [("puncte", "Puncte de lucru"), ("consum", "Consum rețea"), ("mentenanta", "Mentenanță"), ("analize", "Analize de risc"), ("taskuri", "Taskuri"), ("fisiere", "Fișiere beneficiar"), ("proiecte", "Proiecte"), ("balanta", "Balanță Elcomtur")];
+    private string sectionTab = "puncte";
     // /beneficiari/<id>?adauga-interventie=<work point id>: opened from the maintenance map, with the form of a new intervention on that point.
     [SupplyParameterFromQuery(Name = MaintenanceMapRules.AddInterventionQuery)] public int? AddInterventionPoint { get; set; }
     [SupplyParameterFromQuery(Name = ReturnNavigation.QueryName)] public string? ReturnParameter { get; set; }
     private string? returnTo;
     private Beneficiary? beneficiary;
     private IReadOnlyList<Project> projects = Array.Empty<Project>();
-    private bool loading = true, projectsLoading, addingProject, editingBeneficiary, canManage, canMaintenance, canRisk;
+    private bool loading = true, projectsLoading, addingProject, editingBeneficiary, canManage, canMaintenance, canRisk, canNotes;
+    private int notesRefresh;
+    private IReadOnlySet<int> projectsWithEquipment = new HashSet<int>();   // the projects with equipment handed over: the others have no button to generate a note
+    private Project? noteProject;
+    private int noteProjectExisting;
     private string? error, notice, workPointError;
     // The additional work points; the main one is derived from the beneficiary itself (WorkPointRules.Primary).
+    private static readonly IReadOnlyDictionary<string, Func<WorkPoint, IComparable?>> WorkPointSorts = new Dictionary<string, Func<WorkPoint, IComparable?>> { ["name"] = item => item.Name, ["address"] = item => item.Address, ["phone"] = item => item.Phone, ["contact"] = item => item.ContactPerson, ["description"] = item => item.Description };
     private IReadOnlyList<WorkPoint> workPoints = Array.Empty<WorkPoint>();
     // Number of photos per work point id (points without photos are absent).
     private IReadOnlyDictionary<int, int> photoCounts = new Dictionary<int, int>();
@@ -201,6 +281,10 @@ else if (beneficiary is not null)
     // The days before a due date within which the maintenance state shows "In curand" (the threshold of the active template of the source).
     private int thresholdDays = ServiceDueRules.DefaultThresholdDays;
     private bool addingWorkPoint, workPointBusy;
+    // The risk analyses section (to open its form from a work point row) and the work point whose files are shown in a popup (row icons).
+    private RiskAnalysesSection? riskSection;
+    private WorkPoint? filesWorkPoint;
+    private bool WorkPointRowsLocked => workPointBusy || addingWorkPoint || editingWorkPoint is not null || editingBeneficiary || addingProject || filesWorkPoint is not null;
     private WorkPoint? editingWorkPoint;
     private Guid workPointEditorKey;
     private string query = "";
@@ -254,12 +338,15 @@ else if (beneficiary is not null)
         await LoadPermissionsAsync();
         changeSubscription = ChangeFeed.Subscribe(OnChangeAsync);
         ApplyStateFromAddress();
+        // The deep links (?balanta=1 from the notifications, ?adauga-interventie=<id> from the map) open the tab of their section.
+        if (BalanceRequested) sectionTab = "balanta"; else if (AddInterventionPoint is > 0) sectionTab = "mentenanta";
         await LoadAsync();
         if (AddProjectFlag == "1" && beneficiary is not null)
         {
             returnTo = ReturnNavigation.Safe(ReturnParameter);
             await OpenAddProjectAsync();
         }
+        if (ActionParameter is not null && beneficiary is not null) await RunActionAsync(ActionParameter);
     }
 
     protected override async Task OnParametersSetAsync()
@@ -272,8 +359,26 @@ else if (beneficiary is not null)
         }
     }
 
+    // The action of a tile of the main page: opens the tab of its section and then its form (the sections are drawn by this page, so the form of a contract or of a risk analysis opens after the render).
+    private async Task RunActionAsync(string action)
+    {
+        switch (action)
+        {
+            case "adauga-proiect": if (permAdd) await OpenAddProjectAsync(); break;
+            case "adauga-punct": sectionTab = "puncte"; if (canManage) OpenAddWorkPoint(); break;
+            case "adauga-contract": sectionTab = "mentenanta"; pendingSectionAction = action; break;
+            case "adauga-analiza": sectionTab = "analize"; pendingSectionAction = action; break;
+        }
+        Navigation.NavigateTo(Navigation.GetUriWithQueryParameter(MenuCatalog.ActionQuery, (string?)null), replace: true);
+    }
+
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
+        if (pendingSectionAction is { } pending && !loading && beneficiary is not null)
+        {
+            if (pending == "adauga-contract" && contractSection is not null) { pendingSectionAction = null; contractSection.StartAdd(); }
+            else if (pending == "adauga-analiza" && riskSection is not null) { pendingSectionAction = null; riskSection.OpenAddFor(0); }
+        }
         if (!scrollRestorePending || loading || projectsLoading || beneficiary is null) return;
         scrollRestorePending = false;
         try { await JS.InvokeVoidAsync("blazorStocNavigationContext.restoreScroll"); }
@@ -292,11 +397,18 @@ else if (beneficiary is not null)
         });
     }
 
+    private async Task LoadNoteProjectsAsync()
+    {
+        try { projectsWithEquipment = canNotes ? await ConsumptionNoteStore.GetProjectsWithEquipmentAsync(Id, lifetime.Token) : new HashSet<int>(); }
+        catch (Exception exception) when (exception is not OperationCanceledException) { projectsWithEquipment = new HashSet<int>(); }
+    }
+
     private async Task RefreshProjectsAsync()
     {
         try
         {
             projects = await Projects.GetForBeneficiaryAsync(Id, lifetime.Token);
+            await LoadNoteProjectsAsync();
             if (pageNumber > TotalPages) { pageNumber = TotalPages; SyncState(); }
         }
         catch (OperationCanceledException) { }
@@ -311,11 +423,15 @@ else if (beneficiary is not null)
         {
             canManage = await Access.HasModuleWriteAsync("beneficiari", lifetime.Token);
             canMaintenance = await Access.HasModuleWriteAsync("mentenanta", lifetime.Token); canRisk = await Access.HasModuleWriteAsync("analize-risc", lifetime.Token);
+            canNotes = await Access.HasAsync("stoc.view", lifetime.Token);
             var all = await Beneficiaries.GetBeneficiariesAsync(lifetime.Token);
             beneficiary = all.FirstOrDefault(item => item.Id == Id);
             if (beneficiary is null) { error = "Beneficiarul solicitat nu mai există."; return; }
             workPoints = await WorkPointStore.GetAsync(Id, lifetime.Token);
+            tabBalance = await ReadTabBalanceAsync();
             photoCounts = await PhotoStore.CountsForBeneficiaryAsync(Id, lifetime.Token);
+            attachedAll = await AttachedStore.GetForBeneficiaryAsync(Id, lifetime.Token);
+            await LoadOriginAsync();
             // The contracts and the risk analyses are other modules: if one fails, the file of the beneficiary still opens (the section and the column say so).
             contracts = await Modules.TryRunAsync(BlazorStoc.Modules.Maintenance.MaintenanceModule.ModuleId, () => ContractStore.GetForBeneficiaryAsync(Id, lifetime.Token), Array.Empty<ServiceContractDetails>());
             // The risk analyses are another module: if it fails, the file of the beneficiary still opens (the section and the column say so).
@@ -341,6 +457,7 @@ else if (beneficiary is not null)
         try
         {
             projects = await Projects.GetForBeneficiaryAsync(Id, lifetime.Token);
+            await LoadNoteProjectsAsync();
             if (pageNumber > TotalPages) { pageNumber = TotalPages; SyncState(); }
         }
         catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
@@ -348,6 +465,22 @@ else if (beneficiary is not null)
     }
 
     // The page only shows the beneficiary; the editor is opened by the explicit "Editează" action, never by arriving here.
+    // A consumption note is generated on request from the icon of a project (never automatically).
+    private async Task OpenGenerateNoteAsync(Project project)
+    {
+        notice = null;
+        try { noteProjectExisting = (await ConsumptionNoteStore.GetAllAsync(Id, project.Id, lifetime.Token)).Count; }
+        catch (Exception exception) when (exception is not OperationCanceledException) { noteProjectExisting = 0; }
+        noteProject = project;
+    }
+
+    private Task NoteGeneratedAsync(ConsumptionNoteGenerated result)
+    {
+        noteProject = null; notesRefresh++;
+        notice = $"Bonul de consum nr. {result.Note.Id} a fost generat" + (result.Deactivated > 0 ? $"; bonurile anterioare ale proiectului au rămas inactive ({result.Deactivated})." : result.Deleted > 0 ? $"; bonurile anterioare ale proiectului au fost șterse ({result.Deleted})." : ".");
+        return Task.CompletedTask;
+    }
+
     private Task OpenEditBeneficiaryAsync() { editingBeneficiary = true; beneficiaryEditorKey = Guid.NewGuid(); notice = null; return Task.CompletedTask; }
     private Task CloseEditBeneficiaryAsync() { editingBeneficiary = false; return Task.CompletedTask; }
     private async Task BeneficiarySavedAsync(Beneficiary saved)
@@ -456,7 +589,7 @@ else if (beneficiary is not null)
         if (active is null)
         {
             builder.AddAttribute(1, "class", "due-chip due-overdue");
-            builder.AddContent(2, "Fără analiză de risc înregistrată");
+            builder.AddContent(2, "Fără analiză de risc");
         }
         else
         {
@@ -477,12 +610,61 @@ else if (beneficiary is not null)
         }
     }
 
+    // "Preluat din ActivityApp" / "Legat cu ActivityApp", calculated from the ties of the import (null: the beneficiary did not come from there).
+    private BeneficiaryOrigin? origin;
+    private async Task LoadOriginAsync()
+    {
+        try { origin = (await OriginChecks.GetOriginsAsync(lifetime.Token)).TryGetValue(Id, out var found) ? found : null; }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (Exception exception) { origin = null; Logger.LogWarning("Beneficiary origin loading failed ({ErrorType}).", exception.GetType().Name); }
+    }
+
+    // The attached work points (components of the work points) of the beneficiary, one query; the popups below work on them.
+    private IReadOnlyList<AttachedWorkPoint> attachedAll = [];
+    private WorkPoint? attachedListFor;
+    private bool attachedAdding;
+    private AttachedWorkPoint? attachedEditing;
+    private Guid attachedEditorKey;
+    // PROP-0022: the attached points of a work point are listed in its description, one on each line, as "Arondat: name".
+    private IEnumerable<string> AttachedNames(WorkPoint workPoint) => workPoint.Id > 0 ? AttachedOf(workPoint.Id).Select(point => point.Name) : [];
+    // Points taken over by older imports carry "(punct 123)" in the note; the number is not shown.
+    private static string ShownDescription(string description) => System.Text.RegularExpressions.Regex.Replace(description ?? "", @" \(punct \d+\)", "");
+
+    private string DescriptionTitle(WorkPoint workPoint)
+    {
+        var lines = new List<string>();
+        if (workPoint.Description.Length > 0) lines.Add(workPoint.Description);
+        lines.AddRange(AttachedNames(workPoint).Select(name => "Arondat: " + name));
+        return string.Join('\n', lines);
+    }
+
+    private IReadOnlyList<AttachedWorkPoint> AttachedOf(int workPointId) => attachedAll.Where(point => point.WorkPointId == workPointId).ToArray();
+    private void OpenAttachedList(WorkPoint workPoint) { attachedListFor = workPoint; attachedAdding = false; attachedEditing = null; }
+    private void CloseAttachedList() { attachedListFor = null; attachedAdding = false; attachedEditing = null; }
+    private void OpenAddAttached() { attachedAdding = true; attachedEditing = null; attachedEditorKey = Guid.NewGuid(); }
+    private void OpenEditAttached(AttachedWorkPoint point) { attachedAdding = false; attachedEditing = point; attachedEditorKey = Guid.NewGuid(); }
+    private void CloseAttachedEditor() { attachedAdding = false; attachedEditing = null; }
+    private async Task AttachedSavedAsync(AttachedWorkPoint saved) { CloseAttachedEditor(); await ReloadAttachedAsync(); }
+
+    private async Task ReloadAttachedAsync()
+    {
+        try { attachedAll = await AttachedStore.GetForBeneficiaryAsync(Id, lifetime.Token); }
+        catch (OperationCanceledException) { }
+        catch (Exception exception)
+        {
+            Logger.LogWarning("Attached work points refresh failed ({ErrorType}).", exception.GetType().Name);
+            workPointError = "Lista punctelor arondate nu a putut fi actualizată.";
+        }
+    }
+
     private async Task ReloadWorkPointsAsync()
     {
         try
         {
             workPoints = await WorkPointStore.GetAsync(Id, lifetime.Token);
+            tabBalance = await ReadTabBalanceAsync();
             photoCounts = await PhotoStore.CountsForBeneficiaryAsync(Id, lifetime.Token);
+            attachedAll = await AttachedStore.GetForBeneficiaryAsync(Id, lifetime.Token);
         }
         catch (OperationCanceledException) { }
         catch (Exception exception)
@@ -491,6 +673,8 @@ else if (beneficiary is not null)
             workPointError = "Lista punctelor de lucru nu a putut fi actualizată.";
         }
     }
+
+    private void CloseWorkPointFiles() => filesWorkPoint = null;
 
     private Task OpenAddProjectAsync() { addingProject = true; editorKey = Guid.NewGuid(); notice = null; return Task.CompletedTask; }
     private Task CloseAddProjectAsync()

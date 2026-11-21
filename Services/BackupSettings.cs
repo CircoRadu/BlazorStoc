@@ -71,8 +71,8 @@ public static class BackupSettingsRules
 {
     /// <summary>The newest packages are never removed by the retention, whatever their age.</summary>
     public const int KeepNewest = 4;
-    public const int DefaultRetentionDays = 30, MinRetentionDays = 7, MaxRetentionDays = 3650;
-    public const string RetentionMessage = "Pachetele se șterg după cel puțin 7 zile (cel mult 3650); ultimele 4 pachete se păstrează oricum.";
+    public const int DefaultRetentionDays = 30, MinRetentionDays = 4, MaxRetentionDays = 3650;
+    public const string RetentionMessage = "Pachetele se șterg după cel puțin 4 zile (cel mult 3650); ultimele 4 pachete se păstrează oricum.";
 
     public static string? Validate(BackupSettingsInput input)
     {

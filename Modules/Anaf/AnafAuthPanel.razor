@@ -1,0 +1,140 @@
+@using BlazorStoc.Services
+@namespace BlazorStoc.Components.Shared
+@inject IAnafAuthService Auth
+@inject NavigationManager Navigation
+@implements IDisposable
+
+<h2>Autentificare ANAF (E-Factura)</h2>
+<p class="muted">Aplicația se autentifică în ANAF (OAuth2, serviciul e-Factura). Datele aplicației înregistrate la ANAF se salvează aici; autentificarea o face administratorul în ANAF, cu certificatul calificat din browserul lui, iar tokenul rezultat se păstrează criptat pe server.</p>
+
+@if (loadError is not null) { <div class="error-banner" role="alert">@loadError</div> }
+@if (view is null)
+{
+    @if (loadError is null) { <div class="empty-state" role="status"><div class="spinner"></div><h3>Se încarcă setările</h3></div> }
+}
+else
+{
+    @if (message is not null) { <div class="anaf-message @(messageIsError ? "error" : "ok")" role="@(messageIsError ? "alert" : "status")">@message</div> }
+    <div class="anaf-status">
+        <span class="anaf-badge @(!view.Connected ? "warn" : view.AccessValid ? "ok" : "warn")" id="anaf-auth-state">@StateText</span>
+        @if (view.Connected) { <span>Obținut: <strong>@view.ObtainedAt?.ToString("dd.MM.yyyy HH:mm")</strong> · de @view.Admin · valabil până la <strong>@view.AccessExpiresAt?.ToString("dd.MM.yyyy HH:mm")</strong></span> }
+    </div>
+
+    <details class="anaf-section anaf-collapse" open="@(!view.HasSecret)"><summary>1. Aplicația înregistrată la ANAF</summary>
+        <div class="anaf-grid">
+            <label>Client id<input id="anaf-client-id" @bind="clientId" maxlength="200" autocomplete="off" /></label>
+            <label>Client secret @(view.HasSecret ? "(lasă gol ca să păstrezi secretul salvat)" : "")<input id="anaf-client-secret" type="password" @bind="secret" autocomplete="new-password" placeholder="@(view.HasSecret ? "••••••••" : "")" /></label>
+            <label class="anaf-wide">Adresă de răspuns (redirect), exact cea înregistrată la ANAF<input id="anaf-redirect" @bind="redirectUri" placeholder="@SuggestedRedirect" /></label>
+            <label>Mediu<select id="anaf-environment" @bind="environment"><option value="@AnafAuthRules.Production">Producție</option><option value="@AnafAuthRules.Test">Test</option></select></label>
+        </div>
+        <div class="editor-actions">
+            <button type="button" class="refresh act-confirm" id="anaf-auth-save" disabled="@busy" @onclick="SaveAsync">Salvează setările</button>
+        </div>
+    </details>
+
+    <details class="anaf-section anaf-collapse" open><summary>2. Autentificare</summary>
+        <p class="muted"><small>Butonul te duce pe pagina de autentificare ANAF (certificat calificat); după autentificare ANAF te aduce înapoi aici. Autentificarea expiră: tokenul de acces se reînnoiește cu butonul „Reînnoiește tokenul”, iar când și reînnoirea expiră te autentifici din nou.</small></p>
+        <div class="editor-actions">
+            <button type="button" class="primary" id="anaf-auth-begin" disabled="@(busy || !view.HasSecret)" title="@(view.HasSecret ? "Deschide pagina de autentificare ANAF" : "Salvează mai întâi setările aplicației")" @onclick="BeginAsync">@(view.Connected ? "Autentifică din nou în ANAF" : "Autentifică-te în ANAF")</button>
+            <button type="button" class="refresh act-reload" id="anaf-auth-refresh" disabled="@(busy || !view.Connected)" @onclick="RefreshAsync">Reînnoiește tokenul</button>
+            <button type="button" class="danger" id="anaf-auth-disconnect" disabled="@(busy || !view.Connected)" @onclick="() => disconnecting = true">Deconectează</button>
+        </div>
+    </details>
+}
+
+@if (disconnecting)
+{
+    <DeleteConfirmationDialog Title="Deconectezi autentificarea ANAF?" Subject="Tokenul" ObjectLabel="@($"obținut {view?.ObtainedAt:dd.MM.yyyy HH:mm} de {view?.Admin}")"
+                              Description="Tokenul se șterge de pe server; pentru a folosi din nou ANAF te autentifici din nou. Setările aplicației rămân."
+                              ConfirmationNote="Deconectarea va fi înregistrată în jurnal." Error="@disconnectError" Confirmed="DisconnectAsync" Cancelled="() => disconnecting = false" />
+}
+
+@code {
+    // The result of the return from ANAF (the address the callback sent the browser to): ok, refuzat (the administrator refused) or eroare.
+    [Parameter] public string? Result { get; set; }
+
+    private readonly CancellationTokenSource lifetime = new();
+    private AnafAuthView? view;
+    private string clientId = "", redirectUri = "", environment = AnafAuthRules.Production, secret = "";
+    private string? loadError, message, disconnectError;
+    private bool busy, messageIsError, disconnecting;
+
+    private string SuggestedRedirect => new Uri(new Uri(Navigation.BaseUri), AnafAuthRules.CallbackPath.TrimStart('/')).ToString();
+    private string StateText => view is null || !view.Connected ? "Neautentificat" : view.AccessValid ? "Autentificat" : "Token expirat (reînnoiește sau autentifică-te din nou)";
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadAsync();        if (Result == "ok") Say("Autentificarea în ANAF a reușit.");
+        else if (Result == "refuzat") Say("ANAF a refuzat sau ai întrerupt autentificarea.", true);
+        else if (Result == "eroare") Say("Autentificarea nu a putut fi încheiată (a expirat, nu a pornit de aici sau ANAF a refuzat codul). Încearcă din nou.", true);
+    }
+
+    private async Task LoadAsync()
+    {
+        try
+        {
+            view = await Auth.GetAsync(lifetime.Token);
+            clientId = view.ClientId;
+            redirectUri = view.RedirectUri.Length > 0 ? view.RedirectUri : SuggestedRedirect;
+            environment = view.Environment;
+        }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (Exception ex) when (ex is AnafException or AccessDeniedException) { loadError = ex.Message; }
+        catch (Exception) { loadError = "Setările de autentificare ANAF nu au putut fi încărcate."; }
+    }
+
+    private void Say(string text, bool error = false) { message = text; messageIsError = error; }
+
+    private async Task Run(Func<Task> action)
+    {
+        if (busy) return;
+        busy = true;
+        message = null;
+        try { await action(); }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (Exception ex) when (ex is AnafException or AccessDeniedException) { Say(ex.Message, true); }
+        catch (Exception) { Say("Operația nu a putut fi efectuată.", true); }
+        finally { busy = false; }
+    }
+
+    private Task SaveAsync() => Run(async () =>
+    {
+        await Auth.SaveSettingsAsync(new AnafAuthSettings { ClientId = clientId, RedirectUri = redirectUri, Environment = environment }, secret, lifetime.Token);
+        secret = "";
+        await LoadAsync();
+        Say("Setările au fost salvate.");
+    });
+
+    private Task BeginAsync() => Run(async () =>
+    {
+        var url = await Auth.BeginAsync(lifetime.Token);
+        Navigation.NavigateTo(url, forceLoad: true);
+    });
+
+    private Task RefreshAsync() => Run(async () =>
+    {
+        await Auth.RefreshAsync(lifetime.Token);
+        await LoadAsync();
+        Say("Tokenul a fost reînnoit.");
+    });
+
+    private async Task DisconnectAsync(string reason)
+    {
+        disconnectError = null;
+        try
+        {
+            await Auth.DisconnectAsync(reason, lifetime.Token);
+            disconnecting = false;
+            await LoadAsync();
+            Say("Autentificarea a fost deconectată.");
+        }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (Exception ex) when (ex is AnafException or AccessDeniedException) { disconnectError = ex.Message; }
+    }
+
+    public void Dispose()
+    {
+        lifetime.Cancel();
+        lifetime.Dispose();
+    }
+}

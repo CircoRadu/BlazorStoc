@@ -34,7 +34,7 @@ public partial class ProductMovements
     private int? beneficiaryFilter, vehicleFilter;
 
     private static readonly ExitDestination[] FilterDestinations =
-        [ExitDestination.Beneficiary, ExitDestination.Vehicle, ExitDestination.GenericSale, ExitDestination.StockCorrection, ExitDestination.WarehouseReturn];
+        [ExitDestination.Beneficiary, ExitDestination.Vehicle, ExitDestination.GenericSale, ExitDestination.StockCorrection, ExitDestination.OtherReason, ExitDestination.WarehouseReturn];
 
     private DuplicateExitWarningException? exitWarning;
     private ReservationWarningException? reservationWarning;
@@ -54,6 +54,13 @@ public partial class ProductMovements
     private bool linkDetach;
     private bool useProject;
     private IReadOnlyList<Beneficiary> beneficiaries = Array.Empty<Beneficiary>();
+
+    // New beneficiaries taken from ActivityApp (button "Preia din ActivityApp" of the exit form): the list of the choice is loaded again.
+    private async Task ReloadBeneficiariesAsync()
+    {
+        try { beneficiaries = (await Beneficiaries.GetBeneficiariesAsync(lifetime.Token)).OrderBy(b => b.Name, StringComparer.CurrentCultureIgnoreCase).ToArray(); } catch (Exception) { }
+        await InvokeAsync(StateHasChanged);
+    }
     private IReadOnlyList<Vehicle> vehicles = Array.Empty<Vehicle>();
     private IReadOnlyList<VehicleStock> vehicleStocks = Array.Empty<VehicleStock>();
     private bool vehiclesLoaded;
@@ -67,7 +74,6 @@ public partial class ProductMovements
     private StockMovement? editing, deleting, historyFor, voiding;
     private string voidReason = "", voidError = "";
     private bool voidBusy;
-    private IReadOnlyList<ReturnableExit> returnables = [];
     private StockMovementInput editForm = new();
     private bool editUseProject;
 

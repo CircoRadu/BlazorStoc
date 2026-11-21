@@ -30,5 +30,17 @@ public static partial class MariaExtendedChecks
             "Inventory: each leaf is titled with its path, in the order of the tree");
         var onlyOne = await builder.BuildAsync(new InventoryRequest([new InventorySelectionItem(category, second.Subcategory)], false));
         Check(onlyOne.Categories.Single().Subcategories.Single().Lines.Single().Code == $"INV2-{suffix}", "Inventory: a selected leaf reports just its products");
+
+        // The categories of the report follow the order of the Stoc menu (the tree), not the alphabet: the category made first stands first although its name sorts last.
+        var late = $"Ext Zeta Cat {suffix}";
+        var early = $"Ext Alfa Cat {suffix}";
+        await products.CreateCategoryAsync(late);
+        await products.CreateCategoryAsync(early);
+        var lateLeaf = await products.CreateSubcategoryAsync(late, $"Ext Ord frunza Z {suffix}");
+        var earlyLeaf = await products.CreateSubcategoryAsync(early, $"Ext Ord frunza A {suffix}");
+        await products.CreateAsync(new ProductInput { Name = $"ORDZ-{suffix}", Category = late, Subcategory = lateLeaf.Subcategory });
+        await products.CreateAsync(new ProductInput { Name = $"ORDA-{suffix}", Category = early, Subcategory = earlyLeaf.Subcategory });
+        var ordered = await builder.BuildAsync(new InventoryRequest([new InventorySelectionItem(early, earlyLeaf.Subcategory), new InventorySelectionItem(late, lateLeaf.Subcategory)], false));
+        Check(ordered.Categories.Select(item => item.Category).SequenceEqual([late, early]), "Inventory: the categories follow the order of the Stoc menu, not the alphabet");
     }
 }

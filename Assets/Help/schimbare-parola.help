@@ -6,9 +6,12 @@ Fereastra îți schimbă parola propriului cont. O deschizi din numele tău din 
 ## Elemente
 ### Formular
 - Parola actuală | câmp | Parola cu care te autentifici acum; fără ea parola nu se schimbă. După mai multe încercări greșite schimbarea se blochează temporar.
-- Parola nouă | câmp | Minimum 8 caractere, diferită de cea actuală.
+- Parola nouă | câmp | Respectă politica de parolă (8 caractere, literă mică, literă mare, cifră și caracter special), diferită de cea actuală.
 - Repetă parola nouă | câmp | Trebuie să fie identică cu parola nouă.
 - Schimbă parola | buton | Salvează parola nouă; în Jurnal apare „Schimbare parolă proprie” (parola nu se înregistrează).
+### Parola nouă
+- Condițiile parolei | text | 8 caractere, literă mică, literă mare, cifră și caracter special; fiecare condiție devine verde sau roșie pe măsură ce tastezi, iar coincidența cu repetarea se verifică.
+- Arată parola | comutator | Afișează parolele tastate. Câmpurile „Parola nouă” și „Repetă parola” sunt alăturate.
 
 ## Flux: Cum îmi schimb parola
 1. Apasă numele tău în partea de sus a paginii.
@@ -16,3 +19,4 @@ Fereastra îți schimbă parola propriului cont. O deschizi din numele tău din 
 3. Scrie parola actuală, apoi parola nouă de două ori.
 4. Apasă „Schimbă parola”. Folosești parola nouă la următoarea autentificare; sesiunea de acum rămâne deschisă.
 Nota: parola administratorului din configurare nu se schimbă de aici, ci din fișierul de configurare al aplicației.
+Nota: Numele utilizatorului din bara de sus deschide meniul: Autentificatorul meu, Schimbă parola, Deconectare.

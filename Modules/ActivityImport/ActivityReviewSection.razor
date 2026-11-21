@@ -13,9 +13,11 @@
     <div class="catalog-body">
         <p class="muted"><small>Toate tichetele rezolvate din ActivityApp (service și mentenanță) așteaptă aici; niciunul nu se înregistrează singur. Fiecare este propus ca <strong>mentenanță</strong> (tip de mentenanță sau cuvânt cheie în ce s-a făcut, chiar dacă punctul nu are încă un contract) sau ca <strong>service</strong>. Alege: <strong>ochiul</strong> = vizualizare, <strong>creionul</strong> = modifici și preiei, <strong>bifa</strong> = preiei așa cum este propus, <strong>coșul</strong> = discard (tichetul nu se mai preia).</small></p>
         @if (notice is not null) { <div class="notice" role="status">@notice</div> }
+        @if (outcomes.Pending > 0) { <div class="notice" role="status" id="ai-outcomes-pending">@outcomes.Pending tichete decise așteaptă înregistrarea în Mentenanță (modulul este oprit sau încă nu a ajuns la ele); intervențiile și scadențele se actualizează când pornește.</div> }
+        @if (outcomes.Failed > 0) { <div class="error-banner" role="alert" id="ai-outcomes-failed">@outcomes.Failed tichete decise au fost refuzate de registrul de mentenanță la înregistrare (de exemplu data sau punctul de lucru nu mai sunt valide).</div> }
         @if (error is not null && popup == Popup.None) { <div class="error-banner" role="alert">@error</div> }
         @if (items is null) { <p class="muted" role="status">Se citește lista…</p> }
-        else if (items.Count == 0) { <p class="muted" id="ai-review-empty">Nu sunt evenimente de validat.</p> }
+        else if (items.Count == 0) { <div class="empty-state" id="ai-review-empty"><span class="empty-icon">✓</span><h3>Niciun tichet de validat</h3><p>Aici apar tichetele rezolvate din ActivityApp care așteaptă validarea ta înainte să intre în Mentenanță.</p></div> }
     </div>
     @if (items is { Count: > 0 })
     {
@@ -47,31 +49,33 @@
 
 @if (popup == Popup.View && detail is { } view)
 {
-    <div class="delete-overlay" @onkeydown="PopupKey">
-        <div class="delete-dialog template-popup review-popup" role="dialog" aria-modal="true" tabindex="-1" aria-labelledby="review-view-title">
-            <div class="catalog-heading"><h2 id="review-view-title">Tichet @view.Item.TicketNumber @view.Item.Title</h2><span class="heading-actions"><button type="button" class="danger" @onclick="ClosePopup">Închide</button></span></div>
+    <AppDialog PanelClass="template-popup review-popup" OnKeyDown="PopupKey" LabelledBy="review-view-title" OnClose="ClosePopup">
+            <div class="catalog-heading"><h2 id="review-view-title">Tichet @view.Item.TicketNumber @view.Item.Title</h2><span class="heading-actions"><button type="button" class="danger" @onclick="ClosePopup" data-head-close>Închide</button></span></div>
             @if (error is not null) { <div class="error-banner" role="alert">@error</div> }
             <dl class="review-facts">
                 <dt>Beneficiar</dt><dd>@view.Item.Beneficiary</dd>
                 <dt>Punct de lucru</dt><dd>@view.Item.WorkPoint</dd>
                 <dt>Data efectuării</dt><dd>@StockMovementRules.DisplayDate(view.Item.PerformedOn)</dd>
                 <dt>Propus ca</dt><dd>@CategoryText(view.Item) · @Why(view.Item)</dd>
+                @if (view.Source.Number.Length > 0) { <dt>Numărul tichetului</dt><dd>@view.Source.Number</dd> }
+                @if (view.Source.TicketId > 0) { <dt>ID ticket</dt><dd>@view.Source.TicketId</dd> }
+                @if (view.Source.EventId > 0) { <dt>ID eveniment</dt><dd>@view.Source.EventId</dd> }
+                @if (view.Source.Finished is { } finished) { <dt>Data finalizării evenimentului</dt><dd>@finished.ToString("dd.MM.yyyy HH:mm")</dd> }
                 <TicketInfoRows ShowEmpty Problem="@view.Source.Problem" Resolution="@view.Source.Resolution" Report="@view.Source.Report" Executor="@view.Source.Executor" Extras="@view.Source.Extras" />
+                <dt>Observațiile intervenției</dt><dd class="review-text" id="review-view-notes">@NotesMarkup.Html(view.Proposed == ReviewCategory.Service ? view.NotesService : view.NotesMaintenance)</dd>
             </dl>
             <div class="editor-actions">
                 <button type="button" class="primary" disabled="@busy" @onclick="() => TakeAsProposedAsync(view.Item)">Preia ca @CategoryText(view.Item).ToLowerInvariant()</button>
                 <button type="button" class="refresh act-edit" disabled="@busy" @onclick="() => OpenEditAsync(view.Item)">Modifică și preia</button>
                 <button type="button" class="danger" disabled="@busy" @onclick="() => OpenDiscard(view.Item)">Discard</button>
             </div>
-        </div>
-    </div>
+    </AppDialog>
 }
 
 @if (popup == Popup.Edit && detail is { } edit)
 {
-    <div class="delete-overlay" @onkeydown="PopupKey">
-        <div class="delete-dialog template-popup review-popup" role="dialog" aria-modal="true" tabindex="-1" aria-labelledby="review-edit-title">
-            <div class="catalog-heading"><h2 id="review-edit-title">Modifică și preia tichetul @edit.Item.TicketNumber</h2><span class="heading-actions"><button type="button" class="danger" disabled="@busy" @onclick="ClosePopup">Închide</button></span></div>
+    <AppDialog PanelClass="template-popup review-popup" OnKeyDown="PopupKey" LabelledBy="review-edit-title" OnClose="ClosePopup">
+            <div class="catalog-heading"><h2 id="review-edit-title">Modifică și preia tichetul @edit.Item.TicketNumber</h2><span class="heading-actions"><button type="button" class="danger" disabled="@busy" @onclick="ClosePopup" data-head-close>Închide</button></span></div>
             @if (error is not null) { <div class="error-banner" role="alert">@error</div> }
             <p class="muted"><small>@edit.Item.Title · @edit.Item.Beneficiary. Se înregistrează intervenția cu ce alegi aici; tichetul din ActivityApp nu se schimbă.</small></p>
             <fieldset disabled="@busy">
@@ -108,14 +112,12 @@
                 <button type="button" class="primary" disabled="@(busy || performedOn is null)" @onclick="SaveEditAsync">@(busy ? "Se salvează…" : "Preia")</button>
                 <button type="button" class="danger" disabled="@busy" @onclick="ClosePopup">Anulează</button>
             </div>
-        </div>
-    </div>
+    </AppDialog>
 }
 
 @if (popup == Popup.Discard && target is { } doomed)
 {
-    <div class="delete-overlay" @onkeydown="PopupKey">
-        <section class="delete-dialog" role="alertdialog" aria-modal="true" tabindex="-1" aria-labelledby="review-discard-title">
+    <AppDialog OnKeyDown="PopupKey" Alert="true" LabelledBy="review-discard-title" OnClose="ClosePopup">
             <h2 id="review-discard-title">Discard tichet? – @doomed.TicketNumber @doomed.Title</h2>
             <p>Tichetul nu se mai preia din ActivityApp (poate fi reactivat din lista tichetelor discardate din Setări).@(doomed.InRegister ? " Intervenția deja înregistrată pentru el se șterge." : "")</p>
             @if (error is not null) { <div class="error-banner" role="alert">@error</div> }
@@ -123,8 +125,7 @@
                 <button type="button" class="danger" disabled="@busy" @onclick="DiscardAsync">@(busy ? "Se salvează…" : "Discard")</button>
                 <button type="button" class="refresh act-close" disabled="@busy" @onclick="ClosePopup">Anulează</button>
             </div>
-        </section>
-    </div>
+    </AppDialog>
 }
 
 @code {
@@ -134,6 +135,7 @@
     [Parameter] public EventCallback Decided { get; set; }
     private static readonly string MinDate = StockMovementRules.StorageDate(StockMovementRules.EarliestDate);
     private IReadOnlyList<ActivityReviewItem>? items;
+    private TicketOutcomeCounts outcomes = new(0, 0);
     private Popup popup;
     private ActivityReviewItem? target;
     private ActivityReviewDetail? detail;
@@ -160,7 +162,7 @@
     {
         busy = true;
         error = null;
-        try { items = await Reviews.GetPendingAsync(lifetime.Token); }
+        try { items = await Reviews.GetPendingAsync(lifetime.Token); outcomes = await Reviews.GetOutcomeCountsAsync(lifetime.Token); }
         catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
         catch (ModuleUnavailableException) { items = []; error = "Modulul de preluare ActivityApp este oprit."; }
         catch (AccessDeniedException exception) { items = []; error = exception.Message; }

@@ -83,10 +83,10 @@ public sealed class InvoiceAnalysisStore(TimeProvider clock) : IInvoiceAnalysisS
 
 public interface IInvoiceAnalysisService
 {
-    Task<InvoiceAnalysisSession> AnalyzeAsync(Stream pdf, string fileName, CancellationToken cancellationToken = default);
+    Task<InvoiceAnalysisSession> AnalyzeAsync(Stream pdf, string fileName, CancellationToken cancellationToken = default, IProgress<int>? progress = null);
     // Reads the file (words, page pictures) WITHOUT analysing it: nothing is proposed, the session's analysis is empty. Used to edit a saved
     // template on its model; the analysis is run only when the user asks for it (Analyze).
-    Task<InvoiceAnalysisSession> OpenAsync(Stream pdf, string fileName, CancellationToken cancellationToken = default);
+    Task<InvoiceAnalysisSession> OpenAsync(Stream pdf, string fileName, CancellationToken cancellationToken = default, IProgress<int>? progress = null);
     // Runs the analysis of an opened file (on the user's request).
     InvoiceAnalysisSession Analyze(Guid id);
     InvoiceAnalysisSession? Get(Guid id);
@@ -100,23 +100,23 @@ public sealed class InvoiceAnalysisService(IInvoicePdfReader reader, IInvoiceAna
 {
     private string? owner;
 
-    public async Task<InvoiceAnalysisSession> AnalyzeAsync(Stream pdf, string fileName, CancellationToken cancellationToken = default)
+    public async Task<InvoiceAnalysisSession> AnalyzeAsync(Stream pdf, string fileName, CancellationToken cancellationToken = default, IProgress<int>? progress = null)
     {
         // Settings -> Facturi and Produse -> Preluare factura read files (any product operator); creating and changing templates is also open to every product operator, only deleting one is reserved for the administrator.
         await access.EnsureModuleAsync("preluare-factura", cancellationToken).ConfigureAwait(false);
         owner = await access.GetUsernameAsync(cancellationToken).ConfigureAwait(false) ?? "necunoscut";
-        var read = await reader.ReadAsync(pdf, cancellationToken).ConfigureAwait(false);
+        var read = await reader.ReadAsync(pdf, cancellationToken, progress).ConfigureAwait(false);
         // The numbers of the table that the OCR did not read as numbers are read again, cell by cell, once the table is known.
         if (reader is IInvoiceNumberRereader rereader) read = await rereader.RereadNumbersAsync(read, cancellationToken).ConfigureAwait(false);
         var analysis = InvoiceAnalyzer.Analyze(read.Document);
         return store.Add(owner, fileName, read, analysis);
     }
 
-    public async Task<InvoiceAnalysisSession> OpenAsync(Stream pdf, string fileName, CancellationToken cancellationToken = default)
+    public async Task<InvoiceAnalysisSession> OpenAsync(Stream pdf, string fileName, CancellationToken cancellationToken = default, IProgress<int>? progress = null)
     {
         await access.EnsureModuleAsync("preluare-factura", cancellationToken).ConfigureAwait(false);
         owner = await access.GetUsernameAsync(cancellationToken).ConfigureAwait(false) ?? "necunoscut";
-        var read = await reader.ReadAsync(pdf, cancellationToken).ConfigureAwait(false);
+        var read = await reader.ReadAsync(pdf, cancellationToken, progress).ConfigureAwait(false);
         return store.Add(owner, fileName, read, new InvoiceAnalysis(read.Document.Pages, [], null, []));
     }
 

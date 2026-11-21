@@ -39,12 +39,35 @@ public sealed class MariaElcomturBalanceRepository(IConfiguration configuration,
         return new ElcomturImportInfo(DateOnly.FromDateTime(reader.GetDateTime(0)), reader.GetString(1), MariaTimeText.Parse(reader.GetString(2)), reader.GetString(3), (int)reader.GetInt64(4));
     }
 
+    public async Task<IReadOnlyList<ElcomturBalancePoint>> GetHistoryAsync(DateOnly from, CancellationToken cancellationToken = default)
+    {
+        if (accessControl is not null) await accessControl.EnsureAsync(ViewKey, cancellationToken).ConfigureAwait(false);
+        await using var connection = await MariaDb.OpenAsync(configuration, cancellationToken).ConfigureAwait(false);
+        await using var command = Command(connection, "SELECT data_date, total, owed_count, imported_utc FROM elcomtur_balance_history WHERE data_date >= @from ORDER BY data_date, id", ("@from", from.ToString("yyyy-MM-dd")));
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
+        var result = new List<ElcomturBalancePoint>();
+        while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
+            result.Add(new ElcomturBalancePoint(DateOnly.FromDateTime(reader.GetDateTime(0)), reader.GetDecimal(1), reader.GetInt32(2), MariaTimeText.Parse(reader.GetString(3))));
+        return result;
+    }
+
     public async Task ReplaceAsync(string firm, DateOnly dataDate, IReadOnlyList<BeneficiaryBalance> balances, CancellationToken cancellationToken = default)
     {
         if (accessControl is not null) await accessControl.EnsureAsync("elcomtur.import", cancellationToken).ConfigureAwait(false);
         var actor = accessControl is null ? "sistem" : (await RepositoryAudit.ActorAsync(accessControl, cancellationToken).ConfigureAwait(false)).Username;
         await WriteAsync(configuration, async (connection, transaction) =>
         {
+            // PROP-0036: the balances that are about to be replaced are noted once in the history when it is still empty (the first import after the history was introduced), then the total of the new import is noted.
+            await using (var seed = Command(connection, transaction, """
+                INSERT INTO elcomtur_balance_history(data_date,firm,total,owed_count,imported_utc,imported_by)
+                SELECT MAX(data_date), MAX(firm), COALESCE(SUM(CASE WHEN balance > 0.004 THEN balance ELSE 0 END),0), COALESCE(SUM(balance > 0.004),0), MAX(imported_utc), MAX(imported_by)
+                FROM elcomtur_balances HAVING COUNT(*) > 0 AND (SELECT COUNT(*) FROM elcomtur_balance_history) = 0
+                """)) await seed.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
+            await using (var same = Command(connection, transaction, "DELETE FROM elcomtur_balance_history WHERE data_date=@date AND firm=@firm", ("@date", dataDate.ToString("yyyy-MM-dd")), ("@firm", firm))) await same.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
+            await using (var note = Command(connection, transaction, """
+                INSERT INTO elcomtur_balance_history(data_date,firm,total,owed_count,imported_utc,imported_by) VALUES(@date,@firm,@total,@count,@now,@by)
+                """, ("@date", dataDate.ToString("yyyy-MM-dd")), ("@firm", firm), ("@total", balances.Where(item => item.IsOwed).Sum(item => item.Balance)), ("@count", balances.Count(item => item.IsOwed)),
+                ("@now", MariaTimeText.Format(DateTime.UtcNow)), ("@by", actor))) await note.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
             await using (var clear = Command(connection, transaction, "DELETE FROM elcomtur_invoices")) await clear.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
             await using (var clear = Command(connection, transaction, "DELETE FROM elcomtur_balances")) await clear.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
             var now = MariaTimeText.Format(DateTime.UtcNow);

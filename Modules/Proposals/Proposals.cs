@@ -71,11 +71,17 @@ public interface IProposalService
     Task<ProposalFileContent?> GetFileContentAsync(int fileId, CancellationToken cancellationToken = default);
     /// <summary>Administrator (setari-propuneri.edit). A note, when given, is added to the thread.</summary>
     Task<Proposal> ChangeStateAsync(int proposalId, string state, string implementedVersion, string note, CancellationToken cancellationToken = default);
+    /// <summary>Administrator (setari-propuneri.edit): corrects the title, the description and the reason of a proposal and adds more pictures (the ones already there stay). Journaled as its own action.</summary>
+    Task<Proposal> UpdateContentAsync(int proposalId, string title, string description, string benefit, IReadOnlyList<ReportImage> addedImages, CancellationToken cancellationToken = default);
     Task DeleteAsync(int proposalId, CancellationToken cancellationToken = default);
+    /// <summary>Administrator (setari-propuneri.edit): deletes every closed proposal (Implementată, Amânată, Respinsă) with answers and pictures; returns how many. One journal line.</summary>
+    Task<int> DeleteClosedAsync(CancellationToken cancellationToken = default);
     /// <summary>Administrator (setari-propuneri.export): the proposals as a ZIP (a folder for each, an index.csv when there are several).</summary>
     Task<ProposalExportResult> ExportAsync(IReadOnlyList<int> proposalIds, CancellationToken cancellationToken = default);
     /// <summary>The author opens one's own proposal: what changed on it is no longer announced.</summary>
     Task MarkSeenAsync(int proposalId, CancellationToken cancellationToken = default);
     /// <summary>The alerts of the signed-in user (the tab "Propuneri" of Notificari): new proposals for the administrator, changes and answers on one's own proposals for the author.</summary>
     Task<IReadOnlyList<ProposalAlert>> GetAlertsAsync(CancellationToken cancellationToken = default);
+    /// <summary>How many proposals are not closed (the badge of the tab Propuneri of Setari -> Dezvoltare); 0 without the right to see the proposals of everybody.</summary>
+    Task<int> CountOpenAsync(CancellationToken cancellationToken = default) => Task.FromResult(0);
 }

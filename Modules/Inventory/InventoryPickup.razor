@@ -9,6 +9,7 @@
 @inject IInventoryPickupOcrService OcrService
 @inject IInventoryPickupBuilder PickupBuilder
 @inject IInventoryPickupApplier PickupApplier
+@inject IOcrLearningService OcrLearning
 @inject IDatabaseBackupService BackupService
 @inject IAccessControl Access
 @inject IJSRuntime JS
@@ -21,6 +22,7 @@
     <div><p class="eyebrow">SITUAȚIE DE STOC</p><h1>Preluare inventar</h1>
         <p class="muted">Încarcă formularul de service scanat, cu valorile reale completate de mână, pentru a compara stocul numărat fizic cu stocul curent.</p></div>
     <div class="heading-actions">
+        <a class="refresh act-nav" href="/inventar/invatare-ocr">Învățare OCR</a>
         @if (lastPdfBytes is not null)
         {
             <button type="button" class="refresh act-nav" @onclick="ReopenPdfViewerAsync">Redeschide formularul PDF</button>
@@ -45,7 +47,9 @@
 }
 else if (scanning)
 {
-    <div class="empty-state" role="status"><div class="spinner"></div><h3>Se citește fișierul…</h3><p>OCR-ul poate dura câteva secunde pentru un formular cu multe pagini.</p></div>
+    <div class="empty-state" role="status"><div class="spinner"></div><h3>Se citește fișierul… <span id="pickup-scan-percent" class="scan-percent">@scanPercent%</span></h3>
+        <div class="scan-progress" role="progressbar" aria-label="Progresul analizei scanării" aria-valuemin="0" aria-valuemax="100" aria-valuenow="@scanPercent"><span style="@($"width:{scanPercent}%")"></span></div>
+        <p>OCR-ul poate dura câteva secunde pentru un formular cu multe pagini.</p></div>
 }
 else if (loadError is null && review is null)
 {
@@ -73,8 +77,7 @@ else if (review is not null)
             {
                 <section class="catalog inventory-category-card">
                     <div class="catalog-heading"><span class="category-title">@category</span></div>
-                    @foreach (var group in GroupedLines.Where(entry => string.Equals(entry.Category, category, StringComparison.OrdinalIgnoreCase))
-                                  .OrderBy(entry => entry.Subcategory, StringComparer.CurrentCultureIgnoreCase))
+                    @foreach (var group in GroupedLines.Where(entry => string.Equals(entry.Category, category, StringComparison.OrdinalIgnoreCase)))
                     {
                         <div class="category-management-content">
                             <h4>@group.Subcategory</h4>
@@ -93,6 +96,7 @@ else if (review is not null)
                                                 <td>
                                                     @line.ProductName
                                                     @if (line.Uncertain) { <span class="uncertain-badge" title="Citire OCR nesigura - verifica valoarea">⚠ de verificat</span> }
+                                                    @if (line.LearnedNote is not null) { <span class="uncertain-badge learned-badge" title="@($"Valoarea a fost corectată din învățarea OCR ({line.LearnedNote}); verifică-o")">↻ din învățare @line.LearnedNote</span> }
                                                 </td>
                                                 <td>@line.CurrentStock</td>
                                                 <td>
@@ -137,9 +141,7 @@ else if (review is not null)
 
 @if (showSendPopup)
 {
-    <div class="delete-overlay" @onkeydown="PopupKeyDownAsync">
-        <section class="delete-dialog" role="dialog" aria-modal="true" tabindex="-1" @ref="popupDialog" aria-labelledby="pickup-popup-title">
-            <div class="dialog-head"><h2 id="pickup-popup-title">Confirmă modificările de stoc</h2><HelpButton Topic="inventar-preluare" About="Confirmarea modificărilor de stoc" /></div>
+    <AppDialog Title="Confirmă modificările de stoc" TitleId="pickup-popup-title" HelpTopic="inventar-preluare" HelpAbout="Confirmarea modificărilor de stoc" OnKeyDown="PopupKeyDownAsync" OnClose="CloseSendPopup">
             <p>Următoarele modificări vor fi operate în stoc:</p>
             <div class="table-scroll">
                 <table class="save-summary">
@@ -170,34 +172,32 @@ else if (review is not null)
                 <button type="button" class="primary" disabled="@sending" @onclick="ConfirmSendAsync">@(sending ? "Se trimite…" : "Confirmă")</button>
                 <button type="button" class="danger" disabled="@sending" @onclick="CloseSendPopup">Anulează</button>
             </div>
-        </section>
-    </div>
+    </AppDialog>
 }
 
 @if (pendingFile is not null)
 {
-    <div class="delete-overlay" @onkeydown="ReplaceKeyDownAsync">
-        <section class="delete-dialog" role="dialog" aria-modal="true" tabindex="-1" @ref="replaceDialog" aria-labelledby="pickup-replace-title">
+    <AppDialog OnKeyDown="ReplaceKeyDownAsync" LabelledBy="pickup-replace-title" OnClose="CancelReplace">
             <h2 id="pickup-replace-title">Înlocuiești lista curentă?</h2>
             <p>Ai produse bifate care nu au fost trimise. Încărcarea noului fișier șterge selecția curentă fără să modifice stocul.</p>
             <div class="editor-actions">
                 <button type="button" class="primary" @onclick="ConfirmReplaceAsync">Continuă</button>
                 <button type="button" class="danger" @onclick="CancelReplace">Anulează</button>
             </div>
-        </section>
-    </div>
+    </AppDialog>
 }
 
 </PageBoundary>
 
 @code {
     private bool loading = true, scanning, sending;
+    // The share of the analysis of the scan that is done (percent), shown while the file is read (PROP-0033).
+    private int scanPercent;
     private string? loadError, error, notice, sendError, backupProgress, pdfWindowNotice;
     private InventoryPickupReview? review;
     private readonly HashSet<int> selectedProductIds = [];
     private readonly Dictionary<int, int?> editedValues = [];
     private bool showSendPopup;
-    private ElementReference popupDialog, replaceDialog;
     private IBrowserFile? pendingFile;
     private byte[]? lastPdfBytes;
     private string? lastPdfName;
@@ -212,9 +212,7 @@ else if (review is not null)
 
     private IEnumerable<LineGroup> SelectedGroupedForPopup => GroupedLines
         .Select(group => new LineGroup(group.Category, group.Subcategory, group.Lines.Where(IsSelected).ToList()))
-        .Where(group => group.Lines.Count > 0)
-        .OrderBy(group => group.Category, StringComparer.CurrentCultureIgnoreCase)
-        .ThenBy(group => group.Subcategory, StringComparer.CurrentCultureIgnoreCase);
+        .Where(group => group.Lines.Count > 0);
 
     private bool HasSelection => selectedProductIds.Count > 0;
     private bool AllSelected => review is not null && review.Lines.Count > 0 && review.Lines.All(IsSelected);
@@ -292,6 +290,7 @@ else if (review is not null)
         if (file.Size > InventoryPickupOcrRules.MaxFileSizeBytes) { error = InventoryPickupOcrRules.TooLargeMessage; return; }
 
         scanning = true;
+        scanPercent = 0;
         try
         {
             byte[] bytes;
@@ -307,8 +306,9 @@ else if (review is not null)
             await OpenPdfViewerAsync(bytes, file.Name);
 
             using var scanStream = new MemoryStream(bytes, writable: false);
-            var scanResult = await OcrService.ScanAsync(scanStream, lifetime.Token);
-            review = await PickupBuilder.BuildAsync(scanResult.Rows, lifetime.Token);
+            var scanProgress = new Progress<int>(value => { scanPercent = value; _ = InvokeAsync(StateHasChanged); });
+            var scanResult = await OcrService.ScanAsync(scanStream, lifetime.Token, scanProgress);
+            review = await PickupBuilder.BuildAsync(await CalibratedRowsAsync(scanResult.Rows), lifetime.Token);
             if (review.Lines.Count == 0 && review.NotFound.Count == 0) notice = "Fișierul a fost citit. Nu au fost gasite diferente de stoc.";
         }
         catch (InventoryPickupOcrException exception) { error = exception.Message; }
@@ -376,12 +376,14 @@ else if (review is not null)
             var selectedLines = review.Lines.Where(IsSelected)
                 .Select(line => line with { RecognizedValue = EditedValue(line) }).ToList();
             var result = await PickupApplier.ApplyAsync(selectedLines, lifetime.Token);
+            var learningNotice = await SaveOcrCorrectionsAsync(selectedLines, result);
             showSendPopup = false;
             selectedProductIds.Clear();
             review = review with { Lines = review.Lines.Where(line => !result.Applied.Any(applied => applied.ProductId == line.ProductId)).ToList() };
             notice = result.Failed.Count == 0
                 ? $"{result.Applied.Count} {(result.Applied.Count == 1 ? "produs a fost actualizat" : "produse au fost actualizate")} în stoc."
                 : $"{InventoryPickupRules.PartialFailureMessage} Reușite: {result.Applied.Count}. Eșuate: {string.Join(", ", result.Failed.Select(failed => failed.ProductName))}.";
+            if (learningNotice is not null) notice += " " + learningNotice;
         }
         catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
         catch (Exception exception)
@@ -390,6 +392,41 @@ else if (review is not null)
             sendError = "Modificările nu au putut fi trimise.";
         }
         finally { sending = false; backupProgress = null; }
+    }
+
+    // Stage 4 of the OCR learning: the rows read from the scan are calibrated with what the administrator marked as learned (an unsure digit is replaced by the one the user usually put in its place).
+    // A failure to read the learning never stops the take-over: the rows are used as the OCR read them.
+    private async Task<IReadOnlyList<InventoryPickupScanRow>> CalibratedRowsAsync(IReadOnlyList<InventoryPickupScanRow> rows)
+    {
+        try { return OcrCalibrationRules.Apply(rows, await OcrLearning.GetCalibrationAsync(lifetime.Token)); }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { throw; }
+        catch (Exception exception)
+        {
+            Logger.LogError("Reading the OCR learning failed ({ErrorType}).", exception.GetType().Name);
+            return rows;
+        }
+    }
+
+    // What the user corrected in the lines just sent (the value read by the OCR against the value sent) is saved for the OCR learning list (Inventar -> Învățare OCR). It never blocks the take-over:
+    // the stock is already updated, so a failure here only adds a note to the confirmation. Returns that note (null when all went well).
+    private async Task<string?> SaveOcrCorrectionsAsync(IReadOnlyList<InventoryPickupLine> sentLines, InventoryPickupApplyResult result)
+    {
+        try
+        {
+            var failedNames = result.Failed.Select(failed => failed.ProductName).ToHashSet(StringComparer.Ordinal);
+            var corrections = sentLines
+                .Where(line => line.RecognizedValue is not null && !failedNames.Contains(line.ProductName ?? line.RawCode))
+                .Select(line => new OcrCorrectionLine(line.Page, line.RawCode, line.OriginalValue, line.RecognizedValue!.Value, line.Digits, line.CellPng, line.CellWidth, line.CellHeight))
+                .ToList();
+            await OcrLearning.SaveCorrectionsAsync(lastPdfName ?? "", corrections, lifetime.Token);
+            return null;
+        }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { return null; }
+        catch (Exception exception)
+        {
+            Logger.LogError("Saving the OCR corrections failed ({ErrorType}).", exception.GetType().Name);
+            return OcrLearningRules.SaveFailedNotice;
+        }
     }
 
     public async ValueTask DisposeAsync()

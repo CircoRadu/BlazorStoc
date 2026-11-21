@@ -23,7 +23,8 @@ public static class ActivityImportPanelChecks
         public Task SaveTypesAsync(IReadOnlyList<ActivityTypeChoice> choices, CancellationToken cancellationToken = default) => Task.CompletedTask;
         public Task<ActivityConnection?> GetConnectionAsync(CancellationToken cancellationToken = default) => Task.FromResult<ActivityConnection?>(null);
         public Dictionary<string, string>? SavedMap;
-        public ActivityFieldMap Map = ActivityFieldMap.Empty;
+        // Settings saved with the number chosen (BUG-0023); a test of the unchosen number sets ActivityFieldMap.Empty.
+        public ActivityFieldMap Map = ActivityFieldMap.Create(new Dictionary<string, string>(), null, null, null, null, true, out _)!;
         public ActivityFieldMap? SavedSettings;
         public Task<ActivityFieldMap> GetFieldMapAsync(CancellationToken cancellationToken = default) => Task.FromResult(Map);
         public Task<ActivityFieldMapView> GetFieldChoicesAsync(bool readSource, CancellationToken cancellationToken = default) =>
@@ -222,6 +223,8 @@ public static class ActivityImportPanelChecks
         cut.WaitForAssertion(() => { if (cut.FindAll("#review-view-title").Count == 0) throw new Exception("pending"); }, TimeSpan.FromSeconds(5));
         check(cut.Find("[role=dialog]").TextContent.Contains("Raportul original", StringComparison.Ordinal) && cut.Find("[role=dialog]").TextContent.Contains("Ion Popescu", StringComparison.Ordinal) && cut.Find("[role=dialog]").TextContent.Contains("Nu merge centrala", StringComparison.Ordinal),
             "Activity import panel: a ticket is viewed in a popup with the problem, the resolution, the report and the executor");
+        check(cut.FindAll("#review-view-notes").Count == 1 && cut.Find("[role=dialog]").TextContent.Contains("Observațiile intervenției", StringComparison.Ordinal),
+            "Activity import panel: the view of a ticket to validate also shows the notes the intervention would get");
         cut.FindAll("[role=dialog] button").Single(button => button.TextContent.Trim() == "Modifică și preia").Click();
         cut.WaitForAssertion(() => { if (cut.FindAll("#review-edit-title").Count == 0) throw new Exception("pending"); }, TimeSpan.FromSeconds(5));
         cut.Find("#review-point").Change("51");
@@ -238,7 +241,8 @@ public static class ActivityImportPanelChecks
         cut.FindAll("[role=alertdialog] button").Single(button => button.TextContent.Trim() == "Discard").Click();
         cut.WaitForAssertion(() => { if (cut.FindAll("#ai-review-empty").Count == 0) throw new Exception("pending"); }, TimeSpan.FromSeconds(5));
         check(reviewService.Decisions.Last() == (4L, ReviewDecision.Discard) && cut.Markup.Contains("a fost discardat", StringComparison.Ordinal), "Activity import panel: after the confirmation the ticket is discarded and the list is empty");
-        cut.FindAll("button").Single(button => button.TextContent.Trim() == "Arată tichetele discardate").Click();
+        check(cut.Find("#activity-discarded details[data-collapsible-section]").GetAttribute("data-expanded") == "false", "Activity import panel: the list of discarded tickets is a container closed when the page opens (PROP-0018)");
+        cut.FindAll("#activity-discarded button").Single(button => button.TextContent.Trim() == "Actualizează lista").Click();
         cut.WaitForAssertion(() => { if (cut.FindAll("#ai-discarded tbody tr").Count == 0) throw new Exception("pending"); }, TimeSpan.FromSeconds(5));
         cut.Find("#ai-discarded button[aria-label^='Vizualizează tichetul T-80']").Click();
         cut.WaitForAssertion(() => { if (cut.FindAll("#discarded-view-title").Count == 0) throw new Exception("pending"); }, TimeSpan.FromSeconds(5));
@@ -274,7 +278,7 @@ public static class ActivityImportPanelChecks
         // Title and number are always taken (no switch); the other four have a switch, and the destination can be chosen.
         check(cut.FindAll("#ai-fields input[role=switch]").Count == 4 && cut.Find("#ai-fields tbody tr:nth-child(1)").TextContent.Contains("Mereu", StringComparison.Ordinal) && cut.Find("#ai-fields tbody tr:nth-child(2)").TextContent.Contains("Mereu", StringComparison.Ordinal),
             "Activity import panel: the title and the number are always taken (no switch), the other pieces of information have a switch");
-        cut.FindAll("#ai-fields select")[2].Change("Detalii");
+        cut.FindAll("#ai-fields select")[3].Change("Detalii");
         cut.FindAll("button").Single(button => button.TextContent.Trim() == "Salvează corespondența").Click();
         cut.WaitForAssertion(() => { if (!cut.Markup.Contains("Corespondența câmpurilor a fost salvată", StringComparison.Ordinal)) throw new Exception("pending"); }, TimeSpan.FromSeconds(5));
         check(settingsService.SavedMap is { } saved && saved.Count == 1 && saved["Tickete.DescriptionInternal"] == "Detalii", "Activity import panel: saving sends the column chosen (only the ones that differ from the default are kept)");
@@ -292,7 +296,7 @@ public static class ActivityImportPanelChecks
               && savedSettings.Extras.Count == 1 && savedSettings.Extras[0].Column == "Observatii" && savedSettings.Extras[0].Label == "Observații client" && refresh.Refreshes == 1,
             "Activity import panel: the switch, the destination and the extra field are saved, and the tickets kept that lack something are read again after the save");
         cut.FindAll("button").Single(button => button.TextContent.Trim() == "Revino la valorile implicite").Click();
-        check(cut.FindAll("#ai-fields select").All(select => select.GetAttribute("aria-label") is not null) && cut.FindAll("#ai-fields select")[2].GetAttribute("aria-label")!.Contains("Problema", StringComparison.Ordinal),
+        check(cut.FindAll("#ai-fields select").All(select => select.GetAttribute("aria-label") is not null) && cut.FindAll("#ai-fields select")[3].GetAttribute("aria-label")!.Contains("Problema", StringComparison.Ordinal),
             "Activity import panel: the selects of the fields are named for the field");
         // The example ticket: the newest finished ticket opens, "Tichet anterior" loads the one before it, "Tichet mai nou" comes back to the one shown before; a column chosen in the window fills the table.
         TicketSample Example(long id, string problem) => new(id, "T-" + id, "Titlu " + id, new DateTime(2026, 10, 1), [
@@ -309,10 +313,37 @@ public static class ActivityImportPanelChecks
             "Activity import panel: \"Tichet anterior\" loads the ticket before the one shown");
         cut.Find("#ticket-sample-newer").Click();
         check(cut.Find("#ticket-sample-info").TextContent.Contains("Tichet 30", StringComparison.Ordinal) && settingsService.SampleCalls.Count == 2, "Activity import panel: \"Tichet mai nou\" comes back to the ticket shown before without reading it again");
-        cut.Find("select[aria-label='Folosește coloana Detalii pentru']").Change("problem");
-        cut.Find("select[aria-label='Folosește coloana Observatii pentru']").Change("extra");
-        check(cut.Find("#ticket-sample-preview").TextContent.Contains("Detalii 30", StringComparison.Ordinal) && cut.Find("#ticket-sample-preview").TextContent.Contains("Obs 30", StringComparison.Ordinal) && cut.FindAll("#ai-extras tbody tr").Count == 1,
-            "Activity import panel: a column chosen in the window becomes the column of the piece (or an extra field) and the preview follows at once");
+        // The lists of the window: every column is off at first; a column switched on becomes a free field named like the column and enters the list "Folosite", where its description, role and
+        // destination are edited and from where it is detached.
+        check(cut.FindAll("#ticket-sample-used tbody tr").Count == 7 && cut.FindAll("#ai-extras tbody tr").Count == 0, "Activity import panel: the list of the used columns holds the pieces that are on, and no free field yet");
+        cut.Find("#ticket-sample-Tickete [aria-label='Folosește coloana Observatii']").Change(true);
+        check(cut.FindAll("#ai-extras tbody tr").Count == 1 && cut.Find("#ticket-sample-used").TextContent.Contains("Tichet – Observatii", StringComparison.Ordinal) && cut.Find("#ticket-sample-preview").TextContent.Contains("Obs 30", StringComparison.Ordinal)
+              && cut.Find("#ticket-sample-note").TextContent.Contains("este acum folosită", StringComparison.Ordinal),
+            "Activity import panel: switching a column on makes it a free field, listed among the used ones and shown in the summary");
+        cut.Find("input[aria-label='Descrierea pentru Tichet – Observatii']").Change("Observații client");
+        check(cut.Find("#ticket-sample-notes").TextContent.Contains("Observatii client: Obs 30", StringComparison.Ordinal) && cut.FindAll("#ai-extras input").Count(input => input.GetAttribute("value") == "Observații client") == 1,
+            "Activity import panel: the description given in the list is what stands before the value in the notes (description: value)");
+        cut.Find("#ticket-sample-Tickete [aria-label='Folosește coloana Detalii']").Change(true);
+        cut.Find("select[aria-label='Rolul coloanei Tichet – Detalii']").Change("problem");
+        check(cut.Find("#ticket-sample-note").TextContent.Contains("Tichet – DescriptionInternal → Tichet – Detalii", StringComparison.Ordinal) && cut.FindAll("#ai-extras tbody tr").Count == 1 && cut.Find("#ticket-sample-preview").TextContent.Contains("Detalii 30", StringComparison.Ordinal),
+            "Activity import panel: a free field given the role of a piece of information moves that piece to its column (the free field goes away) and says so");
+        cut.Find("button[aria-label='Detașează Executantul']").Click();
+        check(cut.Find("#ticket-sample-note").TextContent.Contains("a fost detașat", StringComparison.Ordinal) && cut.FindAll("button[aria-label='Detașează Executantul']").Count == 0,
+            "Activity import panel: detaching a used piece switches it off and takes it out of the list");
+        cut.Find("#ticket-sample-Tickete [aria-label='Folosește coloana Observatii']").Change(false);
+        check(cut.FindAll("#ai-extras tbody tr").Count == 0 && cut.Find("#ticket-sample-note").TextContent.Contains("a fost detașată", StringComparison.Ordinal),
+            "Activity import panel: switching a column off detaches the free field that read it");
+        // The number (and the title) can be read from any readable column of the ticket, chosen in the block "Coloane obligatorii" at the top of the window (BUG-0023).
+        cut.Find("#ticket-sample-pick-number").Change("Detalii");
+        check(cut.Find("#ticket-sample-note").TextContent.Contains("Tichet – NumeTicket → Tichet – Detalii", StringComparison.Ordinal) && cut.Find("#ticket-sample-preview").TextContent.Contains("Detalii 30", StringComparison.Ordinal)
+              && cut.FindAll("#ticket-sample-used button[aria-label^='Detașează Numărul']").Count == 0,
+            "Activity import panel: the number of the ticket can be read from another column of the used list, and it still cannot be detached");
+        cut.Find("#ticket-sample-pick-title").Change("Detalii");
+        check(cut.Find("#ticket-sample-note").TextContent.Contains("a trecut pe coloana", StringComparison.Ordinal)
+              && cut.Find("#ticket-sample-pick-title option[selected]").GetAttribute("value") == "Detalii",
+            "Activity import panel: giving the title the column of the number moves the number to the column the title left");
+        cut.Find("#ticket-sample-pick-title").Change("Subject");
+        cut.Find("#ticket-sample-pick-number").Change("NumeTicket");
         cut.Find("#ticket-sample-older").Click();
         cut.Find("#ticket-sample-older").Click();
         cut.WaitForAssertion(() => { if (!cut.Find("#ticket-sample-info").TextContent.Contains("Tichet 10", StringComparison.Ordinal)) throw new Exception("pending"); }, TimeSpan.FromSeconds(5));
@@ -336,6 +367,46 @@ public static class ActivityImportPanelChecks
         cut.Find("#ai-issues button").Click();
         cut.WaitForAssertion(() => { if (cut.FindAll("#ai-issues").Count != 0) throw new Exception("pending"); }, TimeSpan.FromSeconds(5));
         check(partners.Resolved == 1, "Activity import panel: marking a problem resolved removes it from the list");
+        // BUG-0023: the column of the ticket number has no default. Settings without it cannot be saved; the window asks for it at the top and shows the live window "Cum arată tichetul preluat".
+        settingsService.Map = ActivityFieldMap.Empty; settingsService.SavedSettings = null; settingsService.SampleCalls.Clear();
+        cut.FindAll("button").Single(button => button.TextContent.Trim() == "Citește coloanele din ActivityApp").Click();
+        cut.WaitForAssertion(() => { if (!cut.Find("#ai-save-fields").HasAttribute("disabled")) throw new Exception("pending"); }, TimeSpan.FromSeconds(5));
+        check(cut.Find("#ai-save-fields").GetAttribute("title")!.Contains("numărul tichetului", StringComparison.Ordinal), "Activity import panel: the correspondence cannot be saved before the column of the ticket number is chosen");
+        cut.Find("#ai-open-sample").Click();
+        cut.WaitForAssertion(() => { if (cut.FindAll("#ticket-sample-required").Count == 0) throw new Exception("pending"); }, TimeSpan.FromSeconds(5));
+        check(cut.FindAll("#ticket-sample-number-required").Count == 1 && cut.FindAll("#ticket-live-preview #ticket-sample-preview").Count == 1 && cut.Find("#ticket-sample-pick-number").QuerySelectorAll("option").First().TextContent.Contains("alege", StringComparison.Ordinal)
+              && cut.Find("#ticket-sample-pick-title option[selected]").GetAttribute("value") == "Subject",
+            "Activity import panel: the window asks for the column of the number (no default) and shows the preview in its own floating window");
+        cut.Find("#ticket-sample-pick-number").Change("NumeTicket");
+        cut.WaitForAssertion(() => { if (cut.FindAll("#ticket-sample-number-required").Count != 0) throw new Exception("pending"); }, TimeSpan.FromSeconds(5));
+        check(!cut.Find("#ai-save-fields").HasAttribute("disabled") && cut.Find("#ticket-live-preview").TextContent.Contains("T-30", StringComparison.Ordinal), "Activity import panel: choosing the number column enables the saving and the live window shows the number");
+        cut.Find("#ticket-sample-preview-toggle").Click();
+        check(cut.FindAll("#ticket-live-preview").Count == 0, "Activity import panel: the floating window can be hidden");
+        cut.Find(".ticket-sample .heading-actions button.danger").Click();
+        cut.Find("#ai-save-fields").Click();
+        cut.WaitForAssertion(() => { if (settingsService.SavedSettings is null) throw new Exception("pending"); }, TimeSpan.FromSeconds(5));
+        check(settingsService.SavedSettings!.NumberChosen && settingsService.SavedSettings.ToJson().Length > 0, "Activity import panel: the settings are saved with the chosen number, also when it is the usual column");
+        // BUG-0023: the rows of "Folosite" are dragged to order the lines of the notes; the required rows stay first and cannot be moved.
+        cut.Find("#ai-open-sample").Click();
+        cut.WaitForAssertion(() => { if (cut.FindAll("#ticket-sample-used").Count == 0) throw new Exception("pending"); }, TimeSpan.FromSeconds(5));
+        string[] Keys() => [.. cut.FindAll("#ticket-sample-used tbody tr").Select(row => row.GetAttribute("data-notes-key") ?? "")];
+        check(Keys().SequenceEqual(["title", "number", "finished", "problem", "resolution", "report", "executor"]) && cut.FindAll("#ticket-sample-used tr.notes-order-fixed").Count == 3 && cut.Find("tr[data-notes-key='problem']").GetAttribute("draggable") == "true"
+              && cut.Find("tr[data-notes-key='title']").GetAttribute("draggable") is null,
+            "Activity import panel: the required rows come first and only the others can be dragged");
+        // BUG-0031: the drag and drop is done by notes-order.js in the browser; the component gets the two keys (MoveNotes), which is what is checked here.
+        void Drop(string key, string target) => cut.InvokeAsync(() => cut.FindComponent<BlazorStoc.Components.Shared.TicketSampleDialog>().Instance.MoveNotes(key, target)).GetAwaiter().GetResult();
+        Drop("problem", "executor");
+        cut.WaitForAssertion(() => { if (!Keys().SequenceEqual(["title", "number", "finished", "resolution", "report", "executor", "problem"])) throw new Exception("pending"); }, TimeSpan.FromSeconds(5));
+        var notesText = cut.Find("#ticket-sample-notes").TextContent;
+        check(notesText.IndexOf("Executant", StringComparison.Ordinal) < notesText.IndexOf("Problema", StringComparison.Ordinal) && cut.FindAll("#ticket-sample-notes strong").Count >= 4 && cut.Find("#ticket-sample-note").TextContent.Contains("Ordinea în observații", StringComparison.Ordinal),
+            "Activity import panel: dropping a row on another moves it there, the preview of the notes follows at once with the labels bold");
+        Drop("report", "title");
+        check(Keys().SequenceEqual(["title", "number", "finished", "resolution", "report", "executor", "problem"]), "Activity import panel: a required row is not a place to drop on");
+        cut.Find(".ticket-sample .heading-actions button.danger").Click();
+        settingsService.SavedSettings = null;
+        cut.Find("#ai-save-fields").Click();
+        cut.WaitForAssertion(() => { if (settingsService.SavedSettings is null) throw new Exception("pending"); }, TimeSpan.FromSeconds(5));
+        check(settingsService.SavedSettings!.Order.SequenceEqual([ActivityFieldMap.Resolution, ActivityFieldMap.Report, ActivityFieldMap.Executor, ActivityFieldMap.Problem]), "Activity import panel: the order of the notes is saved with the correspondence");
         return Task.CompletedTask;
     }
 }

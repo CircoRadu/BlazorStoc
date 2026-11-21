@@ -9,8 +9,7 @@
 @* "Preia de la copil": the parameters, families and tags a child defines move up to the node (or the category). Step 1 picks the child and what to take; step 2 shows what the
    relocation service would do (the real run, rolled back): the values that unite, the namesakes of the sibling branches that must be merged (the user decides: merge, or leave
    the definition out), the products that would become incomplete (they need an explicit acceptance) and asks for the reason. *@
-<div class="delete-overlay">
-<section class="delete-dialog archive-dialog take-dialog" role="dialog" aria-modal="true" aria-labelledby="@TitleId">
+<AppDialog PanelClass="archive-dialog take-dialog" LabelledBy="@TitleId" OnClose="Back">
     <div class="catalog-heading dialog-head"><h2 id="@TitleId">Preia definiții de la un copil · @NodeName</h2><HelpButton Topic="categorii-parametri" About="Preluarea parametrilor și etichetelor de la un copil" /></div>
     @if (loading)
     {
@@ -93,8 +92,7 @@
             <button type="button" class="refresh act-close" disabled="@busy" @onclick="() => Closed.InvokeAsync()">Anulează</button>
         </div>
     }
-</section>
-</div>
+</AppDialog>
 
 @code {
     private sealed record Candidate(DefinitionRef Ref, string Kind, string Name, string Detail, int Products);

@@ -1,0 +1,9 @@
+{
+  "Purpose": "Cont de baza de date pentru Claude pe baza de DEZVOLTARE locala (ALL pe baza BlazorStoc); nu se foloseste in productie",
+  "Host": "127.0.0.1",
+  "Port": 5088,
+  "Database": "BlazorStoc",
+  "User": "claude_dev_admin",
+  "Password": "d00XQdv0mo5vv34cKN05ytbOueef",
+  "SslMode": "Required"
+}

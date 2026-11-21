@@ -1,0 +1,108 @@
+@implements IAsyncDisposable
+@inject IUserDisplayService Display
+@inject IJSRuntime JS
+@inject ILogger<TableGearHost> Logger
+@* The panel of the gear that wwwroot/display-settings.js puts on every data table of the application (PROP-0034): the sizes of the text, of the header, of the images and of the icons of THAT
+   table, saved per user in the database. A value left on "global" follows the global rules (Meniul contului -> Setari afisare). The gear buttons are made by the script; this component draws the
+   panel when one is pressed and pushes the table settings of the user to the script, which puts them on the tables. *@
+
+@if (open)
+{
+    <span class="display-gear-backdrop" @onclick="Close"></span>
+    <div class="display-gear-panel table-gear-panel" role="group" aria-label="Setări de afișare pentru @label" style="left:@(left)px;top:@(top)px" @onkeydown="KeyDown">
+        <h3>Afișare: @label</h3>
+        @if (IsDashboard)
+        {
+            <p class="form-note muted">Valorile alese aici se aplică numai dashboard-ului și înlocuiesc setările globale.</p>
+            <PercentSlider TableMode="true" Title="Text" AriaLabel="Mărimea textului din dashboard" Value="table.Text" Inherited="global.Text" ValueChanged="v => Set(table with { Text = v })" />
+            <PercentSlider TableMode="true" Title="Antet tile" AriaLabel="Mărimea antetului tile-urilor (iconița și categoria)" Value="table.HeaderText" Inherited="global.HeaderText" ValueChanged="v => Set(table with { HeaderText = v })" />
+            <PercentSlider TableMode="true" Title="Iconițe" AriaLabel="Mărimea iconițelor din antetul tile-urilor" Value="table.Icons" Inherited="global.Icons" ValueChanged="v => Set(table with { Icons = v })" />
+        }
+        else
+        {
+            <p class="form-note muted">Valorile alese aici se aplică numai acestui tabel și înlocuiesc setările globale.</p>
+            <PercentSlider TableMode="true" Title="Text din tabel" AriaLabel="Mărimea textului din tabel" Value="table.TableText" Inherited="global.TableText" ValueChanged="v => Set(table with { TableText = v })" />
+            <PercentSlider TableMode="true" Title="Antet tabel" AriaLabel="Mărimea antetului tabelului" Value="table.HeaderText" Inherited="global.HeaderText" ValueChanged="v => Set(table with { HeaderText = v })" />
+            <PercentSlider TableMode="true" Title="Imagini" AriaLabel="Mărimea imaginilor din tabel" Value="table.Images" Inherited="global.Images" ValueChanged="v => Set(table with { Images = v })" />
+            <PercentSlider TableMode="true" Title="Iconițe" AriaLabel="Mărimea iconițelor din tabel" Value="table.Icons" Inherited="global.Icons" ValueChanged="v => Set(table with { Icons = v })" />
+        }
+        @if (!string.IsNullOrEmpty(error)) { <span class="validation-message" role="alert">@error</span> }
+        <div class="editor-actions">
+            <button type="button" class="refresh act-reload" disabled="@table.IsEmpty" title="@(table.IsEmpty ? "Folosește deja setările globale" : "Revine la setările globale")" @onclick="Reset">@(IsDashboard ? "Resetează dashboard-ul" : "Resetează tabelul")</button>
+            <button type="button" class="refresh act-close" @onclick="Close">Închide</button>
+        </div>
+    </div>
+}
+
+@code {
+    private DotNetObjectReference<TableGearHost>? self;
+    private bool open, disposed;
+    private string scope = "", label = "tabel", error = "";
+    private double left, top;
+    // The gear of the personalised dashboard (its scope ends with .dashboard) sets text, header of the tiles and icons instead of the sizes of a table.
+    private bool IsDashboard => scope.EndsWith(".dashboard", StringComparison.Ordinal);
+    private DisplaySettings global = new(), table = new();
+
+    protected override void OnInitialized() => Display.Changed += OnChanged;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+        self = DotNetObjectReference.Create(this);
+        try { await JS.InvokeVoidAsync("tableGears.init", self); await PushAsync(); }
+        catch (Exception exception) when (exception is JSException or InvalidOperationException or JSDisconnectedException) { Logger.LogDebug("Table gears could not start ({ErrorType}).", exception.GetType().Name); }
+    }
+
+    [JSInvokable]
+    public async Task Open(string tableScope, string tableLabel, double x, double y)
+    {
+        if (!DisplayRules.IsValidScope(tableScope)) return;
+        scope = tableScope; label = string.IsNullOrWhiteSpace(tableLabel) ? "tabel" : tableLabel; left = x; top = y; error = "";
+        await LoadAsync();
+        open = true;
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private async Task LoadAsync()
+    {
+        var data = await Display.GetAsync();
+        global = data.Global;
+        table = data.Tables.GetValueOrDefault(scope) ?? new();
+    }
+
+    // The table settings of the user, merged with the global ones, as the style the script puts on each table (the products table keeps its own gear in the page).
+    private async Task PushAsync()
+    {
+        if (disposed) return;
+        var data = await Display.GetAsync();
+        var map = data.Tables.Where(pair => pair.Key != DisplayRules.ProductsCatalogScope).ToDictionary(pair => pair.Key, pair => DisplayRules.ToStyle(data.For(pair.Key)));
+        try { await JS.InvokeVoidAsync("tableGears.setVisible", DisplayRules.ShowTableGear(data.Global)); await JS.InvokeVoidAsync("tableGears.setStyles", map); }
+        catch (Exception exception) when (exception is JSException or InvalidOperationException or JSDisconnectedException) { }
+    }
+
+    private void OnChanged() => _ = InvokeAsync(async () => { await PushAsync(); if (open) { await LoadAsync(); StateHasChanged(); } });
+
+    private async Task Set(DisplaySettings settings)
+    {
+        error = "";
+        try { await Display.SaveAsync(scope, settings); table = settings; }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            Logger.LogWarning("Display settings of {Scope} were not saved ({ErrorType}).", scope, exception.GetType().Name);
+            error = "Setarea nu a putut fi salvată.";
+        }
+    }
+
+    private Task Reset() => Set(new());
+    private void Close() => open = false;
+    private void KeyDown(KeyboardEventArgs args) { if (args.Key == "Escape") open = false; }
+
+    public async ValueTask DisposeAsync()
+    {
+        disposed = true;
+        Display.Changed -= OnChanged;
+        try { await JS.InvokeVoidAsync("tableGears.dispose"); }
+        catch (Exception exception) when (exception is JSException or InvalidOperationException or JSDisconnectedException) { }
+        self?.Dispose();
+    }
+}

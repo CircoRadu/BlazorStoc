@@ -8,7 +8,7 @@
    named with the program, and a free port is proposed. *@
 
 <section class="catalog database-server">
-    <div class="catalog-heading"><h2>Serverul bazei de date</h2><small>Serviciul Windows al bazei de pe acest calculator: pornire, oprire și portul pe care ascultă.</small></div>
+    <details class="catalog-collapse"><summary class="catalog-heading"><h2>Serverul bazei de date</h2><small>Serviciul Windows al bazei de pe acest calculator: pornire, oprire și portul pe care ascultă.</small></summary>
     <div class="catalog-body">
     @if (loading) { <div class="empty-state" role="status"><div class="spinner"></div><h3>Se încarcă</h3></div> }
     else if (state is { } server)
@@ -41,6 +41,7 @@
         }
     }
     </div>
+</details>
 </section>
 @if (mode != Mode.None && state is { } active)
 {

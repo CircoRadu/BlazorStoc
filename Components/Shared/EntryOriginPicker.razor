@@ -3,6 +3,7 @@
 @inject ISupplierRepository SupplierRepository
 @inject NavigationManager Navigation
 @inject BlazorStoc.Modules.ModuleRegistry Modules
+@inject IProjectEquipmentRepository ProjectEquipment
 @* Where an entry comes from: free (no invoice, with a reason), an invoice already recorded, or a new invoice typed by hand. The
    automatic reading of a PDF invoice stays a separate flow (the "Preia din PDF" button), so a failed or unwanted reading never blocks the entry. *@
 <div class="entry-origin">
@@ -10,6 +11,7 @@
         <button type="button" role="tab" class="settings-tab @(origin == Origin.Free ? "active" : "")" aria-selected="@(origin == Origin.Free)" disabled="@Disabled" @onclick="() => SetOrigin(Origin.Free)">Intrare liberă</button>
         @if (SuppliersUp) { <button type="button" role="tab" class="settings-tab @(origin == Origin.Existing ? "active" : "")" aria-selected="@(origin == Origin.Existing)" disabled="@Disabled" @onclick="() => SetOrigin(Origin.Existing)">Factură existentă</button> }
         @if (SuppliersUp) { <button type="button" role="tab" class="settings-tab @(origin == Origin.New ? "active" : "")" aria-selected="@(origin == Origin.New)" disabled="@Disabled" @onclick="() => SetOrigin(Origin.New)">Factură nouă (manual)</button> }
+        @if (AllowReturn) { <button type="button" role="tab" id="@($"{Prefix}-tab-return")" class="settings-tab @(origin == Origin.Return ? "active" : "")" aria-selected="@(origin == Origin.Return)" disabled="@Disabled" @onclick="() => SetOrigin(Origin.Return)">Retur</button> }
         @if (Modules.IsAvailable(BlazorStoc.Modules.Invoices.InvoicesModule.ModuleId)) { <a class="refresh act-confirm origin-pdf" href="/produse/preluare-factura">Preia din PDF</a> }
     </div>
     @if (origin == Origin.Free)
@@ -18,7 +20,7 @@
             <label for="@($"{Prefix}-free-type")">Motivul intrării libere *
                 <select id="@($"{Prefix}-free-type")" disabled="@Disabled" @onchange="FreeTypeChanged">
                     <option value="" selected="@(Model.FreeType is null)">— alege motivul —</option>
-                    @foreach (var type in Enum.GetValues<FreeEntryType>().Where(type => type != FreeEntryType.AwaitedInvoice || SuppliersUp)) { <option value="@((int)type)" selected="@(Model.FreeType == type)">@StockMovementRules.FreeTypeLabel(type)</option> }
+                    @foreach (var type in Enum.GetValues<FreeEntryType>().Where(type => (type != FreeEntryType.AwaitedInvoice || SuppliersUp) && type is not (FreeEntryType.FromBeneficiary or FreeEntryType.ReturnFromProject))) { <option value="@((int)type)" selected="@(Model.FreeType == type)">@StockMovementRules.FreeTypeLabel(type)</option> }
                 </select></label>
             <div>
                 <span class="field-label">Furnizor@(Model.FreeType == FreeEntryType.AwaitedInvoice ? " *" : " (opțional)")</span>
@@ -28,21 +30,58 @@
             <label class="full-width" for="@($"{Prefix}-reference")">Referință (opțional)
                 <InputText id="@($"{Prefix}-reference")" @bind-Value="Model.Reference" maxlength="@StockMovementRules.MaxReferenceLength" placeholder="Aviz, bon, persoană, document…" /></label>
         </div>
-        @if (Model.FreeType == FreeEntryType.FromBeneficiary && ReturnableExits.Count > 0)
-        {
-            <label class="full-width" for="@($"{Prefix}-return-of")">Ieșirea returnată (opțional)
-                <select id="@($"{Prefix}-return-of")" disabled="@Disabled" @onchange="ReturnOfChanged">
-                    <option value="" selected="@(Model.ReturnOfMovementId is null)">— nu e legat de o ieșire —</option>
-                    @foreach (var exit in ReturnableExits)
-                    {
-                        <option value="@exit.MovementId" selected="@(Model.ReturnOfMovementId == exit.MovementId)">@ExitLabel(exit)</option>
-                    }
-                </select></label>
-            <small class="form-note">Un retur legat de o ieșire scade consumul net al proiectului și al beneficiarului; poate fi parțial.</small>
-        }
         @if (Model.FreeType == FreeEntryType.AwaitedInvoice)
         {
             <small class="form-note">Intrarea rămâne în urmărire până se leagă de factura furnizorului; o notificare te anunță dacă factura întârzie.</small>
+        }
+    }
+    else if (origin == Origin.Return)
+    {
+        <fieldset class="destination-group" disabled="@Disabled">
+            <legend>Retur din *</legend>
+            <div class="destination-options">
+                <label><input type="radio" name="@($"{Prefix}-return-from")" id="@($"{Prefix}-return-beneficiary")" checked="@(returnFrom == ReturnFrom.Beneficiary)" @onchange="() => SetReturnFromAsync(ReturnFrom.Beneficiary)" /> Beneficiar</label>
+                <label><input type="radio" name="@($"{Prefix}-return-from")" id="@($"{Prefix}-return-vehicle")" checked="@(returnFrom == ReturnFrom.Vehicle)" @onchange="() => SetReturnFromAsync(ReturnFrom.Vehicle)" /> Vehicul</label>
+            </div>
+        </fieldset>
+        @if (returnFrom == ReturnFrom.Beneficiary)
+        {
+            @if (projectNets.Count == 0)
+            {
+                <small class="form-note" role="status">@(projectNetsLoaded ? "Produsul nu se află în niciun proiect: nu există nimic de returnat." : "Se citesc proiectele…")</small>
+            }
+            else
+            {
+                <div class="relation-row">
+                    <span class="relation-check">Beneficiar</span>
+                    <SearchableSelect Id="@($"{Prefix}-return-beneficiary-select")" Label="Beneficiar" Placeholder="Caută sau alege beneficiarul…" EmptyText="Niciun beneficiar găsit."
+                                      Options="ReturnBeneficiaryOptions" SelectedId="Model.BeneficiaryId" SelectedIdChanged="ReturnBeneficiaryChangedAsync" Disabled="Disabled" />
+                </div>
+                <div class="relation-row">
+                    <span class="relation-check">Proiect</span>
+                    <SearchableSelect Id="@($"{Prefix}-return-project-select")" Label="Proiect" Placeholder="Alege proiectul din care se returnează…" EmptyText="Niciun proiect găsit."
+                                      Options="ReturnProjectOptions" SelectedId="Model.ProjectId" SelectedIdChanged="ReturnProjectChangedAsync" Disabled="@(Disabled || Model.BeneficiaryId is null)" />
+                </div>
+                @if (SelectedNet is { } net) { <small class="form-note" role="status">În proiect: <strong>@net buc.</strong> din acest produs; nu poți returna mai mult.</small> }
+            }
+        }
+        else
+        {
+            @if (HeldVehicles.Count == 0)
+            {
+                <small class="form-note" role="status">@(Vehicles.Count == 0 ? "Nu există vehicule sau modulul Vehicule este oprit." : "Niciun vehicul nu are acest produs: nu există nimic de returnat.")</small>
+            }
+            else
+            {
+                <div class="relation-row">
+                    <span class="relation-check">Vehicul</span>
+                    <select id="@($"{Prefix}-return-vehicle-select")" aria-label="Vehiculul din care se returnează" disabled="@Disabled" @onchange="ReturnVehicleChangedAsync">
+                        <option value="" selected="@(returnVehicleId is null)">— alege vehiculul —</option>
+                        @foreach (var vehicle in HeldVehicles) { <option value="@vehicle.Id" selected="@(returnVehicleId == vehicle.Id)">@vehicle.PlateNumber · @vehicle.Description · @Held(vehicle.Id) buc.</option> }
+                    </select>
+                </div>
+                <small class="form-note">Produsul se mută din vehicul în depozit: stocul total nu se schimbă. Cantitatea nu poate depăși ce ține vehiculul.</small>
+            }
         }
     }
     else if (origin == Origin.Existing)
@@ -53,11 +92,11 @@
                 <SearchableSelect Id="@($"{Prefix}-invoice-supplier")" Label="Furnizor" Placeholder="Caută sau alege furnizorul…" EmptyText="Niciun furnizor găsit."
                                   Options="SupplierOptions" SelectedId="invoiceSupplierId" SelectedIdChanged="InvoiceSupplierChangedAsync" Disabled="Disabled" />
             </div>
-            <label for="@($"{Prefix}-invoice")">Factura *
-                <select id="@($"{Prefix}-invoice")" disabled="@(Disabled || invoiceSupplierId is null)" @onchange="InvoiceChanged">
-                    <option value="" selected="@(Model.InvoiceId is null)">@(invoiceSupplierId is null ? "— alege întâi furnizorul —" : invoices.Count == 0 ? "— furnizorul nu are facturi —" : "— alege factura —")</option>
-                    @foreach (var invoice in invoices) { <option value="@invoice.Id" selected="@(Model.InvoiceId == invoice.Id)">@invoice.Label (@invoice.MovementCount @(invoice.MovementCount == 1 ? "intrare" : "intrări"))</option> }
-                </select></label>
+            <div>
+                <span class="field-label">Factura *</span>
+                <SearchableSelect Id="@($"{Prefix}-invoice")" Label="Factura" Placeholder="@InvoiceChoice.Placeholder(invoiceSupplierId, invoices.Count)" EmptyText="Nicio factură găsită."
+                                  Options="InvoiceChoice.Options(invoices)" SelectedId="Model.InvoiceId" SelectedIdChanged="InvoiceSelectedAsync" Disabled="@(Disabled || invoiceSupplierId is null)" />
+            </div>
             <label for="@($"{Prefix}-invoice-quantity")">Cantitate pe factură (opțional)
                 <InputNumber id="@($"{Prefix}-invoice-quantity")" TValue="int?" @bind-Value="Model.InvoiceQuantity" min="1" max="@StockMovementRules.MaxQuantity" /></label>
         </div>
@@ -82,7 +121,8 @@
 </div>
 
 @code {
-    private enum Origin { Free, Existing, New }
+    private enum Origin { Free, Existing, New, Return }
+    private enum ReturnFrom { Beneficiary, Vehicle }
 
     // The invoices and the suppliers belong to their own module: while it is out only the free entry without a supplier is offered.
     private bool SuppliersUp => Modules.IsAvailable(BlazorStoc.Modules.Suppliers.SuppliersModule.ModuleId);
@@ -91,10 +131,22 @@
     [Parameter] public bool Disabled { get; set; }
     [Parameter] public string Prefix { get; set; } = "add";
     [Parameter] public EventCallback Changed { get; set; }
-    // Exits to a beneficiary of the product that a return ("Primit de la beneficiar") can be tied to.
-    [Parameter] public IReadOnlyList<ReturnableExit> ReturnableExits { get; set; } = [];
+    // The tab Retur (a return from a beneficiary's project or from a vehicle): offered to who may record entries.
+    [Parameter] public bool AllowReturn { get; set; }
+    [Parameter] public int ProductId { get; set; }
+    [Parameter] public IReadOnlyList<Vehicle> Vehicles { get; set; } = [];
+    [Parameter] public IReadOnlyList<VehicleStock> VehicleStocks { get; set; } = [];
+    // The page reads these when it saves: a return from a vehicle is a transfer to the warehouse, not an entry.
+    public bool IsReturnTab => origin == Origin.Return;
+    public bool IsVehicleReturn => origin == Origin.Return && returnFrom == ReturnFrom.Vehicle;
+    public int? ReturnVehicleId => returnVehicleId;
 
     private Origin origin = Origin.Free;
+    private ReturnFrom returnFrom = ReturnFrom.Beneficiary;
+    private int? returnVehicleId;
+    private string? returnSuggestion;
+    private IReadOnlyList<ProjectProductNet> projectNets = [];
+    private bool projectNetsLoaded;
     private StockMovementInput? lastModel;
     private IReadOnlyList<Supplier> suppliers = [];
     private IReadOnlyList<SelectOption> SupplierOptions = [];
@@ -118,37 +170,87 @@
         if (!ReferenceEquals(lastModel, Model)) { if (lastModel is not null) ResetOrigin(); lastModel = Model; }
     }
 
-    private void ResetOrigin() { origin = Origin.Free; invoiceSupplierId = null; invoices = []; newNumber = ""; newDate = StockMovementRules.Today; }
+    private void ResetOrigin() { origin = Origin.Free; returnFrom = ReturnFrom.Beneficiary; returnVehicleId = null; returnSuggestion = null; invoiceSupplierId = null; invoices = []; newNumber = ""; newDate = StockMovementRules.Today; }
 
     private void ClearOrigin()
     {
         Model.InvoiceId = null; Model.FreeType = null; Model.FreeSupplierId = null; Model.Reference = null; Model.InvoiceQuantity = null; Model.DuplicateReason = "";
-        Model.ReturnOfMovementId = null;
+        Model.ReturnOfMovementId = null; Model.BeneficiaryId = null; Model.ProjectId = null;
+        ApplyReturnSuggestion(null);
+        returnVehicleId = null;
     }
 
     private async Task SetOrigin(Origin value)
     {
         if (origin == value) return;
         origin = value; ClearOrigin(); invoiceSupplierId = null; invoices = [];
+        if (value == Origin.Return) { returnFrom = ReturnFrom.Beneficiary; Model.FreeType = FreeEntryType.ReturnFromProject; await LoadProjectNetsAsync(); }
         await Changed.InvokeAsync();
     }
+
+    private async Task LoadProjectNetsAsync()
+    {
+        projectNetsLoaded = false;
+        try { projectNets = ProductId > 0 ? await ProjectEquipment.GetProductProjectsAsync(ProductId) : []; }
+        catch (Exception exception) when (exception is not OperationCanceledException) { projectNets = []; }
+        projectNetsLoaded = true;
+    }
+
+    private async Task SetReturnFromAsync(ReturnFrom value)
+    {
+        if (returnFrom == value) return;
+        returnFrom = value; returnVehicleId = null; Model.BeneficiaryId = null; Model.ProjectId = null; ApplyReturnSuggestion(null);
+        // A return from a vehicle is not an entry: the entry reason stays only for the return from a project.
+        Model.FreeType = value == ReturnFrom.Beneficiary ? FreeEntryType.ReturnFromProject : null;
+        await Changed.InvokeAsync();
+    }
+
+    private IReadOnlyList<SelectOption> ReturnBeneficiaryOptions => projectNets.GroupBy(item => item.BeneficiaryId)
+        .Select(group => new SelectOption(group.Key, group.First().BeneficiaryName)).ToArray();
+    private IReadOnlyList<SelectOption> ReturnProjectOptions => projectNets.Where(item => item.BeneficiaryId == Model.BeneficiaryId)
+        .Select(item => new SelectOption(item.ProjectId, item.ProjectName, $"{item.Net} buc.")).ToArray();
+    private int? SelectedNet => projectNets.FirstOrDefault(item => item.ProjectId == Model.ProjectId && item.ProjectId > 0)?.Net;
+    private IReadOnlyList<Vehicle> HeldVehicles => Vehicles.Where(vehicle => Held(vehicle.Id) > 0).ToArray();
+    private int Held(int vehicleId) => VehicleStocks.FirstOrDefault(stock => stock.VehicleId == vehicleId)?.Quantity ?? 0;
+
+    private async Task ReturnBeneficiaryChangedAsync(int? id)
+    {
+        Model.BeneficiaryId = id; Model.ProjectId = null;
+        // One project of the beneficiary: it is chosen already.
+        if (id is { } beneficiary && projectNets.Where(item => item.BeneficiaryId == beneficiary).ToList() is { Count: 1 } only) Model.ProjectId = only[0].ProjectId;
+        ApplyReturnSuggestion(ProjectSuggestion());
+        await Changed.InvokeAsync();
+    }
+
+    private async Task ReturnProjectChangedAsync(int? id)
+    {
+        Model.ProjectId = id; ApplyReturnSuggestion(ProjectSuggestion());
+        await Changed.InvokeAsync();
+    }
+
+    private async Task ReturnVehicleChangedAsync(ChangeEventArgs args)
+    {
+        returnVehicleId = int.TryParse(args.Value?.ToString(), out var id) ? id : null;
+        ApplyReturnSuggestion(returnVehicleId is { } vehicleId && Vehicles.FirstOrDefault(vehicle => vehicle.Id == vehicleId) is { } vehicle ? StockMovementRules.VehicleReturnDescription(vehicle.PlateNumber) : null);
+        await Changed.InvokeAsync();
+    }
+
+    private string? ProjectSuggestion() => projectNets.FirstOrDefault(item => item.ProjectId == Model.ProjectId && item.ProjectId > 0) is { } net
+        ? StockMovementRules.ProjectReturnDescription(net.ProjectName, net.BeneficiaryName) : null;
+
+    // The description proposed for the return; text typed by the operator is never overwritten.
+    private void ApplyReturnSuggestion(string? suggestion)
+    {
+        Model.Description = StockMovementRules.ApplySuggestion(Model.Description, returnSuggestion, suggestion);
+        returnSuggestion = suggestion;
+    }
+
 
     private async Task FreeTypeChanged(ChangeEventArgs args)
     {
         Model.FreeType = int.TryParse(args.Value?.ToString(), out var value) && Enum.IsDefined(typeof(FreeEntryType), value) ? (FreeEntryType)value : null;
-        if (Model.FreeType != FreeEntryType.FromBeneficiary) Model.ReturnOfMovementId = null;
         await Changed.InvokeAsync();
     }
-
-    private async Task ReturnOfChanged(ChangeEventArgs args)
-    {
-        Model.ReturnOfMovementId = int.TryParse(args.Value?.ToString(), out var id) ? id : null;
-        await Changed.InvokeAsync();
-    }
-
-    private static string ExitLabel(ReturnableExit exit) =>
-        $"{StockMovementRules.DisplayDate(exit.Date)} · {exit.BeneficiaryName ?? "—"}{(exit.ProjectName is null ? "" : $" / {exit.ProjectName}")}"
-        + $"{(string.IsNullOrWhiteSpace(exit.Reference) ? "" : $" · {exit.Reference}")} · rămase {exit.Remaining} din {exit.Quantity} buc. (operația #{exit.OperationId})";
 
     private async Task FreeSupplierChanged(int? id) { Model.FreeSupplierId = id; await Changed.InvokeAsync(); }
 
@@ -167,9 +269,9 @@
         catch (Exception) { invoices = []; }
     }
 
-    private async Task InvoiceChanged(ChangeEventArgs args)
+    private async Task InvoiceSelectedAsync(int? id)
     {
-        Model.InvoiceId = int.TryParse(args.Value?.ToString(), out var id) ? id : null;
+        Model.InvoiceId = id;
         await Changed.InvokeAsync();
     }
 
@@ -180,6 +282,19 @@
         {
             if (Model.FreeType is null) return "Alege motivul intrării libere.";
             if (Model.FreeType == FreeEntryType.AwaitedInvoice && Model.FreeSupplierId is null) return StockMovementRules.AwaitedSupplierRequiredMessage;
+            return null;
+        }
+        if (origin == Origin.Return)
+        {
+            if (returnFrom == ReturnFrom.Vehicle)
+            {
+                if (returnVehicleId is null) return "Alege vehiculul din care se returnează.";
+                if (Model.Quantity is { } fromVehicle && fromVehicle > Held(returnVehicleId.Value)) return $"Vehiculul ține doar {Held(returnVehicleId.Value)} buc. din acest produs.";
+                return null;
+            }
+            if (Model.BeneficiaryId is null) return "Alege beneficiarul de la care se face returul.";
+            if (Model.ProjectId is null) return StockMovementRules.ReturnProjectRequiredMessage;
+            if (SelectedNet is { } left && Model.Quantity is { } quantity && quantity > left) return StockMovementRules.ReturnFromProjectTooMuchMessage(left);
             return null;
         }
         if (origin == Origin.Existing) return Model.InvoiceId is null ? "Alege factura." : null;
@@ -207,5 +322,17 @@
     }
 
     // After a saved entry: the invoice list is refreshed (entry counts) and the invoice stays chosen for the next entry.
-    public async Task RefreshAsync() { if (origin == Origin.Existing && invoiceSupplierId is { } supplierId) { await LoadInvoicesAsync(supplierId); StateHasChanged(); } }
+    public async Task RefreshAsync()
+    {
+        if (origin == Origin.Existing && invoiceSupplierId is { } supplierId) { await LoadInvoicesAsync(supplierId); StateHasChanged(); }
+        // After a return: what is left at the projects is read again and the explicit description is proposed again for the next one.
+        if (origin == Origin.Return)
+        {
+            if (returnFrom == ReturnFrom.Beneficiary) await LoadProjectNetsAsync();
+            returnSuggestion = null;
+            ApplyReturnSuggestion(returnFrom == ReturnFrom.Beneficiary ? ProjectSuggestion()
+                : returnVehicleId is { } vehicleId && Vehicles.FirstOrDefault(vehicle => vehicle.Id == vehicleId) is { } returnVehicle ? StockMovementRules.VehicleReturnDescription(returnVehicle.PlateNumber) : null);
+            StateHasChanged();
+        }
+    }
 }

@@ -1,0 +1,21 @@
+# Setări · Autentificare
+Ruta: /setari
+Tab: Autentificare
+Cautare: autentificare doi pasi cod autentificator retea interna asociere qr coduri recuperare deblocare
+
+Secțiune pentru administratori: codul din aplicația de autentificare (al doilea pas) pentru accesul din exterior. Stabilești când se cere codul și ce rețea este internă, apoi gestionezi autentificatoarele conturilor.
+
+## Elemente
+### Cod din aplicația de autentificare
+- Când se cere codul | listă | Modul: când este cerut codul la autentificare.
+- Rețeaua internă | câmp | Adresele sau rețelele considerate interne (unul pe rând, sau separate prin virgulă; de exemplu 192.168.1.0/24).
+- Salvează | buton | Păstrează setările.
+### Autentificatoare
+- Tabelul | tabel | Pentru fiecare cont: utilizator, rol, autentificator, confirmat, ultima folosire, coduri de recuperare.
+- Operații | iconițe | Asocierea cu cod QR, revocarea, reactivarea, codurile de recuperare (fereastra are buton „Salvează codurile (.txt)”; codurile se rup la margine) și deblocarea.
+
+## Flux: Cum asociez un autentificator
+1. Alege contul și pornește asocierea.
+2. Scanează codul QR cu aplicația de autentificare și confirmă cu un cod.
+3. Salvează codurile de recuperare.
+Nota: utilizatorul își vede propriul autentificator din meniul numelui său („Autentificatorul meu”).

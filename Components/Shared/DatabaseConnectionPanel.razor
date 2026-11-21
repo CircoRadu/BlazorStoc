@@ -8,7 +8,7 @@
    automatic return to the previous configuration if the check fails. The password is never shown. *@
 
 <section class="catalog database-connection">
-    <div class="catalog-heading"><h2>Conexiunea la baza de date</h2><small>Doar conturile cu nivelul „Administrator” pot modifica aceste setări.</small></div>
+    <details class="catalog-collapse"><summary class="catalog-heading"><h2>Conexiunea la baza de date</h2><small>Doar conturile cu nivelul „Administrator” pot modifica aceste setări.</small></summary>
     <div class="catalog-body">
     @if (loading) { <div class="empty-state" role="status"><div class="spinner"></div><h3>Se încarcă</h3></div> }
     else
@@ -56,6 +56,7 @@
         <p class="muted"><small>Configurația salvată din pagină se află în <code>@current.OverridePath</code> (în afara repository-ului; parola este criptată).</small></p>
     }
     </div>
+</details>
 </section>
 @if (confirm != Confirm.None)
 {

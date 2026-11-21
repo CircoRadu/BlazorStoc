@@ -646,10 +646,10 @@ public static class InvoiceTemplateEngine
 
     // The text of the element right above a horizontal line of the column (empty when there is none), and the one right below it.
     public static string AnchorAbove(InvoicePageData page, double left, double right, double y) =>
-        ColumnSegments(page, left, right, strict: true).Where(segment => segment.Box.Y + segment.Box.Height <= y + 2).OrderByDescending(segment => segment.Box.Y + segment.Box.Height).FirstOrDefault()?.Text ?? "";
+        ColumnSegments(page, left, right, strict: true).Where(segment => HasContent(segment.Text) && segment.Box.Y + segment.Box.Height <= y + 2).OrderByDescending(segment => segment.Box.Y + segment.Box.Height).FirstOrDefault()?.Text ?? "";
 
     public static string AnchorBelow(InvoicePageData page, double left, double right, double y) =>
-        ColumnSegments(page, left, right, strict: true).Where(segment => segment.Box.Y >= y - 2).OrderBy(segment => segment.Box.Y).FirstOrDefault()?.Text ?? "";
+        ColumnSegments(page, left, right, strict: true).Where(segment => HasContent(segment.Text) && segment.Box.Y >= y - 2).OrderBy(segment => segment.Box.Y).FirstOrDefault()?.Text ?? "";
 
     // Where the data of a column starts and ends in this file, found from the text of the element above (the zone starts under it) and
     // below (the zone ends over it); 0 = not anchored, or the element is not in this file (the zone is then automatic, never a fixed position).
@@ -658,14 +658,16 @@ public static class InvoiceTemplateEngine
     {
         double top = 0, bottom = 0;
         var bottomPage = 0;
-        if (column.TopAnchor.Length > 0 && document.Pages.FirstOrDefault(page => page.Number == headerPage) is { } first)
+        // An anchor that is only OCR noise ("|", "=", "—": a border or rule read as a character) says nothing about where the zone is and matches any noise of another
+        // file: it is not an anchor (the zone is then automatic on that side).
+        if (HasContent(column.TopAnchor) && document.Pages.FirstOrDefault(page => page.Number == headerPage) is { } first)
         {
             var key = InvoiceValues.Normalize(column.TopAnchor);
             var found = ColumnSegments(first, left, right).Where(segment => InvoiceValues.Normalize(segment.Text) == key)
                 .OrderBy(segment => Math.Abs(segment.Box.Y + segment.Box.Height - expectedTop)).FirstOrDefault();
             if (found is not null) top = found.Box.Y + found.Box.Height;
         }
-        if (column.BottomAnchor.Length > 0)
+        if (HasContent(column.BottomAnchor))
         {
             var key = InvoiceValues.Normalize(column.BottomAnchor);
             var preferred = column.BottomPage > 0 ? column.BottomPage : headerPage;
@@ -682,14 +684,19 @@ public static class InvoiceTemplateEngine
         return (top, bottom, bottomPage);
     }
 
+    // True when the text holds at least one letter or digit (an anchor made of rule characters only has no content).
+    public static bool HasContent(string? text) => !string.IsNullOrEmpty(text) && text.Any(char.IsLetterOrDigit);
+
     // The columns with the data zone of each one found in this file.
-    private static List<InvoiceColumn> WithZones(List<InvoiceColumn> columns, InvoiceTemplateTable table, InvoicePageData page, InvoiceDocument? document, InvoiceAlignment alignment)
+    private static List<InvoiceColumn> WithZones(List<InvoiceColumn> columns, InvoiceTemplateTable table, InvoicePageData page, InvoiceDocument? document, InvoiceAlignment alignment, double headerBottom)
     {
         if (document is null || !table.Columns.Any(column => column.TopAnchor.Length > 0 || column.BottomAnchor.Length > 0)) return columns;
         return columns.Select(column =>
         {
-            if (table.Columns.FirstOrDefault(item => item.Id == column.Id) is not { } own || (own.TopAnchor.Length == 0 && own.BottomAnchor.Length == 0)) return column;
+            if (table.Columns.FirstOrDefault(item => item.Id == column.Id) is not { } own || (!HasContent(own.TopAnchor) && !HasContent(own.BottomAnchor))) return column;
             var (top, bottom, bottomPage) = ResolveZone(own, document, page.Number, column.Left, column.Right, own.Top * page.Height + alignment.TableDy, own.Bottom * page.Height + alignment.TableDy);
+            // A zone that ends over where it starts, or that starts under the header's own page position of its end, is a wrong match: the column is then automatic.
+            if (bottom > 0 && bottomPage == 0 && ((top > 0 && bottom <= top) || bottom <= headerBottom)) { top = 0; bottom = 0; bottomPage = 0; }
             return column with { ZoneTop = top, ZoneBottom = bottom, ZoneBottomPage = bottomPage };
         }).ToList();
     }
@@ -697,7 +704,7 @@ public static class InvoiceTemplateEngine
     internal static (List<InvoiceColumn> Columns, double HeaderBottom) TableGeometry(InvoiceTemplateTable table, InvoicePageData page, InvoiceAlignment alignment, InvoiceDocument? document = null)
     {
         var (columns, headerBottom) = TableGeometryCore(table, page, alignment);
-        return (WithZones(columns, table, page, document, alignment), headerBottom);
+        return (WithZones(columns, table, page, document, alignment, headerBottom), headerBottom);
     }
 
     internal static (List<InvoiceColumn> Columns, double HeaderBottom) TableGeometryCore(InvoiceTemplateTable table, InvoicePageData page, InvoiceAlignment alignment)
@@ -718,6 +725,26 @@ public static class InvoiceTemplateEngine
             if (index < 0) continue;
             used.Add(index);
             matches[column.Id] = cells[index];
+        }
+        // A scan reads the same heading differently each time ("ICANTI-PRETUNITAR|", "CANTITATEA.", "TATEA. |"): a column whose label is not found as written is matched to the
+        // header cell that sits where the template puts the column (moved as the template is, by the alignment) and that no other column took: the header of this file is
+        // found, so the rows start under it, not under the position of the header in the file the template was made from.
+        foreach (var column in table.Columns.Where(column => !matches.ContainsKey(column.Id)))
+        {
+            var expectedLeft = column.Left * page.Width + alignment.TableDx;
+            var expectedRight = column.Right * page.Width + alignment.TableDx;
+            var best = -1;
+            var bestShare = 0.6;
+            for (var index = 0; index < cells.Count; index++)
+            {
+                if (used.Contains(index)) continue;
+                var width = Math.Max(1, cells[index].Right - cells[index].Left);
+                var share = InvoiceLayout.Overlap(expectedLeft, expectedRight, cells[index].Left, cells[index].Right) / Math.Min(width, Math.Max(1, expectedRight - expectedLeft));
+                if (share > bestShare) { bestShare = share; best = index; }
+            }
+            if (best < 0) continue;
+            used.Add(best);
+            matches[column.Id] = cells[best];
         }
         var meaningful = table.Columns.Count(column => column.Use && column.Meaning != InvoiceColumnMeanings.Ignore);
         var matchedMeaningful = table.Columns.Count(column => column.Use && column.Meaning != InvoiceColumnMeanings.Ignore && matches.ContainsKey(column.Id));

@@ -3,6 +3,8 @@ Cautare: formular task adauga editeaza titlu utilizator stare termen limita desc
 
 Fereastra în care administratorul adaugă sau modifică un task. Beneficiarul este stabilit de pagina din care ai deschis-o; data creării este data curentă și nu se modifică.
 
+Taskul are prioritate; fereastra de vizualizare / editare a utilizatorului permite modificarea lui. Un task finalizat se poate edita. Câmpul „Stadiu / note de lucru” se completează oricând, iar în detalii „Jurnalul taskului” (pliabil) arată evenimentele.
+
 ## Elemente
 ### Campurile si butoanele
 - Titlu | câmp | Numele scurt al taskului (cel mult 150 de caractere); apare în tabele.

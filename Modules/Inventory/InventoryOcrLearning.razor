@@ -1,0 +1,251 @@
+@page "/inventar/invatare-ocr"
+@namespace BlazorStoc.Components.Pages
+@attribute [Authorize(Policy = "perm:inventar-preluare.view")]
+@attribute [BlazorStoc.Modules.Module(BlazorStoc.Modules.Inventory.InventoryModule.ModuleId)]
+@rendermode @(new InteractiveServerRenderMode(prerender: false))
+@using BlazorStoc.Services
+@using System.Globalization
+@inject IOcrLearningService Learning
+@inject IAccessControl Access
+@inject ILogger<InventoryOcrLearning> Logger
+@implements IDisposable
+<PageBoundary>
+
+<PageTitle>Învățare OCR · BlazorStoc</PageTitle>
+<div class="page-heading">
+    <div><p class="eyebrow">SITUAȚIE DE STOC</p><h1>Învățare OCR</h1>
+        <p class="muted">Valorile citite greșit din formularele scanate și corectate de utilizator la preluarea inventarului. Alege corecțiile din care citirea trebuie să învețe.</p></div>
+    <div class="heading-actions">
+        <a class="refresh act-nav" href="/inventar/preluare">Preluare inventar</a>
+    </div>
+</div>
+
+@if (error is not null) { <div class="error-banner" role="alert">@error</div> }
+@if (notice is not null) { <div class="success-banner" role="status">@notice</div> }
+
+@if (loading)
+{
+    <div class="empty-state" role="status"><div class="spinner"></div><h3>Se încarcă corecțiile</h3></div>
+}
+else
+{
+    <section class="catalog ocr-learning">
+        <div class="catalog-heading">
+            <h2>Corecții <span class="count-badge">@result?.Total</span></h2>
+            <small>Nou @counts.New · Învățat @counts.Learned · Ignorat @counts.Ignored</small>
+        </div>
+        <div class="filters">
+            <label>Stare
+                <select id="ocr-filter-status" value="@filter.Status" @onchange="e => FilterChangedAsync(filter with { Status = e.Value?.ToString() ?? string.Empty })">
+                    <option value="">Toate</option>
+                    <option value="@OcrLearningStates.New">Nou</option>
+                    <option value="@OcrLearningStates.Learned">Învățat</option>
+                    <option value="@OcrLearningStates.Ignored">Ignorat</option>
+                </select>
+            </label>
+            <label>Tip
+                <select id="ocr-filter-kind" value="@filter.Kind" @onchange="e => FilterChangedAsync(filter with { Kind = e.Value?.ToString() ?? string.Empty })">
+                    <option value="">Toate</option>
+                    <option value="@OcrSampleKinds.Digit">Cifră</option>
+                    <option value="@OcrSampleKinds.Segment">Segmentare</option>
+                </select>
+            </label>
+            <label>Confuzie (citit → corect)
+                <select id="ocr-filter-pair" value="@filter.Pair" @onchange="e => FilterChangedAsync(filter with { Pair = e.Value?.ToString() ?? string.Empty })">
+                    <option value="">Toate</option>
+                    @foreach (var (pair, count) in pairs) { <option value="@pair">@OcrLearningRules.PairLabel(pair) (@count)</option> }
+                </select>
+            </label>
+        </div>
+
+        @if (isAdministrator)
+        {
+            <div class="catalog-body ocr-learning-actions">
+                <ToggleSwitch Value="@AllSelected" ValueChanged="ToggleAllAsync">Selectează toate de pe pagină</ToggleSwitch>
+                <div class="editor-actions">
+                    <button type="button" class="refresh act-confirm" disabled="@(busy || selected.Count == 0)" @onclick="() => SetStatusAsync(OcrLearningStates.Learned)">Învață din selecție</button>
+                    <button type="button" class="refresh act-close" disabled="@(busy || selected.Count == 0)" @onclick="() => SetStatusAsync(OcrLearningStates.Ignored)">Ignoră selecția</button>
+                    <button type="button" class="refresh act-reload" disabled="@(busy || selected.Count == 0)" @onclick="() => SetStatusAsync(OcrLearningStates.New)">Marchează nou</button>
+                    <button type="button" class="refresh act-close" disabled="@(busy || counts.Learned == 0)" @onclick="() => confirmReset = true">Resetează învățarea</button>
+                </div>
+                @if (confirmReset)
+                {
+                    <div class="demo-banner" role="alert">
+                        <span>Toate cele @counts.Learned corecții învățate redevin noi, iar citirea revine la modelul de bază. Continuăm?</span>
+                        <button type="button" class="refresh act-confirm" disabled="@busy" @onclick="ResetAsync">Confirmă resetarea</button>
+                        <button type="button" class="refresh act-close" @onclick="() => confirmReset = false">Renunță</button>
+                    </div>
+                }
+            </div>
+        }
+        else
+        {
+            <div class="catalog-body"><p class="muted">Doar administratorul alege corecțiile din care învață citirea.</p></div>
+        }
+
+        @if (result is null || result.Items.Count == 0)
+        {
+            <div class="empty-state"><h3>Nicio corecție</h3><p>Corecțiile apar aici după ce preiei un inventar în care ai schimbat valori citite de OCR.</p></div>
+        }
+        else
+        {
+            <div class="table-scroll">
+                <table>
+                    <thead><tr>
+                        @if (isAdministrator) { <th><span class="sr-only">Selectează</span></th> }
+                        <th>Captură din formular</th><th>Cod produs</th><th>Citit de OCR</th><th>Corectat</th><th>Cifră</th><th>Probabilități</th><th>Tip</th><th>Pag.</th><th>Data</th><th>Stare</th>
+                    </tr></thead>
+                    <tbody>
+                        @foreach (var sample in result.Items)
+                        {
+                            <tr @key="sample.Id" class="@(isAdministrator ? "selectable-row" : null) @(selected.Contains(sample.Id) ? "selected" : null)" @onclick="() => ToggleRow(sample.Id)">
+                                @if (isAdministrator)
+                                {
+                                    <td><RowSelect Selected="@selected.Contains(sample.Id)" AriaLabel="@($"Selectează corecția {sample.RawCode}")" SelectedChanged="@(value => SetRow(sample.Id, value))" /></td>
+                                }
+                                <td>@if (sample.CellPngBase64 is not null && sample.CellWidth > 0 && sample.CellHeight > 0)
+                                    {
+                                        <div class="ocr-shot" style="aspect-ratio:@sample.CellWidth / @sample.CellHeight">
+                                            <img alt="@($"Captura valorii citite pentru {sample.RawCode}")" src="data:image/png;base64,@sample.CellPngBase64" />
+                                            @if (sample.Kind == OcrSampleKinds.Digit && sample.BoxWidth > 0)
+                                            {
+                                                <span class="ocr-shot-box" style="@BoxStyle(sample)"></span>
+                                            }
+                                        </div>
+                                    }</td>
+                                <td>@sample.RawCode</td>
+                                <td>@(sample.OriginalValue?.ToString(CultureInfo.InvariantCulture) ?? "—")</td>
+                                <td>@sample.FinalValue.ToString(CultureInfo.InvariantCulture)</td>
+                                <td>@if (sample.Kind == OcrSampleKinds.Digit) { <span>@OcrLearningRules.PairLabel(sample.Pair) <small class="muted">(poziția @(sample.DigitIndex + 1))</small></span> } else { <span class="muted">—</span> }</td>
+                                <td>@(sample.Top3.Length == 0 ? "—" : sample.Top3)</td>
+                                <td>@OcrSampleKinds.Label(sample.Kind)</td>
+                                <td>@sample.Page</td>
+                                <td>@sample.CreatedUtc.ToLocalTime().ToString("dd.MM.yyyy HH:mm", CultureInfo.InvariantCulture)</td>
+                                <td><span class="ocr-state ocr-state-@sample.Status">@OcrLearningStates.Label(sample.Status)</span></td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+            <AuditPager Id="ocr-learning-page-size" Label="Corecții pe pagină" PageSizes="OcrLearningRules.PageSizes" PageSize="pageSize" Page="pageNumber" Total="result.Total"
+                        PageChanged="PageChangedAsync" PageSizeChanged="PageSizeChangedAsync" />
+        }
+    </section>
+}
+
+</PageBoundary>
+
+@code {
+    private bool loading = true, busy, isAdministrator, confirmReset;
+    private string? error, notice;
+    private OcrLearningFilter filter = new();
+    private OcrLearningPage? result;
+    private OcrLearningCounts counts = new(0, 0, 0);
+    private IReadOnlyList<(string Pair, int Count)> pairs = [];
+    private readonly HashSet<long> selected = [];
+    private int pageSize = 25, pageNumber = 1;
+    private readonly CancellationTokenSource lifetime = new();
+
+    private bool AllSelected => result is not null && result.Items.Count > 0 && result.Items.All(sample => selected.Contains(sample.Id));
+
+    protected override async Task OnInitializedAsync()
+    {
+        isAdministrator = await Access.IsAdministratorAsync(lifetime.Token);
+        await ReloadAsync();
+        loading = false;
+    }
+
+    private async Task ReloadAsync()
+    {
+        try
+        {
+            result = await Learning.QueryAsync(filter, pageNumber, pageSize, lifetime.Token);
+            counts = await Learning.CountsAsync(lifetime.Token);
+            pairs = await Learning.PairsAsync(lifetime.Token);
+            error = null;
+        }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (InventoryOperationException exception) { error = exception.Message; }
+        catch (Exception exception)
+        {
+            Logger.LogError("Loading the OCR corrections failed ({ErrorType}).", exception.GetType().Name);
+            error = "Corecțiile OCR nu au putut fi încărcate.";
+        }
+    }
+
+    private Task FilterChangedAsync(OcrLearningFilter value)
+    {
+        filter = value; pageNumber = 1; selected.Clear(); notice = null;
+        return ReloadAsync();
+    }
+
+    private Task PageChangedAsync(int value) { pageNumber = value; return ReloadAsync(); }
+    private Task PageSizeChangedAsync(int value) { pageSize = value; pageNumber = 1; return ReloadAsync(); }
+
+    private Task ToggleAllAsync(bool value)
+    {
+        if (result is null) return Task.CompletedTask;
+        foreach (var sample in result.Items) { if (value) selected.Add(sample.Id); else selected.Remove(sample.Id); }
+        return Task.CompletedTask;
+    }
+
+    private void ToggleRow(long id) { if (isAdministrator) SetRow(id, !selected.Contains(id)); }
+    private void SetRow(long id, bool value) { if (value) selected.Add(id); else selected.Remove(id); }
+
+    private async Task SetStatusAsync(string status)
+    {
+        if (busy || selected.Count == 0) return;
+        busy = true; notice = null; error = null;
+        try
+        {
+            var changed = await Learning.SetStatusAsync(selected.ToList(), status, lifetime.Token);
+            notice = status == OcrLearningStates.Learned && changed < selected.Count
+                ? $"{changed} corecții învățate. {OcrLearningRules.LearnOnlyDigitsMessage}"
+                : $"{changed} corecții actualizate: {OcrLearningStates.Label(status).ToLowerInvariant()}.";
+            selected.Clear();
+            await ReloadAsync();
+        }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (Exception exception) when (exception is InventoryOperationException or AccessDeniedException) { error = exception.Message; }
+        catch (Exception exception)
+        {
+            Logger.LogError("Changing the OCR corrections failed ({ErrorType}).", exception.GetType().Name);
+            error = "Modificarea nu a putut fi salvată.";
+        }
+        finally { busy = false; }
+    }
+
+    private async Task ResetAsync()
+    {
+        if (busy) return;
+        busy = true; notice = null; error = null; confirmReset = false;
+        try
+        {
+            var changed = await Learning.ResetLearnedAsync(lifetime.Token);
+            notice = $"{changed} corecții învățate au redevenit noi.";
+            selected.Clear();
+            await ReloadAsync();
+        }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (Exception exception) when (exception is InventoryOperationException or AccessDeniedException) { error = exception.Message; }
+        catch (Exception exception)
+        {
+            Logger.LogError("Resetting the OCR learning failed ({ErrorType}).", exception.GetType().Name);
+            error = "Resetarea nu a putut fi salvată.";
+        }
+        finally { busy = false; }
+    }
+
+    // The box of the digit inside the picture of its cell, as percentages of the cell (the picture is shown at any size).
+    private static string BoxStyle(OcrLearningSample sample)
+    {
+        static string Percent(int part, int whole) => (whole <= 0 ? 0 : 100.0 * part / whole).ToString("0.##", CultureInfo.InvariantCulture) + "%";
+        return $"left:{Percent(sample.BoxX, sample.CellWidth)};top:{Percent(sample.BoxY, sample.CellHeight)};width:{Percent(sample.BoxWidth, sample.CellWidth)};height:{Percent(sample.BoxHeight, sample.CellHeight)}";
+    }
+
+    public void Dispose()
+    {
+        lifetime.Cancel();
+        lifetime.Dispose();
+    }
+}

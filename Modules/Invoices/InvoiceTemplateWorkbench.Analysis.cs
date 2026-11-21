@@ -57,6 +57,7 @@ public partial class InvoiceTemplateWorkbench
     {
         if (busy) return;
         busy = true;
+        readPercent = 0;
         StateHasChanged();
         try
         {
@@ -65,7 +66,7 @@ public partial class InvoiceTemplateWorkbench
             var editing = EditTemplateId is { } editId ? await Templates.GetAsync(editId, lifetime.Token) : null;
             if (editing is not null)
             {
-                session = await Analysis.OpenAsync(stream, fileName, lifetime.Token);
+                session = await Analysis.OpenAsync(stream, fileName, lifetime.Token, ReadProgress());
                 await LoadRegistryAsync();
                 decimalHint = InvoiceValues.DecimalStyle(session.Document.AllWords.Select(word => word.Text));
                 suggestions = [];
@@ -76,7 +77,7 @@ public partial class InvoiceTemplateWorkbench
             }
             else
             {
-                session = await Analysis.AnalyzeAsync(stream, fileName, lifetime.Token);
+                session = await Analysis.AnalyzeAsync(stream, fileName, lifetime.Token, ReadProgress());
                 await LoadRegistryAsync();
                 decimalHint = InvoiceValues.DecimalStyle(session.Document.AllWords.Select(word => word.Text));
                 suggestions = InvoiceTemplateSuggestions.Rank(await Templates.GetAllAsync(lifetime.Token), session.Document);
@@ -95,8 +96,10 @@ public partial class InvoiceTemplateWorkbench
             error = "Fișierul nu a putut fi analizat. Încearcă din nou sau alt fișier.";
             session = null; draft = null;
         }
-        finally { busy = false; }
+        finally { busy = false; readPercent = -1; }
     }
+
+    private IProgress<int> ReadProgress() => new Progress<int>(value => { readPercent = value; _ = InvokeAsync(StateHasChanged); });
 
     private void UseAutomaticProposal()
     {

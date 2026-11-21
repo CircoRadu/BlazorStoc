@@ -60,7 +60,7 @@ public sealed class MariaUserRepository(IConfiguration configuration, IAccessCon
         await using var connection = await MariaDb.OpenAsync(configuration, cancellationToken).ConfigureAwait(false);
         await using var command = new MySqlCommand(
             """
-            SELECT u.id,u.username,u.display_name,u.role,u.is_active,u.version,u.user_type_id,COALESCE(t.name,''),u.must_change_password
+            SELECT u.id,u.username,u.display_name,u.role,u.is_active,u.version,u.user_type_id,COALESCE(t.name,''),u.must_change_password,u.is_developer
             FROM web_users u LEFT JOIN user_types t ON t.id=u.user_type_id ORDER BY u.username,u.id
             """, connection);
         await using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
@@ -148,7 +148,7 @@ public sealed class MariaUserRepository(IConfiguration configuration, IAccessCon
                     throw new UserOperationException("Utilizatorul s-a schimbat între timp. Actualizează lista.");
                 // A deactivated account suspends its authenticator (kept, unusable); when the account is active again the administrator chooses to resume or revoke it.
                 if (original.IsActive && !value.IsActive) await TwoFactorSql.SuspendForUserAsync(connection, transaction, original.Id, cancellationToken).ConfigureAwait(false);
-                return new WebUser(original.Id, value.Username, value.DisplayName, type.Role, value.IsActive, version, type.Id, type.Name, original.MustChangePassword || (passwordHash is not null && !ownAccount));
+                return new WebUser(original.Id, value.Username, value.DisplayName, type.Role, value.IsActive, version, type.Id, type.Name, original.MustChangePassword || (passwordHash is not null && !ownAccount), original.IsDeveloper);
             }, cancellationToken).ConfigureAwait(false);
             var target = $"#{updated.Id} · {updated.Username}";
             var typeChanged = original.TypeId != updated.TypeId || original.Role != updated.Role;
@@ -171,6 +171,27 @@ public sealed class MariaUserRepository(IConfiguration configuration, IAccessCon
         {
             throw new UserOperationException("Există deja un utilizator cu acest nume.");
         }
+    }
+
+    public async Task<WebUser> SetDeveloperAsync(WebUser original, bool isDeveloper, CancellationToken cancellationToken = default)
+    {
+        await EnsureAsync("utilizatori.edit", cancellationToken);
+        var updated = await WriteAsync(async (connection, transaction) =>
+        {
+            var current = await GetLockedAsync(connection, transaction, original.Id, cancellationToken).ConfigureAwait(false);
+            WebUserRules.CheckCurrent(current, original);
+            var version = checked(original.Version + 1);
+            await using var command = Command(connection, transaction, "UPDATE web_users SET is_developer=@dev, version=@version WHERE id=@id AND version=@oldVersion",
+                ("@dev", isDeveloper), ("@version", version), ("@id", original.Id), ("@oldVersion", original.Version));
+            if (await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false) != 1)
+                throw new UserOperationException("Utilizatorul s-a schimbat între timp. Actualizează lista.");
+            return original with { Version = version, IsDeveloper = isDeveloper };
+        }, cancellationToken).ConfigureAwait(false);
+        if (original.IsDeveloper != isDeveloper)
+            await AuditRecorder.RecordActionAsync(auditTrail, accessControl, AuditEntities.User, isDeveloper ? AuditActions.GrantDeveloper : AuditActions.RevokeDeveloper, updated.Id.ToString(),
+                $"#{updated.Id} · {updated.Username}", isDeveloper ? "Cont marcat ca dezvoltator: vede Dezvoltare (Setări) și filele Bugs și Propuneri din Notificări." : "Dreptul de dezvoltator a fost retras.", "", cancellationToken).ConfigureAwait(false);
+        permissions?.Invalidate();
+        return updated;
     }
 
     public async Task DeleteAsync(WebUser original, string reason, CancellationToken cancellationToken = default)
@@ -250,7 +271,7 @@ public sealed class MariaUserRepository(IConfiguration configuration, IAccessCon
     private static async Task<WebUser?> GetLockedAsync(MySqlConnection connection, MySqlTransaction transaction, int id, CancellationToken token)
     {
         await using var command = Command(connection, transaction, """
-            SELECT u.id,u.username,u.display_name,u.role,u.is_active,u.version,u.user_type_id,COALESCE(t.name,''),u.must_change_password
+            SELECT u.id,u.username,u.display_name,u.role,u.is_active,u.version,u.user_type_id,COALESCE(t.name,''),u.must_change_password,u.is_developer
             FROM web_users u LEFT JOIN user_types t ON t.id=u.user_type_id WHERE u.id=@id FOR UPDATE
             """, ("@id", id));
         await using var reader = await command.ExecuteReaderAsync(token).ConfigureAwait(false);
@@ -290,5 +311,5 @@ public sealed class MariaUserRepository(IConfiguration configuration, IAccessCon
     private Task EnsureAsync(string permission, CancellationToken token) => accessControl?.EnsureAsync(permission, token) ?? Task.CompletedTask;
     private Task<string?> GetCurrentUsernameAsync(CancellationToken token) => accessControl?.GetUsernameAsync(token) ?? Task.FromResult<string?>(null);
     private static WebUser ReadUser(MySqlDataReader reader) => new(reader.GetInt32(0), reader.GetString(1), reader.GetString(2),
-        reader.GetString(3), reader.GetBoolean(4), reader.GetInt64(5), reader.IsDBNull(6) ? null : reader.GetInt64(6), reader.GetString(7), reader.GetBoolean(8));
+        reader.GetString(3), reader.GetBoolean(4), reader.GetInt64(5), reader.IsDBNull(6) ? null : reader.GetInt64(6), reader.GetString(7), reader.GetBoolean(8), reader.GetBoolean(9));
 }

@@ -6,10 +6,10 @@ namespace BlazorStoc.Services;
 
 public interface IConsumptionNotePdfWriter
 {
-    byte[] Write(ExitOperationDetails operation, DateTime generatedLocal);
+    byte[] Write(ConsumptionNoteDetails note, DateTime generatedLocal);
 }
 
-// Bon de consum / aviz de predare of an exit operation: recipient, project, the products with quantities, the reference and room for the two
+// Bon de consum / aviz de predare of a project (a stored consumption note): beneficiary, project, the equipment with the date of each movement and room for the two
 // signatures. Same embedded font and PdfSharp drawing as the inventory sheet.
 public sealed class ConsumptionNotePdfWriter : IConsumptionNotePdfWriter
 {
@@ -24,7 +24,7 @@ public sealed class ConsumptionNotePdfWriter : IConsumptionNotePdfWriter
     private static readonly XSolidBrush RedBrush = new(XColors.Red);
     private static readonly XPen RulePen = new(XColors.Black, 0.75);
 
-    public byte[] Write(ExitOperationDetails operation, DateTime generatedLocal)
+    public byte[] Write(ConsumptionNoteDetails details, DateTime generatedLocal)
     {
         _ = FontResolverReady;
         using var document = new PdfDocument();
@@ -60,28 +60,25 @@ public sealed class ConsumptionNotePdfWriter : IConsumptionNotePdfWriter
             return lines;
         }
 
+        var note = details.Note;
         NewPage();
         Line("Bon de consum / aviz de predare", TitleFont, height: 24);
-        Line($"Operația nr. {operation.OperationId} · Data: {StockMovementRules.DisplayDate(operation.Date)}", BoldFont);
-        if (operation.VoidedUtc is not null)
-            Line($"OPERAȚIE STORNATĂ{(string.IsNullOrWhiteSpace(operation.VoidReason) ? "" : $" — motiv: {operation.VoidReason}")}", BoldFont, RedBrush);
+        Line($"Bon nr. {note.Id} · Data: {StockMovementRules.DisplayDate(note.Date)}", BoldFont);
+        if (!note.Active) Line("BON INACTIV — a fost înlocuit de un bon mai nou al proiectului", BoldFont, RedBrush);
         y += 6;
-        if (operation.Destination is { } destination) Line($"Destinația: {StockMovementRules.DestinationLabel(destination)}", NormalFont);
-        if (operation.BeneficiaryName is not null)
-            Line($"Beneficiar: {operation.BeneficiaryName}{(string.IsNullOrWhiteSpace(operation.BeneficiaryCui) ? "" : $" (CUI {operation.BeneficiaryCui})")}", NormalFont);
-        if (operation.ProjectName is not null) Line($"Proiect: {operation.ProjectName}", NormalFont);
-        if (operation.VehiclePlate is not null) Line($"Vehicul: {operation.VehiclePlate}", NormalFont);
-        if (!string.IsNullOrWhiteSpace(operation.Reference)) Line($"Referință: {operation.Reference}", NormalFont);
-        Line($"Operator: {operation.Operator}", NormalFont);
+        Line("Destinația: Beneficiar", NormalFont);
+        Line($"Beneficiar: {note.BeneficiaryName}{(string.IsNullOrWhiteSpace(note.BeneficiaryCui) ? "" : $" (CUI {note.BeneficiaryCui})")}", NormalFont);
+        Line($"Proiect: {note.ProjectName}", NormalFont);
+        Line($"Operator: {note.Operator}", NormalFont);
         y += 8;
 
-        double[] columnWidths = [30, width * 0.34, 55, 80, width - 30 - width * 0.34 - 55 - 80];
+        double[] columnWidths = [30, 70, width - 30 - 70 - 55 - width * 0.22, width * 0.22, 55];
         double[] columnX = new double[5];
         void Header()
         {
             var x = PageMargin;
             for (var i = 0; i < 5; i++) { columnX[i] = x; x += columnWidths[i]; }
-            string[] titles = ["Nr.", "Produs", "Cant.", "Sursa", "Descriere"];
+            string[] titles = ["Nr.", "Data", "Produs", "Subcategorie", "Cant."];
             gfx.DrawRectangle(RulePen, PageMargin, y, width, LineHeight + 2);
             for (var i = 0; i < 5; i++)
             {
@@ -93,26 +90,26 @@ public sealed class ConsumptionNotePdfWriter : IConsumptionNotePdfWriter
 
         // The columns are laid out when the first page is drawn (the width is the same on every page).
         Header();
-        var number = 0;
-        foreach (var item in operation.Lines)
+        foreach (var item in details.Lines)
         {
-            number++;
-            var product = Wrap(item.ProductName, NormalFont, columnWidths[1] - 2 * CellPadding);
-            var description = Wrap(item.Description, NormalFont, columnWidths[4] - 2 * CellPadding);
-            var source = Wrap(item.Source, NormalFont, columnWidths[3] - 2 * CellPadding);
-            var rows = Math.Max(product.Count, Math.Max(description.Count, source.Count));
+            var product = Wrap(item.ProductName, NormalFont, columnWidths[2] - 2 * CellPadding);
+            var subcategory = Wrap(item.Subcategory, NormalFont, columnWidths[3] - 2 * CellPadding);
+            var rows = Math.Max(product.Count, subcategory.Count);
             var height = rows * LineHeight + 2 * CellPadding;
             if (y + height > bottom) { NewPage(); Header(); }
             gfx.DrawRectangle(RulePen, PageMargin, y, width, height);
             for (var i = 1; i < 5; i++) gfx.DrawLine(RulePen, columnX[i], y, columnX[i], y + height);
-            gfx.DrawString(number.ToString(CultureInfo.InvariantCulture), NormalFont, BlackBrush, new XRect(columnX[0] + CellPadding, y + CellPadding, columnWidths[0], LineHeight), XStringFormats.TopLeft);
-            gfx.DrawString(item.Quantity.ToString(CultureInfo.InvariantCulture), NormalFont, BlackBrush, new XRect(columnX[2] + CellPadding, y + CellPadding, columnWidths[2], LineHeight), XStringFormats.TopLeft);
+            void Text(string text, int column) =>
+                gfx.DrawString(text, NormalFont, BlackBrush, new XRect(columnX[column] + CellPadding, y + CellPadding, columnWidths[column], LineHeight), XStringFormats.TopLeft);
+            Text(item.Position.ToString(CultureInfo.InvariantCulture), 0);
+            Text(StockMovementRules.DisplayDate(item.MovementDate), 1);
+            Text(item.Quantity.ToString(CultureInfo.InvariantCulture), 4);
             void Cell(List<string> lines, int column)
             {
                 for (var i = 0; i < lines.Count; i++)
                     gfx.DrawString(lines[i], NormalFont, BlackBrush, new XRect(columnX[column] + CellPadding, y + CellPadding + i * LineHeight, columnWidths[column], LineHeight), XStringFormats.TopLeft);
             }
-            Cell(product, 1); Cell(source, 3); Cell(description, 4);
+            Cell(product, 2); Cell(subcategory, 3);
             y += height;
         }
 

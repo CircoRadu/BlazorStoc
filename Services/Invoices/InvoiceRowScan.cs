@@ -114,8 +114,7 @@ public static partial class InvoiceTableReader
                 CollectRuledPage(page, pageColumns, startY, cells);
                 return;
             }
-            if (indexColumn >= 0) anchors = RunningNumberAnchors(page, cells);
-            else if (page.Number == headerPage || rows.Count > 0)
+            if (indexColumn >= 0) anchors = RunningNumberAnchors(page, cells);            else if (page.Number == headerPage || rows.Count > 0)
             {
                 // Without running numbers the rows are told apart by their amounts, so the totals under the table must be cut off first:
                 // the first line that opens the footer ("Subtotal", "Total amount due", "Total fara TVA") ends the table.
@@ -132,7 +131,7 @@ public static partial class InvoiceTableReader
         {
             var anchors = new List<RowAnchor>();
             // A zone that starts under the first rows (the user cut off a row that is not goods) starts the running numbers at the first number in it.
-            if (page.Number == headerPage && expected == 1 && refined[indexColumn].ZoneTop > 0 && cells.Where(cell => cell.Column == indexColumn).OrderBy(cell => cell.Segment.CenterY).Select(cell => ParseIndex(cell.Segment.Text)).FirstOrDefault(number => number is not null) is { } firstNumber)
+            if (page.Number == headerPage && expected == 1 && refined[indexColumn].ZoneTop > 0 && cells.Where(cell => cell.Column == indexColumn).OrderBy(cell => cell.Segment.CenterY).Select(cell => ParseIndexLoose(cell.Segment.Text)).FirstOrDefault(number => number is not null) is { } firstNumber)
                 expected = firstNumber;
             foreach (var cell in cells.Where(cell => cell.Column == indexColumn).OrderBy(cell => cell.Segment.CenterY))
             {

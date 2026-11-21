@@ -28,8 +28,18 @@ public static class BeneficiaryCheckReasons
 /// <summary>A partner to verify. BeneficiaryId is empty while no beneficiary was made (missing address); WaitingTickets are the tickets that wait for the clarification.</summary>
 public sealed record BeneficiaryCheck(long Id, long PartnerId, int? BeneficiaryId, string Name, string Cui, string Reason, string ReasonText, DateTime CreatedUtc, int WaitingTickets);
 
+/// <summary>Where a beneficiary came from in ActivityApp: created by the import (Created) or already in BlazorStoc and only tied to its partner (otherwise); SourceDeleted = the partner was deleted in ActivityApp since.</summary>
+public sealed record BeneficiaryOrigin(bool Created, bool SourceDeleted)
+{
+    /// <summary>The note shown with the beneficiary: "Preluat din ActivityApp" (created by the import) or "Legat cu ActivityApp" (an existing beneficiary tied to its partner).</summary>
+    public string Text => (Created ? "Preluat din ActivityApp" : "Legat cu ActivityApp") + (SourceDeleted ? " (șters ulterior în ActivityApp)" : "");
+}
+
 public interface IBeneficiaryCheckService
 {
+    /// <summary>Per beneficiary id: where it came from in ActivityApp (computed from the ties of the import, nothing is stored on the beneficiary). A beneficiary that did not come from there is absent; empty while the module is out.</summary>
+    Task<IReadOnlyDictionary<int, BeneficiaryOrigin>> GetOriginsAsync(CancellationToken cancellationToken = default) => Task.FromResult<IReadOnlyDictionary<int, BeneficiaryOrigin>>(new Dictionary<int, BeneficiaryOrigin>());
+
     /// <summary>The beneficiaries (partners) to verify, oldest first.</summary>
     Task<IReadOnlyList<BeneficiaryCheck>> GetPendingAsync(CancellationToken cancellationToken = default);
     /// <summary>Asks ANAF again about the CUI: when it knows it, the beneficiary is verified and its tickets are taken at the next import. Returns the message to show.</summary>

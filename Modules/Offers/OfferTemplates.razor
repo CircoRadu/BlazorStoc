@@ -18,9 +18,10 @@
 @if (editing)
 {
     <section class="catalog offer-template-editor" aria-label="Editor de șablon">
-        <div class="catalog-heading"><h2>@(original is null ? "Șablon nou" : $"Modifică șablonul {original.Name}")</h2><span class="heading-actions"><HelpButton Topic="oferte-sablon-editor" About="Editorul de șablon de ofertă" /><button type="button" class="danger" disabled="@busy" @onclick="CloseEditor">Închide</button></span></div>
+        <div class="catalog-heading"><h2>@(original is null ? "Șablon nou" : $"Modifică șablonul {original.Name}")</h2><span class="heading-actions"><HelpButton Topic="oferte-sablon-editor" About="Editorul de șablon de ofertă" /><button type="button" class="danger" disabled="@busy" @onclick="CloseEditor" data-head-close>Închide</button></span></div>
         <div class="catalog-body">
         <FileDropZone Id="offer-sample" Accept=".xlsx" Disabled="busy" OnChange="SampleChosenAsync" Text="Trage aici un fișier de probă .xlsx sau alege-l (nu se păstrează)" />
+        @if (busy && uploadPercent >= 0) { <div class="catalog-body" role="status"><p class="muted">Se încarcă fișierul… <span id="offer-sample-percent" class="scan-percent">@uploadPercent%</span></p><ProgressBar Percent="uploadPercent" Label="Progresul încărcării fișierului" /></div> }
         @if (workbook is not null && workbook.Sheets.Count > 1)
         {
             <label class="movement-page-size">Foaia
@@ -161,16 +162,14 @@ else
 
 @if (deleting is not null)
 {
-    <div class="delete-overlay">
-        <section class="delete-dialog" role="dialog" aria-modal="true" aria-labelledby="offer-template-delete-title">
+    <AppDialog LabelledBy="offer-template-delete-title">
             <h2 id="offer-template-delete-title">Ștergi șablonul? – @deleting.Name</h2>
             <p>Șablonul se șterge definitiv; ofertele deja preluate nu se schimbă. Se înregistrează în jurnal.</p>
             <div class="editor-actions">
                 <button type="button" class="danger" disabled="@busy" @onclick="DeleteAsync">@(busy ? "Se șterge…" : "Șterge șablonul")</button>
                 <button type="button" class="refresh act-close" disabled="@busy" @onclick="() => deleting = null">Renunț</button>
             </div>
-        </section>
-    </div>
+    </AppDialog>
 }
 
 </PageBoundary>
@@ -182,6 +181,7 @@ else
     private readonly CancellationTokenSource lifetime = new();
     private List<OfferTemplateRecord> templates = [];
     private bool loading = true, busy, editing, isAdministrator;
+    private int uploadPercent = -1;   // the share of the chosen sample already received (-1: no upload in progress)
     private string? error, notice;
     private OfferTemplateRecord? original, deleting;
     private string name = "";
@@ -241,7 +241,8 @@ else
             if (!file.Name.EndsWith(".xlsx", StringComparison.OrdinalIgnoreCase)) throw new XlsxFormatException(XlsxReader.NotXlsxMessage);
             await using var input = file.OpenReadStream(MaxSampleBytes, lifetime.Token);
             using var memory = new MemoryStream();
-            await input.CopyToAsync(memory, lifetime.Token);
+            await StreamProgress.CopyAsync(input, memory, file.Size, new Progress<int>(value => { uploadPercent = value; _ = InvokeAsync(StateHasChanged); }), lifetime.Token);
+            uploadPercent = -1;
             memory.Position = 0;
             workbook = XlsxReader.Read(memory);
             var sheet = workbook.Sheet(definition.Sheet) ?? workbook.Sheets[0];
@@ -256,7 +257,7 @@ else
         catch (XlsxFormatException ex) { error = ex.Message; workbook = null; }
         catch (IOException) { error = $"Fișierul depășește {MaxSampleBytes / (1024 * 1024)} MB sau nu a putut fi citit."; workbook = null; }
         catch (Exception ex) { Logger.LogError("Offer sample reading failed ({ErrorType}).", ex.GetType().Name); error = XlsxReader.NotXlsxMessage; workbook = null; }
-        finally { busy = false; }
+        finally { busy = false; uploadPercent = -1; }
     }
 
     private void SheetChanged(ChangeEventArgs args) { definition.Sheet = args.Value?.ToString(); reading = null; }

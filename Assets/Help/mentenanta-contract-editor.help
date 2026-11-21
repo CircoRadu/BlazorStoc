@@ -1,13 +1,13 @@
 # Formularul de contract de mentenanță
 Cautare: contract mentenanta formular numar data ciclicitate valabil puncte de lucru prima interventie scadenta mutare
-Captura: formular | /beneficiari | click Panoramic Hotel; wait 3000; click Adaugă contract; wait 900; height 2150 | Formularul de contract
+Captura: formular | /beneficiari | click Panoramic Hotel; wait 3000; click sel:#subtab-bf-mentenanta; wait 1500; click Adaugă contract; wait 900; height 2150 | Formularul de contract
 
 Formularul pentru un contract nou sau pentru editarea unuia existent. Se deschide în fișa beneficiarului. Contractul acoperă unul sau mai multe dintre punctele de lucru ale beneficiarului.
 
 ## Elemente
 ### Contractul
 - Număr / dată contract * | câmp | Se acceptă 26/23.09.2025, 26 / 23.09.2025 sau 26 din 23.09.2025; se afișează ca număr/dată.
-- Ciclicitate (luni) * | listă | Ciclicitatea globală a contractului; fiecare punct o poate înlocui cu una proprie.
+- Ciclicitate globală (luni) | listă | Ciclicitatea globală a contractului; fiecare punct o poate înlocui cu una proprie.
 - Valabil până la | câmp | Data de expirare, opțională („Fără termen” o șterge). Nu oprește singură mentenanța.
 - Observații | câmp | Text liber.
 ### Puncte de lucru din contract
@@ -20,6 +20,10 @@ Formularul pentru un contract nou sau pentru editarea unuia existent. Se deschid
 ### Butoane
 - Salvează | buton | Salvează contractul. | sel: .editor-actions button.primary
 - Închide, Anulează | buton | Închid formularul; dacă ai modificat ceva, ești întrebat dacă renunți.
+### Noutăți
+- Data de referință | câmp | Obligatorie.
+- Ciclicitate globală | câmp | Opțională.
+- Componente acoperite | secțiune | Familii cu elemente On/Off, componente discrete și ciclicitate/referință pe unitate; un contract incomplet este înghețat (notă de înghețare) și apare în Notificări → Contracte incomplete ([[nomenclator-componente-mentenanta]]).
 
 ## Flux: Cum adaug un contract de mentenanță
 1. Scrie numărul și data contractului și alege ciclicitatea.

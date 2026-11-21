@@ -55,7 +55,7 @@ public static partial class MariaExtendedChecks
             var withAge = await backupStore.GetAsync();
             var badAge = await Rejects<NasBackupException>(() => backupStore.SaveAsync(new(true, "23:59", 0, false, 30)), "An age below one day is refused");
             var tooOld = await Rejects<NasBackupException>(() => backupStore.SaveAsync(new(true, "23:59", 31, false, 30)), "An age above thirty days is refused");
-            var badRetention = await Rejects<NasBackupException>(() => backupStore.SaveAsync(new(true, "23:59", 2, true, 3)), "A retention below seven days is refused");
+            var badRetention = await Rejects<NasBackupException>(() => backupStore.SaveAsync(new(true, "23:59", 2, true, 3)), "A retention below four days is refused");
             await new MariaBackupSettingsStore(configuration).RecordBackupErrorAsync("cauza de proba", default);
             var withError = await new MariaBackupAlertReader(configuration).GetAsync();
             Check(withAge.MaxAgeDays == 7 && withAge.RetentionEnabled && withAge.RetentionDays == 14 && badAge is not null && tooOld is not null && badRetention is not null

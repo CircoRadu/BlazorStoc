@@ -2,14 +2,22 @@
 Cautare: produs formular cod model categorie subcategorie parametri descriere imagine lipire ctrl v clipboard salveaza pregateste produs nou
 Captura: formular | /produse | click Adaugă produs; wait 1500; full | Formularul de produs
 Captura: editare | /produse | type .search-box input=PIR-DUAL; wait 1000; click sel:.row-icon.view; wait 1500; click Editează; wait 6000; height 1500 | Editarea unui produs existent
-Captura: parametri | /produse | click Adaugă produs; wait 1500; select #product-category = Supraveghere video; wait 800; select #product-subcategory = Camere speciale; wait 1200; height 1500 | Produs într-o subcategorie cu parametri obligatorii
+Captura: parametri | /produse | click Adaugă produs; wait 1500; click sel:#product-group-trigger; wait 700; jsclick Supraveghere video; wait 700; jsclick Camere speciale; wait 1200; height 1500 | Produs într-o subcategorie cu parametri obligatorii
 
 Formularul pentru un produs nou sau pentru editarea unuia existent. Se deschide deasupra catalogului sau ca fereastră în fluxurile de preluare (factură, ofertă), unde „Pregătește produs nou” îl pregătește fără să-l adauge în catalog (se adaugă la finalizarea preluării).
+
+**Fereastra**: Adăugarea și editarea unui produs se fac într-o fereastră peste catalog.
+
+**Parametri**: Fiecare parametru obligatoriu al frunzei se completează; tipurile sunt Număr, Text, Interval (De la / Până la) și Valoare fixă (în familie: alegerea ei dă familiei valoarea); la o familie se alege membrul activ.
+
+**Etichete**: Etichetele frunzei sunt On/Off.
+
+**Produs blocat**: Un produs cu parametri necompletați este blocat până se completează ([[produse-detaliu]]).
 
 ## Elemente
 ### Identificare
 - Cod produs / Model * | câmp | Codul stabilit de producător. Dacă subcategoria are parametri obligatori, aici scrii modelul (fără variantă), iar codul se compune din model și valorile alese. Aplicația te avertizează dacă a găsit caractere care se confundă ușor cu litere sau cifre. | img: parametri | sel: .product-editor .editor-grid > label.full-width:first-child
-- Categorie *, Subcategorie * | listă | Doar combinații existente. „Adaugă categorie / subcategorie” (la produs nou) deschide pagina de categorii într-o fereastră separată; „Gata, înapoi la produs” o închide.
+- Categorie *, Subcategorie * | listă | Doar combinații existente. „Adaugă categorie / subcategorie” (și la adăugarea, și la editarea unui produs) deschide pagina de categorii într-o fereastră separată; „Gata, înapoi la produs” o închide.
 - Parametrii obligatori | listă | Pentru fiecare parametru alegi o valoare; „Adaugă valoarea” adaugă o valoare nouă în listă. Sub ei vezi „Codul produsului rezultat”. | img: parametri | sel: .product-editor select:not(#product-category):not(#product-subcategory)
 - Descriere | câmp | Text liber, cel mult 1000 de caractere.
 ### Imagine
@@ -22,6 +30,8 @@ Formularul pentru un produs nou sau pentru editarea unuia existent. Se deschide 
 - Motivul modificării | câmp | Doar la editare: rezumatul modificărilor se generează sau scrii un motiv propriu. | img: editare | sel: fieldset.change-reason-field
 - Salvează produsul / Pregătește produsul | buton | Salvează (la editare cere confirmarea modificărilor) sau pregătește produsul pentru preluare. | sel: .editor-actions button.primary | img: formular
 - Anulează, Închide | buton | Închid formularul; dacă ai modificat ceva, ești întrebat dacă renunți.
+### Noutăți
+- Categorie / subcategorie | selector | Un selector arborescent (tot arborele, orice adâncime; se aleg doar frunzele) înlocuiește cele două liste; sub el apar parametrii și etichetele frunzei.
 
 ## Flux: Cum adaug un produs nou
 1. Scrie codul (sau modelul), alege categoria și subcategoria.

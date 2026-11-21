@@ -20,6 +20,12 @@ Un produs dintr-o subcategorie cu parametri obligatori nu poate fi salvat sau mi
 - Tabel parametri | tabel | Parametrul, tipul, unitatea, familia, câte valori are și câte produse îl folosesc.
 - Valorile parametrului | iconita:view | Deschide sub rând lista valorilor, cu adăugare, editare (administrator) și ștergere.
 - Editează / Șterge parametrul | iconita:edit | Doar administrator; la ștergere produsele pierd valoarea și codul lor se rescrie.
+### Noutăți
+- Fereastra | text | Fereastra unică „Parametri și etichete” are trei secțiuni pliabile (Etichete, Familii de parametri, Parametri) cu tabele și butoane de adăugare; o iconiță unică pe subcategorie; pe subcategorii apare nota „Moștenește de la categorie”.
+- Tipuri de parametri | text | Număr, Text, Interval (două câmpuri De la / Până la) și Valoare fixă (doar în familie); la editare câmpul „Tip parametru” validează valorile existente.
+- Familii de parametri | secțiune | Creare, editare, desfacere; formularul de produs alege membrul activ.
+- Ștergere | text | Ștergerea unui parametru e permisă și cu produse: confirmarea arată un tabel cod actual / cod nou; codurile identice sunt refuzate.
+- Arhivare | iconita:delete | Iconița „Arhivează” înlocuiește ștergerea; secțiunea „Arhivă” are filele Arhivă și Nefolosite, ferestre de arhivare, restaurare (cu probleme și redenumire) și istoricul de utilizare. Perioada de păstrare se setează în Setări → Catalog.
 
 ## Flux: Cum definesc un parametru obligatoriu
 1. În „Categorii și subcategorii” apasă iconița „Parametri obligatori” de pe rândul subcategoriei.

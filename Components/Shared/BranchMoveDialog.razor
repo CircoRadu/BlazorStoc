@@ -7,8 +7,7 @@
    into the namesakes of the new parents, when the user agrees), those of the new parents are gained, and the products that lack what is gained are listed and must be accepted.
    The preview is a rolled-back run of the real move. The same dialog also promotes a leaf to a category (stage 7): the user first names the subcategory that will stay under the new
    category (the old name goes to the category), the checks run as a rolled-back preview of the whole change, and nothing is written before they pass and the user confirms. *@
-<div class="delete-overlay">
-<section class="delete-dialog archive-dialog take-dialog" role="dialog" aria-modal="true" aria-labelledby="@TitleId">
+<AppDialog PanelClass="archive-dialog take-dialog" LabelledBy="@TitleId">
     <div class="catalog-heading dialog-head"><h2 id="@TitleId">@(Promote ? "Transformare în categorie" : "Verificări la mutare") · @Node.Subcategory</h2><HelpButton Topic="categorii-parametri" About="@(Promote ? "Transformarea unei subcategorii în categorie" : "Verificările la mutarea unei subcategorii")" /></div>
     @if (Promote)
     {
@@ -81,8 +80,7 @@
             <button type="button" class="danger" @onclick="() => Closed.InvokeAsync()">@(Promote ? "Anulează" : "Închide")</button>
         </div>
     }
-</section>
-</div>
+</AppDialog>
 
 @code {
     // What the drag asked for: the node, its new parent (null = first level), the category it ends in and the place among its siblings.

@@ -877,3 +877,193 @@ Cerut de utilizator la 06.10.2026 (verificarea fluxului, apoi deciziile: facturi
 ## Finalizat la 09.11.2026 17:12 - Bara popup-ului ancorata de popup (BUG-0006)
 
 - Bara cu Raporteaza o eroare / Propune / cerc de inchidere se pozitioneaza fata de popup si se muta odata cu el la derulare (nu mai ramane la marginea de sus a ecranului); in colt cand nu e loc deasupra; iese din ecran odata cu popup-ul. Modificare in wwwroot/bug-report.js, nepachetata (dupa 0.5.61).
+
+## Finalizat la 10.11.2026 09:51 - Tichet exemplu: fereastra usoara prin retea
+
+- Fereastra Tichet exemplu (TicketSampleDialog) nu se mai redeseneaza la fiecare randare a panoului: ShouldRender dupa semnatura a ceea ce afiseaza; Folosit pentru si listele de tinte calculate o data per actualizare.
+- Coloana Foloseste pentru are butonul Alege... care deschide lista doar pe randul ales (inainte: o lista pe fiecare coloana cu text); teste actualizate (ActivityFieldSettingsChecks, ActivityImportPanelChecks).
+- Verificari: grupul activityimport trecut.
+
+## Finalizat la 10.11.2026 09:51 - Preluarea tichetelor separata de modulul Mentenanta
+
+- Decizia pe un tichet se pastreaza in activity_ticket_outcomes (migrarea 84, stari pending/applying/applied/failed); tichetul iese din coada si ramane legat in harta si cu Mentenanta oprita.
+- Interventia si scadentele se inregistreaza prin TicketOutcomeApplication (la decizie, daca Mentenanta ruleaza) sau de TicketOutcomeWorker din Mentenanta (fiecare minut, in ordinea datelor, la pornirea modulului) prin ITicketOutcomeProcessor din Services; mesaje de in asteptare/refuzate in Validare tichete; audit cu Inregistrare in Mentenanta.
+- Calea veche (tichet cu interventie la cerere existenta) cere in continuare Mentenanta. ActivityImport 0.14.1, Maintenance 1.11.1.
+- Verificari: sectiunea MariaDB Activity import (170, inclusiv scenariul cu Mentenanta oprita), grupurile activityimport, modules (arhitectura), moduleversions, help.
+
+## Finalizat la 10.11.2026 09:51 - Taskuri: taburi pe utilizator, ordine proprie, stadiu si jurnal al taskului
+
+- Pagina Taskuri utilizator: tab Nepreluate (global) si un tab pe utilizator cu taskuri (UserTaskTabs), taskuri active numerotate cu ordine proprie (maner de tragere task-order.js si sageti), finalizate dedesubt cu comutator de ascundere, taskuri finalizate editabile.
+- Camp nou Stadiu / note de lucru (SetNoteAsync, utilizator sau administrator, si dupa finalizare), Jurnalul taskului pliabil in detalii (GetHistoryAsync din audit_events cu regula de vizibilitate a taskului), actiuni de jurnal Modificare stadiu task si Reordonare taskuri utilizator; Taskurile mele arata numarul curent. Migrarea 85 (sort_order, progress_note; numerotarea taskurilor vechi o face aplicatia, migratorul nu are drepturi pe date). Tasks 1.2.1, Journal 1.4.21.
+- Verificari: sectiunea MariaDB User tasks (70), grupul usertasks (tabs si detalii, 14), help, moduleversions, package.
+
+## Finalizat la 10.11.2026 10:52 - Popup-uri lente si pierderea conexiunii: bucla in bug-report.js
+
+- Cauza: moveHeadingClose scria din nou clasa popup-close-moved pe butonul de inchidere la fiecare trecere (classList.add pe o clasa existenta tot scrie atributul), iar MutationObserver-ul barei popup-ului relua place() fara sfarsit cat era un popup deschis: 237.000 de mutatii in 3 secunde, blocari de pana la 6 secunde, selectii care se deschid greu, inchidere lenta, pierderea conexiunii (pachetele 0.5.60-0.5.62).
+- Corectie: clasa se scrie doar daca butonul nu o are (wwwroot/bug-report.js); masurat pe instanta separata (baza de test): 0 mutatii in 3 secunde cu popup deschis, fara sarcini lungi, popup-ul se inchide imediat. Test nou: grupul popupscript.
+- Nepachetata: necesita pachet nou (0.5.63).
+
+## Finalizat la 10.11.2026 12:40 - Corespondenta tichet ActivityApp: mutare, camp nou, sumar, suspendarea importului
+
+- Tichet exemplu: optiuni "Tichet - nume" / "Eveniment - nume"; o informatie are o singura coloana, alegerea unei coloane deja asignate o muta (informatia obligatorie care o avea o preia pe cea ramasa libera, cea optionala se opreste) cu mesaj; "Camp suplimentar nou" deschide fereastra de nume si destinatie; campurile suplimentare nu mai au limita si numele lor se pot repeta; un camp existent se poate muta pe alta coloana; lista lor are paginare.
+- Sumar la finalul ferestrei: informatie, coloana sursa, valoare, destinatie + observatiile intervenției.
+- Importul tichetelor se suspenda la orice schimbare a structurii (coloana noua, disparuta, alt tip): nimic nu se preia, rularea e "suspended", fara numaratoare de esecuri; notificarea ceruta existenta spune ca preluarea e suspendata; "Corespondenta verificata" o reia (ordinea datelor). Actiune noua in jurnal: Suspendare preluare ActivityApp: structura schimbata (o data).
+- Module: ActivityImport 0.15.0, Journal 1.4.22; versiune 0.5.64 (fara migrare). Teste: grup activityimport 253 PASS, MariaDB sectiunea tichete 52 PASS.
+
+## Ferestre unitare: componenta AppDialog (10.11.2026, versiune 0.5.65)
+- `Components/Shared/AppDialog.razor` (+ `AppDialogSize.cs`, `wwwroot/app-dialog.js`, CSS la finalul `wwwroot/app.css`): structura fixa fundal > cadru > [bara rezervata de 56 px | panou (antet cu titlu + HelpButton, corp care deruleaza, subsol optional)]. Parametri: Title/TitleContent, TitleId, HelpTopic/HelpAbout, Size (Auto/S/M/L/XL), OnClose, Footer, PanelClass, BackdropClass, OnKeyDown, OnBackdropClick/MouseDown, ShowModuleActions, ShowClose, Native+Id (un <dialog> deschis cu showModal din script: ferestrele raportului, propunerii si deconectarii).
+- Butoanele barei vin din registrul `Services/DialogBarActions.cs` (`DialogBarAction`, inregistrate de module cu `services.AddDialogBarAction`): BugReports "Raporteaza o eroare" (ordin 10) si Proposals "Propune" (ordin 20); se afiseaza doar pentru modulele care functioneaza si se actualizeaza singure (ModuleRegistry.Changed) si in ferestrele deschise. Niciun modul nu refera altul.
+- Butonul rotund de inchidere apeleaza OnClose; fara OnClose apasa butonul de inchidere pe care il are fereastra (data-head-close / act-close / cuvintele sigure) prin app-dialog.js, deci fluxul "Inchide" (avertizare modificari nesalvate) ramane acelasi. Escape inchide fereastra de sus (un singur listener pe document, fara observatori).
+- Sub 720 px butoanele barei devin iconite rotunde de 32 px cu simbolul centrat si eticheta pastrata pentru cititoare de ecran.
+- Migrare integrala: toate ferestrele din Components, Modules si Pages (64 de fisiere, aproximativ 100 de ferestre) folosesc AppDialog; testul `-Group appdialog` (PopupScriptChecks) interzice delete-overlay, role="dialog", <dialog> si fundaluri de modal scrise de mana in afara AppDialog.razor si cere ca scripturile sa nu aiba MutationObserver.
+- `wwwroot/bug-report.js`: scoase makeBar/place/reposition/moveHeadingClose/observer si clasele CSS vechi; ramane captura paginii (data-bug-popup / data-proposal-popup).
+- Verificat in browser (instanta separata pe baza de test): ferestre de tipuri diferite pe 1280x720 si pe mobil 375 px (iconite rotunde), ferestre suprapuse (intrebarea de modificari nesalvate peste editor), Escape, ferestrele native (raport, propunere, deconectare), oprirea/pornirea unui modul cu fereastra deschisa; 0 mutatii DOM si 0 long tasks in 5 secunde cu fereastra deschisa.
+- Module: ActivityImport 0.15.1, BugReports 1.1.4, Inventory 1.1.1, Invoices 1.1.5, Maintenance 1.11.2, Notifications 1.5.2, Offers 1.1.2, Proposals 1.0.2, RiskAnalyses 1.3.2, Suppliers 1.0.2, Tasks 1.2.2, Vehicles 1.0.4; versiune 0.5.65 (fara migrare).
+
+## Finalizat la 10.11.2026 14:44 - Setari: Spatiu pe disc, popup propuneri/erori, marcarea zonelor, mutare/redimensionare ferestre (0.5.67)
+
+- Fila Spatiu in Baza de date (DiskUsageService), sectiuni restranse Stare/Conexiune/ANAF, tabele propuneri/erori cu actualizare automata (LiveRefresh), popup mutabil si redimensionabil (app-dialog.js), marcarea zonelor numerotate pe imagini (ImageAnnotator), detaliul propunerilor/erorilor in popup cu vizualizare/editare si iconite edit/export pe randuri (PROP-0003, 0004, 0005, 0007, 0009, 0012, BUG-0009, 0010, 0011, 0013),Verificari: build Release, teste modules/appdialog/help/moduleversions, browser pe instanta de test (baza de test) cu date de test sterse
+
+## Finalizat la 10.11.2026 15:44 - Dezvoltator (cont), stergere in bloc, popup propunere fara taburi, editare continut, capturi mari (0.5.68)
+
+- Migrarea 86 (web_users.is_developer), comutator Dezvoltator pe randul si pagina contului, sub-tab Dezvoltatori, Setari -> Dezvoltare si filele Bugs/Propuneri din Notificari doar pentru dezvoltatori, fila Bugs noua, Sterge toate cele rezolvate (rapoarte si propuneri, definitiv, jurnalizat), popup propunere fara taburi, editare titlu/descriere/motivare + imagini adaugate, capturi pana la 3200 px, spatieri Setari (PROP-0013, 0014, 0015, BUG-0014),Verificari: build Release, suita completa, MariaDB (rapoarte, propuneri, tipuri de utilizatori), browser pe instanta de test cu date de test sterse
+
+## Finalizat la 10.11.2026 16:07 - Ferestre unitare: bara de prindere, redimensionare, Ajutor si marcare pe structura comuna (0.5.69)
+
+- AppDialog da bara de prindere ferestrelor fara titlu, redimensionarea muta cadrul si panoul umple cadrul, fereastra de Ajutor (help.js) si ImageAnnotator folosesc structura AppDialog (mutare/redimensionare din app-dialog.js), test care impune structura comuna (BUG-0015),Verificari: build Release, suita completa, browser pe instanta de test (analize de risc, Ajutor, marcare zone)
+
+## Finalizat la 10.11.2026 18:09 - Bara ferestrelor template v2 pentru toate dialogurile (0.5.70)
+
+- Bara din margine in margine cu pictograma de mutare, denumirea ferestrei si ajutor; padding mutat din panou in corp (variabile --dlg-*), titlul din continut copiat in bara (appDialog.syncTitle); verificat pe 32 de clase de ferestre si pe ferestre reale
+
+## Finalizat la 11.11.2026 - Ferestre, marcare zone la editare, sablonarea tichetului, changelog pe categorii (0.5.72)
+
+- Ajutorul din bara ferestrelor este buton dreptunghiular "Ajutor"; titlul si ajutorul din continut trec in bara, randul gol de sus dispare (BUG-0016, PROP-0016); BUG-0015 retras de utilizator.
+- Editarea rapoartelor de eroare si a propunerilor permite marcarea de zone peste imaginile salvate si adaugate; fereastra de marcare are zoom (-, +, Potriveste, Ctrl + rotita).
+- Sablonarea preluarii tichetului ActivityApp (BUG-0017): liste pliabile Tichet / Eveniment / Client cu comutator "Folosit", lista "Folosite" (descriere, rol, destinatie, detasare), coloane de orice tip, CUI client mereu preluat, observatii "descriere: valoare"; baza permanenta de test ActivityApp_test (tools/load-activityapp-test-db.ps1).
+- Changelog pe categorii Functionalitati noi / Bugs / Diverse (PROP-0019): migrarea 87 (bug_reports.resolved_version), parser si dialog, release.ps1 pastreaza categoriile, tools/changelog-draft.ps1.
+- Teste: suita de componente 1883 PASS, MariaDB (rapoarte de eroare) 29 PASS.
+
+## Finalizat la 11.11.2026 - Puncte de lucru arondate (componente ale punctului de lucru)
+
+- **Date:** migrarea 88 - `work_point_attached` (nume unic per punct de lucru, adresa si/sau coordonate GPS, telefon, persoana de contact; CHECK: cel putin adresa sau coordonatele, coordonate ambele sau niciuna; adresa NU se mosteneste de la punct) si `archive_work_point_attached`. Stergerea unui punct arondat, a unui punct de lucru sau a unui beneficiar le arhiveaza (la punct/beneficiar ca relatii ale arhivei).
+- **Interfata (totul in popup):** coloana "ARONDATE" in tabelul punctelor de lucru; popup-ul listei (adaugare, editare, stergere intr-un pas) si popup-ul de editare cu nume + iconite "+" pentru Coordonate GPS, Adresa, Telefon, Persoana de contact; fiecare informatie are iconite de editare si stergere; ultima informatie de locatie (adresa sau GPS) nu se poate sterge singura.
+- **Jurnal:** "Adaugare punct arondat", "Modificare punct arondat", stergerea arhivata (entitate PunctArondat).
+- **Cautare extinsa beneficiari:** cauta si in numele, adresa, telefonul si contactul punctelor de lucru si ale punctelor arondate (fara diacritice, fara majuscule); rezultatul spune de ce apare ("punct arondat: X (la Y)"). Cautarea simpla ramane neschimbata.
+- **Harta:** pin separat pentru fiecare punct arondat cu coordonate (culoare proprie, legenda, titlu Beneficiar / Punct de lucru / Punct arondat); apar cat timp nu e setat filtru de scadenta, contract sau perioada.
+- **Preluare ActivityApp:** la o rulare completa, un punct de lucru din ActivityApp cu nume asemanator unui punct arondat al aceluiasi beneficiar da o notificare de verificare in lista problemelor deschise (entitate attached-similar), fara a opri importul sau a invalida ceva; cele marcate rezolvate nu se mai ridica.
+- **Nota "Preluat din ActivityApp" / "Legat cu ActivityApp" pe beneficiar:** calculata din legaturile importului (`activity_import_map`), fara coloana noua; in lista si in fisa beneficiarului (punctele de lucru aveau deja nota in descriere).
+- Module: ActivityImport 0.17.0, Maintenance 1.12.0, Journal 1.5.1.
+- Teste: grupul attachedpoints (39 verificari), sectiunea MariaDB "Attached work points" (20), suita de componente 1922 PASS. Verificat in aplicatie pe baza de test (adaugare, editare, stergere, cautare extinsa, pin si panou pe harta).
+
+## Finalizat la 11.11.2026 - Antete unitare, ordonare din antet si memorare pe sesiune (BUG-0018)
+
+- **Antet unic:** regula globala pentru `th` in `wwwroot/app.css` cu tokenurile `--th-size`, `--th-weight`, `--th-spacing`, `--th-color` (majuscule); regulile locale de font ale tabelelor `save-summary`, `help-table`, `database-accounts-table` scoase; celulele-antet de rand (`tbody th`, `scope=row`) raman text normal. Regula permanenta in CLAUDE.md.
+- **Ordonare:** componenta `SortTh` (in `Paged`, interfata `IPagedSort`): clic = crescator, descrescator, ordinea initiala; text fara diferenta de majuscule/diacritice, golurile la sfarsit; `DefaultSortKey`/`DefaultDescending` pentru ordinea de pornire.
+- **Memorare:** `Paged` retine marimea paginii si ordonarea fiecarui tabel (adresa paginii + Id) numai cat ramane deschis tabul browserului (sessionStorage, `wwwroot/table-state.js`); nu retine pagina curenta, nimic pe server.
+- **Liste cu ordonare:** Beneficiari, Utilizatori, Notificari (active si rezolvate), Balante Elcomtur (si facturile unui beneficiar), Analize de risc, facturi furnizori, sabloane de facturi, contracte si interventii de mentenanta, rapoarte si propuneri (administrare si "Rapoartele mele"), puncte de lucru, analizori de risc, tipuri de utilizatori, module. Facturile, contractele, interventiile, analizele si sabloanele de facturi au primit si paginare (25 implicit).
+- **Raman fara ordonare:** jurnalul de activitate (paginat pe server), inventarul, ofertele (previzualizari), cateva liste mici paginate (sesiuni deschise, pachete backup, fisiere beneficiar, importul ActivityApp); mutarea ordonarii vechi (miscari, taskuri, pagina principala) pe `SortTh` nu s-a facut.
+- Module: Elcomtur 1.3.3, Notifications 1.6.2, BugReports 1.4.3, Proposals 1.4.1, RiskAnalyses 1.3.4, Suppliers 1.0.3, Invoices 1.1.6, Maintenance 1.12.1. Teste: 7 verificari noi in PagedChecks; verificat in browser (Beneficiari).
+
+## Finalizat la 11.11.2026 - Titlul si numarul tichetului din orice coloana (BUG-0019)
+
+- Fereastra "Tichet exemplu": randurile Titlu si Numar din lista "Folosite" au lista de coloane (orice coloana text din Tichet); rolurile "Titlul/Numarul tichetului" apar in lista "Rol" a coloanelor text; la coliziune informatia obligatorie trece pe coloana lasata libera, iar un camp liber care citea coloana este scos, cu mesaj. Salvarea si jurnalul neschimbate. Teste: 2 verificari in ActivityImportPanelChecks.
+
+## Finalizat la 11.11.2026 - Fara taburi in raportul de eroare si "+" aliniat (BUG-0020)
+
+- "Raporteaza o eroare": bara de taburi inlocuita cu butonul "Rapoartele mele" / "Raport nou" (formularul de propunere nu avea taburi). Analize de risc: butonul "+" de langa analizor centrat pe linia select-ului. RiskAnalyses 1.3.3.
+
+## Finalizat la 11.11.2026 - Descarcarea pachetelor de backup (PROP-0020)
+
+- Setari -> Backup: iconita de descarcare pe fiecare pachet; endpoint `GET /api/backup/{nume}` (dreptul `setari-backup.edit`): pachetul simplu se trimite ca atare, cu fisierul `.sha256` alaturi vine intr-o arhiva `<nume>-cu-suma-de-control.zip` (stocata, temporar sters la final); un pachet doar pe NAS este adus intai pe server (acelasi pas ca la restaurare). Jurnal: "Descarcare pachet backup" (Journal 1.6.0). Teste: grupul backupdownload (11 verificari); endpoint verificat in browser.
+
+## Finalizat la 11.11.2026 15:46 - Preluare stoc ESPStoc (modulul import-espstoc, punct zero)
+
+- Modulul Modules/EspImport: analiza exportului vechi .sql/.zip, lista pe categorii cu insigne clicabile, parametri propusi din codul vechi, produse preluate inghetate, aplicare ca punct zero (miscari, facturi, oferte, rezervari, copii de siguranta si jurnal sterse; stoc, produse si imagini preluate)
+- Fisiere: Modules/EspImport/*, NasBackup.cs (DeleteFilesAsync), ProductInput/StockMovements (AllowIncomplete, SkipParameterCheck), Settings.razor, Permissions.cs, AuditTrail.cs; teste EspImportChecks (grupul espimport)
+- Verificari: espimport/moduleversions/help/components/parameters, Maria Required parameters, browser pe baza de test cu exportul BStoc; versiunea 0.5.74
+
+## Finalizat la 12.11.2026 09:34 - BUG-0021, BUG-0022, BUG-0023 (versiunea 0.5.75)
+
+- BUG-0021: previzualizarea PDF a inventarului avea iframe fara inaltime in AppDialog; corpul dialogului este acum flex (app.css).
+- BUG-0022: apasarea pe numele unei intrari deschise din meniul de produse o inchide (collapsible.js, closedNodes in MainLayout.razor).
+- BUG-0023: titlul si numarul tichetului din orice coloana citibila, numar obligatoriu fara valoare implicita (NumberChosen), bloc Coloane obligatorii si fereastra flotanta Cum arata tichetul preluat; ActivityImport 0.18.0.
+- Verificari: grupurile activityimport, moduleversions, help, sectiunile MariaDB Activity; BUG-0021/0022 in browser; fereastra flotanta pe macheta.
+
+## Finalizat la 12.11.2026 10:49 - BUG-0024, informatii obligatorii si format observatii (versiunea 0.5.76)
+
+- BUG-0024: marginea ferestrei flotante pe cadru, bara proprie pentru fiecare fereastra.
+- Coloane obligatorii: ID ticket, ID eveniment, Data finalizarii evenimentului (coloana de tip data); observatii **eticheta**: valoare cu rand liber, obligatoriile primele, ordine prin drag and drop (ActivityFieldMap.Order, NotesMarkup); ActivityImport 0.19.0, Maintenance 1.12.2.
+- Verificari: activityimport, MariaDB Activity, moduleversions, help; pozitiile butoanelor pe macheta in browser.
+
+## 12.11.2026 - versiunile 0.5.77-0.5.81: ferestre, preluare ActivityApp, actualizare imediata
+- 0.5.77: BUG-0025 (fereastra Tichet exemplu mai lata), BUG-0026 (fara randuri goale in valorile din observatii), buton "Actualizare imediata" (fara banner si intarziere) + "Actualizeaza cu notificare utilizatori".
+- 0.5.78: vizualizarea tichetului de validat completa (ID-uri, data finalizarii, campuri extra, observatii), BUG-0027 (bara de butoane a ferestrelor cu latime in %), PROP-0018 (tichete discardate colapsabile).
+- 0.5.79: BUG-0028 (notificarile de validat duc in Notificari), BUG-0029 (titlul containerului de discardate cu badge).
+- 0.5.80: BUG-0030 ("Deschide obiectul" deschide tab-ul de validare in aceeasi pagina).
+- 0.5.81: BUG-0031 (drag and drop al randurilor din Folosite, `notes-order.js`), PROP-0022 (linii "Arondat: nume" in descrierea punctului de lucru).
+
+- 13.11.2026 - Versiunile 0.5.82-0.5.86 si anunt de actualizare cu fereastra: PROP-0023..0032, BUG-0032..0043 (fisiere beneficiar live, iconite pe punctele de lucru, export sablon, taburi in fisa beneficiarului, taburi Notificari cu numar, captura paginii in raport) si fereastra "Aplicatia se actualizeaza" pentru ceilalti utilizatori (Am inteles / Inchide / Am nevoie de mai mult timp = intrerupe actualizarea, mesaj pentru cel care a pornit-o, jurnal "Intrerupere actualizare aplicatie"; modulul Jurnal 1.6.2). Motivul la actualizare este optional.
+
+## Finalizat la 14.11.2026 17:05 - Versiunea 0.5.87: ANAF cu sub-taburi (Preluare date firme, E-Factura) si ajutorul actualizat
+
+- Setari -> ANAF are doua sub-taburi: Preluare date firme (configuratorul existent) si E-Factura (autentificare OAuth2 in ANAF: client id, client secret criptat, adresa de raspuns HTTPS, mediu, Autentifica-te / Reinnoieste tokenul / Deconecteaza; fluxul trece prin /anaf/autentificare/raspuns cu verificarea starii; Modules/Anaf/AnafAuth.cs si AnafAuthPanel.razor; jurnal: Modificare setari autentificare ANAF, Autentificare in ANAF, Reinnoire token ANAF, Deconectare autentificare ANAF).,Ajutorul: text actualizat pentru toate componentele din docs/HELP_DE_REGENERAT.md (topicuri noi: setari-preluare-activityapp, setari-preluare-elcomtur, elcomtur-preluare, setari-espstoc, setari-catalog, setari-baza-spatiu, setari-dezvoltare, setari-autentificare) si capturi refacute pe baza demo (scenarii reparate pentru fisa beneficiarului cu file, selectorul arborescent de categorie si panourile restranse ale bazei de date; seederul HelpDemo corectat pentru analizorul de risc). Module: Anaf 1.1.0, Journal 1.6.3.
+
+## Finalizat la 16.11.2026 - Versiunea 0.5.88: ordinea la preluarea inventarului, citire OCR cu linii intrerupte, vizualizarea unei miscari
+
+- Preluare inventar: lista de revizuire respecta ordinea situatiei de inventar (categorii alfabetic, subcategorii in ordinea arborelui, stocurile negative primele, apoi dupa cod); modulul Inventar 1.1.2.
+- Citirea scanului (OCR): o linie de tabel intrerupta de scris de mana era detectata mai scurta si cele doua randuri vecine dispareau tacut din lista (pe un scan real 8 randuri din 341); liniile se extind acum pana la marginile obisnuite ale paginii (`NormalizeLineExtents`, test in `StructureChecks`).
+- Produse -> Intrari/iesiri: iconita "Vezi" pe fiecare rand; fereastra cu toti parametrii miscarii, buton Editeaza in dreapta sus si istoricul modificarilor in sectiune pliabila (inchisa implicit) cu insigna numarului; topic de help `produse-miscare-vizualizare` (captura la cerere).
+- Anaf 1.1.1: registrul de versiuni resincronizat (sursele nemodificate).
+
+## Finalizat la 16.11.2026 18:37 - Invatare OCR la preluarea inventarului (etapele 1-3)
+
+- OCR pastreaza poza celulei si cifrele citite (casete, top 3, imagine 28x28); la preluarea confirmata se compara valoarea citita cu cea trimisa si se salveaza corectiile (cifra / segmentare) in ocr_learning_sessions si ocr_learning_samples (migrarea 089, max 1000 esantioane)
+- Pagina /inventar/invatare-ocr: lista cu captura, filtre, decizii globale ale administratorului (Invata / Ignora / Marcheaza nou / Reseteaza); jurnal cu actiuni proprii; module Inventory 1.2.1, Journal 1.6.4
+- Verificari: grupurile structure, help, moduleversions, ocrlearning; sectiunea MariaDB OCR learning (16); browser pe instanta de test cu esantioane seed (lista, invatare, resetare, jurnal)
+
+## Finalizat la 16.11.2026 19:11 - Invatare OCR etapa 4 si 5 (calibrare pe cifre, teste)
+
+- Citirea unui formular nou aplica corectiile marcate Invatat (OcrCalibrationRules: cifra sub 90% incredere inlocuita daca invatata de >=2 ori, >=50% din ce s-a invatat pentru cifra si in top 3), rand marcat de verificat cu nota; Inventory 1.3.0
+- Verificari: grupurile structure, help, moduleversions, ocrlearning, ocrworker (196); MariaDB OCR learning (17); scanare reala cu captura cifrelor; browser pe pagina de preluare cu scan real si produse de test (citire, potrivire, selectie, dialog de confirmare)
+
+## Finalizat la 18.11.2026 10:11 - Teme de culori, progres facturi/oferte, PROP-0039/40/41/42 (versiunea 0.5.99)
+
+- Temele de culori aduse din BlazorStoc-rel: 20 de palete (6 mai deschise galben/rosiatic/verde), aplicate imediat prin themePalette.set si data-palette pe app-shell; ProgressBar si StreamProgress: progres la citirea PDF facturi (worker OCR cu FileProgress) si la incarcarea xlsx oferte; PROP-0039 text Factura, PROP-0040 buton Adauga produs in subcategorie, PROP-0041 Mergi la proiect, PROP-0042 coloane Nr. crt. si Subcategorie; fix iconite la colaps categorie,
+
+## Finalizat la 18.11.2026 11:40 - Bonuri de consum ale proiectelor (versiunea 0.6.1)
+
+- Bonul se genereaza doar la apasare din iconita proiectului (tabele consumption_notes si consumption_note_lines, migrarea 93, pornesc goale cu numerotarea de la 1); bonuri active/inactive/sterse, fara editare; sectiune pliabila in beneficiar si pagina Administrare -> Bonuri de consum (cautare dubla); bonul vechi pe operatie scos; jurnal cu actiuni proprii; PDF nou cu data miscarii; versiune noua 0.6.1 si regula de numerotare
+
+## Finalizat la 18.11.2026 12:25 - Tab Retur, echipamente proiect cu istoric, bon pe cantitatea neta (versiunea 0.6.1)
+
+- Retur din proiect (FreeEntryType.ReturnFromProject, intrare cu beneficiar si proiect, limitat la netul produsului pe proiect) si retur din vehicul (TransferFromVehicleAsync cu descriere si data); protectii la storno/stergere/modificare iesire; calcul net unic (iesiri minus retururi legate de iesiri minus retururi din proiect); IProjectEquipmentRepository (istoric, proiecte care au produsul); pagina Echipamente proiect cu lista neta si istoric pliabil; bonul de consum pe produs net cu data ultimei iesiri; butonul de bon doar pe proiecte cu echipamente
+
+## Finalizat la 20.11.2026 15:14 - PROP-0043, PROP-0044, PROP-0045 (versiunea 0.6.3)
+
+- Iesire multipla: buton + Proiect nou langa campul Proiect (popup cu ProjectEditor, proiectul creat se alege); fisiere ExitOperation.razor, ExitDestinationPicker.razor.
+- Unde sunt bucatile: doar Stoc total, Stoc depozit, Stoc masini (ProductWhere.razor).
+- Wizard Genereaza bon de consum (/consum/bon, ConsumptionNoteWizard.razor): fiecare proiect ales primeste bon numerotat in registrul existent (consumption_notes, fara migrare noua); bon total = ConsumptionNoteTotalWriter peste bonurile proiectelor; endpointuri /api/bonuri/arhiva.zip, toate.pdf, total.pdf; Descarca toate cu folder (File System Access) sau ZIP; helper unic de nume ConsumptionNoteFiles folosit si de tabelul de bonuri; meniu Produse, breadcrumb, topic help bon-consum.
+- Verificari: teste tintite (bonuri, MariaDB, help, structura, module, pachet); wizard in browser pe baza demo (un bon, separate, total).
+
+## Finalizat la 20.11.2026 15:42 - Eroare preluare factura EMPORIUM 827 cu sablon dintr-un scan
+
+- Cauza: (1) ancorele zonelor de coloana ale sablonului erau caractere OCR (| = -) care se potriveau cu zgomot din alt scan si dadeau zone cu sfarsit deasupra inceputului; (2) titlurile citite diferit de OCR nu se potriveau cu cele din sablon, motorul cadea pe pozitia absoluta a antetului din fisierul model si randurile 1-2 ramaneau deasupra.
+- Remediere in Services/Invoices/InvoiceTemplates.cs: ancorele fara litere/cifre nu mai sunt ancore (InvoiceTemplateEngine.HasContent, AnchorAbove/AnchorBelow le sar), zonele incoerente sunt respinse, iar coloanele fara eticheta potrivita se potrivesc dupa pozitie cu celulele antetului gasit in fisier.
+- Verificari: raportul corpus pe factura 827 cu sablonul exportat citeste cele 7 randuri (ca analiza automata); 3 teste noi in InvoiceChecks.cs; grupul pdf 223 verificari trecute; raportul corpus arata si zonele coloanelor.
+
+## Finalizat la 21.11.2026 15:49 - Modulul Anunturi 1.3.1 si pachetele 0.6.5-0.6.16
+
+- Modul nou Anunturi (Setari -> Anunturi): editor cu formatare si poze, previzualizare, draft, publicare/republicare, coloana Activ, lista cine a citit, ZIP import/export; fereastra dupa logare cu categorii General/Obligatoriu, Am citit, Publicat de; preferinta in meniul contului; migrarile 98-99; curatare HTML pe server si teste de securitate
+- Dashboard fix in meniul lateral, rotita tabelelor deasupra antetului, Iesire multipla (latimi coloane), slidere dashboard (latime disponibila, spatiu intre randuri)
+- Verificari: suita completa, sectiunea MariaDB Announcements, browser pe instanta proprie; pachete 0.6.5-0.6.16
+
+## Finalizat la 21.11.2026 16:09 - Dashboard personalizat: culoare la spatii si zone pe randuri diferite (0.6.17-0.6.18)
+
+- Spatiile libere din caroiaj au culoare aleasa de utilizator; zonele au campul Asezare (langa zona dinainte, pe rand nou centrata/stanga/dreapta) cu latimea necesara tile-urilor; migrarea 100 (user_dashboard_zones.placement)
+- Verificari: teste DashboardChecks + sectiunea MariaDB Dashboard, browser pe instanta proprie
+
+## Finalizat la 21.11.2026 17:02 - Zone dashboard: asezare si latime (0.6.18-0.6.19); anunt general o singura data
+
+- Zonele au camp Asezare si slidere de latime (global si pe zona, migrarile 100-101); culoare la spatii; un anunt general se marcheaza vazut in clipa afisarii (modulul Anunturi 1.3.2)
+- Verificari: teste DashboardChecks si MariaDB Dashboard, grupurile announcements/help/package/moduleversions, browser pe instanta proprie; pachet 0.6.19

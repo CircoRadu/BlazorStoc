@@ -5,7 +5,14 @@ namespace BlazorStoc.Modules.ActivityImport;
 // shown. The most recent finished ticket first; "the previous one" is the next older ticket.
 
 /// <summary>One column of a table of ActivityApp with its value for the ticket shown (null = empty). IsText: a column that can be chosen for a piece of information or an extra field.</summary>
-public sealed record SampleColumn(string Column, string DataType, string? Value, bool IsText);
+public sealed record SampleColumn(string Column, string DataType, string? Value, bool IsText)
+{
+    /// <summary>A column of another readable kind (number, date, flag): it can be a free field with a description, not one of the texts (problem, report ...).</summary>
+    public bool OtherKind { get; init; }
+
+    /// <summary>The column can be used: as a text or as a free field.</summary>
+    public bool Readable => IsText || OtherKind;
+}
 
 public sealed record SampleTable(string Table, IReadOnlyList<SampleColumn> Columns);
 
@@ -16,7 +23,7 @@ public sealed record TicketSample(long TicketId, string Number, string Title, Da
 public sealed record ActivityTicketSampleView(TicketSample? Sample, string? Error);
 
 /// <summary>What one piece of information gets from the ticket shown, with the settings given.</summary>
-public sealed record SamplePreviewItem(string Key, string Label, string Value, string Target);
+public sealed record SamplePreviewItem(string Key, string Label, string Value, string Target, string Source = "");
 
 public sealed record SamplePreview(IReadOnlyList<SamplePreviewItem> Items, string Notes);
 
@@ -24,8 +31,15 @@ public static class ActivityTicketSampleRules
 {
     public const int MaximumValueLength = 4000;
 
+    /// <summary>The destination shown for the end of the event: it is the date of the intervention, not a text of the notes.</summary>
+    public const string Performed = "performed";
+
     private static string? ValueOf(TicketSample sample, string table, string column) =>
         sample.Tables.FirstOrDefault(item => item.Table.Equals(table, StringComparison.OrdinalIgnoreCase))?.Columns.FirstOrDefault(item => item.Column.Equals(column, StringComparison.OrdinalIgnoreCase))?.Value;
+
+    /// <summary>The end of the event as the import would read it: the value of the column chosen for it, written the way the window shows dates.</summary>
+    public static DateTime? FinishedOf(TicketSample sample, ActivityFieldMap map) =>
+        DateTime.TryParseExact(ValueOf(sample, "EvenimenteAgent", map.ColumnOf(ActivityFieldMap.FinishedField)), "dd.MM.yyyy HH:mm:ss", System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.None, out var date) ? date : null;
 
     /// <summary>The ticket as the import would read it with these settings: each text from the column the settings name for it, the extra fields from their columns and the executor from the agents of the event.</summary>
     public static ActivityTicket ToTicket(TicketSample sample, ActivityFieldMap map)
@@ -36,8 +50,8 @@ public static class ActivityTicketSampleRules
             return ValueOf(sample, table, map.ColumnOf(field)) ?? "";
         }
         var extras = map.Extras.ToDictionary(extra => extra.Key, extra => ValueOf(sample, extra.Table, extra.Column) ?? "");
-        var ticket = new ActivityTicket(sample.TicketId, 0, 0, 0, sample.TicketDate, From("Tickete", "NumeTicket"), From("Tickete", "Subject"), From("Tickete", "DescriptionInternal"),
-            sample.Executor.Length > 0 ? sample.Executor : From("Tickete", "ProcesatDe"), 0, null, null, From("EvenimenteAgent", "DescriptionInternal"), null, "", null, extras.Count == 0 ? null : extras);
+        var ticket = new ActivityTicket(sample.TicketId, 0, 0, 0, sample.TicketDate, map.NumberChosen ? From("Tickete", "NumeTicket") : "", From("Tickete", "Subject"), From("Tickete", "DescriptionInternal"),
+            sample.Executor.Length > 0 ? sample.Executor : From("Tickete", "ProcesatDe"), long.TryParse(ValueOf(sample, "EvenimenteAgent", "ID"), out var eventId) ? eventId : 0, FinishedOf(sample, map), null, From("EvenimenteAgent", "DescriptionInternal"), null, "", null, extras.Count == 0 ? null : extras);
         return ActivityTicketFields.Collect(ticket, map);
     }
 
@@ -47,17 +61,21 @@ public static class ActivityTicketSampleRules
         var source = ActivityTicketPlanner.SourceOf(ToTicket(sample, map), map);
         var items = new List<SamplePreviewItem>
         {
-            new(ActivityFieldMap.Title, map.LabelOf(ActivityFieldMap.Title), source.Title, ActivityFieldMap.Notes),
-            new(ActivityFieldMap.Number, map.LabelOf(ActivityFieldMap.Number), source.Number, ActivityFieldMap.Notes)
+            new(ActivityFieldMap.Title, map.LabelOf(ActivityFieldMap.Title), source.Title, ActivityFieldMap.Notes, map.SourceOf(ActivityFieldMap.Title) ?? ""),
+            new(ActivityFieldMap.Number, map.LabelOf(ActivityFieldMap.Number), source.Number, ActivityFieldMap.Notes, map.NumberChosen ? map.SourceOf(ActivityFieldMap.Number) ?? "" : "coloana nu este aleasă"),
+            new(ActivityFieldMap.Finished, map.LabelOf(ActivityFieldMap.Finished), FinishedOf(sample, map) is { } finished ? finished.ToString("dd.MM.yyyy HH:mm", System.Globalization.CultureInfo.InvariantCulture) : "", Performed, map.SourceOf(ActivityFieldMap.Finished) ?? "")
         };
+        string From(string key) => key == ActivityFieldMap.Resolution
+            ? ActivityFieldMap.ColumnName("EvenimenteAgent", map.ColumnOf(ActivityFieldMap.Fields.First(field => field.Table == "EvenimenteAgent" && field.Column == "DescriptionInternal"))) + " fără textul problemei"
+            : map.SourceOf(key) ?? "";
         string Value(string key) => key switch
         {
             ActivityFieldMap.Problem => source.Problem, ActivityFieldMap.Resolution => source.Resolution, ActivityFieldMap.Report => source.Report, ActivityFieldMap.Executor => source.Executor,
             _ => source.Extras is not null && source.Extras.TryGetValue(key, out var value) ? value : ""
         };
         foreach (var item in ActivityFieldMap.Info.Where(item => !item.Mandatory))
-            items.Add(new(item.Key, map.LabelOf(item.Key), map.IsEnabled(item.Key) ? Value(item.Key) : "", map.IsEnabled(item.Key) ? map.TargetOf(item.Key) : "oprit"));
-        foreach (var extra in map.Extras) items.Add(new(extra.Key, extra.Label, Value(extra.Key), extra.Target));
+            items.Add(new(item.Key, map.LabelOf(item.Key), map.IsEnabled(item.Key) ? Value(item.Key) : "", map.IsEnabled(item.Key) ? map.TargetOf(item.Key) : "oprit", map.IsEnabled(item.Key) ? From(item.Key) : ""));
+        foreach (var extra in map.Extras) items.Add(new(extra.Key, extra.Label, Value(extra.Key), extra.Target, From(extra.Key)));
         return new SamplePreview(items, ActivityTicketPlanner.Notes(source, map));
     }
 

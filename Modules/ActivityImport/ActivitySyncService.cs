@@ -173,6 +173,12 @@ public sealed class MariaActivitySyncService(IConfiguration configuration, IActi
             if (manual) throw;
             return new SyncResult(true, "O altă rulare era în desfășurare.", 0, 0, 0, 0, 0);
         }
+        catch (ActivityImportException exception) when (exception.Message.StartsWith(ActivityImportRules.SuspendedPrefix, StringComparison.Ordinal))
+        {
+            // The structure of the tickets changed: the import waits for the correspondence to be confirmed. It is not a failure of the source (no failure count, no "synchronization fails" notification);
+            // the notification about the structure asks for the check.
+            result = new SyncResult(true, exception.Message, 0, 0, 0, 0, 0);
+        }
         catch (Exception exception) when (exception is ActivityImportException or ActivitySourceException)
         {
             result = new SyncResult(false, exception.Message, 0, 0, 0, 0, 0);

@@ -15,8 +15,8 @@
     }
     else
     {
-        <Paged Items="alerts" Id="proposal-alerts-size" Context="pageRows" DefaultSize="10">
-            <div class="table-scroll"><table id="proposal-alerts-table"><thead><tr><th>NUMĂR</th><th>TITLU</th><th>MOTIV</th><th>AUTOR</th><th>ACTUALIZAT</th><th><span class="sr-only">Acțiuni</span></th></tr></thead><tbody>
+        <Paged Items="alerts" Id="proposal-alerts-size" Context="pageRows" DefaultSize="10" Sorts="Sorts">
+            <div class="table-scroll"><table id="proposal-alerts-table"><thead><tr><SortTh Key="number">NUMĂR</SortTh><SortTh Key="title">TITLU</SortTh><SortTh Key="reason">MOTIV</SortTh><SortTh Key="author">AUTOR</SortTh><SortTh Key="updated">ACTUALIZAT</SortTh><th><span class="sr-only">Acțiuni</span></th></tr></thead><tbody>
             @foreach (var alert in pageRows)
             {
                 var proposal = alert.Proposal;
@@ -36,6 +36,7 @@
 
 @code {
     private IReadOnlyList<ProposalAlert> alerts = [];
+    private static readonly IReadOnlyDictionary<string, Func<ProposalAlert, IComparable?>> Sorts = new Dictionary<string, Func<ProposalAlert, IComparable?>> { ["number"] = item => item.Proposal.Number, ["title"] = item => item.Proposal.Title, ["reason"] = item => item.Reason, ["author"] = item => item.Proposal.UserName, ["updated"] = item => item.Proposal.UpdatedUtc ?? item.Proposal.CreatedUtc };
     private bool loading = true;
     private string? error;
 

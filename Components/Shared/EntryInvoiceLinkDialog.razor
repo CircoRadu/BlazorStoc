@@ -4,9 +4,7 @@
 @inject ISupplierRepository SupplierRepository
 @* Administrator only: ties free entries to an invoice (several at once) or frees one entry from its invoice. The stock does not change;
    each entry is its own event in the journal and the reason is required. *@
-<div class="delete-overlay">
-    <section class="delete-dialog movement-dialog" role="dialog" aria-modal="true" aria-labelledby="link-title">
-        <div class="dialog-head"><h2 id="link-title">@(Detach ? "Detașează intrarea de la factură" : Entries.Count == 1 ? "Atașează intrarea la factură" : $"Atașează {Entries.Count} intrări la factură")</h2><HelpButton Topic="facturi-legare-intrari" About="Legarea intrărilor de factură" /></div>
+<AppDialog TitleId="link-title" HelpTopic="facturi-legare-intrari" HelpAbout="Legarea intrărilor de factură" PanelClass="movement-dialog" OnClose="Cancelled"><TitleContent>@(Detach ? "Detașează intrarea de la factură" : Entries.Count == 1 ? "Atașează intrarea la factură" : $"Atașează {Entries.Count} intrări la factură")</TitleContent><ChildContent>
         <ul class="link-entries">
             @foreach (var entry in Entries)
             {
@@ -22,11 +20,11 @@
                         <SearchableSelect Id="link-supplier" Label="Furnizor" Placeholder="Caută sau alege furnizorul…" EmptyText="Niciun furnizor găsit."
                                           Options="options" SelectedId="supplierId" SelectedIdChanged="SupplierChangedAsync" Disabled="busy" />
                     </div>
-                    <label for="link-invoice">Factura *
-                        <select id="link-invoice" disabled="@(busy || supplierId is null)" @onchange="args => invoiceId = int.TryParse(args.Value?.ToString(), out var id) ? id : null">
-                            <option value="" selected="@(invoiceId is null)">@(supplierId is null ? "— alege întâi furnizorul —" : invoices.Count == 0 ? "— furnizorul nu are facturi —" : "— alege factura —")</option>
-                            @foreach (var invoice in invoices) { <option value="@invoice.Id" selected="@(invoiceId == invoice.Id)">@invoice.Label (@invoice.MovementCount @(invoice.MovementCount == 1 ? "intrare" : "intrări"))</option> }
-                        </select></label>
+                    <div>
+                        <span class="field-label">Factura *</span>
+                        <SearchableSelect Id="link-invoice" Label="Factura" Placeholder="@InvoiceChoice.Placeholder(supplierId, invoices.Count)" EmptyText="Nicio factură găsită."
+                                          Options="InvoiceChoice.Options(invoices)" SelectedId="invoiceId" SelectedIdChanged="id => { invoiceId = id; }" Disabled="@(busy || supplierId is null)" />
+                    </div>
                 </div>
                 @if (MismatchSupplier is { } mismatch) { <small class="form-note" role="status">⚠ Intrarea a fost înregistrată pentru furnizorul «@mismatch»; factura aleasă este a altui furnizor. Explică în motiv.</small> }
             }
@@ -39,8 +37,8 @@
                 <button type="button" class="danger" @onclick="Cancelled">Anulează</button>
             </div>
         </fieldset>
-    </section>
-</div>
+</ChildContent>
+</AppDialog>
 
 @code {
     [Parameter, EditorRequired] public IReadOnlyList<StockMovement> Entries { get; set; } = [];

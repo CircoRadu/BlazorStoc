@@ -88,12 +88,19 @@ public sealed class ApplicationUpdateService(UpdateInstallation installation, IU
     /// <summary>
     /// The administrator confirms, with a reason. The journal gets "Actualizare aplicație X -> Y" under his name now; the users are told; the updater is asked after the notice time.
     /// </summary>
-    public async Task<UpdateAnnouncement> ConfirmAsync(string checkId, string reason, CancellationToken cancellationToken = default)
+    public async Task<UpdateAnnouncement> ConfirmAsync(string checkId, string reason, CancellationToken cancellationToken = default) => await ConfirmAsync(checkId, reason, false, cancellationToken).ConfigureAwait(false);
+
+    /// <summary>With <paramref name="immediate"/> the updater is asked at once: no banner for the users and no notice time (the journal says so).</summary>
+    public const string NoReasonGiven = "Fără motiv indicat";
+
+    public async Task<UpdateAnnouncement> ConfirmAsync(string checkId, string reason, bool immediate, CancellationToken cancellationToken = default)
     {
         await access.EnsureAsync(ApplyPermission, cancellationToken).ConfigureAwait(false);
         EnsureManaged();
-        if (ChangeReasonRules.ValidationError(reason) is { } reasonError) throw new UpdateOperationException(reasonError);
+        // The reason is optional (an update is a decision of the administrator): when empty, the journal and the updater get a fixed text.
         reason = ChangeReasonRules.Normalize(reason);
+        if (reason.Length == 0) reason = NoReasonGiven;
+        else if (ChangeReasonRules.ValidationError(reason) is { } reasonError) throw new UpdateOperationException(reasonError);
         var report = installation.Check(checkId) ?? throw new UpdateOperationException("Verificarea pachetului nu mai există: încarcă pachetul din nou.");
         if (!report.CanInstall || report.Version is null) throw new UpdateOperationException("Pachetul nu poate fi instalat: " + (report.Detail ?? "verificarea a găsit probleme."));
         if (report.Running != installation.Current) throw new UpdateOperationException("Versiunea instalată s-a schimbat de la verificare: încarcă pachetul din nou.");
@@ -103,11 +110,11 @@ public sealed class ApplicationUpdateService(UpdateInstallation installation, IU
         var actor = await access.GetUsernameAsync(cancellationToken).ConfigureAwait(false) ?? "necunoscut";
         var from = report.Running ?? AppVersion.Current;
         var details = AuditDetails.Identification(("De la", from), ("La", report.Version), ("Pachet SHA-256", report.Sha256), ("Semnat de", Short(report.Signer)),
-            ("Migrări noi ale bazei de date", report.NewMigrations?.ToString() ?? "necunoscut"), ("Pornește în", $"{(int)Notice.TotalSeconds} s"));
+            ("Migrări noi ale bazei de date", report.NewMigrations?.ToString() ?? "necunoscut"), ("Pornește în", immediate ? "imediat, fără anunț" : $"{(int)Notice.TotalSeconds} s"));
         await AuditRecorder.RecordActionAsync(audit, access, AuditEntities.Application, AuditActions.ApplicationUpdate, string.Empty, EntityName, details, reason, cancellationToken).ConfigureAwait(false);
 
         var request = new UpdateRequestDocument(report.Id, UpdateRequestKinds.Apply, report.Package, report.Sha256, actor, reason, clock.GetUtcNow().UtcDateTime);
-        if (!coordinator.TrySchedule(request, from, report.Version, Notice))
+        if (!coordinator.TrySchedule(request, from, report.Version, Notice, immediate))
         {
             await AuditRecorder.RecordActionAsync(audit, access, AuditEntities.Application, AuditActions.ApplicationUpdateCancelled, string.Empty, EntityName,
                 AuditDetails.Identification(("De la", from), ("La", report.Version), ("Motiv anulare", "altă actualizare era deja programată")), reason, CancellationToken.None).ConfigureAwait(false);
@@ -125,6 +132,22 @@ public sealed class ApplicationUpdateService(UpdateInstallation installation, IU
         await AuditRecorder.RecordActionAsync(audit, access, AuditEntities.Application, AuditActions.ApplicationUpdateCancelled, string.Empty, EntityName,
             AuditDetails.Identification(("De la", waiting.From), ("La", waiting.To), ("Motiv anulare", "anulată de administrator înainte de pornire")), "Anulare de către administrator", cancellationToken).ConfigureAwait(false);
         return true;
+    }
+
+    /// <summary>
+    /// "Am nevoie de mai mult timp": any signed-in user (not the one who started the update) stops an update that waits for its hour. The journal names the user. Null when it was too late
+    /// or nothing waited.
+    /// </summary>
+    public async Task<UpdateInterruption?> RequestMoreTimeAsync(CancellationToken cancellationToken = default)
+    {
+        var user = await access.GetUsernameAsync(cancellationToken).ConfigureAwait(false);
+        if (string.IsNullOrEmpty(user)) return null;
+        var interruption = coordinator.RequestMoreTime(user);
+        if (interruption is null) return null;
+        await AuditRecorder.RecordActionAsync(audit, access, AuditEntities.Application, AuditActions.ApplicationUpdateInterrupted, string.Empty, EntityName,
+            AuditDetails.Identification(("De la", interruption.From), ("La", interruption.To), ("Pornită de", interruption.RequestedBy), ("Întreruptă de", interruption.InterruptedBy)),
+            $"Utilizatorul {interruption.InterruptedBy} are nevoie de mai mult timp", CancellationToken.None).ConfigureAwait(false);
+        return interruption;
     }
 
     /// <summary>The package that was checked is not wanted: removed from the server.</summary>

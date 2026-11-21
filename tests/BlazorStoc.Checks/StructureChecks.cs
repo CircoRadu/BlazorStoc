@@ -20,6 +20,7 @@ public static class StructureChecks
             "Route: a product address is recognised, the main page has no steps and a detail page links back to its list");
         Routes(check);
         SettleNumbers(check);
+        OcrLearningChecks.Run(check);
         OverStock(check);
         PermissionCatalog(check);
         LoginRateLimits(check);
@@ -131,6 +132,12 @@ public static class StructureChecks
 
     private static void SettleNumbers(Action<bool, string> check)
     {
+        // A rule broken near an end (a pen stroke across it) was found shorter than its neighbours, which dropped the two rows beside it from the review.
+        var lines = InventoryPickupOcrService.NormalizeLineExtents(
+            [new(100, 216, 2281), new(200, 304, 2281), new(300, 216, 1454), new(400, 216, 2281)], 2480);
+        check(lines.All(line => line.Left == 216 && line.Right == 2281),
+            "Inventory scan: a table rule cut short at either end is taken out to the usual edges of the page's rules");
+
         check(Numbers([Row(1, 1, 1), Row(1, 2, 2), Row(1, 3, 3)]).SequenceEqual([1, 2, 3]),
             "Nr. crt.: numbers read in order are kept");
         check(Numbers([Row(1, 1, 1), Row(1, 2, 2), Row(1, 3, 9), Row(1, 4, 4)]).SequenceEqual([1, 2, 3, 4]),

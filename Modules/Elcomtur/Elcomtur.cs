@@ -22,6 +22,20 @@ public sealed record BeneficiaryBalance(int BeneficiaryId, string BeneficiaryNam
     public decimal Difference => Math.Round(Balance - Invoices.Sum(invoice => invoice.Rest), 2, MidpointRounding.AwayFromZero);
 }
 
+/// <summary>The first day of a period of the chart of the evolution (PROP-0036): "year" = 1 January of the current year, "six" / "three" = the same day 6 / 3 months ago.</summary>
+public static class ElcomturEvolution
+{
+    public static DateOnly From(string period, DateOnly today) => period switch
+    {
+        "three" => today.AddMonths(-3),
+        "six" => today.AddMonths(-6),
+        _ => new DateOnly(today.Year, 1, 1)
+    };
+}
+
+/// <summary>PROP-0036: the total of the payments overdue or due (sum of the positive balances) at one import, with the date of the backup it came from.</summary>
+public sealed record ElcomturBalancePoint(DateOnly DataDate, decimal Total, int OwedCount, DateTime ImportedUtc);
+
 public sealed record ElcomturImportInfo(DateOnly DataDate, string Firm, DateTime ImportedUtc, string ImportedBy, int Beneficiaries);
 
 public interface IElcomturBalanceRepository
@@ -33,6 +47,8 @@ public interface IElcomturBalanceRepository
     /// <summary>How many beneficiaries have a positive balance (the number on the tab of the Notifications page).</summary>
     Task<int> CountOwedAsync(CancellationToken cancellationToken = default);
     Task<ElcomturImportInfo?> GetInfoAsync(CancellationToken cancellationToken = default);
+    /// <summary>The totals noted at each import since <paramref name="from"/>, oldest first (the chart "Arată evoluție balanță").</summary>
+    Task<IReadOnlyList<ElcomturBalancePoint>> GetHistoryAsync(DateOnly from, CancellationToken cancellationToken = default);
     /// <summary>Replaces every balance by the ones of a new import.</summary>
     Task ReplaceAsync(string firm, DateOnly dataDate, IReadOnlyList<BeneficiaryBalance> balances, CancellationToken cancellationToken = default);
 }

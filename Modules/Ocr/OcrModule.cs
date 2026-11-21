@@ -8,7 +8,7 @@ public sealed class OcrModule : IModule
 {
     public string Id => OcrRules.ModuleId;
     public string Name => "Recunoastere documente (OCR)";
-    public Version Version { get; } = new(1, 0, 0);
+    public Version Version { get; } = new(1, 1, 1);
     public IReadOnlyList<ModuleNavItem> Nav { get; } = [];
 
     public void Register(IServiceCollection services, IConfiguration configuration)

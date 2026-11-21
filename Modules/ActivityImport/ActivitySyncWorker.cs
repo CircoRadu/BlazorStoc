@@ -48,6 +48,18 @@ public sealed class ActivitySyncWorker(IServiceScopeFactory scopes, ModuleRegist
 /// <summary>The services of the import built to act as the system (the scheduled synchronization has no signed-in user: its work is journaled under "sistem").</summary>
 public sealed record ActivityImportSystem(IActivitySyncService Sync)
 {
+    /// <summary>The import and the partner import built to act as the system (the beneficiaries taken when a page opens have no user either).</summary>
+    public static (IActivityImportService Import, IActivityPartnerImportService Partners) CreatePartnerServices(IServiceProvider provider)
+    {
+        var configuration = provider.GetRequiredService<IConfiguration>();
+        var audit = provider.GetRequiredService<IAuditTrail>();
+        var source = provider.GetRequiredService<IActivitySource>();
+        var system = new SystemAccess();
+        var import = new MariaActivityImportService(configuration, provider.GetRequiredService<IDataProtectionProvider>(), source, system, audit);
+        var lookup = provider.GetService<ICompanyDataLookupFactory>()?.For(system);
+        return (import, new MariaActivityPartnerImportService(configuration, import, source, new MariaBeneficiaryRepository(configuration, system, audit), new MariaWorkPointRepository(configuration, system, audit), system, audit, lookup));
+    }
+
     public static ActivityImportSystem Create(IServiceProvider provider)
     {
         var configuration = provider.GetRequiredService<IConfiguration>();

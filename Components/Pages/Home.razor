@@ -16,6 +16,7 @@
 @inject ChangeOrigin Origin
 @inject UnsavedChanges Guard
 @inject IProductLockRepository Locks
+@inject IUserDisplayService Display
 @implements IAsyncDisposable
 <PageBoundary>
 
@@ -27,7 +28,8 @@
 <LiveChangeNotice Visible="live?.HasPendingChange == true" Reload="ReloadLiveAsync" />
 @if (lockMessage is not null) { <div class="info-banner" role="status">@lockMessage</div> }
 @if (lockLost && editing) { <div class="info-banner" role="status">Blocarea editării a fost pierdută (a expirat sau a fost eliberată de un administrator). Poți continua, dar la salvare se verifică versiunea produsului.</div> }
-@if (editing) { <div class="invoice-modal-backdrop product-editor-backdrop" role="dialog" aria-modal="true" aria-label="@(editingProduct is null ? "Produs nou" : $"Editează produsul {editingProduct.Name}")"><div class="invoice-modal product-editor-modal"><ProductEditor @key="editorKey" Original="editingProduct" InitialCategory="@category" InitialSubcategory="@subcategory" Groups="groups" Saved="ProductSavedAsync" Closed="CloseEditorAsync" /></div></div> }
+@if (editing) { <AppDialog PanelClass="invoice-modal product-editor-modal" BackdropClass="product-editor-backdrop" Label="@(editingProduct is null ? "Produs nou" : "Editare produs")"><ProductEditor @key="editorKey" Original="editingProduct" InitialCategory="@category" InitialSubcategory="@subcategory" Groups="groups" Saved="ProductSavedAsync" Closed="CloseEditorAsync" />
+</AppDialog> }
 <div class="settings-tabs" role="tablist" aria-label="Secțiuni produse">
     <button type="button" role="tab" class="settings-tab @(!regularizeTab ? "active" : "")" aria-selected="@(!regularizeTab)" @onclick="() => regularizeTab = false">Catalog</button>
     <button type="button" role="tab" class="settings-tab @(regularizeTab ? "active" : "")" aria-selected="@regularizeTab" @onclick="() => regularizeTab = true">De regularizat@(toRegularize > 0 ? $" ({toRegularize})" : "")</button>
@@ -44,30 +46,27 @@ else
     <article><span>Fără stoc</span><strong>@(loaded ? ScopedProducts.Count(p => p.Quantity == 0).ToString() : "—")</strong><small>Cantitate disponibilă zero</small><i class="amber">○</i></article>
     <article><span>Stoc negativ</span><strong>@(loaded ? ScopedProducts.Count(p => p.Quantity < 0).ToString() : "—")</strong><small>De verificat în selecție</small><i class="red">!</i></article>
 </section>
-<section class="catalog"><div class="catalog-heading"><h2>Catalog produse <span>@Filtered.Count</span></h2><small>@(lastLoaded is null ? "În așteptarea datelor" : $"Actualizat la {lastLoaded:HH:mm:ss} UTC")</small></div>
+<section class="catalog"><div class="catalog-heading"><h2>Catalog produse <span>@Filtered.Count</span></h2><small class="catalog-updated">@(lastLoaded is null ? "În așteptarea datelor" : $"Actualizat la {lastLoaded:HH:mm:ss} UTC")</small></div>
 <div class="filters"><label class="search-box"><span>⌕</span><input aria-label="Caută produse" placeholder="Caută după cod produs sau descriere…" @bind="query" @bind:event="oninput" @bind:after="ResetPage" /></label><label><span class="sr-only">Disponibilitate</span><select @bind="stock" @bind:after="ResetPage"><option value="">Orice stoc</option><option value="positive">În stoc</option><option value="zero">Fără stoc</option><option value="negative">Stoc negativ</option></select></label>@if (IncompleteInScope > 0 || onlyIncomplete) { <label><span class="sr-only">Completare parametri</span><select @bind="onlyIncomplete" @bind:after="ResetPage"><option value="@false">Toate produsele</option><option value="@true">Doar incomplete (@IncompleteInScope)</option></select></label> }</div>
 @if (loading) { <div class="empty-state" role="status"><div class="spinner"></div><h3>Se încarcă produsele</h3><p>Preluăm catalogul pentru această sesiune.</p></div> }
 else if (Filtered.Count == 0) { <div class="empty-state"><span class="empty-icon">▦</span><h3>@(error is not null ? "Catalog indisponibil" : products.Count == 0 ? "Catalogul nu conține produse" : "Nu am găsit produse")</h3><p>@(error is not null ? "Datele nu au putut fi preluate. Reîncearcă după verificarea conexiunii." : products.Count == 0 ? "Folosește „Adaugă produs” pentru a crea primul produs și categoriile sale." : "Încearcă alt termen sau elimină filtrele.")</p>@if (products.Count > 0) { <button class="refresh act-reload" @onclick="ClearFilters">Resetează filtrele</button> }</div> }
-else { @ActiveTagsBar()<div class="table-scroll"><table><thead><tr><th>COD PRODUS</th><th>CATEGORIE</th><th>SUBCATEGORIE</th>@if (ShowTagColumn) { <th>@(ShowParameters ? (ShowLabels ? "PARAMETRI · ETICHETE" : "PARAMETRI") : "ETICHETE")</th> }<th class="number" aria-sort="@(quantityDescending ? "descending" : "ascending")"><button class="sort-header" @onclick="ToggleQuantitySort" aria-label="Sortează cantitatea @(quantityDescending ? "crescător" : "descrescător")">CANTITATE <span aria-hidden="true">@(quantityDescending ? "↓" : "↑")</span></button></th><th>DISPONIBILITATE</th><th><span class="sr-only">Detalii</span></th></tr></thead><tbody>@foreach (var p in Paged) { <tr @key="p.Id"><td><div class="product-cell"><button type="button" class="product-thumbnail" title="Mărește imaginea" aria-label="Mărește imaginea pentru @p.Name" @onclick="() => imagePreview = p"><img src="@ProductImageUrl(p)" alt="" /></button><div><button class="product-name" @onclick="() => OpenMovements(p)">@p.Name</button><small>@p.Description</small>@if (LockOfOthers(p.Id) is { } held) { <small class="lock-badge">🔒 În editare de @held.Owner</small> }@if (incompleteProducts.Contains(p.Id)) { <small class="lock-badge incomplete-badge" title="Subcategoria cere parametri obligatori pe care produsul nu îi are încă: este blocat pentru mișcări de stoc până se editează.">⚠ Parametri obligatorii necompletați · blocat</small> }</div></div></td><td><a class="category-table-link" href="@ProductUrl(p.Category)">@p.Category</a></td><td><a class="category-table-link" href="@ProductUrl(p.Category, p.Subcategory)">@p.Subcategory</a></td>@if (ShowTagColumn) { <td>@ParameterTags(p)</td> }<td class="number quantity">@p.Quantity <small>buc.</small>@if (InVehicles(p.Id) is > 0 and var inCars) { <small class="stock-breakdown">@(p.Quantity - inCars) în depozit, @inCars în vehicule</small> }</td><td><span class="stock-badge @StockClass(p.Quantity)"><span>●</span> @StockLabel(p.Quantity)</span></td><td>@if (stockOut) { <button class="row-icon exit" disabled="@incompleteProducts.Contains(p.Id)" title="@(incompleteProducts.Contains(p.Id) ? "Produs blocat: parametri obligatorii necompletați" : "Ieșire rapidă")" aria-label="@($"Ieșire rapidă {p.Name}")" @onclick="() => quickExit = p"></button> }@if (permEdit) { <button class="row-icon edit" title="@($"Editează produsul {p.Name}")" aria-label="@($"Editează produsul {p.Name}")" @onclick="() => OpenEditorAsync(p)"></button> }<button class="row-icon view" aria-label="@($"Detalii {p.Name}")" @onclick="() => OpenMovements(p)" title="@($"Deschide mișcările produsului {p.Name}")"></button></td></tr> }</tbody></table></div> }
+else { @ActiveTagsBar()<div class="table-tools">@if (permAdd && !string.IsNullOrEmpty(subcategory)) { <button type="button" class="add-in-subcategory" disabled="@(loading || editing || deleting is not null)" title="@($"Adaugă produs în subcategoria {subcategory}")" @onclick="() => OpenEditorAsync(null)"><span class="row-icon add" aria-hidden="true"></span><span>Adaugă produs în @subcategory</span></button> }<TableDisplayGear Scope="@DisplayRules.ProductsCatalogScope" Label="catalogul de produse" /></div><div class="table-scroll" style="@tableStyle" data-display-own="true"><table><thead><tr><th>COD PRODUS</th><th>CATEGORIE</th><th>SUBCATEGORIE</th>@if (ShowTagColumn) { <th>@(ShowParameters ? (ShowLabels ? "PARAMETRI · ETICHETE" : "PARAMETRI") : "ETICHETE")</th> }<th class="number" aria-sort="@(quantityDescending ? "descending" : "ascending")"><button class="sort-header" @onclick="ToggleQuantitySort" aria-label="Sortează cantitatea @(quantityDescending ? "crescător" : "descrescător")">CANTITATE <span aria-hidden="true">@(quantityDescending ? "↓" : "↑")</span></button></th><th>DISPONIBILITATE</th><th><span class="sr-only">Detalii</span></th></tr></thead><tbody>@foreach (var p in Paged) { <tr @key="p.Id"><td><div class="product-cell"><button type="button" class="product-thumbnail" title="Mărește imaginea" aria-label="Mărește imaginea pentru @p.Name" @onclick="() => imagePreview = p"><img src="@ProductImageUrl(p)" alt="" /></button><div><button class="product-name" @onclick="() => OpenMovements(p)">@p.Name</button><small>@p.Description</small>@if (LockOfOthers(p.Id) is { } held) { <small class="lock-badge">🔒 În editare de @held.Owner</small> }@if (incompleteProducts.Contains(p.Id)) { <small class="lock-badge incomplete-badge" title="Subcategoria cere parametri obligatori pe care produsul nu îi are încă: este blocat pentru mișcări de stoc până se editează.">⚠ Parametri obligatorii necompletați · blocat</small> }</div></div></td><td><a class="category-table-link" href="@ProductUrl(p.Category)">@p.Category</a></td><td><a class="category-table-link" href="@ProductUrl(p.Category, p.Subcategory)">@p.Subcategory</a></td>@if (ShowTagColumn) { <td>@ParameterTags(p)</td> }<td class="number quantity">@p.Quantity <small>buc.</small>@if (InVehicles(p.Id) is > 0 and var inCars) { <small class="stock-breakdown">@(p.Quantity - inCars) în depozit, @inCars în vehicule</small> }</td><td><span class="stock-badge @StockClass(p.Quantity)"><span>●</span> @StockLabel(p.Quantity)</span></td><td>@if (stockOut) { <button class="row-icon exit" disabled="@incompleteProducts.Contains(p.Id)" title="@(incompleteProducts.Contains(p.Id) ? "Produs blocat: parametri obligatorii necompletați" : "Ieșire rapidă")" aria-label="@($"Ieșire rapidă {p.Name}")" @onclick="() => quickExit = p"></button> }@if (permEdit) { <button class="row-icon edit" title="@($"Editează produsul {p.Name}")" aria-label="@($"Editează produsul {p.Name}")" @onclick="() => OpenEditorAsync(p)"></button> }<button class="row-icon view" aria-label="@($"Detalii {p.Name}")" @onclick="() => OpenMovements(p)" title="@($"Deschide mișcările produsului {p.Name}")"></button></td></tr> }</tbody></table></div> }
 <AuditPager Id="products-page-size" Label="Produse pe pagină" PageSizes="pageSizes" PageSize="pageSize" Page="page" Total="Filtered.Count" PageChanged="value => page = value" PageSizeChanged="value => { pageSize = value; page = 1; }" /></section>
 <p class="workspace-note"><span class="status-dot"></span> Date din BlazorStoc <span>·</span> Catalog și gestiune produse</p>
 }
 
 @if (imagePreview is not null)
 {
-    <div class="image-lightbox" role="dialog" aria-modal="true" aria-label="Imagine mărită pentru @imagePreview.Name" @onclick="CloseImagePreviewAsync">
-        <button type="button" class="image-lightbox-close" aria-label="Închide imaginea" @onclick="CloseImagePreviewAsync" title="Închide imaginea">×</button>
-        <figure @onclick:stopPropagation="true"><img src="@ProductImageUrl(imagePreview)" alt="Imagine mărită pentru @imagePreview.Name" /><figcaption>@imagePreview.Name</figcaption></figure>
-    </div>
+    <AppDialog BackdropClass="image-lightbox front" PanelClass="image-figure" Label="@($"Imagine mărită pentru {imagePreview.Name}")" ShowModuleActions="false" OnClose="CloseImagePreviewAsync" OnBackdropClick="CloseImagePreviewAsync">
+        <figure><img src="@ProductImageUrl(imagePreview)" alt="Imagine mărită pentru @imagePreview.Name" /><figcaption>@imagePreview.Name</figcaption></figure>
+    </AppDialog>
 }
 
 @if (quickExit is not null)
 {
-    <div class="invoice-modal-backdrop" role="dialog" aria-modal="true" aria-label="Ieșire rapidă @quickExit.Name">
-        <div class="invoice-modal quick-exit-modal">
+    <AppDialog OnClose="CloseQuickExitAsync" PanelClass="invoice-modal quick-exit-modal" Label="@($"Ieșire rapidă {quickExit.Name}")">
             <ExitOperation @key="quickExit.Id" Embedded="true" InitialProductId="quickExit.Id" OnClosed="CloseQuickExitAsync" />
-        </div>
-    </div>
+    </AppDialog>
 }
 
 @if (deleting is not null)
@@ -96,6 +95,9 @@ else { @ActiveTagsBar()<div class="table-scroll"><table><thead><tr><th>COD PRODU
     [SupplyParameterFromQuery(Name = "subcategorie")] public string? SubcategoryQuery { get; set; }
     [SupplyParameterFromQuery(Name = "incomplete")] public string? IncompleteQuery { get; set; }
     [SupplyParameterFromQuery(Name = "edit")] public int? EditId { get; set; }
+    // /produse?actiune=adauga-produs: the tile "Adaugă produs" of the main page opens the form of a new product.
+    [SupplyParameterFromQuery(Name = MenuCatalog.ActionQuery)] public string? ActionParameter { get; set; }
+    private bool actionHandled;
     [SupplyParameterFromQuery(Name = "sterge")] public int? DeleteId { get; set; }
     [SupplyParameterFromQuery(Name = ReturnNavigation.QueryName)] public string? ReturnQuery { get; set; }
     private IReadOnlyList<Product> products = Array.Empty<Product>();
@@ -168,8 +170,14 @@ else { @ActiveTagsBar()<div class="table-scroll"><table><thead><tr><th>COD PRODU
     private IEnumerable<Product> Paged => pageSize == 0 ? Filtered : Filtered.Skip((page - 1) * pageSize).Take(pageSize);
     // Other sessions and external applications: refresh the catalog in place (Task 8).
     private LiveRefresh? live, liveLocks;
+    // The table's own display scale (gear above the table) over the user's global one.
+    private string tableStyle = "";
+    private void DisplayChanged() => _ = InvokeAsync(async () => { tableStyle = await Display.StyleAsync(DisplayRules.ProductsCatalogScope); StateHasChanged(); });
+
     protected override async Task OnInitializedAsync()
     {
+        tableStyle = await Display.StyleAsync(DisplayRules.ProductsCatalogScope);
+        Display.Changed += DisplayChanged;
         regularizeTab = TabName == "de-regularizat";
         await LoadAsync();
         await CountToRegularizeAsync();
@@ -382,6 +390,13 @@ else { @ActiveTagsBar()<div class="table-scroll"><table><thead><tr><th>COD PRODU
         onlyIncomplete = IncompleteQuery == "1";
         var scope = category + "001f" + subcategory; if (scope != scopeKey) { scopeKey = scope; activeTags.Clear(); activeParams.Clear(); activeLabels.Clear(); }
         ResetPage();
+        if (!actionHandled && ActionParameter == "adauga-produs" && loaded)
+        {
+            actionHandled = true;
+            if (permAdd) await OpenEditorAsync(null);
+            Navigation.NavigateTo(Navigation.GetUriWithQueryParameter(MenuCatalog.ActionQuery, (string?)null), replace: true);
+            return;
+        }
         if (EditId is > 0 && loaded && (!editing || editingProduct?.Id != EditId.Value))
         {
             var requested = products.FirstOrDefault(product => product.Id == EditId.Value);
@@ -579,6 +594,7 @@ else { @ActiveTagsBar()<div class="table-scroll"><table><thead><tr><th>COD PRODU
     private static string StockLabel(int quantity) => quantity < 0 ? "Stoc negativ" : quantity == 0 ? "Fără stoc" : "În stoc";
     public async ValueTask DisposeAsync()
     {
+        Display.Changed -= DisplayChanged;
         live?.Dispose(); liveLocks?.Dispose();
         var lockedId = lockedProductId; StopHeartbeat();
         if (lockedId > 0)

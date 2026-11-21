@@ -215,6 +215,11 @@ Cunoscut: daca adaugarea componentelor alese la creare esueaza (de ex. tipul a f
 
 ## Modificari de testat - telefon optional (23.10.2026)
 
+### 17.11.2026 - Tabul "Balanta Elcomtur" colorat dupa balanta, cu valoarea in insigna (BUG-0045)
+**Ce s-a adaugat:** pe fisa beneficiarului, tabul "Balanta Elcomtur" arata balanta direct in insigna si este colorat dupa ea, si cand nu este tabul deschis.
+**Ce face acum:** balanta pozitiva (plati restante) face tabul rosu, cu valoarea (de exemplu "1.234,50 RON") in insigna rosie; balanta zero sau negativa il face verde, cu valoarea in insigna verde. Daca modulul Elcomtur e oprit, nu ai dreptul la balante sau importul nu a avut client pentru beneficiar, tabul ramane simplu, fara culoare si fara insigna.
+Pasi: Beneficiari -> un beneficiar cu balanta pozitiva (din Preluare date Elcomtur) -> tabul "Balanta Elcomtur" este rosu si arata suma, desi alt tab este deschis; un beneficiar cu balanta 0 -> tabul este verde cu "0,00 RON".
+
 **Ce s-a adaugat:** campul „Numar de telefon” al beneficiarului nu mai este obligatoriu (ANAF nu il are intotdeauna; preluarea din ActivityApp creeaza beneficiari si fara telefon).
 **Ce face acum:** formularul se salveaza cu telefonul gol; daca este completat, trebuie sa aiba 7-15 cifre (optional cu +).
 
@@ -281,3 +286,77 @@ Cunoscut: daca adaugarea componentelor alese la creare esueaza (de ex. tipul a f
 | 2 | Scrie ceva si apasa "Inchide" | Intrebarea "Parasesti editarea?" | |
 | 3 | Salveaza | beneficiar apare in lista | |
 | 4 | Creion pe un rand existent | Editarea se deschide in pagina (nu in popup) | |
+
+## Modificari de testat - puncte de lucru arondate (11.11.2026)
+
+**Ce s-a adaugat:** un punct de lucru poate avea puncte de lucru arondate (de exemplu o scoala cu cladirea de invatamant primar si gradinita), fiecare cu nume si cel putin adresa sau coordonate GPS; telefon si persoana de contact sunt optionale. Cautarea extinsa a beneficiarilor le cauta. Beneficiarii preluati din ActivityApp au nota "Preluat din ActivityApp".
+**Ce face acum:** in tabelul punctelor de lucru, coloana "Arondate" deschide fereastra listei; adaugarea si editarea se fac in popup, cu iconite + pentru Coordonate GPS, Adresa, Telefon, Persoana de contact.
+
+| Nr | Pas | Rezultat asteptat | Rezultat |
+|----|-----|-------------------|----------|
+| 1 | Fisa beneficiar -> Puncte de lucru -> "+ Arondate" pe un punct -> "+ Adauga punct arondat" | Popup cu nume si 4 iconite + (GPS, Adresa, Telefon, Persoana de contact) | |
+| 2 | Scrie doar numele si salveaza | Refuz: "Completeaza cel putin adresa sau coordonatele GPS" | |
+| 3 | Adauga Adresa, apasa Aplica | Adresa apare cu iconite de editare si stergere; stergerea ei e dezactivata (e singura locatie) | |
+| 4 | Adauga si Coordonate GPS (de ex. 45.7489, 21.2087), Aplica | Pin pe harta din popup; acum adresa se poate sterge, apoi GPS-ul ramane blocat | |
+| 5 | Adauga Telefon "abc" | Mesaj: numarul trebuie sa aiba 7-15 cifre; cu 0744123456 se accepta | |
+| 6 | Salveaza; adauga alt punct cu acelasi nume | Refuz: exista deja un punct arondat cu acest nume | |
+| 7 | Editeaza un punct arondat din lista, modifica o informatie, salveaza | Lista se actualizeaza; Jurnal: "Modificare punct arondat" | |
+| 8 | Sterge un punct arondat din lista | Dispare dintr-un pas; Jurnal: Stergere (Puncte arondate) | |
+| 9 | Beneficiari -> Cautare extinsa -> scrie numele unui punct arondat | Beneficiarul apare cu nota "punct arondat: X (la Y)"; in cautarea simpla nu apare | |
+| 10 | Stergerea unui punct de lucru sau a unui beneficiar care are puncte arondate | Se sterg (arhivate) odata cu el | |
+| 11 | Beneficiar preluat din ActivityApp (lista si fisa) | Nota "Preluat din ActivityApp"; cele doar legate: "Legat cu ActivityApp" | |
+
+## Modificari de testat - antete unitare si ordonare (11.11.2026, BUG-0018)
+
+
+
+**Ce s-a adaugat:** acelasi font la antetul tuturor tabelelor; clic pe antetul unei coloane ordoneaza lista (crescator, descrescator, ordinea initiala).
+
+**Ce face acum:** ordonarea si numarul de randuri pe pagina se pastreaza cat ramane deschis tabul browserului.
+
+
+
+| Pas | Ce faci | Ce trebuie sa vezi | OK |
+
+|---|---|---|---|
+
+| 1 | Beneficiari -> clic pe BENEFICIAR de doua ori | Lista in ordine descrescatoare, sageata in jos | |
+
+| 2 | Treci in alta pagina si revino la Beneficiari | Aceeasi ordonare si acelasi numar de randuri pe pagina | |
+
+| 3 | Inchide tabul si redeschide aplicatia | Ordonarea nu s-a pastrat (valorile initiale) | |
+
+| 4 | Notificari (active), Utilizatori, Balante restante: compara antetele | Acelasi font si aceeasi culoare peste tot | |
+
+## Modificari de testat - punctele arondate in descrierea punctului de lucru (12.11.2026, PROP-0022)
+
+**Ce s-a adaugat:** in fisa beneficiarului, coloana Descriere a unui punct de lucru arata si punctele arondate lui.
+
+**Ce face acum:** sub descriere apare cate o linie "Arondat: nume" pentru fiecare punct arondat (si in tooltip).
+
+| Pas | Ce faci | Ce trebuie sa vezi | OK |
+|---|---|---|---|
+| 1 | Deschide un beneficiar cu un punct de lucru care are puncte arondate | In coloana Descriere, cate o linie "Arondat: nume" pentru fiecare | |
+| 2 | Adauga sau sterge un punct arondat | Liniile se actualizeaza | |
+
+## Modificari de testat - bonuri de consum (18.11.2026, versiunea 0.6.1)
+
+**Ce s-a adaugat:** iconita "Genereaza bon de consum" pe fiecare proiect al unui beneficiar; sectiunea pliabila "Bonuri de consum" in beneficiar; pagina Administrare -> Bonuri de consum. Bonul nu se mai genereaza automat la iesiri.
+**Ce face acum:** bonul se genereaza doar la apasare, cu echipamentele predate proiectului pana atunci (data fiecarei miscari in tabel), legat de beneficiar si de proiect. Bonurile nu se editeaza: se vad, se descarca, se tiparesc, se sterg.
+1. Beneficiar -> Proiecte: apasa iconita de bon a unui proiect cu echipamente predate; "Genereaza bonul": apare in sectiunea "Bonuri de consum" a beneficiarului.
+2. Genereaza al doilea bon pentru acelasi proiect: alege "Pastreaza-le ca inactive", apoi inca unul cu "Sterge-le": raman doar bonul nou.
+3. Pe un bon: vezi (PDF), descarca, tipareste, sterge (cu confirmare).
+4. Administrare -> Bonuri de consum: cautare dupa text, alegere beneficiar/proiect; Jurnal: actiunile "Generare/Dezactivare/Stergere bon de consum".
+5. Dupa actualizare: numarul primului bon este 1.
+6. Iconita de bon apare doar pe proiectele cu echipamente predate; un proiect cu o iesire de 10 bucati si un retur de 2 da un bon cu 8 (net), iar un proiect fara echipamente nu are iconita.
+7. Bonul de consum are un rand pe produs, cu cantitatea neta (iesiri minus retururi) si data ultimei iesiri; un retur de 2 dintr-o iesire de 10 da 8 pe bon.
+
+## Modificari de testat - Generare bon de consum, wizard (20.11.2026, PROP-0045)
+
+**Ce s-a adaugat:** Produse -> "Genereaza bon de consum" (pagina /consum/bon): wizard cu pasii Beneficiar, Proiecte, Tipul bonurilor (doar la mai multe proiecte). Fisierele PDF ale bonurilor se numesc peste tot "nr beneficiar proiect generat data ora".
+**Ce face acum:** pentru un proiect se genereaza bonul si se arata intr-o fereastra cu Descarca, Tipareste, Inchide. Pentru mai multe proiecte: bonuri separate (taburi pe proiect, Descarca toate in folder sau ZIP, Tipareste toate) sau un bon total cu sectiune pe proiect si total pe produs. Fiecare proiect primeste bon numerotat in Administrare -> Bonuri de consum; proiectele returnate integral apar dezactivate.
+1. Alege un beneficiar cu un singur proiect cu echipamente -> Inainte -> bifeaza proiectul -> Genereaza bon de consum: apare PDF-ul; Descarca bonul salveaza un fisier cu numele "nr beneficiar proiect generat data ora.pdf".
+2. Beneficiar cu doua proiecte: bifeaza ambele -> Inainte -> Bon separat -> Genereaza bonuri: doua taburi; Descarca toate bonurile (Chrome/Edge: alegi un folder; alt browser sau http in retea: se descarca un ZIP); Tipareste toate bonurile deschide o singura tiparire.
+3. Acelasi beneficiar, Un singur bon total: un singur PDF cu ambele proiecte si totalul pe produs; numele fisierului incepe cu primul si ultimul numar de bon.
+4. Un proiect ale carui echipamente au fost toate returnate apare dezactivat si nu poate fi ales.
+5. Breadcrumb-ul paginii arata Produse > Genereaza bon de consum; Administrare -> Bonuri de consum contine bonurile noi, iar iconita de descarcare de pe rand da fisierul cu acelasi nume.

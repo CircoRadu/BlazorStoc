@@ -8,6 +8,8 @@ Captura: import | /setari | click Bază de date; click Conexiune; wait 1500; cli
 
 Fereastra se deschide din „Conturile bazei de date” ([[setari-baza-conexiune]]) când începi o operație care schimbă ceva: schimbarea parolei unui cont, a tuturor parolelor, resetarea conturilor, exportul și importul configurării. Are câmpurile operației și, mereu, parola contului tău de administrator; nimic nu se întâmplă până nu apeși butonul ferestrei. Dacă serviciul refuză (parolă greșită, parolă prea scurtă, o copie de siguranță în curs), mesajul apare în fereastră, cu ce ai tastat păstrat, și poți corecta și încerca din nou.
 
+Parolele noi ale conturilor bazei de date arată live lista de condiții (verde / roșu) și au întrerupătorul „Arată parola”; același lucru la fraza-parolă a exportului de configurare.
+
 ## Elemente
 ### Câmpurile operației
 - Parola nouă | câmp | La schimbarea parolei unui cont: cel puțin 16 caractere. | img: parola

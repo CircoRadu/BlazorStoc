@@ -1,0 +1,56 @@
+@using BlazorStoc.Services
+@inject ISupplierInvoiceRepository InvoiceRepository
+@inject ILogger<InvoiceInfoDialog> Logger
+@* PROP-0039: the information of an invoice in a window (opened from the table of stock movements): supplier (link), number, date, who recorded it and the entries taken from it
+   (the product codes are links to the movements of the product). Read only. *@
+<AppDialog Title="@($"Factura {Number}")" TitleId="invoice-info-title" HelpTopic="facturi-informatii" HelpAbout="Informațiile facturii" PanelClass="movement-dialog" OnClose="Closed">
+    @if (error is not null) { <div class="error-banner" role="alert">@error</div> }
+    else if (!loaded) { <p class="muted" role="status">Se citește…</p> }
+    else if (invoice is null) { <p class="muted">Factura nu mai există.</p> }
+    else
+    {
+        <table class="facts" id="invoice-info-facts"><tbody>
+            <tr><th scope="row">Furnizor</th><td><a class="category-table-link" href="@SupplierNavigation.SupplierUrl(invoice.SupplierId)">@invoice.SupplierName</a></td></tr>
+            <tr><th scope="row">Număr factură</th><td>@invoice.Number</td></tr>
+            <tr><th scope="row">Data emiterii</th><td>@StockMovementRules.DisplayDate(invoice.Date)</td></tr>
+            <tr><th scope="row">Preluată de</th><td>@invoice.CreatedBy, @invoice.CreatedUtc.ToLocalTime().ToString("dd.MM.yyyy HH:mm")</td></tr>
+        </tbody></table>
+        <h3>Intrări din această factură <span class="count-badge">@entries.Count</span></h3>
+        @if (entries.Count == 0) { <p class="muted">Nicio intrare nu este legată de factură.</p> }
+        else
+        {
+            <div class="table-scroll"><table id="invoice-info-entries"><thead><tr><th>COD PRODUS</th><th class="number">BUCĂȚI</th><th>DATA</th></tr></thead><tbody>
+                @foreach (var entry in entries)
+                {
+                    <tr><td><a class="category-table-link" href="@($"/produse/{entry.ProductId}/miscari")">@entry.ProductName</a></td><td class="number">@entry.Quantity</td><td>@StockMovementRules.DisplayDate(entry.Date)</td></tr>
+                }
+            </tbody></table></div>
+        }
+    }
+    <div class="editor-actions"><button type="button" class="refresh act-close" @onclick="Closed">Închide</button></div>
+</AppDialog>
+
+@code {
+    [Parameter, EditorRequired] public int SupplierId { get; set; }
+    [Parameter, EditorRequired] public string Number { get; set; } = "";
+    [Parameter] public EventCallback Closed { get; set; }
+    private SupplierInvoice? invoice;
+    private IReadOnlyList<InvoiceEntry> entries = [];
+    private bool loaded;
+    private string? error;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            invoice = await InvoiceRepository.FindAsync(SupplierId, Number);
+            if (invoice is not null) entries = await InvoiceRepository.GetEntriesAsync(invoice.Id);
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            Logger.LogWarning("The invoice information could not be read ({ErrorType}).", exception.GetType().Name);
+            error = "Informațiile facturii nu au putut fi citite.";
+        }
+        loaded = true;
+    }
+}

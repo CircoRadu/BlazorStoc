@@ -35,7 +35,7 @@ public static partial class MariaExtendedChecks
         async Task<long> Count(string sql) => await Scalar<long>(probe, sql);
         async Task CleanAsync()
         {
-            foreach (var table in new[] { "activity_import_map", "activity_import_issues", "activity_import_runs", "activity_import_types", "activity_import_settings", "activity_import_suggestions", "activity_import_keywords", "activity_import_partner_checks", "activity_import_tickets" })
+            foreach (var table in new[] { "activity_import_map", "activity_import_issues", "activity_import_runs", "activity_import_types", "activity_import_settings", "activity_import_suggestions", "activity_import_keywords", "activity_import_partner_checks", "activity_ticket_outcomes", "activity_import_tickets" })
                 await Exec(probe, "DELETE FROM " + table);
         }
         try
@@ -172,6 +172,28 @@ public static partial class MariaExtendedChecks
             var last = await tickets.ApplyAsync();
             Check(last.Tickets.Create == 0 && last.ToValidate == 0, "Activity maintenance: once in the queue, the tickets are not proposed again");
 
+            // The maintenance module is out: the ticket is still taken (it leaves the queue and is never proposed again) and its outcome waits; the due date moves when the module runs again.
+            var outReview = new MariaActivityReviewService(configuration, admin, audit, new UnavailableOnDemandInterventionRecorder());
+            var waiting = (await outReview.GetPendingAsync()).Single(item => item.TicketId == 9003);
+            await outReview.DecideAsync(waiting.Id, ReviewDecision.Maintenance);
+            var outCounts = await outReview.GetOutcomeCountsAsync();
+            Check(outCounts is { Pending: 1, Failed: 0 } && (await outReview.GetPendingAsync()).Count == 0 && await Count("SELECT COUNT(*) FROM service_interventions") == interventionsBefore + 5
+                && await Count("SELECT COUNT(*) FROM activity_import_map WHERE entity = 'ticket' AND source_id = 9003") == 1 && await Count("SELECT COUNT(*) FROM activity_import_tickets WHERE ticket_id = 9003 AND state = 'imported'") == 1
+                && await Count($"SELECT COUNT(*) FROM service_contract_points WHERE contract_id = {contract.Contract.Id} AND next_due = '2026-09-02'") == 1,
+                "Activity maintenance: with the maintenance module out a ticket is still taken (out of the queue, tied) and only its outcome waits; no intervention, no due date moved");
+            var whileOut = await tickets.ApplyAsync();
+            Check(whileOut.Tickets.Create == 0 && whileOut.ToValidate == 0 && (await outReview.GetPendingAsync()).Count == 0, "Activity maintenance: a ticket taken while the module is out is not proposed again by the next synchronization");
+            Check(await TicketOutcomeApplication.ApplyPendingAsync(configuration, new UnavailableOnDemandInterventionRecorder(), CancellationToken.None) == 0 && (await outReview.GetOutcomeCountsAsync()).Pending == 1,
+                "Activity maintenance: while the module is still out the outcome stays pending");
+            var catchUp = await TicketOutcomeApplication.ApplyPendingAsync(configuration, recorder, CancellationToken.None);
+            Check(catchUp == 1 && (await outReview.GetOutcomeCountsAsync()) is { Pending: 0, Failed: 0 } && await Count("SELECT COUNT(*) FROM service_interventions") == interventionsBefore + 6
+                && await Count("SELECT COUNT(*) FROM service_interventions si JOIN service_intervention_source s ON s.intervention_id = si.id WHERE s.source_ticket_id = 9003 AND si.kind = 'M'") == 1
+                && await Count($"SELECT COUNT(*) FROM service_contract_points WHERE contract_id = {contract.Contract.Id} AND next_due = '2026-10-06'") == 1
+                && await Count("SELECT COUNT(*) FROM activity_import_map m JOIN service_interventions si ON si.id = m.local_id WHERE m.entity = 'ticket' AND m.source_id = 9003") == 1,
+                "Activity maintenance: when the module runs again the pending outcome is recorded, the due date follows the ticket taken meanwhile and the ticket is tied to its intervention");
+            Check(await TicketOutcomeApplication.ApplyPendingAsync(configuration, recorder, CancellationToken.None) == 0 && await Count("SELECT COUNT(*) FROM service_interventions") == interventionsBefore + 6,
+                "Activity maintenance: an outcome already recorded is never recorded twice");
+
             await keywords.SetActiveAsync((await keywords.GetAllAsync()).Single(item => item.Id == word.Id), false);
             Check((await keywords.GetAllAsync()).Single(item => item.Id == word.Id).Active == false, "Activity keywords: deactivated again");
             await keywords.DeleteAsync((await keywords.GetAllAsync()).Single(item => item.Id == revision.Id));
@@ -179,7 +201,7 @@ public static partial class MariaExtendedChecks
 
             var events = (await audit.QueryAsync(new AuditQuery(Entity: AuditEntities.ActivityImport), 1, 400)).Events.Where(entry => entry.TimestampUtc >= started).ToList();
             Check(events.Any(entry => entry.Action == AuditActions.AddActivityKeyword && entry.Details.Contains("mentenanță", StringComparison.Ordinal)) && events.Any(entry => entry.Action == AuditActions.EditActivityKeyword && entry.Details.Contains("revizie", StringComparison.Ordinal))
-                && events.Any(entry => entry.Action == AuditActions.DeleteActivityKeyword) && events.Count(entry => entry.Action == AuditActions.DecideActivityMaintenance && entry.Details.Contains("Ext Mentenanta", StringComparison.Ordinal)) == 5
+                && events.Any(entry => entry.Action == AuditActions.DeleteActivityKeyword) && events.Count(entry => entry.Action == AuditActions.DecideActivityMaintenance && entry.Details.Contains("Ext Mentenanta", StringComparison.Ordinal)) == 6
                 && events.Any(entry => entry.Action == AuditActions.DecideActivityMaintenance && entry.Details.Contains("este mentenanță", StringComparison.Ordinal))
                 && events.Count(entry => entry.Action == AuditActions.DiscardActivityTicket) == 1 && events.Count(entry => entry.Action == AuditActions.ReactivateActivityTicket) == 1,
                 "Activity maintenance: keywords, decisions, discard and reactivation are in the journal by their exact action, with the old and the new value");

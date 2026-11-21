@@ -1,0 +1,417 @@
+@namespace BlazorStoc.Components.Pages
+@using BlazorStoc.Modules.EspImport
+@using BlazorStoc.Services
+@inject IEspImportService Import
+@inject ILogger<EspImportPanel> Logger
+@implements IDisposable
+@* Setari -> Preluare stoc ESPStoc (administrator only): the export of the old ESPStoc database is analysed (nothing is written), the products that go in subcategories with parameters get their
+   parameters settled, and the application is the point zero of the stock keeping (docs/PROPUNERE_IMPORT_ESPSTOC.md). *@
+
+<section class="catalog esp-import">
+    <div class="catalog-heading"><h2>Preluare stoc ESPStoc</h2><small>Produsele cu cantitate pozitivă din aplicația veche, cu imaginile lor, devin punctul zero al gestiunii din BlazorStoc.</small></div>
+    <div class="catalog-body">
+    @if (loading) { <div class="empty-state" role="status"><div class="spinner"></div><h3>Se încarcă</h3></div> }
+    else
+    {
+        @if (error is not null) { <div class="error-banner" role="alert" id="esp-error">@error</div> }
+        @if (notice is not null) { <div class="success-banner" role="status" id="esp-notice">@notice</div> }
+
+        @if (state is not null && EspPointZeroStatus.Finished(state.Status))
+        {
+            <div class="anaf-message ok" role="status" id="esp-done">Punctul zero al gestiunii a fost stabilit la <strong>@state.FinishedUtc?.ToLocalTime().ToString("dd.MM.yyyy HH:mm")</strong> din exportul <strong>@state.Source</strong>: @state.Products produse, @state.Pieces bucăți. Un nou import se poate face numai după restaurarea unui pachet de siguranță.</div>
+            @if (state.Log.Count > 0)
+            {
+                <details class="invoice-section"><summary>Jurnalul operațiunii <span>@state.Log.Count rânduri</span></summary><pre class="esp-log">@string.Join("\n", state.Log)</pre></details>
+            }
+        }
+        else
+        {
+            @if (state is { Running: true } && !busy)
+            {
+                <div class="anaf-message warn" role="status" id="esp-running">Punctul zero rulează chiar acum (început la @state.StartedUtc.ToLocalTime().ToString("dd.MM.yyyy HH:mm"), stare: <strong>@StatusText(state.Status)</strong>). Pagina se actualizează singură.@if (state.Log.Count > 0) { <br /><small>@state.Log[^1]</small> }</div>
+            }
+            else if (state is not null)
+            {
+                <div class="anaf-message warn" role="status" id="esp-unfinished">O operațiune începută la @state.StartedUtc.ToLocalTime().ToString("dd.MM.yyyy HH:mm") nu s-a încheiat (stare: <strong>@StatusText(state.Status)</strong>). Alege din nou exportul și apasă „Aplică”: se reia de unde a rămas. Pachetul de siguranță: @(state.SafetyPackage ?? "—").</div>
+                @if (state.Log.Count > 0)
+                {
+                    <details class="invoice-section"><summary>Ce nu a mers <span>@state.Log.Count rânduri</span></summary><pre class="esp-log">@string.Join("\n", state.Log)</pre></details>
+                }
+            }
+
+            <fieldset class="anaf-section"><legend>1. Exportul bazei vechi</legend>
+                <p class="muted">Un fișier <code>.sql</code> (HeidiSQL sau mysqldump) sau un <code>.zip</code> care îl conține. Se citesc doar categoriile, subcategoriile, produsele și imaginile produselor cu stoc; mișcările și restul datelor vechi nu se preiau.</p>
+                <div class="anaf-grid">
+                    <label>Alege fișierul (încărcare)<InputFile id="esp-file" OnChange="FileSelectedAsync" accept=".zip,.sql" disabled="@busy" /></label>
+                    <label>sau calea fișierului de pe server<input id="esp-path" @bind="serverPath" maxlength="500" autocomplete="off" placeholder="D:\Radu\ESP_Stoc\export.zip" disabled="@busy" /></label>
+                </div>
+                <div class="editor-actions">
+                    <button type="button" id="esp-analyze" class="primary" disabled="@(busy || string.IsNullOrWhiteSpace(serverPath))" @onclick="AnalyzePathAsync">Analizează fișierul de pe server</button>
+                    @if (analysis is not null) { <button type="button" class="refresh act-reload" disabled="@busy" @onclick="RefreshAsync">Actualizează catalogul</button> <button type="button" class="refresh act-close" disabled="@busy" @onclick="DiscardAsync">Renunță la analiză</button> }
+                    @if (busy) { <span class="muted" role="status">@busyText</span> }
+                </div>
+            </fieldset>
+
+            @if (analysis is not null)
+            {
+                <fieldset class="anaf-section"><legend>2. Ce se preia</legend>
+                    <p class="muted"><strong>@analysis.SourceName</strong> — @analysis.Export.TotalProducts produse în export, @analysis.Export.ZeroProducts fără stoc (nu se preiau), @analysis.Export.Products.Count cu stoc.</p>
+                    <div class="esp-summary" id="esp-summary">
+                        <span class="anaf-badge ok">Se preiau @analysis.TakenProducts produse (@analysis.TakenPieces buc.)</span>
+                        <span class="anaf-badge ok">@analysis.NewProducts noi</span>
+                        <span class="anaf-badge ok">@analysis.ExistingProducts existente (primesc cantitatea)</span>
+                        @if (analysis.ProblemProducts > 0) { <button type="button" class="anaf-badge error esp-badge-link" id="esp-problem-total" title="Arată lista" @onclick='() => Filter("problems", null)'>@analysis.ProblemProducts cu probleme</button> }
+                        @if (analysis.ProposedProducts > 0) { <button type="button" class="anaf-badge warn esp-badge-link" id="esp-proposed-total" title="Arată lista" @onclick='() => Filter("proposed", null)'>@analysis.ProposedProducts cu parametri propuși (de verificat)</button> }
+                        @if (analysis.FrozenProducts > 0) { <button type="button" class="anaf-badge warn esp-badge-link" id="esp-frozen-total" title="Arată lista (preluate fără parametri: rămân înghețate în BlazorStoc până sunt completate)" @onclick='() => Filter("frozen", null)'>@analysis.FrozenProducts înghețate</button> }
+                        @if (analysis.OmittedProducts > 0) { <button type="button" class="anaf-badge warn esp-badge-link" id="esp-omitted-total" title="Arată lista" @onclick='() => Filter("omitted", null)'>@analysis.OmittedProducts omise</button> }
+                        @if (analysis.NewCategories + analysis.NewSubcategories > 0) { <span class="anaf-badge warn">@analysis.NewCategories categorii și @analysis.NewSubcategories subcategorii noi</span> }
+                    </div>
+                    <div class="esp-filters" id="esp-filter-bar">
+                        @if (filterKind.Length > 0) { <span>Filtru activ: <strong>@FilterName()</strong> — @Groups().Sum(group => group.Count()) produse</span> <button type="button" id="esp-filter-clear" class="refresh act-nav" @onclick="ClearFilter">Arată toate produsele</button> }
+                        else { <span class="muted">Apasă pe o insignă (cu probleme, de verificat, înghețate) ca să vezi lista ei.</span> }
+                        @if (Unresolved() > 0) { <button type="button" id="esp-freeze-all" class="refresh act-edit" disabled="@busy" title="Produsele rămân fără parametri și înghețate în BlazorStoc (nicio mișcare) până sunt completate în editorul de produs." @onclick="FreezeAllAsync">Preia înghețate produsele fără parametri (@Unresolved())</button> }
+                    </div>
+                    @foreach (var group in Groups())
+                    {
+                        var key = group.Key;
+                        var open = openCategories.Contains(key);
+                        <div class="esp-category" data-category="@key">
+                            <button type="button" class="esp-head" aria-expanded="@(open ? "true" : "false")" @onclick="() => Toggle(key)">
+                                <span class="esp-caret">@(open ? "▾" : "▸")</span><strong>@key</strong>
+                                <span class="count-badge" title="Produse preluate din total">@group.Count(item => item.IsTaken) din @group.Count()</span>
+                                <span class="count-badge" title="Bucăți preluate">@group.Where(item => item.IsTaken).Sum(item => item.Quantity) buc.</span>
+                                @if (group.Any(item => item.HasProblems)) { <span role="button" tabindex="0" class="anaf-badge error esp-badge-link esp-problems" title="Arată lista" @onclick='() => Filter("problems", key)' @onclick:stopPropagation="true">@group.Count(item => item.HasProblems) cu probleme</span> }
+                                @if (group.Any(item => item.IsFrozen)) { <span role="button" tabindex="0" class="anaf-badge warn esp-badge-link" title="Arată lista" @onclick='() => Filter("frozen", key)' @onclick:stopPropagation="true">@group.Count(item => item.IsFrozen) înghețate</span> }
+                                @if (group.Any(item => item.IsTaken && item.Proposed)) { <span role="button" tabindex="0" class="anaf-badge warn esp-badge-link" title="Arată lista" @onclick='() => Filter("proposed", key)' @onclick:stopPropagation="true">@group.Count(item => item.IsTaken && item.Proposed) de verificat</span> }
+                            </button>
+                            @if (open)
+                            {
+                                <div class="esp-body">
+                                    <div class="table-scroll"><table class="catalog-table">
+                                        <thead><tr><th>Cod vechi</th><th>Subcategorie</th><th>Stoc</th><th>Rezultat în BlazorStoc</th><th>Parametri</th><th>Observații</th><th>Preia</th><th></th></tr></thead>
+                                        <Paged Items="Rows(group)" Id="@($"esp-rows-{key}")" Context="pageRows" DefaultSize="25">
+                                        <tbody>
+                                        @foreach (var item in pageRows)
+                                        {
+                                            <tr class="@(item.HasProblems ? "esp-row-problem" : "")" data-old-id="@item.OldId">
+                                                <td>@item.Code</td>
+                                                <td>@item.TargetSubcategory@if (item.NewSubcategory) { <span class="count-badge">nouă</span> }</td>
+                                                <td>@item.Quantity</td>
+                                                <td>@Result(item)</td>
+                                                <td>@ParameterText(item)</td>
+                                                <td>@foreach (var problem in item.Problems) { <div class="negative-stock">@problem</div> }@foreach (var note in item.Notes) { <div class="muted">@note</div> }@if (item.CategoryCorrected) { <div class="muted">Categoria din baza veche diferă de cea a subcategoriei; se urmează subcategoria.</div> }@if (!item.HasImage) { <div class="muted">Fără imagine în export.</div> }</td>
+                                                <td><ToggleSwitch Compact="true" Value="!item.Omit" ValueChanged="value => OmitAsync(item, !value)" AriaLabel="@($"Preia produsul {item.Code}")" Title="@(item.Omit ? "Omis: nu se preia" : "Se preia")" /></td>
+                                                <td>@if (item.Slots.Count > 0 && (item.Existing is null || item.Completes) || item.Proposed) { <button type="button" class="row-icon params" aria-label="@($"Alege parametrii produsului {item.Code}")" title="@($"Alege parametrii produsului {item.Code}")" @onclick="() => StartEdit(item)"></button> }</td>
+                                            </tr>
+                                            @if (editing == item.OldId)
+                                            {
+                                                <tr class="esp-editor"><td colspan="8">
+                                                    <div class="anaf-grid">
+                                                        <label>Model (fără parametri)<input id="esp-model" @bind="editModel" maxlength="90" autocomplete="off" /></label>
+                                                        @for (var index = 0; index < item.Slots.Count; index++)
+                                                        {
+                                                            var slotIndex = index;
+                                                            var slot = item.Slots[slotIndex];
+                                                            var edit = slotEdits[slotIndex];
+                                                            var member = slot.Members.FirstOrDefault(candidate => candidate.Id == edit.ParameterId) ?? slot.Members[0];
+                                                            <div class="esp-slot">
+                                                                <strong>@slot.Name</strong>
+                                                                @if (slot.Members.Count > 1)
+                                                                {
+                                                                    <select id="@($"esp-member-{slotIndex}")" value="@edit.ParameterId" @onchange="args => MemberChanged(slotIndex, args.Value?.ToString())">
+                                                                        @foreach (var candidate in slot.Members) { <option value="@candidate.Id">@candidate.Name@(candidate.Unit.Length > 0 ? " (" + candidate.Unit + ")" : "")</option> }
+                                                                    </select>
+                                                                }
+                                                                <select id="@($"esp-value-{slotIndex}")" @bind="edit.ValueKey">
+                                                                    <option value="">— alege —</option>
+                                                                    @foreach (var value in member.Values) { <option value="#@value.Id">@ProductParameterRules.Display(member.Unit, value.Value)</option> }
+                                                                    @if (member.Kind != ParameterKind.Fixed) { <option value="new">valoare nouă…</option> }
+                                                                </select>
+                                                                @if (edit.ValueKey == "new") { <input id="@($"esp-new-{slotIndex}")" @bind="edit.NewText" maxlength="60" placeholder="@(member.Kind == ParameterKind.Interval ? "ex. 2,8-12" : "valoare")" autocomplete="off" /> }
+                                                            </div>
+                                                        }
+                                                    </div>
+                                                    <div class="editor-actions">
+                                                        <button type="button" id="esp-edit-save" class="primary" disabled="@busy" @onclick="() => SaveEditAsync(item)">Salvează parametrii</button>
+                                                        <button type="button" id="esp-edit-freeze" class="refresh act-edit" disabled="@busy" title="Produsul se preia fără parametri: rămâne înghețat în BlazorStoc (nicio mișcare) până îl completezi în editorul de produs." @onclick="() => FreezeAsync(item)">Preia înghețat, fără parametri</button>
+                                                        <button type="button" class="refresh act-close" @onclick="CancelEdit">Renunță</button>
+                                                    </div>
+                                                </td></tr>
+                                            }
+                                        }
+                                        </tbody>
+                                        </Paged>
+                                    </table></div>
+                                </div>
+                            }
+                        </div>
+                    }
+                    @{ var rest = analysis.NotInExport(); }
+                    <p class="muted" id="esp-not-in-export">În BlazorStoc există @rest.Count produse (@rest.Sum(product => product.Quantity) buc.) fără corespondent cu stoc în export: după punctul zero au stoc 0.</p>
+                </fieldset>
+
+                <fieldset class="anaf-section"><legend>3. Punctul zero al gestiunii</legend>
+                    <p class="muted">Aplicarea <strong>șterge</strong> mișcările de stoc, facturile preluate, ofertele și rezervările, pune cantitățile pe 0 și preia stocul din export ca intrare inițială. Apoi șterge <strong>toate copiile de siguranță</strong> de pe server și de pe NAS (după ce face un pachet nou, „punct de pornire”) și <strong>golește jurnalul de acțiuni</strong>. Produsele, categoriile, utilizatorii, beneficiarii și restul rămân.</p>
+                    <div class="editor-actions">
+                        <button type="button" id="esp-preview" class="refresh act-reload" disabled="@busy" @onclick="PreviewAsync">Arată ce se șterge</button>
+                    </div>
+                    @if (preview is not null)
+                    {
+                        <div class="table-scroll"><table class="catalog-table" id="esp-delete-counts">
+                            <thead><tr><th>Se șterge</th><th>Rânduri</th></tr></thead>
+                            <tbody>
+                                @foreach (var count in preview.Counts) { <tr><td>@count.Label</td><td>@count.Rows</td></tr> }
+                                <tr><td>Stoc din BlazorStoc (se pune 0)</td><td>@preview.PiecesInStock buc. la @preview.ProductsWithStock produse</td></tr>
+                                <tr><td>Jurnal de acțiuni (se golește)</td><td>@preview.JournalEvents evenimente@(preview.JournalFirstUtc is { } first ? $" ({first.ToLocalTime():dd.MM.yyyy} – {preview.JournalLastUtc?.ToLocalTime():dd.MM.yyyy})" : "")</td></tr>
+                                <tr><td>Copii de siguranță pe server (se șterg)</td><td id="esp-local-packages">@preview.LocalPackages.Count pachete, @FormatSize(preview.LocalPackages.Sum(file => file.SizeBytes))</td></tr>
+                                <tr><td>Copii de siguranță pe NAS (se șterg)</td><td id="esp-nas-packages">@preview.NasPackages.Count fișiere, @FormatSize(preview.NasPackages.Sum(file => file.SizeBytes))@(preview.NasNote is not null ? " — " + preview.NasNote : "")</td></tr>
+                            </tbody>
+                        </table></div>
+                        @if (preview.LocalPackages.Count + preview.NasPackages.Count > 0)
+                        {
+                            <details class="invoice-section"><summary>Pachetele care se șterg <span>@(preview.LocalPackages.Count + preview.NasPackages.Count)</span></summary>
+                                <ul class="esp-list">
+                                    @foreach (var file in preview.LocalPackages) { <li>server: @file.Name (@file.CreatedUtc.ToLocalTime().ToString("dd.MM.yyyy HH:mm"), @FormatSize(file.SizeBytes))</li> }
+                                    @foreach (var file in preview.NasPackages) { <li>NAS: @file.Name (@FormatSize(file.SizeBytes))</li> }
+                                </ul>
+                            </details>
+                        }
+                        <p class="muted">Înainte de orice ștergere se face un pachet de siguranță complet; el se șterge și el la sfârșit, după ce există pachetul nou. Dacă vrei să păstrezi jurnalul, exportă-l din pagina Jurnal activitate înainte de aplicare. <strong>După terminare nu mai există cale de întoarcere la gestiunea veche.</strong></p>
+                        <div class="anaf-grid">
+                            <label>Scrie <strong>PUNCT ZERO</strong> pentru confirmare<input id="esp-confirm" @bind="confirmation" @bind:event="oninput" maxlength="20" autocomplete="off" disabled="@busy" /></label>
+                        </div>
+                        <div class="editor-actions">
+                            <button type="button" id="esp-apply" class="danger" disabled="@(busy || state?.Running == true || !analysis.CanApply || confirmation.Trim() != "PUNCT ZERO")" title="@(analysis.CanApply ? "" : "Rezolvă mai întâi problemele sau omite produsele cu probleme.")" @onclick="ApplyAsync">Aplică punctul zero</button>
+                            @if (busy) { <span class="muted" role="status">@busyText</span> }
+                        </div>
+                    }
+                    @if (progressLog.Count > 0)
+                    {
+                        <pre class="esp-log" id="esp-progress">@string.Join("\n", progressLog)</pre>
+                    }
+                </fieldset>
+            }
+        }
+    }
+    </div>
+</section>
+
+@code {
+    private sealed class SlotEdit { public int ParameterId { get; set; } public string ValueKey { get; set; } = ""; public string NewText { get; set; } = ""; }
+    private sealed class Reporter(Action<string> action) : IProgress<string> { public void Report(string value) => action(value); }
+
+    private readonly CancellationTokenSource lifetime = new();
+    private bool loading = true, busy, disposed;
+    private string filterKind = "";
+    private string? error, notice, busyText;
+    private string serverPath = "", confirmation = "", editModel = "";
+    private int editing;
+    private List<SlotEdit> slotEdits = [];
+    private EspAnalysis? analysis;
+    private EspPointZeroPreview? preview;
+    private EspPointZeroState? state;
+    private readonly HashSet<string> openCategories = new(StringComparer.Ordinal);
+    private readonly List<string> progressLog = [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            analysis = await Import.GetCurrentAsync(lifetime.Token);
+            state = await Import.GetStateAsync(lifetime.Token);
+            if (state?.Running == true) pollTimer = new Timer(_ => _ = InvokeAsync(PollAsync), null, 3000, 3000);
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException) { error = Message(exception); }
+        loading = false;
+    }
+
+    private Timer? pollTimer;
+
+    // While the operation runs (the page was sent to the maintenance page and came back), the state is read again every few seconds.
+    private async Task PollAsync()
+    {
+        if (disposed) return;
+        try { state = await Import.GetStateAsync(CancellationToken.None); }
+        catch (Exception exception) when (exception is MaintenanceInProgressException or ObjectDisposedException) { return; }
+        catch (Exception exception) when (!disposed) { error = Message(exception); return; }
+        if (state?.Running != true)
+        {
+            pollTimer?.Dispose(); pollTimer = null;
+            try { analysis = await Import.GetCurrentAsync(CancellationToken.None); } catch (Exception exception) when (exception is not OperationCanceledException) { }
+        }
+        if (!disposed) StateHasChanged();
+    }
+
+    public void Dispose() { disposed = true; pollTimer?.Dispose(); lifetime.Cancel(); lifetime.Dispose(); }
+
+    private string Message(Exception exception)
+    {
+        if (exception is EspImportOperationException or EspExportException or AccessDeniedException or ModuleUnavailableException or ProductOperationException) return exception.Message;
+        Logger.LogError("Stock import page failed ({ErrorType}).", exception.GetType().Name);
+        return "Operațiunea nu s-a putut face. Încearcă din nou.";
+    }
+
+    private static string StatusText(string status) => status switch
+    {
+        EspPointZeroStatus.Started => "pachet de siguranță făcut",
+        EspPointZeroStatus.Deleted => "date șterse, preluarea neterminată",
+        EspPointZeroStatus.ImportErrors => "preluare cu erori",
+        EspPointZeroStatus.VerifyFailed => "verificarea finală a eșuat",
+        EspPointZeroStatus.Verified => "verificat, curățarea neterminată",
+        _ => status
+    };
+
+    private static string FormatSize(long bytes) => bytes <= 0 ? "0 KB" : bytes >= 1L << 30 ? $"{bytes / (double)(1L << 30):0.0} GB" : bytes >= 1L << 20 ? $"{bytes / (double)(1L << 20):0.0} MB" : $"{Math.Max(1, bytes / 1024)} KB";
+
+    private async Task RunAsync(string text, Func<Task> work)
+    {
+        busy = true; busyText = text; error = null; notice = null;
+        StateHasChanged();
+        try { await work(); }
+        catch (OperationCanceledException) { }
+        catch (Exception exception) when (!disposed) { error = Message(exception); }
+        finally { busy = false; busyText = null; }
+    }
+
+    private async Task FileSelectedAsync(InputFileChangeEventArgs eventArgs) => await RunAsync("Se încarcă și se analizează exportul…", async () =>
+    {
+        var file = eventArgs.File;
+        string? path = null;
+        await using (var stream = file.OpenReadStream(2L << 30, lifetime.Token)) path = await Import.SaveUploadAsync(stream, file.Name, lifetime.Token);
+        analysis = await Import.AnalyzeAsync(path, file.Name, true, lifetime.Token);
+        AfterAnalysis();
+    });
+
+    private async Task AnalyzePathAsync() => await RunAsync("Se analizează exportul…", async () =>
+    {
+        var path = serverPath.Trim().Trim('"');
+        analysis = await Import.AnalyzeAsync(path, Path.GetFileName(path), false, lifetime.Token);
+        AfterAnalysis();
+    });
+
+    private void AfterAnalysis()
+    {
+        preview = null; confirmation = ""; editing = 0; progressLog.Clear(); openCategories.Clear();
+        notice = $"Analiza s-a încheiat: {analysis!.TakenProducts} produse de preluat, {analysis.ProblemProducts} cu probleme.";
+        var first = analysis.Items.GroupBy(item => item.TargetCategory).FirstOrDefault(group => group.Any(item => item.HasProblems));
+        if (first is not null) openCategories.Add(first.Key);
+    }
+
+    private async Task RefreshAsync() => await RunAsync("Se citește catalogul…", async () => { await Import.RefreshAsync(lifetime.Token); analysis = await Import.GetCurrentAsync(lifetime.Token); notice = "Catalogul a fost citit din nou."; });
+
+    private async Task DiscardAsync() => await RunAsync("…", async () => { await Import.DiscardAsync(lifetime.Token); analysis = null; preview = null; confirmation = ""; });
+
+    private IEnumerable<IGrouping<string, EspPlanItem>> Groups() => analysis!.Items.Where(Visible).GroupBy(item => item.TargetCategory).OrderBy(group => group.Key, StringComparer.CurrentCultureIgnoreCase);
+
+    private bool Visible(EspPlanItem item) => filterKind switch
+    {
+        "problems" => item.HasProblems,
+        "proposed" => item.IsTaken && item.Proposed,
+        "frozen" => item.IsFrozen,
+        "omitted" => item.Omit,
+        _ => true
+    };
+
+    private string FilterName() => filterKind switch { "problems" => "cu probleme", "proposed" => "cu parametri propuși (de verificat)", "frozen" => "înghețate", "omitted" => "omise", _ => "" };
+
+    // A badge shows the list behind it: the products of that kind, with their categories opened (only the one clicked, when the badge is the one of a category).
+    private void Filter(string kind, string? category)
+    {
+        if (filterKind == kind && category is null) { ClearFilter(); return; }
+        filterKind = kind;
+        editing = 0;
+        if (category is not null) openCategories.Add(category);
+        else foreach (var group in Groups()) openCategories.Add(group.Key);
+    }
+
+    private void ClearFilter() => filterKind = "";
+
+    private IReadOnlyList<EspPlanItem> Rows(IGrouping<string, EspPlanItem> group) => [.. group.OrderBy(item => item.TargetSubcategory, StringComparer.CurrentCultureIgnoreCase).ThenBy(item => item.Code, StringComparer.CurrentCultureIgnoreCase)];
+
+    private void Toggle(string key) { if (!openCategories.Remove(key)) openCategories.Add(key); }
+
+    private static string Result(EspPlanItem item) => item.Omit ? "Omis" : item.Problems.Count > 0 ? "—" : item.IsFrozen ? FrozenText(item) : item.Existing is not null ? (item.Completes ? $"Se completează: {item.Existing.Name} → {item.FinalCode} (acum {item.Existing.Quantity} buc. → {item.Quantity})" : $"Există: {item.Existing.Name} (acum {item.Existing.Quantity} buc. → {item.Quantity})") : $"Produs nou: {item.FinalCode}";
+
+    private static string FrozenText(EspPlanItem item) => item.Existing is not null
+        ? $"Există, preluat înghețat: {item.Existing.Name} (acum {item.Existing.Quantity} buc. → {item.Quantity})"
+        : $"Produs nou, înghețat: {item.FinalCode}";
+
+    private static string ParameterText(EspPlanItem item)
+    {
+        if (item.Slots.Count == 0) return "";
+        if (item.IsFrozen) return "înghețat (fără parametri)";
+        var parts = Enumerable.Range(0, item.Slots.Count).Select(index => EspPlanner.ChoiceText(item, index)).Where(text => text.Length > 0).ToList();
+        if (parts.Count == 0) return item.Existing is not null ? "" : "neales";
+        return string.Join("; ", parts) + (item.Proposed ? " (propus)" : "");
+    }
+
+    private async Task OmitAsync(EspPlanItem item, bool omit) => await RunAsync("…", async () => { await Import.SetOmitAsync(item.OldId, omit, lifetime.Token); if (editing == item.OldId) editing = 0; });
+
+    private void StartEdit(EspPlanItem item)
+    {
+        editing = item.OldId;
+        editModel = item.BaseModel.Length > 0 ? item.BaseModel : item.Code;
+        slotEdits = [];
+        for (var index = 0; index < item.Slots.Count; index++)
+        {
+            var slot = item.Slots[index];
+            var edit = new SlotEdit { ParameterId = slot.Members[0].Id };
+            if (item.Choices.TryGetValue(index, out var choice))
+            {
+                edit.ParameterId = choice.ParameterId;
+                if (choice.ValueId is { } valueId) edit.ValueKey = "#" + valueId;
+                else if (choice.NewValue is not null) { edit.ValueKey = "new"; edit.NewText = choice.NewValue; }
+            }
+            slotEdits.Add(edit);
+        }
+    }
+
+    private void MemberChanged(int slotIndex, string? value)
+    {
+        if (!int.TryParse(value, out var id)) return;
+        slotEdits[slotIndex].ParameterId = id;
+        slotEdits[slotIndex].ValueKey = "";
+        slotEdits[slotIndex].NewText = "";
+    }
+
+    private void CancelEdit() => editing = 0;
+
+    private int Unresolved() => analysis?.Items.Count(item => item.HasProblems && item.Slots.Count > 0) ?? 0;
+
+    private async Task FreezeAsync(EspPlanItem item) => await RunAsync("…", async () => { await Import.SetFrozenAsync(item.OldId, true, lifetime.Token); editing = 0; });
+
+    private async Task FreezeAllAsync() => await RunAsync("…", async () => { var count = await Import.FreezeUnresolvedAsync(lifetime.Token); notice = $"{count} produse se preiau înghețate (fără parametri)."; });
+
+    private async Task SaveEditAsync(EspPlanItem item) => await RunAsync("Se salvează…", async () =>
+    {
+        var picks = new List<EspPick>();
+        for (var index = 0; index < slotEdits.Count; index++)
+        {
+            var edit = slotEdits[index];
+            if (edit.ValueKey.StartsWith('#') && int.TryParse(edit.ValueKey[1..], out var valueId)) picks.Add(new(index, edit.ParameterId, valueId, null));
+            else if (edit.ValueKey == "new" && !string.IsNullOrWhiteSpace(edit.NewText)) picks.Add(new(index, edit.ParameterId, null, edit.NewText));
+        }
+        await Import.ChooseAsync(item.OldId, editModel, picks, lifetime.Token);
+        editing = 0;
+    });
+
+    private async Task PreviewAsync() => await RunAsync("Se numără ce se șterge și se citesc copiile de siguranță (și de pe NAS)…", async () => preview = await Import.PreviewAsync(lifetime.Token));
+
+    private async Task ApplyAsync()
+    {
+        progressLog.Clear();
+        await RunAsync("Se aplică punctul zero. Nu închide pagina…", async () =>
+        {
+            var reporter = new Reporter(message =>
+            {
+                if (disposed) return;
+                progressLog.Add(message); busyText = message;
+                try { _ = InvokeAsync(StateHasChanged); } catch (ObjectDisposedException) { }
+            });
+            var result = await Import.ApplyAsync(confirmation, reporter, CancellationToken.None);
+            state = await Import.GetStateAsync(CancellationToken.None);
+            if (result.Success) { notice = result.Message; analysis = null; preview = null; confirmation = ""; }
+            else error = result.Message;
+        });
+    }
+}

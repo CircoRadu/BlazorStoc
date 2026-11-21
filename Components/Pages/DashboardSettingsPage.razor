@@ -1,0 +1,409 @@
+@page "/personalizare-pagina-principala"
+@attribute [Authorize]
+@rendermode @(new InteractiveServerRenderMode(prerender: false))
+@using BlazorStoc.Services
+@inject IUserDashboardRepository Repository
+@inject IAccessControl Access
+@inject NavigationManager Navigation
+@inject IJSRuntime JS
+@implements IDisposable
+<PageBoundary>
+
+<PageTitle>Personalizare dashboard · BlazorStoc</PageTitle>
+
+<div class="page-heading">
+    <div>
+        <p class="eyebrow">CONTUL MEU</p>
+        <h1>Personalizare dashboard</h1>
+        <p class="muted">Alege opțiunile care apar ca tile-uri pe dashboard (intrări din meniu, pagini din Setări și acțiuni principale, pe categorii), apoi aranjează-le în caroiaj: tragi tile-urile, adaugi etichete și spații între rânduri și muți rândurile. Alegerea ta se păstrează în baza de date și se încarcă la fiecare autentificare. Fără nicio opțiune aleasă, se afișează dashboard-ul standard.</p>
+    </div>
+    <div class="heading-actions"><a class="refresh act-nav" href="/">← Dashboard</a></div>
+</div>
+@if (error is not null) { <div class="error-banner" role="alert">@error</div> }
+@if (notice is not null) { <div class="success-banner" role="status">@notice</div> }
+
+<section class="catalog" aria-label="Opțiunile disponibile pentru dashboard">
+    <div class="catalog-heading"><h2>Opțiuni <span class="count-badge">@(plan.Keys.Count())</span></h2></div>
+    <div class="catalog-body">
+        @if (!loaded) { <div class="empty-state" role="status"><div class="spinner"></div><h3>Se încarcă opțiunile</h3></div> }
+        else
+        {
+            @foreach (var group in MenuCatalog.Groups)
+            {
+                var inGroup = available.Where(entry => entry.Group == group).ToList();
+                if (inGroup.Count == 0) continue;
+                <details class="dashboard-section" data-section="@group">
+                    <summary><span class="dashboard-section-title">@group</span>@Badges(inGroup)</summary>
+                    @foreach (var kind in Kinds)
+                    {
+                        var entries = inGroup.Where(entry => entry.Kind == kind).ToList();
+                        if (entries.Count == 0) continue;
+                        <details class="dashboard-subsection" data-subsection="@kind">
+                            <summary><span class="dashboard-section-title">@(kind == MenuEntryKind.Menu ? "Intrări meniu principal" : "Acțiuni")</span>@Badges(entries)</summary>
+                            <div class="table-scroll" data-display-own><table>
+                                <thead><tr><th>Pe dashboard</th><th>Iconiță</th><th>Opțiune</th><th>@(kind == MenuEntryKind.Menu ? "Rută" : "Se deschide")</th></tr></thead>
+                                <tbody>
+                                @foreach (var entry in entries)
+                                {
+                                    var key = entry.Key;
+                                    <tr @key="key">
+                                        <td><ToggleSwitch Compact="true" Value="plan.Contains(key)" ValueChanged="v => Toggle(key, v)" AriaLabel="@($"Arată {entry.Route} pe dashboard")" /></td>
+                                        <td><span class="main-menu-icon" aria-hidden="true">@entry.Icon</span></td>
+                                        <td>@entry.Title</td>
+                                        <td><small>@entry.Href</small></td>
+                                    </tr>
+                                }
+                                </tbody>
+                            </table></div>
+                        </details>
+                    }
+                </details>
+            }
+
+            <h3 class="dashboard-grid-title">Aranjare în caroiaj</h3>
+            @if (startedFromStandard) { <p class="info-banner" role="status">Nu ți-ai aranjat încă un dashboard al tău: pornești de la cel activ, cel standard. Tile-urile lui sunt deja în aranjare; modifică-le și apasă „Salvează”. Dacă îl golești și salvezi, dashboard-ul tău rămâne gol.</p> }
+            <p class="muted">Dashboard-ul se împarte în zone așezate una lângă alta; fiecare zonă are titlu obligatoriu și propriul caroiaj. Trage un tile într-o celulă liberă (din orice zonă) sau peste alt tile, ca să le schimbi locurile. Mânerul <strong>⋮⋮</strong> de pe un rând îl mută, cu tile-urile lui, în aceeași zonă sau în alta, iar mânerul din antetul unei zone mută zona. Între rânduri poți insera o etichetă, un spațiu sau un rând nou. Cu tastatura: selectezi tile-ul și apeși săgețile.</p>
+            <div class="dashboard-sizes" aria-label="Dimensiunile tile-urilor și ale spațiilor">
+                <label class="dashboard-slider" for="dashboard-tile-width">Lățime tile
+                    <input id="dashboard-tile-width" type="range" min="@DashboardSizes.MinWidth" max="@WidthMax" step="10" value="@(plan.Sizes.TileWidth > 0 ? Math.Min(plan.Sizes.TileWidth, WidthMax) : WidthMax)" @oninput="WidthChanged" />
+                    <output>@(plan.Sizes.TileWidth > 0 ? Math.Min(plan.Sizes.TileWidth, WidthMax) + " px" : "automată")</output>
+                </label>
+                <label class="dashboard-slider" for="dashboard-tile-height">Înălțime tile
+                    <input id="dashboard-tile-height" type="range" min="@DashboardSizes.MinHeight" max="@DashboardSizes.MaxHeight" step="2" value="@(plan.Sizes.TileHeight > 0 ? plan.Sizes.TileHeight : StandardTileHeight)" @oninput="HeightChanged" />
+                    <output>@(plan.Sizes.TileHeight > 0 ? plan.Sizes.TileHeight + " px" : "standard")</output>
+                </label>
+                <label class="dashboard-slider" for="dashboard-row-gap">Înălțime spațiu
+                    <input id="dashboard-row-gap" type="range" min="@DashboardSizes.MinGap" max="@DashboardSizes.MaxGap" step="1" value="@plan.Sizes.GapOrDefault" @oninput="GapChanged" />
+                    <output>@(plan.Sizes.GapOrDefault) px</output>
+                </label>
+                <label class="dashboard-slider" for="dashboard-zone-width">Lățime zone
+                    <input id="dashboard-zone-width" type="range" min="@DashboardZone.MinWidth" max="@ZoneWidthMax" step="10" value="@(plan.Sizes.ZoneWidth > 0 ? Math.Min(plan.Sizes.ZoneWidth, ZoneWidthMax) : ZoneWidthMax)" @oninput="ZoneWidthGlobalChanged" />
+                    <output>@(plan.Sizes.ZoneWidth > 0 ? Math.Min(plan.Sizes.ZoneWidth, ZoneWidthMax) + " px" : "automată")</output>
+                </label>
+                <button type="button" class="refresh act-nav" disabled="@(plan.Sizes == DashboardSizes.Standard)" title="Revine la dimensiunile standard ale tile-urilor și ale spațiilor" @onclick="ResetSizes">Dimensiuni standard</button>
+            </div>
+            <div class="dashboard-toolbar">
+                <button type="button" class="refresh act-confirm" disabled="@(plan.Zones.Count >= DashboardZone.MaxZones)" title="@(plan.Zones.Count >= DashboardZone.MaxZones ? $"Dashboard-ul poate avea cel mult {DashboardZone.MaxZones} zone" : "Adaugă o zonă nouă, în dreapta")" @onclick="AddZone">+ Zonă</button>
+                <button type="button" class="refresh act-close dashboard-clear" disabled="@(!plan.Zones.Any(zone => zone.Rows.Any()) && !plan.Buffer.Any())" @onclick="Clear" title="Scoate toate tile-urile, etichetele și spațiile din aranjare (zonele rămân); după salvare dashboard-ul tău rămâne gol">Golește dashboard</button>
+                <button type="button" class="refresh act-nav dashboard-standard" disabled="@(busy || startedFromStandard)" @onclick="ResetToStandardAsync" title="Renunță la aranjarea ta și revino la dashboard-ul standard">Revino la dashboard-ul standard</button>
+            </div>
+            @if (!plan.Keys.Any()) { <p class="muted" role="status">Nu ai ales încă niciun tile: pornește comutatorul uneia dintre opțiunile de mai sus.</p> }
+            <div class="dashboard-buffer" data-buffer data-dashboard-grid aria-label="Zona de așteptare">
+                <div class="dashboard-buffer-title"><strong>Zonă de așteptare</strong> <span class="count-badge">@plan.Buffer.Count</span></div>
+                @if (plan.Buffer.Count == 0) { <small class="muted">Opțiunile pe care le pornești apar aici; trage-le în caroiaj. Un tile din caroiaj trage-l aici ca să-l pui deoparte.</small> }
+                <div class="dashboard-buffer-tiles">
+                    @foreach (var bufferKey in plan.Buffer.ToList())
+                    {
+                        var key = bufferKey;
+                        @if (MenuCatalog.Find(key) is { } waiting)
+                        {
+                            <div class="dashboard-tile" draggable="true" tabindex="0" role="button" data-tile="@key" aria-label="@($"{waiting.Route}, în zona de așteptare. Trage-l în caroiaj.")">
+                                <span class="main-menu-icon" aria-hidden="true">@waiting.Icon</span><strong>@waiting.Route</strong>
+                                <button type="button" class="row-icon delete dashboard-tile-remove" title="@($"Scoate {waiting.Route} din aranjare")" aria-label="@($"Scoate {waiting.Route} din aranjare")" @onclick="() => Toggle(key, false)" @onclick:stopPropagation="true"></button>
+                            </div>
+                        }
+                    }
+                </div>
+            </div>
+            <div class="dashboard-editor" data-dashboard-grid style="@EditorStyle()">
+                <div class="dashboard-zones">
+                @foreach (var band in plan.Bands())
+                {
+                <div class="@($"dashboard-band dashboard-band-{plan.BandAlign(band)}")">
+                @foreach (var zoneIndex in band)
+                {
+                    var z = zoneIndex;
+                    var zone = plan.Zones[z];
+                    var missingTitle = zone.Title.Trim().Length == 0;
+                    <section class="dashboard-zonebox" data-zonebox="@z" style="@OwnRowStyle(zone, plan.BandAlign(band) != DashboardZone.Beside)" aria-label="@($"Zona {z + 1}: {zone.Title}")">
+                        <header class="dashboard-zonehead">
+                            <span class="row-handle" data-zone-handle="@z" draggable="true" title="Trage zona ca s-o muți" aria-label="@($"Mută zona {z + 1}")">⋮⋮</span>
+                            <input type="text" class="@("dashboard-zone-title" + (missingTitle ? " invalid" : ""))" maxlength="@DashboardZone.MaxTitle" value="@zone.Title" placeholder="Titlul zonei (obligatoriu)" required aria-required="true" aria-invalid="@missingTitle" aria-label="@($"Titlul zonei {z + 1}")" @onchange="e => SetZoneTitle(z, e.Value?.ToString())" />
+                            @if (z > 0)
+                            {
+                                <label class="dashboard-zone-placement">Așezare
+                                    <select aria-label="@($"Așezarea zonei {z + 1}")" @onchange="e => PlacementChanged(z, e)">
+                                        @foreach (var choice in DashboardZone.Placements) { <option value="@choice" selected="@(choice == zone.Placement)">@DashboardZone.PlacementLabel(choice)</option> }
+                                    </select>
+                                </label>
+                            }
+                            <label class="dashboard-zone-columns">Pe rând
+                                <select value="@zone.Columns" aria-label="@($"Tile-uri pe rând în zona {z + 1}")" @onchange="e => ColumnsChanged(z, e)">
+                                    @foreach (var choice in ColumnChoices) { <option value="@choice" selected="@(choice == zone.Columns)">@choice</option> }
+                                </select>
+                            </label>
+                            <button type="button" class="row-icon delete" disabled="@(plan.Zones.Count <= 1)" title="@(plan.Zones.Count <= 1 ? "Dashboard-ul are cel puțin o zonă" : $"Șterge zona {zone.Title}; tile-urile ei merg în zona de așteptare")" aria-label="@($"Șterge zona {z + 1}")" @onclick="() => RemoveZone(z)"></button>
+                        </header>
+                        <div class="dashboard-zone-widthrow">
+                            <label class="dashboard-slider" for="@($"dashboard-zone-width-{z}")">Lățime zonă
+                                <input id="@($"dashboard-zone-width-{z}")" type="range" min="@DashboardZone.MinWidth" max="@ZoneWidthMax" step="10" value="@ZoneSliderValue(zone)" @oninput="e => ZoneWidthChanged(z, e)" />
+                                <output>@ZoneWidthText(zone)</output>
+                            </label>
+                            <button type="button" class="refresh act-nav" disabled="@(zone.Width == 0)" title="@(zone.Width == 0 ? "Zona urmează deja lățimea globală" : "Revine la lățimea globală a zonelor")" @onclick="() => ZoneWidthChanged(z, null)">Lățime globală</button>
+                        </div>
+                        @if (missingTitle) { <small class="dashboard-zone-error" role="alert">Titlul zonei este obligatoriu.</small> }
+                        <div class="dashboard-zonebody">
+                        @for (var index = 0; index < zone.Rows.Count; index++)
+                        {
+                            var i = index;
+                            var row = zone.Rows[i];
+                            @(InsertBar(z, i))
+                            <div class="@RowClass(row, i)" data-row="@i" data-zone="@z" data-kind="@row.Kind">
+                                <span class="row-handle" data-row-handle="@i" draggable="true" title="Trage rândul ca să-l muți" aria-label="@($"Mută rândul {i + 1} din zona {z + 1}")">⋮⋮</span>
+                                <div class="dashboard-rowbody">
+                                @if (row.IsTiles)
+                                {
+                                    <div class="dashboard-cells" style="@($"grid-template-columns:repeat({zone.Columns}, minmax(0, var(--dash-tw, 1fr)))")">
+                                        @for (var col = 0; col < zone.Columns; col++)
+                                        {
+                                            var c = col;
+                                            var tileKey = plan.KeyAt(z, i, c);
+                                            <div class="dashboard-cell" data-cell="@($"{z},{i},{c}")">
+                                                @if (tileKey is not null && MenuCatalog.Find(tileKey) is { } tile)
+                                                {
+                                                    <div class="dashboard-tile" draggable="true" tabindex="0" role="button" data-tile="@tileKey"
+                                                         aria-label="@($"{tile.Route}, zona {z + 1}, rândul {i + 1}, coloana {c + 1}. Mută-l cu tastele săgeți.")"
+                                                         @onkeydown="e => KeyMove(tileKey, e.Key)">
+                                                        <div class="dash-tile-head"><span class="main-menu-icon" aria-hidden="true">@tile.Icon</span><span class="dash-tile-category">@tile.Group</span></div><strong class="dash-tile-title">@tile.Title</strong>
+                                                        <button type="button" class="row-icon delete dashboard-tile-remove" title="@($"Scoate {tile.Route} din aranjare")" aria-label="@($"Scoate {tile.Route} din aranjare")" @onclick="() => Toggle(tileKey, false)" @onclick:stopPropagation="true"></button>
+                                                    </div>
+                                                }
+                                            </div>
+                                        }
+                                    </div>
+                                    @if (row.IsEmpty) { <button type="button" class="row-icon delete dashboard-row-remove" title="@($"Șterge rândul gol {i + 1}")" aria-label="@($"Șterge rândul gol {i + 1} din zona {z + 1}")" @onclick="() => RemoveRow(z, i)"></button> }
+                                }
+                                @if (row.Kind == DashboardRow.Label)
+                                {
+                                    <div class="dashboard-label-edit">
+                                        <input type="text" class="dashboard-label-input" maxlength="@DashboardRow.MaxText" value="@row.Text" placeholder="Textul etichetei" aria-label="@($"Textul etichetei din rândul {i + 1}")"
+                                               style="@LabelStyle(row)" @onchange="e => SetLabelText(row, e.Value?.ToString())" />
+                                        <label class="dashboard-color">Culoare<input type="color" value="@(row.Color.Length > 0 ? row.Color : ThemeColor)" aria-label="@($"Culoarea etichetei din rândul {i + 1}")" @onchange="e => SetLabelColor(row, e.Value?.ToString())" /></label>
+                                        <button type="button" class="refresh act-nav" disabled="@(row.Color.Length == 0)" title="Revine la culoarea temei" @onclick="() => SetLabelColor(row, null)">Culoarea temei</button>
+                                    </div>
+                                    <button type="button" class="row-icon delete dashboard-row-remove" title="@($"Șterge eticheta din rândul {i + 1}")" aria-label="@($"Șterge eticheta din rândul {i + 1}")" @onclick="() => RemoveRow(z, i)"></button>
+                                }
+                                @if (row.Kind == DashboardRow.Spacer)
+                                {
+                                    <div class="dashboard-spacer-edit @(row.Color.Length > 0 ? "colored" : "")" aria-label="@($"Spațiu de {plan.Sizes.GapOrDefault} px")" style="@(row.Color.Length > 0 ? $"background:{row.Color}" : null)"><small>Spațiu de @(plan.Sizes.GapOrDefault) px</small></div>
+                                    <div class="dashboard-spacer-color">
+                                        <label class="dashboard-color">Culoare<input type="color" value="@(row.Color.Length > 0 ? row.Color : ThemeColor)" aria-label="@($"Culoarea spațiului din rândul {i + 1}")" @onchange="e => SetLabelColor(row, e.Value?.ToString())" /></label>
+                                        <button type="button" class="refresh act-nav" disabled="@(row.Color.Length == 0)" title="Revine la spațiul fără culoare" @onclick="() => SetLabelColor(row, null)">Fără culoare</button>
+                                    </div>
+                                    <button type="button" class="row-icon delete dashboard-row-remove" title="@($"Șterge spațiul din rândul {i + 1}")" aria-label="@($"Șterge spațiul din rândul {i + 1}")" @onclick="() => RemoveRow(z, i)"></button>
+                                }
+                                </div>
+                            </div>
+                        }
+                        @(InsertBar(z, zone.Rows.Count))
+                        </div>
+                    </section>
+                }
+                </div>
+                }
+                </div>
+            </div>
+        }
+        <div class="editor-actions">
+            <button type="button" class="primary" disabled="@(!loaded || busy)" @onclick="SaveAsync">Salvează</button>
+        </div>
+    </div>
+</section>
+
+</PageBoundary>
+
+@code {
+    private const string ThemeColor = "#13796a";
+    private static readonly MenuEntryKind[] Kinds = [MenuEntryKind.Menu, MenuEntryKind.Action];
+    private const int StandardTileHeight = 88;
+    private static readonly int[] ColumnChoices = [.. Enumerable.Range(MariaUserDashboardRepository.MinColumns, MariaUserDashboardRepository.MaxColumns - MariaUserDashboardRepository.MinColumns + 1)];
+    private List<MenuEntry> available = [];
+    private DashboardLayout plan = DashboardLayout.From(DashboardState.Empty);
+    private bool loaded, busy, startedFromStandard;
+    private string? error, notice;
+    private DotNetObjectReference<DashboardSettingsPage>? reference;
+
+    // The two badges of a section: how many of its options are on the dashboard and how many are free.
+    private RenderFragment Badges(IReadOnlyCollection<MenuEntry> entries) => builder =>
+    {
+        var used = entries.Count(entry => plan.Contains(entry.Key));
+        builder.OpenElement(0, "span"); builder.AddAttribute(1, "class", "count-badge used-badge"); builder.AddAttribute(2, "title", "Opțiuni pe dashboard"); builder.AddContent(3, $"{used} pe dashboard"); builder.CloseElement();
+        builder.OpenElement(4, "span"); builder.AddAttribute(5, "class", "count-badge free-badge"); builder.AddAttribute(6, "title", "Opțiuni libere"); builder.AddContent(7, $"{entries.Count - used} libere"); builder.CloseElement();
+    };
+
+    // The bar between two rows of a zone (and after the last one): inserts a label, a space or a row of tiles at that place; it shows on hover or focus.
+    private RenderFragment InsertBar(int zone, int at) => builder =>
+    {
+        var seq = 0;
+        builder.OpenElement(seq++, "div"); builder.AddAttribute(seq++, "class", "dashboard-insert"); builder.AddAttribute(seq++, "data-insert", zone + "," + at);
+        foreach (var (kind, text, label) in new[] { (DashboardRow.Label, "+ Etichetă", "etichetă"), (DashboardRow.Spacer, "+ Spațiu", "spațiu"), (DashboardLayout.TilesKind, "+ Rând", "rând de tile-uri") })
+        {
+            builder.OpenElement(seq++, "button"); builder.AddAttribute(seq++, "type", "button"); builder.AddAttribute(seq++, "class", "dashboard-insert-button");
+            builder.AddAttribute(seq++, "title", $"Inserează {label} aici"); builder.AddAttribute(seq++, "aria-label", $"Inserează {label} înaintea rândului {at + 1} din zona {zone + 1}");
+            builder.AddAttribute(seq++, "onclick", EventCallback.Factory.Create(this, () => Insert(zone, kind, at))); builder.AddContent(seq++, text); builder.CloseElement();
+        }
+        builder.CloseElement();
+    };
+
+    // The sizes chosen with the sliders show in the editor at once (CSS variables); the standard look keeps the defaults of the stylesheet.
+    private string EditorStyle()
+    {
+        var sizes = plan.Sizes;
+        return (sizes.TileWidth > 0 ? $"--dash-tw:{sizes.TileWidth}px;" : "") + (sizes.TileHeight > 0 ? $"--dash-th:{sizes.TileHeight}px;" : "") + $"--dash-gap:{sizes.GapOrDefault}px";
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var admin = await Access.IsAdministratorAsync();
+            var list = new List<MenuEntry>();
+            foreach (var entry in MenuCatalog.Entries) if (entry.AdminOnly ? admin : await Access.HasAsync(entry.Permission)) list.Add(entry);
+            available = list;
+            await LoadPlanAsync();
+            loaded = true;
+        }
+        catch (Exception) { error = "Opțiunile nu au putut fi încărcate. Reîncearcă."; }
+    }
+
+    // The arrangement of the user; a user who arranged nothing sees the standard page, so the editor starts from its tiles (the ones this user may open).
+    private async Task LoadPlanAsync()
+    {
+        var state = await Repository.GetAsync();
+        plan = DashboardLayout.From(state);
+        foreach (var key in plan.Keys.Where(key => !available.Any(entry => entry.Key == key)).ToList()) plan.RemoveTile(key);
+        startedFromStandard = !state.Custom;
+        if (startedFromStandard) foreach (var key in MenuCatalog.StandardDashboardKeys.Where(key => available.Any(entry => entry.Key == key))) plan.PlaceTile(key);
+    }
+
+    private void Toggle(string key, bool on) { notice = null; if (on) plan.AddTile(key); else plan.RemoveTile(key); }
+    // Back to the standard main page: nothing of the arrangement is kept (the editor then starts again from the standard tiles).
+    private async Task ResetToStandardAsync()
+    {
+        busy = true; error = null; notice = null;
+        try
+        {
+            await Repository.SaveAsync(new DashboardState(plan.Columns, [], [], false, null, plan.Sizes));
+            await LoadPlanAsync();
+            notice = "Dashboard-ul standard a fost restabilit.";
+        }
+        catch (AccessDeniedException ex) { error = ex.Message; }
+        catch (Exception) { error = "Dashboard-ul standard nu a putut fi restabilit. Reîncearcă."; }
+        finally { busy = false; }
+    }
+
+    private void Clear() { notice = null; startedFromStandard = false; plan.Clear(); }
+    private void Insert(int zone, string kind, int at) { notice = null; if (!plan.AddRow(zone, kind, at)) error = "O zonă poate avea cel mult " + MariaUserDashboardRepository.MaxRows + " de rânduri."; else error = null; }
+    private void RemoveRow(int zone, int index) { notice = null; plan.RemoveRow(zone, index); }
+    private void ColumnsChanged(int zone, ChangeEventArgs e) { notice = null; plan.SetColumns(zone, int.TryParse(e.Value?.ToString(), out var value) ? value : MariaUserDashboardRepository.DefaultColumns); }
+    // A zone on a row of its own is as wide as its tiles need (the chosen tile width or 250 px), never stretched; the editor keeps room for the controls of its header.
+    private string? OwnRowStyle(DashboardLayout.LayoutZone zone, bool ownRow) =>
+        plan.EffectiveWidth(zone) is > 0 and var chosen ? $"flex:0 0 auto;width:{chosen}px;min-width:min(100%,600px);max-width:100%"
+        : ownRow ? $"flex:0 0 auto;width:{zone.Columns * (plan.Sizes.TileWidth > 0 ? plan.Sizes.TileWidth : 250) + (zone.Columns - 1) * 14 + 35}px;min-width:min(100%,600px);max-width:100%" : null;
+    // The sliders of the width of the zones end at the width the editor row of zones has now (measured in the page); at the end of the global slider the width is automatic. A width chosen for one zone
+    // overrides the global one; a zone without its own width follows the global width.
+    private int zonesAvailable;
+    private int ZoneWidthMax => zonesAvailable >= DashboardZone.MinWidth + 10 ? Math.Min(DashboardZone.MaxWidth, zonesAvailable / 10 * 10) : 1600;
+    private int ZoneSliderValue(DashboardLayout.LayoutZone zone) => Math.Min(zone.Width > 0 ? zone.Width : plan.Sizes.ZoneWidth > 0 ? plan.Sizes.ZoneWidth : ZoneWidthMax, ZoneWidthMax);
+    private string ZoneWidthText(DashboardLayout.LayoutZone zone) => zone.Width > 0 ? Math.Min(zone.Width, ZoneWidthMax) + " px" : plan.Sizes.ZoneWidth > 0 ? $"globală, {Math.Min(plan.Sizes.ZoneWidth, ZoneWidthMax)} px" : "globală, automată";
+    private void ZoneWidthGlobalChanged(ChangeEventArgs e) { notice = null; var width = Parse(e); plan.Sizes = (plan.Sizes with { ZoneWidth = width >= ZoneWidthMax ? 0 : width }).Valid(); }
+    private void ZoneWidthChanged(int zone, ChangeEventArgs? e) { notice = null; plan.SetZoneWidth(zone, e is null ? 0 : Parse(e)); }
+    private void PlacementChanged(int zone, ChangeEventArgs e) { notice = null; plan.SetPlacement(zone, e.Value?.ToString()); }
+    private void AddZone() { notice = null; error = plan.AddZone($"Zona {plan.Zones.Count + 1}") ? null : $"Dashboard-ul poate avea cel mult {DashboardZone.MaxZones} zone."; }
+    private void RemoveZone(int zone) { notice = null; plan.RemoveZone(zone); }
+    private void SetZoneTitle(int zone, string? title) { notice = null; plan.SetZoneTitle(zone, title); }
+    private static int Parse(ChangeEventArgs e) => int.TryParse(e.Value?.ToString(), out var value) ? value : 0;
+    // The widest a tile can be in the narrowest zone (measured in the page, rounded down to 10 px): the slider ends there, so every step of it changes something; at the end the width is automatic.
+    private int availableWidth;
+    private int WidthMax => availableWidth >= DashboardSizes.MinWidth + 10 ? Math.Min(DashboardSizes.MaxWidth, availableWidth / 10 * 10) : DashboardSizes.MaxWidth;
+    private void WidthChanged(ChangeEventArgs e) { notice = null; var width = Parse(e); plan.Sizes = (plan.Sizes with { TileWidth = width >= WidthMax ? 0 : width }).Valid(); }
+    private void HeightChanged(ChangeEventArgs e) { notice = null; plan.Sizes = (plan.Sizes with { TileHeight = Parse(e) }).Valid(); }
+    private void GapChanged(ChangeEventArgs e) { notice = null; var gap = Parse(e); plan.Sizes = (plan.Sizes with { RowGap = gap == DashboardSizes.DefaultGap ? 0 : gap }).Valid(); }
+    private void ResetSizes() { notice = null; plan.Sizes = DashboardSizes.Standard; }
+    private void SetLabelText(DashboardLayout.LayoutRow row, string? text) { notice = null; row.Text = (text ?? "").Trim(); }
+    private void SetLabelColor(DashboardLayout.LayoutRow row, string? color) { notice = null; row.Color = MariaUserDashboardRepository.ValidColor(color); }
+    private string RowClass(DashboardLayout.LayoutRow row, int index) => "dashboard-rowbox " + (row.IsTiles ? "tiles" : row.Kind);
+    private static string LabelStyle(DashboardLayout.LayoutRow row) => row.Color.Length > 0 ? $"color:{row.Color}" : "";
+
+    // The drops come from wwwroot/dashboard-dnd.js (the browser side of the drag, like the order of the categories): a tile dropped on a free cell of any zone moves, on another tile the two change
+    // places; a row dragged by its handle and dropped on another row (of the same zone or of another) goes to that place; a zone dragged by its handle goes to the place of the zone it is dropped on.
+    [JSInvokable]
+    public Task DropTile(string key, int zone, int row, int col) => InvokeAsync(() => { if (plan.MoveTile(key, zone, row, col)) notice = null; StateHasChanged(); });
+
+    // A negative target row = the end of the zone (the row was dropped on the zone itself, not on one of its rows).
+    [JSInvokable]
+    public Task DropRow(int fromZone, int from, int toZone, int target) => InvokeAsync(() =>
+    {
+        var moved = fromZone == toZone
+            ? plan.MoveRow(fromZone, from, target < 0 ? plan.Zones[fromZone].Rows.Count - 1 : target)
+            : plan.MoveRowToZone(fromZone, from, toZone, target < 0 ? plan.Zones[toZone].Rows.Count : target);
+        if (moved) notice = null;
+        StateHasChanged();
+    });
+
+    [JSInvokable]
+    public Task DropZone(int from, int target) => InvokeAsync(() => { if (plan.MoveZone(from, target)) notice = null; StateHasChanged(); });
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        try
+        {
+            var measuredZones = await JS.InvokeAsync<int>("dashboardSizes.zonesAvailable");
+            if (measuredZones > 0 && Math.Abs(measuredZones - zonesAvailable) >= 10) { zonesAvailable = measuredZones; StateHasChanged(); }
+        }
+        catch (Exception exception) when (exception is JSException or InvalidOperationException or OperationCanceledException) { }
+        // The available width is read after every render while no width is set (a set width narrows the tiles and hides what the zone gives them).
+        if (plan.Sizes.TileWidth <= 0)
+        {
+            try
+            {
+                var measured = await JS.InvokeAsync<int>("dashboardSizes.available");
+                if (measured > 0 && Math.Abs(measured - availableWidth) >= 10) { availableWidth = measured; StateHasChanged(); }
+            }
+            catch (Exception exception) when (exception is JSException or InvalidOperationException or OperationCanceledException) { }
+        }
+        if (!firstRender) return;
+        reference = DotNetObjectReference.Create(this);
+        try { await JS.InvokeVoidAsync("blazorStocDashboardDnd.register", reference); }
+        catch (Exception exception) when (exception is JSException or InvalidOperationException or OperationCanceledException) { }
+    }
+
+    public void Dispose()
+    {
+        reference?.Dispose();
+        reference = null;
+    }
+
+    private void KeyMove(string key, string pressed)
+    {
+        if (plan.Find(key) is not { } from) return;
+        var zone = from.Zone; var row = from.Row; var col = from.Col;
+        var rows = plan.Zones[zone].Rows;
+        switch (pressed)
+        {
+            case "ArrowLeft": col--; break;
+            case "ArrowRight": col++; break;
+            case "ArrowUp": do row--; while (row >= 0 && !rows[row].IsTiles); break;
+            case "ArrowDown": do row++; while (row < rows.Count && !rows[row].IsTiles); break;
+            default: return;
+        }
+        if (row < 0 || row >= rows.Count) return;
+        if (plan.MoveTile(key, zone, row, col)) notice = null;
+    }
+
+    private async Task SaveAsync()
+    {
+        error = null; notice = null;
+        if (plan.Validate() is { } problem) { error = problem; return; }
+        busy = true;
+        try
+        {
+            await Repository.SaveAsync(plan.ToState());
+            await LoadPlanAsync();
+            notice = plan.Keys.Any() ? "Dashboard-ul a fost personalizat." : "Dashboard-ul tău este acum gol, așa cum ai ales.";
+        }
+        catch (AccessDeniedException ex) { error = ex.Message; }
+        catch (Exception) { error = "Alegerea nu a putut fi salvată. Reîncearcă."; }
+        finally { busy = false; }
+    }
+}

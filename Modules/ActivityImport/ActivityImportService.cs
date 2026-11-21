@@ -65,6 +65,8 @@ public static class ActivityImportRules
     public const string StateSelected = "selectat";
     public const int DefaultSyncMinutes = 60;
     public const string NoTypesMessage = "Nu este ales niciun tip de tichet. Alege tipurile în secțiunea 2.";
+    /// <summary>The start of the message of an import stopped because the structure of the tickets changed (not a failure of the source: it ends when the correspondence is confirmed).</summary>
+    public const string SuspendedPrefix = "Preluarea tichetelor este suspendată";
 
     public static string? Validate(ActivityImportInput input)
     {
@@ -505,10 +507,10 @@ public sealed class MariaActivityImportService(IConfiguration configuration, IDa
             var actual = await source.ReadStructureAsync(new ActivityConnection(settings.Server, settings.Port, settings.Database, settings.User, password), cancellationToken).ConfigureAwait(false);
             return new ActivityFieldMapView([.. ActivityFieldMap.Fields.Select(field =>
             {
-                var available = ActivityFieldMap.TextColumns(actual, field.Table);
+                var available = ActivityFieldMap.ChoiceColumns(actual, field);
                 var current = map.ColumnOf(field);
                 return new ActivityFieldChoice(field, current, available, !available.Contains(current, StringComparer.OrdinalIgnoreCase));
-            })], null, map, ActivityFieldMap.ExtraTables.ToDictionary(table => table, table => ActivityFieldMap.TextColumns(actual, table)), pending);
+            })], null, map, ActivityFieldMap.ExtraTables.ToDictionary(table => table, table => ActivityFieldMap.ReadableColumns(actual, table)), pending);
         }
         catch (ActivitySourceException exception) { return new ActivityFieldMapView(Offline(), exception.Message, map, null, pending); }
     }
@@ -518,14 +520,16 @@ public sealed class MariaActivityImportService(IConfiguration configuration, IDa
         await access.EnsureAsync(Edit, cancellationToken).ConfigureAwait(false);
         // Only the columns change: what was switched off, the destinations and the extra fields stay as they are.
         var existing = await ReadFieldMapAsync(cancellationToken).ConfigureAwait(false);
-        var map = ActivityFieldMap.Create(chosen, existing.Off, existing.Targets, existing.Extras, existing.Labels, out var error) ?? throw new ActivityImportException(error ?? "Corespondența câmpurilor nu este validă.");
+        var map = ActivityFieldMap.Create(chosen, existing.Off, existing.Targets, existing.Extras, existing.Labels, existing.NumberChosen, out var error)?.WithOrder(existing.Order) ?? throw new ActivityImportException(error ?? "Corespondența câmpurilor nu este validă.");
         await SaveMapAsync(map, existing, cancellationToken).ConfigureAwait(false);
     }
 
     public async Task SaveFieldSettingsAsync(ActivityFieldMap settings, CancellationToken cancellationToken = default)
     {
         await access.EnsureAsync(Edit, cancellationToken).ConfigureAwait(false);
-        var map = ActivityFieldMap.Create(settings.Columns, settings.Off, settings.Targets, settings.Extras, settings.Labels, out var error) ?? throw new ActivityImportException(error ?? "Corespondența câmpurilor nu este validă.");
+        var map = ActivityFieldMap.Create(settings.Columns, settings.Off, settings.Targets, settings.Extras, settings.Labels, settings.NumberChosen, out var error)?.WithOrder(settings.Order) ?? throw new ActivityImportException(error ?? "Corespondența câmpurilor nu este validă.");
+        // The ticket number has no default (BUG-0023): settings are not saved before its column is chosen (a return to the defaults, which saves nothing, is allowed).
+        if (!map.NumberChosen && map.ToJson().Length > 0) throw new ActivityImportException(ActivityFieldMap.NumberRequiredMessage);
         await SaveMapAsync(map, await ReadFieldMapAsync(cancellationToken).ConfigureAwait(false), cancellationToken).ConfigureAwait(false);
     }
 

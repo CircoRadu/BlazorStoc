@@ -193,6 +193,16 @@ internal static class MariaArchivePersistence
                     ("@contact", workPoint.ContactPerson), ("@description", workPoint.Description), ("@latitude", workPoint.Latitude),
                     ("@longitude", workPoint.Longitude), ("@primary", workPoint.IsPrimary ? 1 : 0), ("@version", workPoint.Version)).ConfigureAwait(false);
                 break;
+            case AuditEntities.AttachedWorkPoint:
+                var attached = ArchiveJson.Entity<AttachedWorkPoint>(snapshot);
+                await ExecuteAsync(connection, transaction, """
+                    INSERT INTO archive_work_point_attached
+                        (archive_id,original_id,work_point_id,name,address,phone,contact_person,latitude,longitude,version)
+                    VALUES(@archiveId,@id,@workPoint,@name,@address,@phone,@contact,@latitude,@longitude,@version)
+                    """, token, ("@archiveId", operation.Id.ToString("D")), ("@id", attached.Id), ("@workPoint", attached.WorkPointId),
+                    ("@name", attached.Name), ("@address", attached.Address), ("@phone", attached.Phone), ("@contact", attached.ContactPerson),
+                    ("@latitude", attached.Latitude), ("@longitude", attached.Longitude), ("@version", attached.Version)).ConfigureAwait(false);
+                break;
             case AuditEntities.ServicePhoto:
                 var servicePhoto = ArchiveJson.Entity<ServicePhoto>(snapshot);
                 await ExecuteAsync(connection, transaction, """

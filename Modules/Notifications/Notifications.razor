@@ -42,15 +42,16 @@
     }
     @if (queues.CanTickets || queues.CanBeneficiaries)
     {
-        <button type="button" role="tab" id="tab-issues" class="settings-tab @(validationTab == "issues" ? "active" : "")" aria-selected="@(validationTab == "issues" ? "true" : "false")" aria-controls="panel-notifications" @onclick="() => OpenIssues()">Probleme import</button>
+        <button type="button" role="tab" id="tab-issues" class="settings-tab @(validationTab == "issues" ? "active" : "")" aria-selected="@(validationTab == "issues" ? "true" : "false")" aria-controls="panel-notifications" @onclick="() => OpenIssues()">Probleme import <span class="count-badge">@queues.Issues</span></button>
     }
     <ElcomturBalancesTab Active="@(validationTab == "balances")" Selected="OpenBalances" />
     <MaintenanceIncompleteTab Active="@(validationTab == "incomplete")" Selected="OpenIncomplete" />
     <UserTaskAlertsTab Active="@(validationTab == "tasks")" Selected="OpenTasks" />
+    <BugAlertsTab Active="@(validationTab == "bugs")" Selected="OpenBugs" />
     <ProposalAlertsTab Active="@(validationTab == "proposals")" Selected="OpenProposals" />
 </div>
 
-<div id="panel-notifications" role="tabpanel" aria-labelledby="@(validationTab == "tickets" ? "tab-tickets" : validationTab == "beneficiaries" ? "tab-beneficiaries" : validationTab == "issues" ? "tab-issues" : validationTab == "balances" ? "tab-balances" : validationTab == "incomplete" ? "tab-contracts-incomplete" : validationTab == "tasks" ? "tab-user-tasks" : validationTab == "proposals" ? "tab-proposals" : showResolved ? "tab-resolved" : "tab-active")">
+<div id="panel-notifications" role="tabpanel" aria-labelledby="@(validationTab == "tickets" ? "tab-tickets" : validationTab == "beneficiaries" ? "tab-beneficiaries" : validationTab == "issues" ? "tab-issues" : validationTab == "balances" ? "tab-balances" : validationTab == "incomplete" ? "tab-contracts-incomplete" : validationTab == "tasks" ? "tab-user-tasks" : validationTab == "bugs" ? "tab-bugs" : validationTab == "proposals" ? "tab-proposals" : showResolved ? "tab-resolved" : "tab-active")">
 @if (validationTab == "tickets")
 {
     <ValidationQueuePanel ShowDiscarded="true" Changed="RefreshQueuesAsync" />
@@ -62,6 +63,10 @@ else if (validationTab == "balances")
 else if (validationTab == "tasks")
 {
     <UserTaskAlertsPanel />
+}
+else if (validationTab == "bugs")
+{
+    <BugAlertsPanel />
 }
 else if (validationTab == "proposals")
 {
@@ -107,8 +112,8 @@ else if (loaded)
         @if (resolved.Count == 0) { <div class="empty-state"><span class="empty-icon">✓</span><h3>Nu există notificări rezolvate</h3><p>O notificare devine rezolvată când o marchezi tu sau când data obiectului se schimbă ori obiectul dispare.</p></div> }
         else
         {
-            <Paged Items="resolved" Id="notif-resolved-size" Context="pageRows">
-            <div class="table-scroll"><table class="notification-table"><thead><tr><th>TITLU</th><th>OBIECT</th><th>SCADENȚĂ</th><th>REZOLVATĂ LA</th><th>REZOLVATĂ DE</th><th>MOTIV</th></tr></thead><tbody>
+            <Paged Items="resolved" Id="notif-resolved-size" Context="pageRows" Sorts="ResolvedSorts">
+            <div class="table-scroll"><table class="notification-table"><thead><tr><SortTh Key="subject">TITLU</SortTh><SortTh Key="object">OBIECT</SortTh><SortTh Key="expiry">SCADENȚĂ</SortTh><SortTh Key="at">REZOLVATĂ LA</SortTh><SortTh Key="by">REZOLVATĂ DE</SortTh><SortTh Key="reason">MOTIV</SortTh></tr></thead><tbody>
             @foreach (var item in pageRows)
             {
                 <tr @key="item.Notification.Id" class="notification-row" tabindex="0" role="button" aria-label="Deschide notificarea rezolvată @item.Subject"
@@ -130,9 +135,7 @@ else if (loaded)
 
 @if (selected is not null)
 {
-    <div class="delete-overlay" @onkeydown="DialogKeyDown">
-        <section class="delete-dialog notification-dialog" role="dialog" aria-modal="true" tabindex="-1" aria-labelledby="notification-title">
-            <div class="dialog-head"><h2 id="notification-title">@selected.Subject</h2><HelpButton Topic="notificari-detaliu" About="Detaliile notificării" /></div>
+    <AppDialog TitleId="notification-title" HelpTopic="notificari-detaliu" HelpAbout="Detaliile notificării" PanelClass="notification-dialog" OnKeyDown="DialogKeyDown" OnClose="Close"><TitleContent>@selected.Subject</TitleContent><ChildContent>
             <p class="delete-object"><strong>@selected.Category · @selected.EventName · @selected.ObjectLabel</strong></p>
             <p class="notification-body">@selected.Body</p>
             @if (selected.IsOverdue) { <p class="notification-overdue-note">Termenul a fost depășit cu @(-selected.DaysLeft) @(-selected.DaysLeft == 1 ? "zi" : "zile").</p> }
@@ -164,26 +167,24 @@ else if (loaded)
                 <div class="editor-actions">
                     @if (selected.IsAlert) { <button type="button" class="primary" disabled="@busy" @onclick="AcknowledgeAsync">@(busy ? "Se salvează…" : "Preiau notificarea")</button> }
                     <button type="button" class="refresh act-confirm" disabled="@busy" @onclick="() => confirmingResolve = true">Marchează ca rezolvată</button>
-                    @if (selected.Url is { Length: > 0 } url) { <a class="refresh act-nav" href="@url">Deschide obiectul</a> }
+                    @if (selected.Url is { Length: > 0 } url) { <a class="refresh act-nav" href="@url" @onclick="() => OpenObject(url)" @onclick:preventDefault="@IsOnThisPage(url)">Deschide obiectul</a> }
                     <button type="button" class="danger" disabled="@busy" @onclick="Close">Închide</button>
                 </div>
             }
-        </section>
-    </div>
+</ChildContent>
+</AppDialog>
 }
 
 @if (selectedResolved is not null)
 {
-    <div class="delete-overlay" @onkeydown="DialogKeyDown">
-        <section class="delete-dialog notification-dialog" role="dialog" aria-modal="true" tabindex="-1" aria-labelledby="resolved-title">
-            <div class="dialog-head"><h2 id="resolved-title">@selectedResolved.Subject</h2><HelpButton Topic="notificari-rezolvata" About="Notificarea rezolvată" /></div>
+    <AppDialog TitleId="resolved-title" HelpTopic="notificari-rezolvata" HelpAbout="Notificarea rezolvată" PanelClass="notification-dialog" OnKeyDown="DialogKeyDown" OnClose="Close"><TitleContent>@selectedResolved.Subject</TitleContent><ChildContent>
             <p class="delete-object"><strong>@selectedResolved.SourceText · @selectedResolved.ObjectLabel</strong></p>
             <p class="notification-body">@selectedResolved.Body</p>
             <p class="muted small">Scadență @StockMovementRules.DisplayDate(selectedResolved.Notification.ExpiryDate) · rezolvată la @ResolvedAt(selectedResolved.Notification) de @(selectedResolved.Notification.ResolvedAutomatically ? "sistem (automat)" : selectedResolved.Notification.ResolvedBy)</p>
             <p class="notification-reason-box"><strong>Motiv:</strong> @selectedResolved.Notification.ResolvedReason</p>
             <div class="editor-actions"><button type="button" class="danger" @onclick="Close">Închide</button></div>
-        </section>
-    </div>
+</ChildContent>
+</AppDialog>
 }
 
 </PageBoundary>
@@ -199,6 +200,22 @@ else if (loaded)
     [SupplyParameterFromQuery(Name = "tab")] public string? TabQuery { get; set; }
 
     private void OpenTab(string? validation, bool resolvedTab) { validationTab = validation ?? ""; showResolved = resolvedTab; }
+    // BUG-0030: the object of a notification can be a tab of this same page; a link to the address already open does nothing, so the window closes and the tab opens here.
+    private static string? PageTab(string url) => url switch
+    {
+        "/notificari?tab=tichete" => "tickets",
+        "/notificari?tab=beneficiari" => "beneficiaries",
+        "/notificari?tab=probleme" => "issues",
+        _ => null
+    };
+    private bool IsOnThisPage(string url) => PageTab(url) is not null;
+    private void OpenObject(string url)
+    {
+        if (PageTab(url) is not { } tab) return;   // another page: the link navigates by itself
+        Close();
+        OpenTab(tab, false);
+    }
+
     private void OpenTickets() => OpenTab("tickets", false);
     private void OpenBeneficiaries() => OpenTab("beneficiaries", false);
     private void OpenIssues() => OpenTab("issues", false);
@@ -206,6 +223,7 @@ else if (loaded)
     private void OpenIncomplete() => OpenTab("incomplete", false);
     private void OpenTasks() => OpenTab("tasks", false);
     private void OpenProposals() => OpenTab("proposals", false);
+    private void OpenBugs() => OpenTab("bugs", false);
     // The id of the Elcomtur module (a module does not refer to another: the tab is shown only while that module runs; its content comes through ElcomturBalancesPanel).
     private const string ElcomturModuleId = "elcomtur";
 
@@ -238,12 +256,15 @@ else if (loaded)
         else if (TabQuery == "balante" && Modules.IsAvailable(ElcomturModuleId)) validationTab = "balances";
         else if (TabQuery == "taskuri") validationTab = "tasks";
         else if (TabQuery == "propuneri") validationTab = "proposals";
+        else if (TabQuery == "bugs") validationTab = "bugs";
         else if (TabQuery == "contracte-incomplete" && Modules.IsAvailable("mentenanta")) validationTab = "incomplete";
         await LoadAsync(true);
         RefreshPeriodicallyAsync().FireAndForget(Logger, "periodic refresh");
     }
 
-    private RenderFragment NotificationTable(IReadOnlyList<NotificationView> items, bool overdue) => @<Paged Items="items" Id="@(overdue ? "notif-overdue-size" : "notif-upcoming-size")" Context="pageRows"><div class="table-scroll"><table class="notification-table"><thead><tr><th>STARE</th><th>TITLU</th><th>OBIECT</th><th>@(overdue ? "SCADENȚĂ" : "EXPIRĂ LA")</th><th class="number">@(overdue ? "DEPĂȘIT CU (ZILE)" : "ZILE RĂMASE")</th></tr></thead><tbody>
+    private static readonly IReadOnlyDictionary<string, Func<NotificationView, IComparable?>> NotificationSorts = new Dictionary<string, Func<NotificationView, IComparable?>> { ["state"] = item => item.IsAlert ? 0 : 1, ["subject"] = item => item.Subject, ["object"] = item => item.ObjectLabel, ["expiry"] = item => item.Notification.ExpiryDate, ["days"] = item => item.DaysLeft };
+    private static readonly IReadOnlyDictionary<string, Func<ResolvedNotificationView, IComparable?>> ResolvedSorts = new Dictionary<string, Func<ResolvedNotificationView, IComparable?>> { ["subject"] = item => item.Subject, ["object"] = item => item.ObjectLabel, ["expiry"] = item => item.Notification.ExpiryDate, ["at"] = item => item.Notification.ResolvedUtc, ["by"] = item => item.Notification.ResolvedAutomatically ? "sistem (automat)" : item.Notification.ResolvedBy, ["reason"] = item => item.Notification.ResolvedReason };
+    private RenderFragment NotificationTable(IReadOnlyList<NotificationView> items, bool overdue) => @<Paged Items="items" Id="@(overdue ? "notif-overdue-size" : "notif-upcoming-size")" Context="pageRows" Sorts="NotificationSorts"><div class="table-scroll"><table class="notification-table"><thead><tr><SortTh Key="state">STARE</SortTh><SortTh Key="subject">TITLU</SortTh><SortTh Key="object">OBIECT</SortTh><SortTh Key="expiry">@(overdue ? "SCADENȚĂ" : "EXPIRĂ LA")</SortTh><SortTh Key="days" Class="number">@(overdue ? "DEPĂȘIT CU (ZILE)" : "ZILE RĂMASE")</SortTh></tr></thead><tbody>
         @foreach (var view in pageRows)
         {
             <tr @key="view.Notification.Id" class="notification-row @(view.IsAlert ? "notification-unread" : "") @(overdue ? "notification-overdue" : "")" tabindex="0" role="button"

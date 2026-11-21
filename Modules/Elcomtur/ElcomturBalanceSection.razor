@@ -2,6 +2,7 @@
 @using BlazorStoc.Modules.Elcomtur
 @using BlazorStoc.Services
 @inject IElcomturBalanceRepository Balances
+@inject IServiceProvider Services
 @inject TimeProvider Clock
 @inject IJSRuntime Js
 @inject ILogger<ElcomturBalanceSection> Logger
@@ -30,7 +31,7 @@
                 }
             </summary>
             <div class="catalog-body">
-                <p class="muted"><small>Date din backup-ul Elcomtur de la @StockMovementRules.DisplayDate(balance.DataDate) (firma @balance.Firm); se actualizează la fiecare preluare din Administrare → Preluare date Elcomtur. Balanța este facturat minus încasat; facturile sunt cele pe care Elcomtur le marchează neachitate.</small></p>
+                <p class="muted"><small>Date din backup-ul Elcomtur de la @StockMovementRules.DisplayDate(balance.DataDate) (firma @ElcomturFirmNames.Display(balance.Firm, autoSettings)); se actualizează la fiecare preluare din Administrare → Preluare date Elcomtur. Balanța este facturat minus încasat; facturile sunt cele pe care Elcomtur le marchează neachitate.</small></p>
             </div>
             @if (balance.IsOwed)
             {
@@ -38,9 +39,9 @@
                 @if (overdue.Count == 0) { <div class="catalog-body"><p class="muted" id="elcomtur-overdue-empty">Nicio factură cu termenul depășit.</p></div> }
                 else
                 {
-                    <Paged Items="overdue" Id="elcomtur-overdue-size" Context="pageRows">
+                    <Paged Items="overdue" Id="elcomtur-overdue-size" Context="pageRows" Sorts="OverdueSorts">
                         <div class="table-scroll"><table class="catalog-table" id="elcomtur-overdue">
-                            <thead><tr><th>Factura</th><th>Data</th><th>Scadența</th><th>Întârziere</th><th>Total</th><th>Plătit</th><th>Rest de plată</th></tr></thead>
+                            <thead><tr><SortTh Key="number">Factura</SortTh><SortTh Key="date">Data</SortTh><SortTh Key="due">Scadența</SortTh><SortTh Key="delay">Întârziere</SortTh><SortTh Key="total">Total</SortTh><SortTh Key="paid">Plătit</SortTh><SortTh Key="rest">Rest de plată</SortTh></tr></thead>
                             <tbody>
                             @foreach (var invoice in pageRows)
                             {
@@ -55,9 +56,9 @@
                 @if (inTerm.Count == 0) { <div class="catalog-body"><p class="muted" id="elcomtur-interm-empty">Nicio factură în termen.</p></div> }
                 else
                 {
-                    <Paged Items="inTerm" Id="elcomtur-interm-size" Context="pageRows">
+                    <Paged Items="inTerm" Id="elcomtur-interm-size" Context="pageRows" Sorts="TermSorts">
                         <div class="table-scroll"><table class="catalog-table" id="elcomtur-interm">
-                            <thead><tr><th>Factura</th><th>Data</th><th>Scadența</th><th>Scadentă în</th><th>Total</th><th>Plătit</th><th>Rest de plată</th></tr></thead>
+                            <thead><tr><SortTh Key="number">Factura</SortTh><SortTh Key="date">Data</SortTh><SortTh Key="due">Scadența</SortTh><SortTh Key="delay">Scadentă în</SortTh><SortTh Key="total">Total</SortTh><SortTh Key="paid">Plătit</SortTh><SortTh Key="rest">Rest de plată</SortTh></tr></thead>
                             <tbody>
                             @foreach (var invoice in pageRows)
                             {
@@ -92,6 +93,9 @@ else if (allowed)
 }
 
 @code {
+    // The delay of an overdue invoice grows as its due date goes back; the time left of an invoice in term as its due date goes forward.
+    private static readonly IReadOnlyDictionary<string, Func<BalanceInvoice, IComparable?>> OverdueSorts = new Dictionary<string, Func<BalanceInvoice, IComparable?>> { ["number"] = item => item.Number, ["date"] = item => item.Date, ["due"] = item => item.DueDate, ["delay"] = item => -item.DueDate.DayNumber, ["total"] = item => item.Total, ["paid"] = item => item.Paid, ["rest"] = item => item.Rest };
+    private static readonly IReadOnlyDictionary<string, Func<BalanceInvoice, IComparable?>> TermSorts = new Dictionary<string, Func<BalanceInvoice, IComparable?>> { ["number"] = item => item.Number, ["date"] = item => item.Date, ["due"] = item => item.DueDate, ["delay"] = item => item.DueDate.DayNumber, ["total"] = item => item.Total, ["paid"] = item => item.Paid, ["rest"] = item => item.Rest };
     [Parameter, EditorRequired] public int BeneficiaryId { get; set; }
     /// <summary>The section is opened and brought into view (the link from the Notifications tab).</summary>
     [Parameter] public bool StartOpen { get; set; }
@@ -105,9 +109,11 @@ else if (allowed)
 
     private static string Invoices(int count) => count == 1 ? "1 factură" : $"{count} facturi";
 
+    private ElcomturAutoSettings? autoSettings;
     protected override async Task OnParametersSetAsync()
     {
         allowed = true;
+        try { autoSettings = await (Services.GetService<IElcomturAutoService>()?.GetAsync() ?? Task.FromResult<ElcomturAutoSettings?>(null)!); } catch (Exception) { autoSettings = null; }
         try { balance = await Balances.GetAsync(BeneficiaryId); }
         catch (Exception exception) when (exception is AccessDeniedException or BlazorStoc.Modules.ModuleUnavailableException) { balance = null; allowed = false; }
         catch (Exception exception) when (exception is not OperationCanceledException)

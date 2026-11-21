@@ -1,4 +1,4 @@
-﻿using BlazorStoc.Components;
+using BlazorStoc.Components;
 using BlazorStoc.Services;
 using BlazorStoc.Startup;
 using Microsoft.AspNetCore.Hosting.StaticWebAssets;
@@ -93,7 +93,7 @@ app.UseStatusCodePages(async context =>
         _ => ("Cererea nu a putut fi procesată.", "Încearcă din nou. Dacă problema persistă, contactează administratorul.")
     };
     response.ContentType = "text/html; charset=utf-8";
-    await response.WriteAsync($"<!DOCTYPE html><html lang=\"ro\"><head><meta charset=\"utf-8\" /><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\" /><title>{title} · BlazorStoc</title><link rel=\"stylesheet\" href=\"/app.css\" /></head><body class=\"login-body\"><main class=\"login-card\"><h1>{title}</h1><p class=\"muted\">{text}</p><a class=\"refresh\" href=\"/\">Înapoi la pagina principală</a></main></body></html>");
+    await response.WriteAsync($"<!DOCTYPE html><html lang=\"ro\"><head><meta charset=\"utf-8\" /><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\" /><title>{title} · BlazorStoc</title><link rel=\"stylesheet\" href=\"/app.css\" /></head><body class=\"login-body\"><main class=\"login-card\"><h1>{title}</h1><p class=\"muted\">{text}</p><a class=\"refresh\" href=\"/\">Înapoi la dashboard</a></main></body></html>");
 });
 app.UseStaticFiles();
 app.UseRouting();
@@ -150,13 +150,68 @@ app.MapGet("/health", async (IConfiguration configuration, CancellationToken tok
 }).AllowAnonymous();
 // Polled by every open page (wwwroot/maintenance-watch.js): tells an already-open tab that a backup/restore has
 // started or ended, so it can be moved to the waiting page and brought back. Carries no names or details.
-// Bon de consum / aviz de predare of an exit operation (opens in the browser's PDF viewer).
-app.MapGet("/api/iesiri/{operationId:int}/bon.pdf", async (int operationId, IStockMovementRepository movements, IConsumptionNotePdfWriter writer, CancellationToken token) =>
+// Bon de consum / aviz de predare of a project: a stored consumption note (opens in the browser's PDF viewer; ?descarca=1 offers it as a file).
+// The names of the files come from ConsumptionNoteFiles, the one helper that names every downloaded note.
+app.MapGet("/api/bonuri/{noteId:int}/bon.pdf", async (int noteId, bool? descarca, HttpContext context, IConsumptionNoteRepository notes, IConsumptionNotePdfWriter writer, CancellationToken token) =>
 {
     try
     {
-        var operation = await movements.GetOperationAsync(operationId, token);
-        return operation is null ? Results.NotFound() : Results.File(writer.Write(operation, DateTime.Now), "application/pdf");
+        var note = await notes.GetAsync(noteId, token);
+        if (note is null) return Results.NotFound();
+        var bytes = writer.Write(note, DateTime.Now);
+        context.Response.Headers.ContentDisposition = ConsumptionNoteFiles.ContentDisposition(ConsumptionNoteFiles.FileName(note.Note), attachment: descarca == true);
+        return Results.File(bytes, "application/pdf");
+    }
+    catch (AccessDeniedException) { return Results.Forbid(); }
+}).RequireAuthorization(PermissionPolicy.For("stoc.view"));
+// Several notes at once (wizard "Generează bon de consum"): a zip with one PDF per note, one PDF with all the notes (to print them together) and the total note of several projects.
+static int[] NoteIds(string ids) => ids.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).Select(item => int.TryParse(item, out var n) ? n : 0).Where(n => n > 0).Distinct().Take(200).ToArray();
+app.MapGet("/api/bonuri/arhiva.zip", async (string ids, HttpContext context, IConsumptionNoteRepository notes, IConsumptionNotePdfWriter writer, CancellationToken token) =>
+{
+    try
+    {
+        var numbers = NoteIds(ids);
+        if (numbers.Length == 0) return Results.BadRequest();
+        using var stream = new MemoryStream();
+        using (var archive = new System.IO.Compression.ZipArchive(stream, System.IO.Compression.ZipArchiveMode.Create, leaveOpen: true))
+            foreach (var number in numbers)
+            {
+                var note = await notes.GetAsync(number, token);
+                if (note is null) continue;
+                var entry = archive.CreateEntry(ConsumptionNoteFiles.FileName(note.Note), System.IO.Compression.CompressionLevel.Fastest);
+                await using var entryStream = entry.Open();
+                await entryStream.WriteAsync(writer.Write(note, DateTime.Now), token);
+            }
+        context.Response.Headers.ContentDisposition = ConsumptionNoteFiles.ContentDisposition(ConsumptionNoteFiles.ZipName(DateTime.Now), attachment: true);
+        return Results.File(stream.ToArray(), "application/zip");
+    }
+    catch (AccessDeniedException) { return Results.Forbid(); }
+}).RequireAuthorization(PermissionPolicy.For("stoc.view"));
+app.MapGet("/api/bonuri/toate.pdf", async (string ids, HttpContext context, IConsumptionNoteRepository notes, IConsumptionNotePdfWriter writer, IConsumptionNoteTotalWriter total, CancellationToken token) =>
+{
+    try
+    {
+        var documents = new List<byte[]>();
+        foreach (var number in NoteIds(ids))
+            if (await notes.GetAsync(number, token) is { } note) documents.Add(writer.Write(note, DateTime.Now));
+        if (documents.Count == 0) return Results.NotFound();
+        context.Response.Headers.ContentDisposition = ConsumptionNoteFiles.ContentDisposition(ConsumptionNoteFiles.MergedName(DateTime.Now), attachment: false);
+        return Results.File(total.Merge(documents), "application/pdf");
+    }
+    catch (AccessDeniedException) { return Results.Forbid(); }
+}).RequireAuthorization(PermissionPolicy.For("stoc.view"));
+app.MapGet("/api/bonuri/total.pdf", async (string ids, bool? descarca, HttpContext context, IConsumptionNoteRepository notes, IConsumptionNoteTotalWriter total, CancellationToken token) =>
+{
+    try
+    {
+        var details = new List<ConsumptionNoteDetails>();
+        foreach (var number in NoteIds(ids))
+            if (await notes.GetAsync(number, token) is { } note) details.Add(note);
+        if (details.Count == 0) return Results.NotFound();
+        if (details.Select(item => item.Note.BeneficiaryId).Distinct().Count() > 1) return Results.BadRequest();
+        var now = DateTime.Now;
+        context.Response.Headers.ContentDisposition = ConsumptionNoteFiles.ContentDisposition(ConsumptionNoteFiles.TotalFileName(details.Select(item => item.Note).ToArray(), now), attachment: descarca == true);
+        return Results.File(total.Write(details, now), "application/pdf");
     }
     catch (AccessDeniedException) { return Results.Forbid(); }
 }).RequireAuthorization(PermissionPolicy.For("stoc.view"));
@@ -187,6 +242,26 @@ app.MapPost("/api/elcomtur/incarcare", async (HttpContext context, BlazorStoc.Mo
     catch (BlazorStoc.Modules.ModuleUnavailableException) { return Results.StatusCode(StatusCodes.Status503ServiceUnavailable); }
     catch (AccessDeniedException) { return Results.Forbid(); }
 }).RequireAuthorization(PermissionPolicy.For(BlazorStoc.Modules.Elcomtur.ElcomturImportService.ImportKey));
+// The address ANAF sends the administrator back to after the sign-in (registered at ANAF as the redirect address of the application).
+app.MapGet(AnafAuthRules.CallbackPath, async (string? code, string? state, string? error, IAnafAuthService auth, CancellationToken token) =>
+{
+    var target = $"/setari?{SettingsNavigation.TabParameter}=anaf&{SettingsNavigation.SubtabParameter}=factura&anafauth=";
+    if (!string.IsNullOrEmpty(error)) return Results.Redirect(target + "refuzat");
+    try { await auth.CompleteAsync(code, state, token); return Results.Redirect(target + "ok"); }
+    catch (AnafException) { return Results.Redirect(target + "eroare"); }
+    catch (BlazorStoc.Modules.ModuleUnavailableException) { return Results.StatusCode(StatusCodes.Status503ServiceUnavailable); }
+    catch (AccessDeniedException) { return Results.Forbid(); }
+}).RequireAuthorization(PermissionPolicy.For("setari-anaf.edit"));
+app.MapGet("/api/backup/{fileName}",async (string fileName, IBackupDownloadService downloads, CancellationToken token) =>
+{
+    try
+    {
+        var file = await downloads.OpenAsync(fileName, token);
+        return Results.File(file.Content, file.ContentType, file.DownloadName, enableRangeProcessing: !file.Archived);
+    }
+    catch (BackupDownloadException) { return Results.NotFound(); }
+    catch (AccessDeniedException) { return Results.Forbid(); }
+}).RequireAuthorization(PermissionPolicy.For("setari-backup.edit"));
 app.MapGet("/api/consum.csv", async (int? beneficiar, int? proiect, string? de, string? pana, IConsumptionReader reader, CancellationToken token) =>
 {
     try
@@ -242,6 +317,19 @@ app.MapGet("/media/products/{productId:int}", async (int productId, IProductImag
         ? Results.Redirect(ProductImageRules.PlaceholderUrl)
         : Results.File(image.Content, image.ContentType, enableRangeProcessing: true);
 }).RequireAuthorization(PermissionPolicy.For("stoc.view"));
+// A picture of an announcement: shown inside the announcements, only to signed-in users (the type comes from the bytes, nosniff).
+app.MapGet("/media/anunturi/{imageId:int}", async (int imageId, HttpContext context, BlazorStoc.Modules.Announcements.IAnnouncementService announcements, CancellationToken token) =>
+{
+    try
+    {
+        var image = await announcements.GetImageAsync(imageId, token);
+        if (image is null) return Results.NotFound();
+        context.Response.Headers["X-Content-Type-Options"] = "nosniff";
+        return Results.File(image.Content, image.ContentType);
+    }
+    catch (BlazorStoc.Modules.ModuleUnavailableException) { return Results.StatusCode(StatusCodes.Status503ServiceUnavailable); }
+    catch (AccessDeniedException) { return Results.Unauthorized(); }
+}).RequireAuthorization();
 app.MapGet("/media/project-files/{fileId:int}", async (int fileId, IObservationFiles files, CancellationToken token) =>
 {
     try
@@ -330,6 +418,9 @@ var statusOnly = args.Contains("--schema-status");
             var backfill = await WorkPointBackfill.EnsurePrimariesAsync(app.Configuration);
             if (backfill.Created + backfill.Promoted > 0 || backfill.EmptyAddress > 0)
                 app.Logger.LogInformation("Main work points: {Created} created, {Promoted} promoted from an additional point, {Empty} beneficiary(ies) without an address.", backfill.Created, backfill.Promoted, backfill.EmptyAddress);
+            // The projects of the mandatory types (Nomenclator -> Proiecte obligatorii) for the beneficiaries that exist (idempotent: makes only what is missing).
+            var mandatoryProjects = await new MariaBeneficiaryProjectTypeRepository(app.Configuration).EnsureProjectsAsync();
+            if (mandatoryProjects > 0) app.Logger.LogInformation("Mandatory projects: {Made} project(s) made for the existing beneficiaries.", mandatoryProjects);
         }
         // Exit codes of --migrate-schema (also used by the updater): 0 = schema current, 1 = columns still missing, 3 = an applied migration was edited (drift).
         if (migrateOnly) return report.MissingColumns.Count > 0 ? 1 : report.Drifted.Count > 0 ? 3 : 0;

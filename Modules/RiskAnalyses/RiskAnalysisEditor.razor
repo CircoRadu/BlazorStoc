@@ -13,7 +13,7 @@
 
 <UnsavedChangesTracker @ref="tracker" Subject="@(BlazorStoc.Services.PopupSubject.Of("analiză de risc", Original?.Analysis.Number))" Adding="@(Original is null)" Snapshot="CurrentSnapshot" Discard="DiscardAsync" />
 <section class="product-editor" aria-labelledby="risk-analysis-editor-title">
-    <div class="catalog-heading"><h2 id="risk-analysis-editor-title">@(Original is null ? "Adaugă analiză de risc" : $"Editează analiza de risc {Original.Analysis.Number}")</h2><span class="heading-actions"><HelpButton Topic="analize-risc-editor" About="Formularul analizei de risc" /><button type="button" class="danger" disabled="@saving" @onclick="CloseAsync">Închide</button></span></div>
+    <div class="catalog-heading"><h2 id="risk-analysis-editor-title">@(Original is null ? "Adaugă analiză de risc" : $"Editează analiza de risc {Original.Analysis.Number}")</h2><span class="heading-actions"><HelpButton Topic="analize-risc-editor" About="Formularul analizei de risc" /><button type="button" class="danger" disabled="@saving" @onclick="CloseAsync" data-head-close>Închide</button></span></div>
     @if (error is not null) { <div class="error-banner" role="alert">@error</div> }
     @if (errors.Count > 0)
     {
@@ -26,6 +26,7 @@
                 {
                     <SearchableSelect Id="risk-beneficiary" Label="Beneficiar *" Placeholder="Caută sau alege beneficiarul…" EmptyText="Niciun beneficiar găsit."
                                       Options="BeneficiaryOptions" SelectedId="beneficiaryId" SelectedIdChanged="BeneficiaryChangedAsync" Disabled="saving" />
+                    <ActivityTakeButton OnTaken="ReloadBeneficiariesAsync" />
                 }
                 @if (Original is null)
                 {
@@ -39,12 +40,12 @@
                 {
                     <div class="form-note">Punct de lucru: <strong>@Original.WorkPointName</strong> · @Original.WorkPointAddress</div>
                 }
-                <div class="full-width analyzer-field"><label for="risk-analyzer">Analizor de risc *
+                <div class="full-width analyzer-field"><label for="risk-analyzer">Analizor de risc *<span class="analyzer-row">
                     <select id="risk-analyzer" value="@(input.AnalyzerId ?? 0)" @onchange="AnalyzerChanged">
                         <option value="0">@(analyzers.Count == 0 ? "Nu există analizori - adaugă unul" : "Alege analizorul")</option>
                         @foreach (var analyzer in analyzers) { <option value="@analyzer.Id">@analyzer.Name</option> }
-                    </select><small>Se alege din nomenclatorul „Analizor de risc”.</small></label>
-                    @if (canAddAnalyzer) { <button type="button" class="row-icon add" aria-label="Adaugă analizor de risc" title="Adaugă analizor de risc în nomenclator" disabled="@saving" @onclick="() => addingAnalyzer = true"></button> }</div>
+                    </select>
+                    @if (canAddAnalyzer) { <button type="button" class="row-icon add" aria-label="Adaugă analizor de risc" title="Adaugă analizor de risc în nomenclator" disabled="@saving" @onclick="() => addingAnalyzer = true"></button> }</span><small>Se alege din nomenclatorul „Analizor de risc”.</small></label></div>
                 <label for="risk-number">Număr de înregistrare *<InputTextLive id="risk-number" @bind-Value="input.Number" maxlength="@RiskAnalysisRules.NumberMaximumLength" autocomplete="off" /><small>Rămâne același la reviziile analizei (folosește «Reînnoiește»); o analiză nouă are un număr nou.</small></label>
                 <label for="risk-initial-date">Data întocmirii *<PickOnlyDate Id="risk-initial-date" @bind-Value="input.InitialDate" Max="@TodayText" Disabled="@(saving || InitialLocked)" /><small>@(InitialLocked ? "Nu se mai poate modifica după ce analiza a fost reînnoită." : "Ultima reînnoire a unei analize noi este chiar data înregistrării.")</small></label>
                 <label for="risk-validity">Valabilitate (luni) *<input id="risk-validity" type="number" min="@RiskAnalysisRules.MinimumValidityMonths" max="@RiskAnalysisRules.MaximumValidityMonths" @bind="input.ValidityMonths" /><small>Conform legii, 36 de luni; valoarea se poate modifica oricând. Expiră: <strong>@ExpiryPreview</strong>.</small></label>
@@ -65,7 +66,12 @@
     <EntityFilesPanel OwnerKind="@EntityFileOwners.Risk" OwnerId="@(Original?.Analysis.Id ?? 0)" />
 </section>
 
+<BeneficiarySyncOnOpen OnNewBeneficiaries="ReloadBeneficiariesAsync" />
+
 @code {
+    // Beneficiaries entered in ActivityApp a moment ago are taken in the background after the page opened; the list is loaded again when there are new ones.
+    private async Task ReloadBeneficiariesAsync() { if (BeneficiaryId != 0) return; try { BeneficiaryOptions = (await BeneficiaryStore.GetBeneficiariesAsync(lifetime.Token)).Select(item => new SelectOption(item.Id, item.Name)).ToArray(); } catch (Exception) { } StateHasChanged(); }
+
     // 0 = the beneficiary is chosen in the form (the page of all analyses); otherwise the analysis is for this beneficiary.
     [Parameter] public int BeneficiaryId { get; set; }
     [Parameter] public RiskAnalysisView? Original { get; set; }

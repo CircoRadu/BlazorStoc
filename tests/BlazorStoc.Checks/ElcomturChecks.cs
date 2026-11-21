@@ -318,5 +318,40 @@ public static class ElcomturChecks
         cut.WaitForAssertion(() => { if (auto.Checks.Count != 2) throw new Exception("pending"); }, TimeSpan.FromSeconds(5));
         check(auto.Checks.SequenceEqual([false, true]) && cut.Find("#elcomtur-auto-status").TextContent.Contains("reușită") && cut.Find("#elcomtur-auto-last-import").TextContent.Contains("b.elc") && cut.Find("#elcomtur-auto-last-import").TextContent.Contains("firma3 — KS DIGITAL ENERGY SRL"),
             "Elcomtur automatic panel: \"Verifică acum\" and \"Preia ultimul backup acum\" run the check (the second forced) and show the result and the last backup taken");
+        // BUG-0045: the tab "Balanță Elcomtur" of the beneficiary shows the balance in its badge and is coloured by it (red: payments due, green: none), also when it is not the open tab.
+        var detail = File.ReadAllText(Path.Combine(ProjectRoot(), "Components", "Pages", "BeneficiaryDetail.razor"));
+        var appCss = File.ReadAllText(Path.Combine(ProjectRoot(), "wwwroot", "app.css"));
+        check(detail.Contains("BalanceTabClass(tabId)", StringComparison.Ordinal) && detail.Contains("id=\"balance-tab-badge\"", StringComparison.Ordinal) && detail.Contains("ElcomturFormat.Money(tabBalance.Balance)", StringComparison.Ordinal)
+              && detail.Contains("tabBalance.IsOwed ? \"balance-due\" : \"balance-ok\"", StringComparison.Ordinal),
+            "Elcomtur balance tab: the tab of the beneficiary takes the class balance-due or balance-ok from the balance and shows the balance in its badge");
+        check(appCss.Contains(".settings-subtab.balance-due:not(.active)", StringComparison.Ordinal) && appCss.Contains(".settings-subtab.balance-ok:not(.active)", StringComparison.Ordinal),
+            "Elcomtur balance tab: the colours (red / green) are drawn also for a tab that is not the open one");
+        check(new BeneficiaryBalance(1, "X", 0m, new DateOnly(2026, 11, 1), "F", []).IsOwed == false && new BeneficiaryBalance(1, "X", -5m, new DateOnly(2026, 11, 1), "F", []).IsOwed == false && new BeneficiaryBalance(1, "X", 12.5m, new DateOnly(2026, 11, 1), "F", []).IsOwed,
+            "Elcomtur balance tab: zero or a negative balance is green, a positive one is red");
+        // PROP-0035: a firm is shown by its name when the automatic import knows it, else by its folder.
+        var named = ElcomturAutoSettings.Empty with { FirmFolder = "firma1", FirmName = "Electric Standard Prest SRL" };
+        check(ElcomturFirmNames.Display("firma1", named) == "Electric Standard Prest SRL" && ElcomturFirmNames.Display("firma2", named) == "firma2" && ElcomturFirmNames.Display("firma1", null) == "firma1",
+            "Elcomtur firm: shown by name when the automatic import knows the folder, else by the folder");
+        // PROP-0038 / PROP-0039: the table of movements shows supplier and invoice on two rows (no magnifier), the invoice and the project open a window with their information.
+        var movements = File.ReadAllText(Path.Combine(ProjectRoot(), "Components", "Pages", "ProductMovements.razor"));
+        check(movements.Contains(">Factură: @m.InvoiceNumber</button>", StringComparison.Ordinal) && movements.Contains("<InvoiceInfoDialog ", StringComparison.Ordinal) && !movements.Contains("title=\"Filtrează după acest furnizor\"", StringComparison.Ordinal)
+              && movements.Contains("<ProjectInfoDialog ", StringComparison.Ordinal) && movements.Contains("project-info-link", StringComparison.Ordinal),
+            "Movements table: supplier on the first row and \"Factura: nr\" on the second (opens the invoice window), the project opens its information window, no magnifier on the supplier");
+        // PROP-0036: the periods of the chart of the evolution.
+        var evolutionToday = new DateOnly(2026, 11, 17);
+        check(ElcomturEvolution.From("year", evolutionToday) == new DateOnly(2026, 1, 1) && ElcomturEvolution.From("six", evolutionToday) == new DateOnly(2026, 5, 17) && ElcomturEvolution.From("three", evolutionToday) == new DateOnly(2026, 8, 17),
+            "Elcomtur evolution: the current year starts on 1 January, the last 6 / 3 months go back the same day");
+        // BUG-0047: the round red close button of the window "Ieșire rapidă" (the catalogue) closes it: the dialog calls the same flow as the embedded form.
+        var home = File.ReadAllText(Path.Combine(ProjectRoot(), "Components", "Pages", "Home.razor"));
+        check(home.Contains("<AppDialog OnClose=\"CloseQuickExitAsync\"", StringComparison.Ordinal),
+            "Quick exit window: the red close button of the dialog closes the window (OnClose is the same CloseQuickExitAsync as the form)");
+    }
+
+    // The folder of the project (where BlazorStoc.csproj is), for the checks that read its sources.
+    private static string ProjectRoot()
+    {
+        var directory = new DirectoryInfo(AppContext.BaseDirectory);
+        while (directory is not null && !File.Exists(Path.Combine(directory.FullName, "BlazorStoc.csproj"))) directory = directory.Parent;
+        return directory?.FullName ?? throw new InvalidOperationException("Project root not found");
     }
 }

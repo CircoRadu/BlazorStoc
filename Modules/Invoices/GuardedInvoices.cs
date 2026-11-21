@@ -12,11 +12,11 @@ internal sealed class GuardedInvoiceAnalysisService(IInvoiceAnalysisService inne
     // The synchronous members work on the session in memory (and run the analysis of an opened file); they complete at once.
     private T Sync<T>(Func<T> operation) => modules.RunAsync(Id, () => Task.FromResult(operation())).GetAwaiter().GetResult();
 
-    public Task<InvoiceAnalysisSession> AnalyzeAsync(Stream pdf, string fileName, CancellationToken cancellationToken = default) =>
-        modules.RunAsync(Id, () => inner.AnalyzeAsync(pdf, fileName, cancellationToken));
+    public Task<InvoiceAnalysisSession> AnalyzeAsync(Stream pdf, string fileName, CancellationToken cancellationToken = default, IProgress<int>? progress = null) =>
+        modules.RunAsync(Id, () => inner.AnalyzeAsync(pdf, fileName, cancellationToken, progress));
 
-    public Task<InvoiceAnalysisSession> OpenAsync(Stream pdf, string fileName, CancellationToken cancellationToken = default) =>
-        modules.RunAsync(Id, () => inner.OpenAsync(pdf, fileName, cancellationToken));
+    public Task<InvoiceAnalysisSession> OpenAsync(Stream pdf, string fileName, CancellationToken cancellationToken = default, IProgress<int>? progress = null) =>
+        modules.RunAsync(Id, () => inner.OpenAsync(pdf, fileName, cancellationToken, progress));
 
     public InvoiceAnalysisSession Analyze(Guid id) => Sync(() => inner.Analyze(id));
 
@@ -51,8 +51,8 @@ internal sealed class UnavailableInvoiceAnalysisService : IInvoiceAnalysisServic
 {
     private static Task<T> Out<T>() => Task.FromException<T>(new ModuleUnavailableException(InvoicesModule.ModuleId));
 
-    public Task<InvoiceAnalysisSession> AnalyzeAsync(Stream pdf, string fileName, CancellationToken cancellationToken = default) => Out<InvoiceAnalysisSession>();
-    public Task<InvoiceAnalysisSession> OpenAsync(Stream pdf, string fileName, CancellationToken cancellationToken = default) => Out<InvoiceAnalysisSession>();
+    public Task<InvoiceAnalysisSession> AnalyzeAsync(Stream pdf, string fileName, CancellationToken cancellationToken = default, IProgress<int>? progress = null) => Out<InvoiceAnalysisSession>();
+    public Task<InvoiceAnalysisSession> OpenAsync(Stream pdf, string fileName, CancellationToken cancellationToken = default, IProgress<int>? progress = null) => Out<InvoiceAnalysisSession>();
     public InvoiceAnalysisSession Analyze(Guid id) => throw new ModuleUnavailableException(InvoicesModule.ModuleId);
     public InvoiceAnalysisSession? Get(Guid id) => null;
     public void Discard(Guid id) { }

@@ -1,0 +1,53 @@
+@using BlazorStoc.Services
+@inject IConsumptionNoteRepository Notes
+@inject ILogger<ConsumptionNotesSection> Logger
+@implements IDisposable
+@* The collapsible section "Bonuri de consum" of a beneficiary: the notes generated for its projects (active and inactive). A note is generated from the icon of a project (the list
+   of projects above); here it is viewed, downloaded, printed or deleted. *@
+<section class="catalog" id="beneficiary-consumption-notes">
+    <details class="catalog-collapse" open="@StartOpen"><summary class="catalog-heading"><h2>Bonuri de consum <span>@items.Count</span></h2>
+        <small>Generate la cerere pentru proiectele beneficiarului</small></summary>
+        @if (loading) { <div class="empty-state" role="status"><div class="spinner"></div><h3>Se încarcă bonurile</h3></div> }
+        else if (error is not null) { <div class="error-banner" role="alert">@error</div> }
+        else { <ConsumptionNotesTable Items="items" IdPrefix="beneficiary-consumption-notes" EmptyText="Acest beneficiar nu are bonuri de consum. Generează unul din iconița de bon a unui proiect." Changed="LoadAsync" /> }
+    </details>
+</section>
+
+@code {
+    [Parameter, EditorRequired] public int BeneficiaryId { get; set; }
+    [Parameter] public bool StartOpen { get; set; }
+    // Changes when a note was generated elsewhere on the page: the list is read again.
+    [Parameter] public int Refresh { get; set; }
+
+    private readonly CancellationTokenSource lifetime = new();
+    private IReadOnlyList<ConsumptionNote> items = [];
+    private bool loading = true;
+    private string? error;
+    private (int Beneficiary, int Refresh) loadedFor = (-1, -1);
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (loadedFor == (BeneficiaryId, Refresh)) return;
+        loadedFor = (BeneficiaryId, Refresh);
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        try
+        {
+            items = await Notes.GetAllAsync(BeneficiaryId, null, lifetime.Token);
+            error = null;
+        }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (AccessDeniedException exception) { error = exception.Message; }
+        catch (Exception exception)
+        {
+            Logger.LogWarning("The consumption notes could not be read ({ErrorType}).", exception.GetType().Name);
+            error = "Bonurile de consum nu au putut fi citite.";
+        }
+        finally { loading = false; }
+    }
+
+    public void Dispose() { lifetime.Cancel(); lifetime.Dispose(); }
+}

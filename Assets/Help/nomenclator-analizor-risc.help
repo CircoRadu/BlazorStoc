@@ -5,6 +5,8 @@ Cautare: nomenclator analizor de risc analizori persoana firma analiza adauga mo
 
 Lista analizorilor de risc: persoanele sau firmele care întocmesc analizele de risc la securitate. La o analiză de risc nouă, analizorul se alege din această listă.
 
+Tab cu lista analizoarelor de risc: adăugare, modificare, ștergere, paginare.
+
 ## Elemente
 ### Lista analizorilor
 - Adaugă analizor | buton | Deschide formularul unui analizor nou.

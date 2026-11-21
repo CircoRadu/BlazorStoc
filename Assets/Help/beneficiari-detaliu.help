@@ -2,15 +2,28 @@
 Ruta: /beneficiari/{id:int}
 Cautare: beneficiar fisa puncte de lucru proiecte consum net contracte mentenanta analize risc adauga proiect editeaza anaf
 Captura: pagina | /beneficiari | click Panoramic Hotel; wait 3000; full | Fișa unui beneficiar
-Captura: proiecte | /beneficiari | click Logistic Park; wait 3000; full | Lista de proiecte cu pagini
+Captura: proiecte | /beneficiari | click Logistic Park; wait 3000; click sel:#subtab-bf-proiecte; wait 1500; full | Lista de proiecte cu pagini
+Captura: consum | /beneficiari | click Panoramic Hotel; wait 3000; click sel:#subtab-bf-consum; wait 1500; full | Fila Consum rețea
+Captura: mentenanta | /beneficiari | click Panoramic Hotel; wait 3000; click sel:#subtab-bf-mentenanta; wait 1500; full | Fila Mentenanță
+Captura: taskuri | /beneficiari | click Panoramic Hotel; wait 3000; click sel:#subtab-bf-taskuri; wait 1500; full | Fila Taskuri
 
 Fișa unui beneficiar: datele lui, punctele de lucru, consumul net de produse, contractele și intervențiile de mentenanță, analizele de risc și proiectele. De aici adaugi proiecte și puncte de lucru.
+
+**Adaugă proiect**: Pe rând: deschide formularul de proiect nou al beneficiarului.
+
+**Adaugă analiză de risc**: Pe rând: deschide formularul de analiză cu punctul de lucru ales.
+
+**Adaugă fișiere**: Pe rând: fereastra „Fișiere – punct” cu panoul de fișiere ale punctului ([[beneficiari-fisiere]]).
+
+**Editoarele**: Punctele de lucru, contractele, intervențiile, analizele de risc și proiectele se editează în ferestre peste pagină; contractul și analiza nouă rămân deschise după salvare.
+
+**Vizualizare intervenție**: Fereastră cu datele intervenției și tichetul ActivityApp; la editarea unei intervenții care nu a mutat scadența poți alege felul (Mentenanță / La cerere).
 
 ## Elemente
 ### Antet
 - ← Beneficiari | link | Revine la registrul beneficiarilor.
 - Numele și datele beneficiarului | text | Persoană fizică sau CUI, adresa, telefonul, iar la persoanele juridice Reg. Com., cod poștal și CAEN.
-- Date preluate din ANAF / Date introduse manual | insignă | Spune de unde vin datele persoanei juridice. | sel: .page-heading .anaf-source
+- Date preluate din ANAF / Date introduse manual | insignă | Spune de unde vin datele persoanei juridice. | sel: .page-heading .anaf-source
 - Editează | buton | Deschide formularul beneficiarului ([[beneficiari-editor]]).
 ### Secțiunile fișei
 - Puncte de lucru, Consum net, Contracte, Intervenții, Analize de risc, Proiecte | secțiuni | Fiecare secțiune se strânge sau se deschide apăsând pe titlul ei; numărul de lângă titlu arată câte elemente are.
@@ -25,9 +38,9 @@ Fișa unui beneficiar: datele lui, punctele de lucru, consumul net de produse, c
 - Editează punctul de lucru | iconita:edit | Deschide formularul punctului.
 - Șterge punctul de lucru | iconita:delete | Șterge punctul; punctul principal nu se șterge, iar adresa și telefonul lui se modifică din editarea beneficiarului.
 ### Consum net
-- Consum net | tabel | Pe produs: ieșirile către acest beneficiar, retururile legate de ele și consumul net. Apare doar dacă ai dreptul să vezi mișcările de stoc și există ceva de arătat. Apasă produsul ca să-i deschizi pagina.
+- Consum net | tabel | Pe produs: ieșirile către acest beneficiar, retururile legate de ele și consumul net. Apare doar dacă ai dreptul să vezi mișcările de stoc și există ceva de arătat. Apasă produsul ca să-i deschizi pagina. | img: consum
 ### Alte secțiuni de pe fișă
-- Contracte de mentenanță și Intervenții | secțiuni | Din modulul Mentenanță: contractele beneficiarului ([[mentenanta-contracte]]) și registrul intervențiilor pe punctele de lucru ([[mentenanta-interventii]]). Apar doar cât modulul funcționează.
+- Contracte de mentenanță și Intervenții | secțiuni | Din modulul Mentenanță: contractele beneficiarului ([[mentenanta-contracte]]) și registrul intervențiilor pe punctele de lucru ([[mentenanta-interventii]]). Apar doar cât modulul funcționează. | img: mentenanta
 - Analize de risc | secțiune | Din modulul Analize de risc: analizele punctelor de lucru, reînnoirile și expirarea lor ([[analize-risc-sectiune]]).
 ### Proiecte
 - + Adaugă proiect | buton | Se află în secțiunea Proiecte; deschide formularul de proiect nou pentru acest beneficiar ([[proiecte-editor]]).
@@ -35,6 +48,15 @@ Fișa unui beneficiar: datele lui, punctele de lucru, consumul net de produse, c
 - Proiect | coloană | Apasă numele ca să deschizi pagina proiectului. | img: proiecte
 - Ultima modificare | coloană | Data și ora ultimei modificări a proiectului. | img: proiecte
 - Paginile | butoane | Trec la pagina anterioară sau următoare a listei de proiecte. | img: proiecte | sel: .pagination
+### Filele fișei
+- Secțiunile fișei | filă | Secțiunile sunt file: Puncte de lucru, Consum rețea, Mentenanță, Analize de risc, Taskuri, Fișiere beneficiar, Proiecte și, ultima, Balanță Elcomtur; legăturile din tabelul de fișiere comută pe fila potrivită.
+### Puncte de lucru: noutăți
+- Arondate | coloană | Numărul punctelor arondate; deschide fereastra „Puncte de lucru arondate” cu adăugare/editare ([[puncte-de-lucru-editor]]).
+- Analiza de risc | coloană | Arată „Fără analiza de risc” când punctul nu are analiză; nota unui punct preluat din ActivityApp nu mai arată „(punct N)”.
+### Fila Taskuri
+- Taskuri | tabel | Tabele „Active” și „Finalizate” cu butonul „+ Adaugă task” ([[task-formular]]). | img: taskuri
+### Fila Balanță Elcomtur
+- Balanță Elcomtur | text | Fără balanță importată, antetul spune „Nu există balanță importată pentru acest beneficiar”.
 
 ## Flux: Cum adaug un proiect pentru un beneficiar
 1. În secțiunea „Proiecte” apasă „+ Adaugă proiect”.

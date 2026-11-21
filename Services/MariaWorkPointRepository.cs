@@ -107,8 +107,11 @@ public sealed class MariaWorkPointRepository(
         if (original.IsPrimary) throw WorkPointRules.PrimaryNotDeletable();
         string ownerName;
         IReadOnlyList<ServicePhoto> photos;
+        IReadOnlyList<AttachedWorkPoint> attached;
         await using (var connection = await MariaDb.OpenAsync(configuration, cancellationToken).ConfigureAwait(false))
         {
+            // The attached work points of the point are archived with it (as relations) and deleted before it.
+            attached = await MariaAttachedWorkPointRepository.ReadAsync(connection, null, "a.work_point_id=@id", cancellationToken, ("@id", original.Id)).ConfigureAwait(false);
             await using var owner = Command(connection, null, "SELECT name FROM beneficiaries WHERE id=@id", ("@id", original.BeneficiaryId));
             ownerName = await owner.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false) as string
                 ?? throw new WorkPointOperationException("Beneficiarul nu mai există. Actualizează lista.");
@@ -123,7 +126,7 @@ public sealed class MariaWorkPointRepository(
         }
         var liveRoot = MariaAssetPaths.ServicePhotos(configuration);
         var archiveRoot = MariaAssetPaths.ArchiveFiles(configuration);
-        await archiver.ExecuteAsync(ArchiveRequests.WorkPoint(original, ownerName, photos, WorkPointRules.DeleteReason), async (operation, token) =>
+        await archiver.ExecuteAsync(ArchiveRequests.WorkPoint(original, ownerName, photos, WorkPointRules.DeleteReason, attached), async (operation, token) =>
         {
             var prepared = await ServicePhotoArchive.PrepareAsync(liveRoot, archiveRoot, photos, operation, token).ConfigureAwait(false);
             try
@@ -139,7 +142,11 @@ public sealed class MariaWorkPointRepository(
                         throw ServiceInterventionRules.WorkPointHasInterventions(interventionsNow);
                     var current = await ServicePhotoArchive.ReadAsync(connection, transaction, "work_point_id=@id", token, ("@id", original.Id)).ConfigureAwait(false);
                     if (!current.Select(photo => photo.Id).Order().SequenceEqual(photos.Select(photo => photo.Id).Order())) throw WorkPointRules.Changed();
+                    var currentAttached = await MariaAttachedWorkPointRepository.ReadAsync(connection, transaction, "a.work_point_id=@id", token, ("@id", original.Id)).ConfigureAwait(false);
+                    if (!currentAttached.SequenceEqual(attached)) throw WorkPointRules.Changed();
                     await MariaArchivePersistence.InsertAsync(connection, transaction, operation, prepared, token).ConfigureAwait(false);
+                    await using (var deleteAttached = Command(connection, transaction, "DELETE FROM work_point_attached WHERE work_point_id=@id", ("@id", original.Id)))
+                        await deleteAttached.ExecuteNonQueryAsync(token).ConfigureAwait(false);
                     await using (var deletePhotos = Command(connection, transaction, "DELETE FROM service_photos WHERE work_point_id=@id", ("@id", original.Id)))
                         await deletePhotos.ExecuteNonQueryAsync(token).ConfigureAwait(false);
                     await using var command = Command(connection, transaction,

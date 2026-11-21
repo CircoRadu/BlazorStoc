@@ -19,6 +19,7 @@ public static class ArchiveSchemaRegistry
             new ArchiveEntitySchema(AuditEntities.Vehicle, "archive_vehicles", true, false),
             new ArchiveEntitySchema(AuditEntities.WorkPoint, "archive_work_points", true, true),
             new ArchiveEntitySchema(AuditEntities.ServicePhoto, "archive_service_photos", false, true),
+            new ArchiveEntitySchema(AuditEntities.AttachedWorkPoint, "archive_work_point_attached", false, false),
             new ArchiveEntitySchema(AuditEntities.ServiceContract, "archive_service_contracts", true, false),
             new ArchiveEntitySchema(AuditEntities.RiskAnalysis, "archive_risk_analyses", true, false),
             new ArchiveEntitySchema(AuditEntities.ServiceIntervention, "archive_service_interventions", true, true),
@@ -159,11 +160,12 @@ public static class ArchiveRequests
 
     // The work points of the beneficiary and their photos travel with it as relations (their files as archived files).
     public static ArchiveRequest Beneficiary(Beneficiary value, string motif,
-        IEnumerable<WorkPoint>? workPoints = null, IEnumerable<ServicePhoto>? photos = null)
+        IEnumerable<WorkPoint>? workPoints = null, IEnumerable<ServicePhoto>? photos = null, IEnumerable<AttachedWorkPoint>? attached = null)
     {
         var details = AuditDetails.Identification(("Denumire", value.Name), ("CUI", value.Cui));
         var relations = (workPoints ?? []).Select(point => ArchiveRelationSnapshot.Create(AuditEntities.WorkPoint, point.Id.ToString(), point))
-            .Concat((photos ?? []).Select(photo => ArchiveRelationSnapshot.Create(AuditEntities.ServicePhoto, photo.Id.ToString(), photo)));
+            .Concat((photos ?? []).Select(photo => ArchiveRelationSnapshot.Create(AuditEntities.ServicePhoto, photo.Id.ToString(), photo)))
+            .Concat((attached ?? []).Select(point => ArchiveRelationSnapshot.Create(AttachedWorkPointRules.RelationType, point.Id.ToString(), point)));
         return new(ArchiveSnapshot.Create(AuditEntities.Beneficiary, value.Id.ToString(), value.Version, value, relations),
             $"#{value.Id} · {value.Name}", details, motif);
     }
@@ -175,12 +177,21 @@ public static class ArchiveRequests
         return new(ArchiveSnapshot.Create(AuditEntities.Supplier, value.Id.ToString(), value.Version, value), SupplierRules.Target(value), details, motif);
     }
 
-    public static ArchiveRequest WorkPoint(WorkPoint value, string beneficiaryName, IEnumerable<ServicePhoto> photos, string motif)
+    public static ArchiveRequest WorkPoint(WorkPoint value, string beneficiaryName, IEnumerable<ServicePhoto> photos, string motif, IEnumerable<AttachedWorkPoint>? attached = null)
     {
         var details = AuditDetails.Identification(("Nume", value.Name), ("Adresă", value.Address), ("Beneficiar", beneficiaryName));
-        var relations = photos.Select(photo => ArchiveRelationSnapshot.Create(AuditEntities.ServicePhoto, photo.Id.ToString(), photo));
+        var relations = photos.Select(photo => ArchiveRelationSnapshot.Create(AuditEntities.ServicePhoto, photo.Id.ToString(), photo))
+            .Concat((attached ?? []).Select(point => ArchiveRelationSnapshot.Create(AttachedWorkPointRules.RelationType, point.Id.ToString(), point)));
         return new(ArchiveSnapshot.Create(AuditEntities.WorkPoint, value.Id.ToString(), value.Version, value, relations),
             WorkPointRules.Target(value.BeneficiaryId, beneficiaryName, value.Name), details, motif);
+    }
+
+    public static ArchiveRequest AttachedWorkPoint(AttachedWorkPoint value, int beneficiaryId, string beneficiaryName, string workPointName, string motif)
+    {
+        var details = AuditDetails.Identification(("Nume", value.Name), ("Adresă", value.Address), ("Coordonate", WorkPointCoordinates.Format(value.Latitude, value.Longitude)),
+            ("Punct de lucru", workPointName), ("Beneficiar", beneficiaryName));
+        return new(ArchiveSnapshot.Create(AuditEntities.AttachedWorkPoint, value.Id.ToString(), value.Version, value),
+            AttachedWorkPointRules.Target(beneficiaryId, beneficiaryName, workPointName, value.Name), details, motif);
     }
 
     public static ArchiveRequest ServicePhoto(ServicePhoto value, string workPointName, string motif)

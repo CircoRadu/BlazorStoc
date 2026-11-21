@@ -7,20 +7,17 @@
 
 @if (adding || editing is not null)
 {
-    <div class="delete-overlay">
-        <div class="delete-dialog template-popup" role="dialog" aria-modal="true" tabindex="-1" aria-labelledby="intervention-editor-title">
+    <AppDialog PanelClass="template-popup" LabelledBy="intervention-editor-title">
             <ServiceInterventionEditor @key="editorKey" BeneficiaryId="BeneficiaryId" WorkPoints="WorkPoints" Contracts="Contracts" Interventions="interventions" Original="editing" InitialWorkPointId="initialWorkPointId"
                                        Saved="SavedAsync" Closed="CloseEditorAsync" PhotosChanged="ReloadCountsAsync" />
-        </div>
-    </div>
+    </AppDialog>
 }
 
 @if (viewing is not null)
 {
-    <div class="delete-overlay">
-        <div class="delete-dialog template-popup review-popup" role="dialog" aria-modal="true" tabindex="-1" aria-labelledby="intervention-view-title">
+    <AppDialog PanelClass="template-popup review-popup" LabelledBy="intervention-view-title" OnClose="CloseView">
             <div class="catalog-heading"><h2 id="intervention-view-title">Intervenția @ServiceInterventionRules.KindText(viewing.Kind) din @StockMovementRules.DisplayDate(viewing.PerformedOn)</h2>
-                <span class="heading-actions"><button type="button" class="danger" @onclick="CloseView">Închide</button></span></div>
+                <span class="heading-actions"><button type="button" class="danger" @onclick="CloseView" data-head-close>Închide</button></span></div>
             <dl class="review-facts">
                 <dt>Fel</dt><dd>@ServiceInterventionRules.KindLabel(viewing.Kind)</dd>
                 <dt>Punct de lucru</dt><dd>@viewing.WorkPointName<br /><small class="muted">@viewing.WorkPointAddress</small></dd>
@@ -30,7 +27,7 @@
                 {
                     <dt>Scadență</dt><dd>@if (viewing.MovesDue) { <text>@StockMovementRules.DisplayDate(viewing.PlannedDue!.Value) → <strong>@StockMovementRules.DisplayDate(viewing.NextDueSet!.Value)</strong></text> } else { <text>Nu a modificat scadența</text> }</dd>
                 }
-                <dt>Observații</dt><dd class="review-text">@(viewing.Notes.Length > 0 ? viewing.Notes : "—")</dd>
+                <dt>Observații</dt><dd class="review-text">@(viewing.Notes.Length > 0 ? NotesMarkup.Html(viewing.Notes) : new Microsoft.AspNetCore.Components.MarkupString("—"))</dd>
                 <dt>Înregistrată de</dt><dd>@viewing.RecordedBy · @StockMovementRules.DisplayDate(DateOnly.FromDateTime(viewing.RecordedUtc.ToLocalTime()))</dd>
             </dl>
             @if (viewTicketLoading) { <p class="muted" role="status">Se citește tichetul…</p> }
@@ -43,8 +40,7 @@
                     <dt>Preluat la</dt><dd>@StockMovementRules.DisplayDate(DateOnly.FromDateTime(ticket.ImportedUtc.ToLocalTime()))</dd>
                 </dl>
             }
-        </div>
-    </div>
+    </AppDialog>
 }
 
 <section class="catalog">
@@ -71,8 +67,9 @@
     }
     else
     {
-        <div class="table-scroll"><table><thead><tr><th>EFECTUATĂ LA</th><th>FEL</th><th>PUNCT DE LUCRU</th><th>CONTRACT</th><th>SCADENȚĂ</th><th>OBSERVAȚII</th><th class="number">FOTO</th><th></th></tr></thead><tbody>
-        @foreach (var item in Visible)
+        <Paged Items="Visible" Id="service-interventions-size" Context="pageRows" Sorts="Sorts">
+        <div class="table-scroll"><table><thead><tr><SortTh Key="on">EFECTUATĂ LA</SortTh><SortTh Key="kind">FEL</SortTh><SortTh Key="point">PUNCT DE LUCRU</SortTh><SortTh Key="contract">CONTRACT</SortTh><SortTh Key="due">SCADENȚĂ</SortTh><th>OBSERVAȚII</th><th class="number">FOTO</th><th></th></tr></thead><tbody>
+        @foreach (var item in pageRows)
         {
             <tr @key="item.Id">
                 <td>@StockMovementRules.DisplayDate(item.PerformedOn)</td>
@@ -84,7 +81,7 @@
                     else if (item.MovesDue) { <span>@StockMovementRules.DisplayDate(item.PlannedDue!.Value) → <strong>@StockMovementRules.DisplayDate(item.NextDueSet!.Value)</strong><br /><small class="muted">@ServiceInterventionRules.BasisLabel(item.Basis!.Value)</small></span> }
                     else { <small class="muted">Nu a modificat scadența</small> }
                 </td>
-                <td class="work-point-description" title="@item.Notes">@item.Notes</td>
+                <td class="work-point-description" title="@NotesMarkup.Plain(item.Notes)">@NotesMarkup.Plain(item.Notes)</td>
                 <td class="number">@(photoCounts.TryGetValue(item.Id, out var count) ? count.ToString() : "")</td>
                 <td>
                     <button class="row-icon view" aria-label="Vizualizează intervenția din @StockMovementRules.DisplayDate(item.PerformedOn)" title="Vizualizează intervenția din @StockMovementRules.DisplayDate(item.PerformedOn)" @onclick="() => OpenViewAsync(item)"></button>
@@ -97,6 +94,7 @@
             </tr>
         }
         </tbody></table></div>
+        </Paged>
     }
 </details>
 </section>
@@ -131,6 +129,7 @@
     private readonly CancellationTokenSource lifetime = new();
 
     private bool Locked => busy || adding || editing is not null;
+    private static readonly IReadOnlyDictionary<string, Func<ServiceIntervention, IComparable?>> Sorts = new Dictionary<string, Func<ServiceIntervention, IComparable?>> { ["on"] = item => item.PerformedOn, ["kind"] = item => item.Kind.ToString(), ["point"] = item => item.WorkPointName, ["contract"] = item => item.ContractLabel, ["due"] = item => item.PlannedDue };
     private IReadOnlyList<ServiceIntervention> Visible => kindFilter.Length == 0 ? interventions : interventions.Where(item => ServiceInterventionRules.KindCode(item.Kind).ToString() == kindFilter).ToList();
 
     private string DeleteDescription => deleting is { MovesDue: true }

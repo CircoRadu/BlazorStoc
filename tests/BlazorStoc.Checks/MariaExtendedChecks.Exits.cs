@@ -212,6 +212,12 @@ public static partial class MariaExtendedChecks
             Check(vehicleHeld.Stock == 7 && overWarehouse.Stock == 1 && overPage.InVehicles == 2 && overPage.OverStockIds!.Contains(overWarehouse.Movement.Id),
                 "An exit above what the warehouse holds is marked even when the vehicles make the total look sufficient");
             await movements.TransferFromVehicleAsync(new VehicleTransfer(car.Id, null));
+            // The tab Retur returns a quantity from a vehicle with the description of the operator (the stock does not change).
+            await movements.CreateAsync(pb.Id, Out(1, "Ext inca una in masina", ExitDestination.Vehicle, input => input.VehicleId = car.Id));
+            var stockBeforeVehicleReturn = await Stock(pb.Id);
+            var withText = await movements.TransferFromVehicleAsync(new VehicleTransfer(car.Id, null, [new VehicleTransferLine(pb.Id, 1)], "Ext retur cu motiv scris", today));
+            Check(withText.Count == 1 && withText[0].Description == "Ext retur cu motiv scris" && withText[0].Date == today && withText[0].Quantity == 1 && await Stock(pb.Id) == stockBeforeVehicleReturn,
+                "A return from a vehicle takes the description and the date given by the operator and leaves the total stock unchanged");
 
             // 16-22: regularization of a negative stock before the next entry.
             await movements.CreateAsync(pc.Id, Out(4, "Ext iesire uitata", ExitDestination.GenericSale));
@@ -277,10 +283,12 @@ public static partial class MariaExtendedChecks
         var beneficiary = await beneficiaries.CreateAsync(Legal($"Ext Out Beneficiar {suffix} SRL", "RO" + Random.Shared.Next(60000000, 69999999)));
         var car = await vehicles.CreateAsync(new VehicleInput { PlateNumber = "TS-94-" + Letters(), Description = "Ext iesiri", ItpExpiry = Expiry, InsuranceExpiry = Expiry, RovinietaExpiry = Expiry });
         var car2 = await vehicles.CreateAsync(new VehicleInput { PlateNumber = "TS-95-" + Letters(), Description = "Ext iesiri 2", ItpExpiry = Expiry, InsuranceExpiry = Expiry, RovinietaExpiry = Expiry });
+        // An exit to a beneficiary is always made on a project: the mandatory project every beneficiary has (Nomenclator -> Proiecte obligatorii).
+        var ownProject = (await new MariaProjectRepository(configuration, new TestWebHostEnvironment(Path.GetTempPath()), admin, audit).GetForBeneficiaryAsync(beneficiary.Id)).First();
         try
         {
             StockMovementInput Out(int quantity, string text, ExitDestination destination, Action<StockMovementInput>? change = null)
-            { var input = new StockMovementInput { Kind = StockMovementKind.Exit, Date = today, Quantity = quantity, Description = text, Destination = destination }; change?.Invoke(input); return input; }
+            { var input = new StockMovementInput { Kind = StockMovementKind.Exit, Date = today, Quantity = quantity, Description = text, Destination = destination, ProjectId = destination == ExitDestination.Beneficiary ? ownProject.Id : null }; change?.Invoke(input); return input; }
             async Task<bool> Journaled(string action, int id, string? detail = null) => (await audit.GetEventsAsync()).Any(item => item.TimestampUtc >= started && item.Action == action
                 && item.EntityId == id.ToString() && (detail is null || item.Details.Contains(detail)));
             await movements.CreateAsync(product.Id, new StockMovementInput { Kind = StockMovementKind.Entry, Date = today.AddDays(-2), Quantity = 40, Description = "Ext stoc initial" });
@@ -535,14 +543,60 @@ public static partial class MariaExtendedChecks
                   && byBeneficiary.Sum(item => item.Net) == 4,
                 "The net consumption of a project and of a beneficiary is exits minus returns, without voided operations");
 
-            // 4. The consumption note: the operation as printed (recipient, project, reference, products) in a PDF.
-            var details = (await movements.GetOperationAsync(operation.OperationId))!;
+            // 4. The consumption note of a project: generated on request (one line per exit movement, net of returns), a newer one makes the older inactive or deletes it, any can be deleted.
+            // A product leaves 4 and then 6 pieces to the project and 2 come back tied to the second exit: the note has one line per product with the quantity left (8) and the date of the last exit.
+            var partialOperation = await movements.CreateExitOperationAsync([Line(second.Id, 6, "Ext livrare partiala")]);
+            await movements.CreateAsync(second.Id, new StockMovementInput { Kind = StockMovementKind.Entry, Date = today, Quantity = 2, Description = "Ext retur partial", FreeType = FreeEntryType.FromBeneficiary, ReturnOfMovementId = partialOperation.Movements[0].Movement.Id });
+            var notes = new MariaConsumptionNoteRepository(configuration, admin, audit);
+            var withEquipment = await notes.GetProjectsWithEquipmentAsync(beneficiary.Id);
+            Check(withEquipment.Contains(project.Id) && withEquipment.Count == 1, "Only the projects with equipment handed over (net of returns above zero) are offered a consumption note");
+            var choices = await notes.GetProjectChoicesAsync(beneficiary.Id);
+            Check(choices.Count == 1 && choices[0] is { Selectable: true } && choices[0].ProjectId == project.Id && choices[0].Net == 8 && choices[0].Name == project.Name,
+                "The wizard lists the projects of the beneficiary that got equipment, with what is left at each (net of returns)");
+            var generated = await notes.GenerateAsync(project.Id, false);
+            var details = (await notes.GetAsync(generated.Note.Id))!;
             var pdf = new ConsumptionNotePdfWriter().Write(details, DateTime.Now);
             using var document = UglyToad.PdfPig.PdfDocument.Open(pdf);
             var text = string.Join(" ", document.GetPages().SelectMany(page => page.GetWords()).Select(word => word.Text));
-            Check(details.Lines.Count == 1 && details.Reference == "Aviz sto" && pdf.Length > 1000 && text.Contains("Bon de consum") && text.Contains($"Ext Sto Beneficiar {suffix}")
-                  && text.Contains($"Ext Sto Proiect {suffix}") && text.Contains("Aviz sto") && text.Contains($"Ext Sto A {suffix}") && text.Contains("semnătură"),
-                "The consumption note lists the recipient, project, reference and products and has room for the signatures");
+            Check(details.Lines.Count == 1 && details.Lines[0].ProductId == second.Id && details.Lines[0].Quantity == 8 && details.Lines[0].Position == 1 && details.Lines[0].MovementDate == today && generated.Note.Active && generated.Note.ProjectId == project.Id
+                  && generated.Note.BeneficiaryId == beneficiary.Id && pdf.Length > 1000 && text.Contains("Bon de consum") && text.Contains($"Ext Sto Beneficiar {suffix}") && text.Contains($"Ext Sto Proiect {suffix}")
+                  && text.Contains($"Ext Sto B {suffix}") && text.Contains("semnătură") && text.Contains("Data"),
+                "The consumption note of a project lists the equipment at this moment (net of returns), with the date of the movement, the beneficiary and the project, and has room for the signatures");
+            var second2 = await notes.GenerateAsync(project.Id, false);
+            var listed = await notes.GetAllAsync(beneficiary.Id, project.Id);
+            Check(second2.Deactivated == 1 && second2.Note.Id > generated.Note.Id && listed.Count == 2 && !listed.Single(item => item.Id == generated.Note.Id).Active && listed.Single(item => item.Id == second2.Note.Id).Active,
+                "A newer consumption note makes the older one of the project inactive (kept for traceability)");
+            var third = await notes.GenerateAsync(project.Id, true);
+            var afterThird = await notes.GetAllAsync(beneficiary.Id, project.Id);
+            Check(third.Deleted == 2 && afterThird.Count == 1 && afterThird[0].Id == third.Note.Id && await notes.GetAsync(generated.Note.Id) is null,
+                "Generating a note and deleting the previous ones leaves only the new note");
+            await notes.DeleteAsync(third.Note.Id);
+            var deletedTwice = await Rejects<ConsumptionNoteException>(() => notes.DeleteAsync(third.Note.Id), "A consumption note that no longer exists cannot be deleted again");
+            var noteEvents = (await audit.GetEventsAsync()).Where(item => item.TimestampUtc >= started && item.EntityType == AuditEntities.ConsumptionNote).Select(item => item.Action).ToList();
+            Check((await notes.GetAllAsync(beneficiary.Id, project.Id)).Count == 0 && deletedTwice is not null && noteEvents.Contains(AuditActions.GenerateConsumptionNote) && noteEvents.Contains(AuditActions.DeactivateConsumptionNote)
+                  && noteEvents.Contains(AuditActions.DeleteConsumptionNote),
+                "A consumption note can be deleted and the generations, deactivations and deletions are journaled with their own actions");
+
+            // 5. A return from the project (tab Retur): an entry with the project, limited to what the product has there; it lowers the net of the project and is journaled.
+            StockMovementInput ProjectReturn(int productId, int quantity) => new() { Kind = StockMovementKind.Entry, Date = today, Quantity = quantity, Description = StockMovementRules.ProjectReturnDescription(project.Name, beneficiary.Name),
+                FreeType = FreeEntryType.ReturnFromProject, BeneficiaryId = beneficiary.Id, ProjectId = project.Id };
+            var before = await Stock(second.Id);
+            var tooMuchFromProject = await Rejects<StockMovementOperationException>(() => movements.CreateAsync(second.Id, ProjectReturn(second.Id, 99)), "A return above what the product has at the project is refused");
+            var projectReturn = await movements.CreateAsync(second.Id, ProjectReturn(second.Id, 3));
+            var netAfter = (await movements.GetNetConsumptionAsync(project.Id, null)).Single(item => item.ProductId == second.Id);
+            var equipmentApi = new MariaProjectEquipmentRepository(configuration, admin);
+            var holders = await equipmentApi.GetProductProjectsAsync(second.Id);
+            var history = await equipmentApi.GetHistoryAsync(project.Id);
+            Check(tooMuchFromProject is not null && projectReturn.Movement.FreeType == FreeEntryType.ReturnFromProject && projectReturn.Movement.ProjectId == project.Id && await Stock(second.Id) == before + 3
+                  && netAfter.Net == 5 && holders.Count == 1 && holders[0].ProjectId == project.Id && holders[0].Net == 5
+                  && history.Count(entry => entry.IsReturn && entry.ProductId == second.Id) == 2 && history.Count(entry => !entry.IsReturn && !entry.Voided && entry.ProductId == second.Id) == 2 && history.Any(entry => entry.Voided)
+                  && (await audit.GetEventsAsync()).Any(item => item.TimestampUtc >= started && item.Action == AuditActions.ReturnFromProject && item.EntityId == projectReturn.Movement.Id.ToString()),
+                "A return from a project is limited to the quantity of the product there, adds to the stock, lowers the net of the project, shows in the history with the exits and is journaled");
+            var guardedExit = await movements.CreateExitOperationAsync([Line(first.Id, 3, "Ext livrare de returnat")]);
+            await movements.CreateAsync(first.Id, ProjectReturn(first.Id, 3));
+            var voidGuarded = await Rejects<StockMovementOperationException>(() => movements.VoidExitOperationAsync(guardedExit.OperationId, "Ext cu retur din proiect"), "An exit whose product was returned from the project cannot be voided");
+            var deleteGuarded = await Rejects<StockMovementOperationException>(() => movements.DeleteAsync(guardedExit.Movements[0].Movement, "Ext stergere cu retur din proiect"), "An exit whose product was returned from the project cannot be deleted");
+            Check(voidGuarded is not null && deleteGuarded is not null && await Stock(first.Id) == 10, "An exit cannot be voided or deleted when the returns from the project would exceed what is left");
         }
         finally
         {
@@ -578,6 +632,8 @@ public static partial class MariaExtendedChecks
         var beneficiary = await beneficiaries.CreateAsync(Legal($"Ext Rez Client {suffix} SRL", "RO" + Random.Shared.Next(60000000, 69999999)));
         var first = await projects.CreateAsync(new ProjectInput { BeneficiaryId = beneficiary.Id, Name = $"Ext Rez Proiect A {suffix}" });
         var second = await projects.CreateAsync(new ProjectInput { BeneficiaryId = beneficiary.Id, Name = $"Ext Rez Proiect B {suffix}" });
+        // "No project" below means the mandatory project every beneficiary has: it holds no reservation.
+        var own = (await projects.GetForBeneficiaryAsync(beneficiary.Id)).First(item => item.Id != first.Id && item.Id != second.Id);
         var type = await types.CreateAsync($"Ext Rez Sistem {suffix}");
         try
         {
@@ -588,7 +644,7 @@ public static partial class MariaExtendedChecks
                 var input = new StockMovementInput
                 {
                     Kind = StockMovementKind.Exit, Date = today, Quantity = quantity, Description = "Ext rezervare iesire", Destination = ExitDestination.Beneficiary,
-                    BeneficiaryId = beneficiary.Id, ProjectId = project, Reference = "Aviz rez"
+                    BeneficiaryId = beneficiary.Id, ProjectId = project ?? own.Id, Reference = "Aviz rez"
                 };
                 change?.Invoke(input);
                 return input;

@@ -3,9 +3,7 @@
 @inject IStockMovementRepository Movements
 @* Adds a product to an invoice by hand (the automatic reading was not wanted or did not work). The same checks as everywhere apply:
    a product already taken from the invoice, or more than the quantity written on it, is added only with a reason. *@
-<div class="delete-overlay">
-    <section class="delete-dialog movement-dialog" role="dialog" aria-modal="true" aria-labelledby="manual-entry-title">
-        <div class="dialog-head"><h2 id="manual-entry-title">Adaugă produs la factura @Invoice.Number</h2><HelpButton Topic="facturi-produs-manual" About="Adăugarea unui produs la factură" /></div>
+<AppDialog TitleId="manual-entry-title" HelpTopic="facturi-produs-manual" HelpAbout="Adăugarea unui produs la factură" PanelClass="movement-dialog" OnClose="Cancelled"><TitleContent>Adaugă produs la factura @Invoice.Number</TitleContent><ChildContent>
         <p class="delete-object"><strong>@Invoice.SupplierName</strong> · emisă la @StockMovementRules.DisplayDate(Invoice.Date)</p>
         <fieldset disabled="@busy">
             <div class="editor-grid">
@@ -42,8 +40,8 @@
                 <button type="button" class="danger" @onclick="Cancelled">Închide</button>
             </div>
         </fieldset>
-    </section>
-</div>
+</ChildContent>
+</AppDialog>
 
 @code {
     [Parameter, EditorRequired] public SupplierInvoice Invoice { get; set; } = default!;

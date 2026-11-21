@@ -1,0 +1,19 @@
+# Nomenclator · Proiecte obligatorii
+Ruta: /nomenclator
+Tab: Proiecte obligatorii
+Cautare: nomenclator proiecte obligatorii beneficiar tip proiect reparatii sisteme existente implicit activ ordine
+
+Tipurile de proiect pe care le are fiecare beneficiar. Un tip activ creează automat un proiect cu denumirea lui la toți beneficiarii care nu îl au; beneficiarii noi îl primesc la creare. Proiectul obligatoriu nu se redenumește și nu se șterge din pagina beneficiarului; la ieșirile de stoc spre un beneficiar proiectul trebuie ales mereu, iar aceste proiecte sunt mereu la îndemână.
+
+## Elemente
+### Lista tipurilor
+- Denumirea unui tip nou | câmp | Scrii denumirea (de exemplu „Reparații sisteme existente”); apasă „Adaugă tipul”.
+- Adaugă tipul | buton | Adaugă tipul și creează proiectul la toți beneficiarii care nu îl au.
+- Ordine | iconițe | Mută tipul mai sus sau mai jos în listă.
+- Denumire | text și creion | Redenumește tipul; proiectele deja create își păstrează denumirea.
+- Activ | comutator | Un tip dezactivat nu mai creează proiecte noi (cele create rămân); reactivat, creează proiectul la beneficiarii care nu îl au.
+
+## Flux: Cum adaug un tip de proiect obligatoriu
+1. Deschide Nomenclator și alege tabul „Proiecte obligatorii”.
+2. Scrie denumirea tipului și apasă „Adaugă tipul”.
+3. Proiectul apare la toți beneficiarii; la un beneficiar nou apare singur, la creare.

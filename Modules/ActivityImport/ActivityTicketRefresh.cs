@@ -144,7 +144,7 @@ public sealed class MariaActivityTicketRefreshService(IConfiguration configurati
     private async Task<NotesResult> RenewInterventionAsync(Row row, int interventionId, ActivityTicket before, ActivityTicket current, ActivityFieldMap map, CancellationToken cancellationToken)
     {
         var newSource = ActivityTicketPlanner.SourceOf(current, map);
-        var newPrefix = ActivityTicketPlanner.NotesPrefix(newSource.Number, newSource.Title, ActivityTicketPlanner.NoteLines(newSource, map).Select(line => (line.Label, line.Value)));
+        var newPrefix = ActivityTicketPlanner.NotesPrefix(newSource, ActivityTicketPlanner.NoteLines(newSource, map).Select(line => (line.Label, line.Value)));
         var oldPrefix = OldPrefix(row, before, map);
         var result = NotesResult.Unchanged;
         var notesDone = oldPrefix is not null && string.Equals(TextNormalization.ForStorage(oldPrefix.Replace("\r\n", "\n")), TextNormalization.ForStorage(newPrefix.Replace("\r\n", "\n")), StringComparison.Ordinal);
@@ -184,7 +184,7 @@ public sealed class MariaActivityTicketRefreshService(IConfiguration configurati
             if (line is null) return null;
             if (line.Value.Value.Length > 0) lines.Add(line.Value);
         }
-        return ActivityTicketPlanner.NotesPrefix(raw.Number, raw.Title, lines);
+        return ActivityTicketPlanner.NotesPrefix(raw, lines);
     }
 }
 

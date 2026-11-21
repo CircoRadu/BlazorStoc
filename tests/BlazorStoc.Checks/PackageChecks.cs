@@ -9,6 +9,13 @@ namespace BlazorStoc.Checks;
 // reaches a database or the real key of the machine: the keys are made in a temporary folder and the "application" is a handful of files.
 public static class PackageChecks
 {
+    private static string ProjectRoot()
+    {
+        var dir = new DirectoryInfo(AppContext.BaseDirectory);
+        while (dir is not null && !File.Exists(Path.Combine(dir.FullName, "BlazorStoc.csproj"))) dir = dir.Parent;
+        return dir?.FullName ?? throw new InvalidOperationException("Project root not found");
+    }
+
     private static readonly string Describe = JsonSerializer.Serialize(new
     {
         version = "0.0.7",
@@ -31,6 +38,16 @@ public static class PackageChecks
             "Changelog: an update shows the versions after its origin up to its target (newest first); a rollback or an unknown version shows only its own");
         check(BlazorStoc.Services.Update.UpdateChangelog.NotesFor(sample, "0.2.0") == "- doi" && BlazorStoc.Services.Update.UpdateChangelog.NotesFor(sample, "0.9.0") is null,
             "Changelog: the notes of a version are its lines; a version without a section has none");
+        // The categories of a version (PROP-0019): "### name" before the lines; a version written before them stays flat.
+        var grouped = BlazorStoc.Services.Update.UpdateChangelog.Parse("## 0.4.0 | 04.01.2026\n### Functionalitati noi\n- PROP-0001\n- PROP-0002\n### Bugs\n- BUG-0003\n### Diverse\n- altceva\n## 0.3.0 | 03.01.2026\n- vechi a\n- vechi b\n");
+        check(grouped.Count == 2 && grouped[0].Grouped && grouped[0].Items.Count == 4 && grouped[0].Sections.Select(section => section.Name).SequenceEqual(["Functionalitati noi", "Bugs", "Diverse"])
+              && grouped[0].Sections[0].Items.SequenceEqual(["PROP-0001", "PROP-0002"]) && !grouped[1].Grouped && grouped[1].Sections.Count == 1 && grouped[1].Sections[0].Name == "" && grouped[1].Items.Count == 2,
+            "Changelog: the categories of a version are read (Functionalitati noi, Bugs, Diverse) and a version written without them stays flat");
+        check(BlazorStoc.Services.Update.UpdateChangelog.NotesFor(grouped, "0.4.0") == "Functionalitati noi:\n- PROP-0001\n- PROP-0002\nBugs:\n- BUG-0003\nDiverse:\n- altceva" && BlazorStoc.Services.Update.UpdateChangelog.NotesFor(grouped, "0.3.0") == "- vechi a\n- vechi b",
+            "Changelog: the notes of a version with categories keep them, the notes of a flat version are as before");
+        var releaseScript = File.ReadAllText(Path.Combine(ProjectRoot(), "tools", "release.ps1"));
+        check(releaseScript.Contains("changelogLines", StringComparison.Ordinal) && releaseScript.Contains("'^###", StringComparison.Ordinal) && File.Exists(Path.Combine(ProjectRoot(), "tools", "changelog-draft.ps1")),
+            "Changelog: the release script keeps the categories in the notes of the package and the draft script exists");
         var current = BlazorStoc.Services.Update.UpdateChangelog.Versions;
         check(current.Count > 0 && current.All(entry => entry.Items.Count > 0) && BlazorStoc.Services.Update.UpdateChangelog.NotesFor(BlazorStoc.Services.AppVersion.Current) is not null,
             "Changelog: the embedded changelog has a section with changes for the version of the application");

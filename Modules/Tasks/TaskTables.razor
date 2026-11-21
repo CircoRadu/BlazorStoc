@@ -14,9 +14,9 @@
 
 @if (formOpen)
 {
-    <div class="delete-overlay"><div class="delete-dialog template-popup" role="dialog" aria-modal="true" tabindex="-1" aria-labelledby="task-editor-title">
+    <AppDialog PanelClass="template-popup" LabelledBy="task-editor-title">
         <TaskForm @key="formKey" BeneficiaryId="@(editing?.BeneficiaryId ?? BeneficiaryId)" BeneficiaryName="@(editing?.BeneficiaryName ?? BeneficiaryName)" Original="editing" Saved="SavedAsync" Closed="CloseFormAsync" />
-    </div></div>
+    </AppDialog>
 }
 @if (viewingId is { } viewId)
 {

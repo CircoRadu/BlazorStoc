@@ -58,7 +58,8 @@ public sealed class MariaActivityTicketImportService(IConfiguration configuratio
             }
             catch (Exception exception)
             {
-                await ImportStore.FinishRunAsync(configuration, runId, exception is OperationCanceledException ? "interrupted" : "failed", null, exception is OperationCanceledException ? "Rularea a fost întreruptă." : exception is ActivityImportException or ActivitySourceException ? exception.Message : "Eroare internă (" + exception.GetType().Name + ").").ConfigureAwait(false);
+                var suspended = exception is ActivityImportException && exception.Message.StartsWith(ActivityImportRules.SuspendedPrefix, StringComparison.Ordinal);
+                await ImportStore.FinishRunAsync(configuration, runId, exception is OperationCanceledException ? "interrupted" : suspended ? "suspended" : "failed", null, exception is OperationCanceledException ? "Rularea a fost întreruptă." : exception is ActivityImportException or ActivitySourceException ? exception.Message : "Eroare internă (" + exception.GetType().Name + ").").ConfigureAwait(false);
                 throw;
             }
             await ImportStore.FinishRunAsync(configuration, runId, "completed", report, null).ConfigureAwait(false);
@@ -97,9 +98,21 @@ public sealed class MariaActivityTicketImportService(IConfiguration configuratio
         var fields = await import.GetFieldMapAsync(cancellationToken).ConfigureAwait(false);
         var actualStructure = await source.ReadStructureAsync(connection, cancellationToken).ConfigureAwait(false);
         var structure = ActivityStructureChecker.Check(actualStructure, null, fields);
-        // The structure of the tickets is compared with the one the correspondence was checked against: a column new, gone or of another kind starts a notification (Setari -> Notificari) that
-        // asks to check the correspondence of the fields. The import goes on with the correspondence in force (a column chosen that is gone stops it, as before).
-        if (apply) await ActivityTicketStructureStore.CheckAsync(configuration, actualStructure, cancellationToken).ConfigureAwait(false);
+        // The structure of the tickets is compared with the one the correspondence was checked against: a column new, gone or of another kind SUSPENDS the import (nothing is taken, the tickets
+        // stay in ActivityApp) and starts a notification (Setari -> Notificari) that asks to check the correspondence of the fields. When the administrator confirms it (or the structure is the
+        // same again) the next run takes the tickets, in the order of their dates. A simulation only reads and is not stopped.
+        if (apply)
+        {
+            var known = await ActivityTicketStructureStore.PendingAsync(configuration, cancellationToken).ConfigureAwait(false);
+            var diff = await ActivityTicketStructureStore.CheckAsync(configuration, actualStructure, cancellationToken).ConfigureAwait(false);
+            if (diff.Any)
+            {
+                if (!known.Any)
+                    await AuditRecorder.RecordActionAsync(audit, access, AuditEntities.ActivityImport, AuditActions.SuspendActivityImport, "", "Preluare tichete ActivityApp",
+                        AuditDetails.Identification(("Motiv", "structura tichetelor din ActivityApp s-a schimbat"), ("Ce s-a schimbat", diff.Describe()), ("Reluare", "după „Corespondența verificată” în Setări → Preluare ActivityApp")), "", CancellationToken.None).ConfigureAwait(false);
+                throw new ActivityImportException($"{ActivityImportRules.SuspendedPrefix}: structura tichetelor din ActivityApp s-a schimbat ({diff.Describe()}). Verifică corespondența câmpurilor (Setări → Preluare date ActivityApp, secțiunea 6) și apasă „Corespondența verificată”.");
+            }
+        }
         foreach (var entity in new[] { ActivityContract.Tickets, ActivityContract.Events })
             if (structure.IsBlocked(entity)) throw new ActivityImportException($"Structura ActivityApp s-a schimbat: „{entity}” nu poate fi preluat (vezi raportul de structură din setări).");
         // A column the administrator chose that is gone (or no longer text) stops the run: reading the default instead would put another text in the interventions.

@@ -6,6 +6,12 @@ Captura: eroare | /beneficiari | sql RENAME TABLE beneficiaries TO beneficiaries
 
 Registrul beneficiarilor: persoanele fizice și juridice către care se operează ieșiri de stoc și pentru care ai proiecte. CUI-ul (persoană juridică) sau numele complet (persoană fizică) identifică în mod unic fiecare beneficiar.
 
+**Fisa beneficiarului**: Secțiunile fișei sunt file (vezi [[beneficiari-detaliu]]).
+
+**Ordonare**: Antetul tabelului ordonează lista (clic: crescător, descrescător, ordinea inițială); marimea paginii și ordonarea se rețin cât ține deschis tabul browserului.
+
+**Preluat din ActivityApp**: Beneficiarul preluat din ActivityApp poartă o notă, iar notificarea de verificare apare în lista problemelor importului.
+
 ## Elemente
 ### Antet
 - + Adaugă beneficiar | buton | Deschide formularul de beneficiar nou ([[beneficiari-editor]]); doar cu dreptul necesar.
@@ -29,6 +35,10 @@ Registrul beneficiarilor: persoanele fizice și juridice către care se opereaz�
 - Rânduri pe pagină | listă | Sub tabel alegi câte rânduri se arată (10, 25, 50, 100 sau Toate) și treci între pagini.
 - Editează beneficiarul | iconita:edit | Deschide formularul de editare.
 - Șterge beneficiarul | iconita:delete | Șterge beneficiarul; nu se poate dacă are proiecte sau mișcări de stoc.
+### Noutăți în registru
+- Căutare simplă / extinsă | comutator | Sub câmpul de căutare, în aceeași pagină: „Căutare simplă” (implicit; denumire și CUI) sau „Căutare extinsă” (denumire, CUI, adresă, telefon, puncte de lucru și puncte arondate); textul din câmp se schimbă după opțiune.
+- Coordonate GPS | coloană | Trei stări: bifă verde (toate punctele au coordonate), liniuță galbenă (parțial), X roșu (niciun punct).
+- Adaugă beneficiar | buton | Adăugarea se face într-o fereastră peste pagină ([[beneficiari-editor]]).
 
 ## Flux: Cum adaug un beneficiar
 1. Apasă „+ Adaugă beneficiar”.

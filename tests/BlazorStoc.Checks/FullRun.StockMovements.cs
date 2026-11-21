@@ -43,6 +43,25 @@ public static partial class FullRun
             "Movement dates are displayed as dd.MM.yyyy while the legacy column keeps dd-MM-yyyy");
         Check(StockMovementRules.NormalizeDisplayDates("Data: 22-08-2022 → 01-03-2024; cod 99-99-2020; ref 122-08-2022") == "Data: 22.08.2022 → 01.03.2024; cod 99-99-2020; ref 122-08-2022"
               && StockMovementRules.NormalizeDisplayDates(null) == "", "Older journal texts show real dates as dd.MM.yyyy and leave other text untouched");
+        try { StockMovementRules.Validated(MovementInput(StockMovementKind.Exit, 1, "Spre beneficiar", beneficiaryId: 5), StockMovementKind.Exit, false); throw new Exception("An exit to a beneficiary without a project accepted"); }
+        catch (StockMovementOperationException exception) { Check(exception.Message.Contains(StockMovementRules.ProjectRequiredMessage, StringComparison.Ordinal), "An exit to a beneficiary needs a project (the project is no longer optional)"); }
+        Check(StockMovementRules.Validated(MovementInput(StockMovementKind.Exit, 1, "Spre beneficiar", beneficiaryId: 5, projectId: 9), StockMovementKind.Exit, false).ProjectId == 9, "An exit to a beneficiary with a project is accepted and keeps the project");
+        // "Alt motiv" (other reason): an exit without beneficiary, project or vehicle; its own label and journal action; the stock goes down like any exit.
+        var otherReason = StockMovementRules.Validated(MovementInput(StockMovementKind.Exit, 2, "Rebut la depozit", destination: ExitDestination.OtherReason), StockMovementKind.Exit, false);
+        Check(otherReason.Destination == ExitDestination.OtherReason && StockMovementRules.DestinationLabel(ExitDestination.OtherReason) == "Alt motiv" && StockMovementRules.ExitAuditAction(ExitDestination.OtherReason) == AuditActions.ExitOtherReason
+            && StockMovementRules.Effect(StockMovementKind.Exit, ExitDestination.OtherReason, 2) == -2, "An exit with the destination Alt motiv is accepted, labelled, journalled by its own action and lowers the stock");
+        // A return from a project (tab Retur): an entry that names the beneficiary and the project; no other entry may.
+        var returnInput = MovementInput(StockMovementKind.Entry, 2, "Retur din proiect", beneficiaryId: 5, projectId: 9); returnInput.FreeType = FreeEntryType.ReturnFromProject;
+        var returnKept = StockMovementRules.Validated(returnInput, StockMovementKind.Entry, false);
+        var plainEntryWithProject = MovementInput(StockMovementKind.Entry, 2, "Intrare cu proiect", beneficiaryId: 5, projectId: 9);
+        var returnWithoutProject = MovementInput(StockMovementKind.Entry, 2, "Retur fara proiect", beneficiaryId: 5); returnWithoutProject.FreeType = FreeEntryType.ReturnFromProject;
+        var rejectedPlain = false; var rejectedNoProject = false;
+        try { StockMovementRules.Validated(plainEntryWithProject, StockMovementKind.Entry, false); } catch (StockMovementOperationException) { rejectedPlain = true; }
+        try { StockMovementRules.Validated(returnWithoutProject, StockMovementKind.Entry, false); } catch (StockMovementOperationException) { rejectedNoProject = true; }
+        Check(returnKept.FreeType == FreeEntryType.ReturnFromProject && returnKept.BeneficiaryId == 5 && returnKept.ProjectId == 9 && rejectedPlain && rejectedNoProject
+              && StockMovementRules.FreeTypeLabel(FreeEntryType.ReturnFromProject) == "Retur din proiect" && StockMovementRules.Effect(StockMovementKind.Entry, 2) == 2
+              && StockMovementRules.ProjectReturnDescription("P", "B") == "Retur din proiectul P (beneficiar B)" && StockMovementRules.VehicleReturnDescription("AB-12-XYZ") == "Retur din vehiculul AB-12-XYZ",
+            "A return from a project is an entry with the beneficiary and the project (required), no other entry has them, and the descriptions proposed are explicit");
         try { StockMovementRules.Validated(MovementInput(StockMovementKind.Exit, 1, "  "), StockMovementKind.Exit, false); throw new Exception("Blank description accepted"); }
         catch (StockMovementOperationException) { Check(true, "Movement description is mandatory"); }
         try { StockMovementRules.Validated(MovementInput(StockMovementKind.Exit, 0), StockMovementKind.Exit, false); throw new Exception("Zero quantity accepted"); }

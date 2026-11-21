@@ -6,6 +6,8 @@ Captura: din-factura | /produse/preluare-factura | sql UPDATE suppliers SET name
 
 Formularul pentru un furnizor nou sau pentru editarea unuia existent. Se deschide deasupra registrului sau fișei furnizorului și ca fereastră în fluxul de preluare a facturilor (CUI-ul și numele citite din factură vin completate).
 
+Adăugarea unui furnizor se face într-o fereastră peste pagină.
+
 ## Elemente
 ### Identificare
 - Țara furnizorului * | listă | România (CUI verificat în ANAF) sau alt stat membru UE (cod de TVA introdus manual).

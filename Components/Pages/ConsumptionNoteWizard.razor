@@ -1,0 +1,252 @@
+@page "/consum/bon"
+@namespace BlazorStoc.Components.Pages
+@attribute [Authorize(Policy = "perm:stoc.view")]
+@rendermode @(new InteractiveServerRenderMode(prerender: false))
+@using BlazorStoc.Services
+@inject IBeneficiaryRepository Beneficiaries
+@inject IConsumptionNoteRepository Notes
+@inject IAccessControl Access
+@inject IJSRuntime JS
+@inject ILogger<ConsumptionNoteWizard> Logger
+@implements IDisposable
+<PageBoundary>
+@* Wizard "Generează bon de consum" (PROP-0045): 1 beneficiary, 2 projects with equipment, 3 (only for several projects) one note per project or one total note.
+   Every project gets its own numbered note in the register of notes (Bonuri de consum); a total note is one document that sums up the notes of the chosen projects.
+   The names of the files come from ConsumptionNoteFiles. *@
+
+<PageTitle>Generează bon de consum · BlazorStoc</PageTitle>
+<div class="page-heading"><div><p class="eyebrow">STOC</p><h1>Generează bon de consum</h1><p class="muted">Bon de consum pe beneficiar și proiect: ce s-a predat (ieșiri minus retururi), doar cantități.</p></div><div class="heading-actions"><HelpButton Topic="bon-consum" About="Generează bon de consum" /><a class="refresh act-nav" href="/bonuri-consum">Bonurile generate</a><a class="refresh act-nav" href="/produse">← Produse</a></div></div>
+
+@if (error is not null) { <div class="error-banner" role="alert">@error</div> }
+
+@if (loading)
+{
+    <div class="empty-state" role="status"><div class="spinner"></div><h3>Se încarcă</h3></div>
+}
+else if (!canManage)
+{
+    <div class="empty-state"><h3>Acces restricționat</h3><p>Bonurile de consum pot fi generate de utilizatorii care gestionează produsele.</p></div>
+}
+else
+{
+    <section class="catalog consumption-wizard">
+        <div class="catalog-body">
+            <ol class="wizard-steps" aria-label="Pașii wizardului">
+                @for (var number = 1; number <= (SelectedCount > 1 ? 3 : 2); number++)
+                {
+                    var current = number;
+                    <li class="wizard-step @(current < step ? "done" : current == step ? "current" : "todo")" aria-current="@(current == step ? "step" : null)">
+                        <span class="wizard-circle">@(current < step ? "✓" : current.ToString())</span>
+                        <span class="wizard-title">@(current == 1 ? "Beneficiar" : current == 2 ? "Proiecte" : "Tipul bonurilor")</span>
+                    </li>
+                }
+            </ol>
+
+            @if (step == 1)
+            {
+                <div class="relation-row">
+                    <span class="relation-check">Beneficiar</span>
+                    <SearchableSelect Id="note-beneficiary" Label="Beneficiar" Placeholder="Caută sau alege beneficiarul…" EmptyText="Niciun beneficiar găsit."
+                                      Options="BeneficiaryOptions" SelectedId="beneficiaryId" SelectedIdChanged="id => { beneficiaryId = id; return Task.CompletedTask; }" />
+                    <ActivityTakeButton OnTaken="ReloadBeneficiariesAsync" />
+                </div>
+                <div class="editor-actions"><button type="button" class="primary" disabled="@(beneficiaryId is null || busy)" @onclick="ToProjectsAsync">@(busy ? "Se încarcă…" : "Înainte")</button></div>
+            }
+            else if (step == 2)
+            {
+                <p class="muted">Proiectele beneficiarului <strong>@BeneficiaryName</strong> care au echipamente. Alege proiectul sau proiectele pentru care se generează bonul.</p>
+                @if (projects.Count == 0)
+                {
+                    <p class="form-note">Beneficiarul nu are proiecte cu echipamente predate.</p>
+                }
+                else
+                {
+                    <div class="table-scroll"><table class="operation-lines"><thead><tr><th>Alege</th><th>Proiect</th><th class="number">Echipamente (buc.)</th></tr></thead><tbody>
+                    @foreach (var project in projects)
+                    {
+                        var current = project;
+                        <tr class="@(current.Selectable ? null : "muted")">
+                            <td><ToggleSwitch Compact Id="@($"note-project-{current.ProjectId}")" Value="chosen.Contains(current.ProjectId)" Disabled="@(!current.Selectable || busy)"
+                                              Title="@(current.Selectable ? null : "Proiectul nu mai are echipamente de predat (totul a fost returnat).")"
+                                              AriaLabel="@($"Proiect {current.Name}")" ValueChanged="value => Choose(current.ProjectId, value)" /></td>
+                            <td>@current.Name@(current.Selectable ? "" : " (returnat integral)")</td>
+                            <td class="number">@current.Net</td>
+                        </tr>
+                    }
+                    </tbody></table></div>
+                }
+                <div class="editor-actions">
+                    <button type="button" class="refresh act-nav" disabled="@busy" @onclick="() => step = 1">Înapoi</button>
+                    @if (SelectedCount > 1)
+                    {
+                        <button type="button" class="primary" disabled="@busy" @onclick="() => step = 3">Înainte</button>
+                    }
+                    else
+                    {
+                        <button type="button" class="primary" disabled="@(SelectedCount == 0 || busy)" @onclick="GenerateAsync">@(busy ? "Se generează…" : "Generează bon de consum")</button>
+                    }
+                </div>
+            }
+            else
+            {
+                <fieldset class="destination-group" disabled="@busy">
+                    <legend>Ai ales @SelectedCount proiecte. Cum vrei bonurile?</legend>
+                    <div class="destination-options">
+                        <label><input type="radio" name="note-kind" id="note-kind-separate" checked="@separate" @onchange="() => separate = true" /> Bon separat pentru fiecare proiect</label>
+                        <label><input type="radio" name="note-kind" id="note-kind-total" checked="@(!separate)" @onchange="() => separate = false" /> Un singur bon total</label>
+                    </div>
+                </fieldset>
+                <div class="editor-actions">
+                    <button type="button" class="refresh act-nav" disabled="@busy" @onclick="() => step = 2">Înapoi</button>
+                    <button type="button" class="primary" disabled="@busy" @onclick="GenerateAsync">@(busy ? "Se generează…" : separate ? "Generează bonuri" : "Generează bon total")</button>
+                </div>
+            }
+        </div>
+    </section>
+}
+
+@if (generated.Count > 0)
+{
+    var active = generated[Math.Min(activeTab, generated.Count - 1)];
+    var ids = generated.Select(note => note.Id).ToArray();
+    <AppDialog PanelClass="template-popup note-popup" LabelledBy="note-popup-title" OnClose="CloseResultAsync" HelpTopic="bon-consum" HelpAbout="Bonurile de consum generate">
+        <h2 id="note-popup-title">@(isTotal ? $"Bon de consum total (bonurile {string.Join(", ", ids)})" : generated.Count == 1 ? $"Bon de consum nr. {active.Id}" : $"Bonuri de consum generate ({generated.Count})")</h2>
+        @if (resultMessage is not null) { <div class="success-banner" role="status">@resultMessage</div> }
+        @if (!isTotal && generated.Count > 1)
+        {
+            <div class="editor-actions note-all-actions">
+                <button type="button" class="refresh act-export" id="note-download-all" disabled="@busy" @onclick="DownloadAllAsync">Descarcă toate bonurile</button>
+                <button type="button" class="refresh act-nav" id="note-print-all" disabled="@busy" @onclick="PrintAllAsync">Tipărește toate bonurile</button>
+            </div>
+            <div class="settings-subtabs" role="tablist" aria-label="Bonurile generate">
+                @for (var index = 0; index < generated.Count; index++)
+                {
+                    var position = index;
+                    <button type="button" role="tab" class="settings-subtab @(position == activeTab ? "active" : "")" aria-selected="@(position == activeTab)"
+                            @onclick="() => activeTab = position">@generated[position].ProjectName</button>
+                }
+            </div>
+        }
+        <iframe class="note-frame" title="@(isTotal ? "Bon de consum total" : $"Bon de consum nr. {active.Id}")" src="@(isTotal ? ConsumptionNoteFiles.TotalUrl(ids) : ConsumptionNoteFiles.PdfUrl(active.Id))"
+                style="width:100%;height:60vh;border:1px solid var(--line)"></iframe>
+        <div class="editor-actions">
+            @if (isTotal)
+            {
+                <a class="refresh act-export" id="note-download" href="@ConsumptionNoteFiles.TotalUrl(ids, download: true)" download="@ConsumptionNoteFiles.TotalFileName(generated, DateTime.Now)">Descarcă bonul total</a>
+                <button type="button" class="refresh act-nav" id="note-print" @onclick="() => PrintUrlAsync(ConsumptionNoteFiles.TotalUrl(ids))">Tipărește bonul total</button>
+            }
+            else
+            {
+                <a class="refresh act-export" id="note-download" href="@ConsumptionNoteFiles.PdfUrl(active.Id, download: true)" download="@ConsumptionNoteFiles.FileName(active)">Descarcă bonul</a>
+                <button type="button" class="refresh act-nav" id="note-print" @onclick="() => PrintUrlAsync(ConsumptionNoteFiles.PdfUrl(active.Id))">Tipărește bonul</button>
+            }
+            <button type="button" class="danger" @onclick="CloseResultAsync">Închide</button>
+        </div>
+    </AppDialog>
+}
+</PageBoundary>
+
+<BeneficiarySyncOnOpen OnNewBeneficiaries="ReloadBeneficiariesAsync" />
+
+@code {
+    // Beneficiaries entered in ActivityApp a moment ago are taken in the background after the page opened; the list is loaded again when there are new ones.
+    private async Task ReloadBeneficiariesAsync() { if (!canManage) return; try { beneficiaries = (await Beneficiaries.GetBeneficiariesAsync(lifetime.Token)).OrderBy(item => item.Name, StringComparer.CurrentCultureIgnoreCase).ToArray(); } catch (Exception) { } StateHasChanged(); }
+
+    private readonly CancellationTokenSource lifetime = new();
+    private bool loading = true, canManage, busy, separate = true, isTotal;
+    private int step = 1;
+    private string? error, resultMessage;
+    private int? beneficiaryId;
+    private IReadOnlyList<Beneficiary> beneficiaries = [];
+    private IReadOnlyList<ConsumptionProjectChoice> projects = [];
+    private readonly HashSet<int> chosen = [];
+    private IReadOnlyList<ConsumptionNote> generated = [];
+    private int activeTab;
+
+    private int SelectedCount => chosen.Count;
+    private string BeneficiaryName => beneficiaries.FirstOrDefault(item => item.Id == beneficiaryId)?.Name ?? "";
+    private IReadOnlyList<SelectOption> BeneficiaryOptions =>
+        beneficiaries.Select(item => new SelectOption(item.Id, item.Name, $"{item.Cui} {item.Phone}")).ToArray();
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            canManage = await Access.CanManageProductsAsync(lifetime.Token);
+            if (canManage) beneficiaries = (await Beneficiaries.GetBeneficiariesAsync(lifetime.Token)).OrderBy(item => item.Name, StringComparer.CurrentCultureIgnoreCase).ToArray();
+        }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (Exception exception) { Logger.LogError("Consumption note wizard loading failed ({ErrorType}).", exception.GetType().Name); error = "Datele nu au putut fi încărcate."; }
+        loading = false;
+    }
+
+    private async Task ToProjectsAsync()
+    {
+        if (beneficiaryId is not { } id) return;
+        busy = true; error = null; chosen.Clear();
+        try { projects = await Notes.GetProjectChoicesAsync(id, lifetime.Token); step = 2; }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (AccessDeniedException exception) { error = exception.Message; }
+        catch (Exception exception) { Logger.LogError("Consumption note projects failed ({ErrorType}).", exception.GetType().Name); error = "Proiectele nu au putut fi încărcate."; }
+        busy = false;
+    }
+
+    private void Choose(int projectId, bool value) { if (value) chosen.Add(projectId); else chosen.Remove(projectId); }
+
+    // Every chosen project gets its numbered note (the older notes of the project stay as inactive); several projects can be shown as separate notes or as one total note.
+    private async Task GenerateAsync()
+    {
+        if (chosen.Count == 0) return;
+        busy = true; error = null; resultMessage = null;
+        try
+        {
+            var created = new List<ConsumptionNote>();
+            foreach (var project in projects.Where(item => chosen.Contains(item.ProjectId)))
+                created.Add((await Notes.GenerateAsync(project.ProjectId, deletePrevious: false, lifetime.Token)).Note);
+            isTotal = created.Count > 1 && !separate;
+            generated = created; activeTab = 0;
+        }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (ConsumptionNoteException exception) { error = exception.Message; }
+        catch (AccessDeniedException exception) { error = exception.Message; }
+        catch (Exception exception) { Logger.LogError("Consumption note generation failed ({ErrorType}).", exception.GetType().Name); error = "Bonurile nu au putut fi generate. Încearcă din nou."; }
+        busy = false;
+    }
+
+    private Task CloseResultAsync()
+    {
+        generated = []; resultMessage = null; step = 1; chosen.Clear(); projects = []; separate = true; isTotal = false;
+        return Task.CompletedTask;
+    }
+
+    private async Task PrintUrlAsync(string url)
+    {
+        try { await JS.InvokeVoidAsync("consumptionNotes.print", lifetime.Token, url); }
+        catch (Exception exception) when (exception is JSException or JSDisconnectedException or OperationCanceledException) { error = "Bonul nu a putut fi trimis la tipărire. Descarcă-l și tipărește-l din vizualizator."; }
+    }
+
+    private Task PrintAllAsync() => PrintUrlAsync(ConsumptionNoteFiles.MergedUrl(generated.Select(note => note.Id)));
+
+    // A folder chosen by the user when the browser allows it; otherwise (or when the folder cannot be written) one zip with the same file names.
+    private async Task DownloadAllAsync()
+    {
+        busy = true; resultMessage = null;
+        try
+        {
+            var saved = -1;
+            if (await JS.InvokeAsync<bool>("consumptionNotes.canPickFolder", lifetime.Token))
+                saved = await JS.InvokeAsync<int>("consumptionNotes.saveAll", lifetime.Token, generated.Select(note => ConsumptionNoteFiles.PdfUrl(note.Id, download: true)).ToArray(), generated.Select(ConsumptionNoteFiles.FileName).ToArray());
+            if (saved == generated.Count) resultMessage = $"Cele {saved} bonuri au fost salvate în folderul ales.";
+            else if (saved == 0) resultMessage = "Nu s-a ales niciun folder; nimic nu a fost descărcat.";
+            else
+            {
+                await JS.InvokeVoidAsync("consumptionNotes.downloadUrl", lifetime.Token, ConsumptionNoteFiles.ZipUrl(generated.Select(note => note.Id)));
+                resultMessage = "Folderul nu a putut fi folosit; bonurile se descarcă într-o arhivă ZIP.";
+            }
+        }
+        catch (Exception exception) when (exception is JSException or JSDisconnectedException or OperationCanceledException) { }
+        busy = false;
+    }
+
+    public void Dispose() { lifetime.Cancel(); lifetime.Dispose(); }
+}

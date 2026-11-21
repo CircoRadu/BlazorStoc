@@ -84,3 +84,12 @@ Pregatire: un beneficiar cu cel putin doua puncte de lucru (numele sa inceapa cu
 | 2 | Completeaza analizorul, numarul, salveaza | Se salveaza fara autor | |
 | 3 | Deschide formularul, scrie ceva, apasa "Inchide" sau "Anuleaza" | Apare intrebarea "Parasesti editarea?"; fara modificari se inchide direct | |
 | 4 | Editeaza o analiza veche (cu autor) | Se salveaza; autorul vechi nu se pierde | |
+
+## Modificari de testat - butonul + aliniat (11.11.2026, BUG-0020)
+
+**Ce s-a adaugat:** butonul + de langa "Analizor de risc" este centrat pe linia campului.
+**Ce face acum:** + si selectul au acelasi centru vertical.
+
+| Pas | Ce faci | Ce trebuie sa vezi | OK |
+|---|---|---|---|
+| 1 | Analize de risc -> Adauga analiza | Butonul + este pe mijlocul liniei selectului, nu mai sus | |

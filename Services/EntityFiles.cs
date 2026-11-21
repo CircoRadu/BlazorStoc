@@ -20,6 +20,14 @@ public static class EntityFileOwners
     };
 }
 
+// Raised (per user circuit) when a file of any owner was added, renamed or deleted in a panel, so the beneficiary's file table shows the change
+// without a page reload. The panels raise it, the table listens.
+public sealed class EntityFileChanges
+{
+    public event Action? Changed;
+    public void Notify() => Changed?.Invoke();
+}
+
 public interface IEntityFileStore
 {
     Task<IReadOnlyList<EntityFile>> GetAsync(string ownerKind, int ownerId, CancellationToken cancellationToken = default);

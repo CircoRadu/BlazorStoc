@@ -8,6 +8,13 @@ public sealed record ElcomturFirmChoice(string Folder, string Name)
     public string Label => Name.Length > 0 ? $"{Folder} — {Name}" : Folder;
 }
 
+/// <summary>PROP-0035: a firm is shown by its name, not by its folder ("firma1"): the name is the one saved with the automatic import when that import reads the same folder.</summary>
+public static class ElcomturFirmNames
+{
+    public static string Display(string firm, ElcomturAutoSettings? auto) =>
+        auto is not null && string.Equals(auto.FirmFolder, firm, StringComparison.OrdinalIgnoreCase) && auto.FirmName.Trim().Length > 0 ? auto.FirmName.Trim() : firm;
+}
+
 /// <summary>What is read from an Elcomtur backup (.elc): one firm, with the date of the backup.</summary>
 public sealed record ElcomturData(string Firm, DateOnly DataDate, IReadOnlyList<ElcomturClient> Clients, IReadOnlyList<ElcomturInvoice> Invoices, IReadOnlyList<ElcomturReceipt> Receipts);
 

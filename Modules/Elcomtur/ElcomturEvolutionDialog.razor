@@ -1,0 +1,69 @@
+@namespace BlazorStoc.Components.Pages
+@using BlazorStoc.Modules.Elcomtur
+@using BlazorStoc.Services
+@inject IElcomturBalanceRepository Balances
+@inject TimeProvider Clock
+@inject ILogger<ElcomturEvolutionDialog> Logger
+@* PROP-0036: the evolution of the total of the payments overdue or due, one vertical bar per import of an Elcomtur backup (the values are the ones kept in the database), for the current year,
+   the last 6 months or the last 3 months. A bar is red when the total grew since the import before it, green when it fell, grey for the first one shown. Read only. *@
+<AppDialog Title="Evoluție balanță restantă" TitleId="elcomtur-evolution-title" HelpTopic="elcomtur-evolutie" HelpAbout="Evoluția balanței restante" PanelClass="movement-dialog elcomtur-evolution-dialog" OnClose="Closed">
+    <div class="evolution-periods" role="group" aria-label="Perioada afișată">
+        @foreach (var (key, text) in Periods)
+        {
+            <button type="button" class="refresh @(period == key ? "act-confirm" : "act-nav")" id="@($"evolution-period-{key}")" aria-pressed="@(period == key ? "true" : "false")" @onclick="() => period = key">@text</button>
+        }
+    </div>
+    @if (error is not null) { <div class="error-banner" role="alert">@error</div> }
+    else if (points is null) { <p class="muted" role="status">Se citește…</p> }
+    else if (Shown.Count == 0) { <p class="muted" id="evolution-empty">Nu există preluări Elcomtur în această perioadă. Valorile se notează la fiecare preluare din backup.</p> }
+    else
+    {
+        var max = Math.Max(1m, Shown.Max(point => point.Total));
+        var slot = 86; var chartHeight = 260; var top = 30; var bottom = 40; var width = Math.Max(420, Shown.Count * slot + 20);
+        <div class="balance-chart-scroll">
+            <svg class="balance-chart" id="elcomtur-evolution-chart" role="img" aria-label="Evoluția totalului plăților restante" viewBox="0 0 @width @(chartHeight + top + bottom)" width="@width" height="@(chartHeight + top + bottom)">
+                <line class="balance-chart-axis" x1="10" y1="@(top + chartHeight)" x2="@(width - 10)" y2="@(top + chartHeight)" />
+                @for (var index = 0; index < Shown.Count; index++)
+                {
+                    var point = Shown[index];
+                    var barHeight = (double)(point.Total / max) * chartHeight;
+                    var x = 10 + index * slot + 12;
+                    var kind = index == 0 ? "first" : point.Total > Shown[index - 1].Total ? "up" : point.Total < Shown[index - 1].Total ? "down" : "first";
+                    <g class="balance-bar-group" data-total="@point.Total.ToString("0.00", System.Globalization.CultureInfo.InvariantCulture)">
+                        <title>@StockMovementRules.DisplayDate(point.DataDate): @ElcomturFormat.Money(point.Total), @point.OwedCount beneficiari cu plăți restante</title>
+                        <rect class="balance-bar balance-bar-@kind" x="@x" y="@((top + chartHeight - barHeight).ToString("0.##", System.Globalization.CultureInfo.InvariantCulture))" width="@(slot - 24)" height="@barHeight.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture)" rx="3" />
+                        <text class="balance-bar-value" x="@(x + (slot - 24) / 2)" y="@((top + chartHeight - barHeight - 6).ToString("0.##", System.Globalization.CultureInfo.InvariantCulture))" text-anchor="middle">@ElcomturFormat.Money(point.Total)</text>
+                        <text class="balance-bar-date" x="@(x + (slot - 24) / 2)" y="@(top + chartHeight + 20)" text-anchor="middle">@StockMovementRules.DisplayDate(point.DataDate)</text>
+                    </g>
+                }
+            </svg>
+        </div>
+        <p class="muted"><small>O bară = totalul plăților restante la o preluare din backup-ul Elcomtur (data din backup). Roșu: a crescut față de preluarea dinainte; verde: a scăzut.</small></p>
+    }
+    <div class="editor-actions"><button type="button" class="refresh act-close" @onclick="Closed">Închide</button></div>
+</AppDialog>
+
+@code {
+    [Parameter] public EventCallback Closed { get; set; }
+    private static readonly (string Key, string Text)[] Periods = [("year", "Anul curent"), ("six", "Ultimele 6 luni"), ("three", "Ultimele 3 luni")];
+    private IReadOnlyList<ElcomturBalancePoint>? points;
+    private string period = "year";
+    private string? error;
+
+    private DateOnly Today => DateOnly.FromDateTime(Clock.GetLocalNow().DateTime);
+
+    // The imports of the chosen period (from the first day of the year, or the same day 6 / 3 months ago), oldest first.
+    private IReadOnlyList<ElcomturBalancePoint> Shown => points is null ? [] : [.. points.Where(point => point.DataDate >= ElcomturEvolution.From(period, Today)).OrderBy(point => point.DataDate).ThenBy(point => point.ImportedUtc)];
+
+    protected override async Task OnInitializedAsync()
+    {
+        try { points = await Balances.GetHistoryAsync(DateOnly.MinValue); }
+        catch (Exception exception) when (exception is AccessDeniedException) { error = exception.Message; }
+        catch (BlazorStoc.Modules.ModuleUnavailableException) { error = "Modulul Elcomtur este oprit sau indisponibil momentan."; }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            Logger.LogError("Elcomtur balance history loading failed ({ErrorType}).", exception.GetType().Name);
+            error = "Istoricul balanței nu a putut fi încărcat.";
+        }
+    }
+}

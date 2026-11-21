@@ -48,7 +48,8 @@ public static class ModuleChecks
         var ungated = File.ReadAllLines(Path.Combine(root, "Components", "Pages", "Dashboard.razor"))
             .Where(line => line.Contains("main-menu-icon") || line.Contains("<ModuleTile "))
             .Select(line => (Href: Regex.Match(line, "(?:<a href|<ModuleTile [^>]*Href)=\"([^\"]+)\"").Groups[1].Value, Gated: line.Contains("<ModuleGate") || line.Contains("<ModuleTile ")))
-            .Where(tile => tile.Href.Length > 0 && !core.Contains(tile.Href) && !tile.Gated)
+            // The tiles chosen by the user (Href is an expression, "@entry.Href") are drawn from the menu catalog: the ones of a module go through ModuleTile in the other branch of the same loop.
+            .Where(tile => tile.Href.Length > 0 && !tile.Href.StartsWith('@') && !core.Contains(tile.Href) && !tile.Gated)
             .Select(tile => tile.Href).ToList();
         check(ungated.Count == 0, "Modules: every module tile of the main page is inside the gate of its module (" + string.Join(", ", ungated) + ")");
     }
@@ -71,6 +72,7 @@ public static class ModuleChecks
         await ProjectObservationsModuleChecks.RunAsync(check);
         await InventoryModuleChecks.RunAsync(check);
         await AnafModuleChecks.RunAsync(check);
+        DiskUsageChecks.Run(check);
         await InvoiceModuleChecks.RunAsync(check);
         await NotificationModuleChecks.RunAsync(check);
         await SupplierModuleChecks.RunAsync(check);

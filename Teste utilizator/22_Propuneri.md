@@ -15,3 +15,10 @@ Modulul "Propuneri" este separat de "Raportare erori". Textul propunerilor si ra
 | 9 | Orice popup deschis: bara de deasupra are "Raporteaza o eroare", "Propune" si cercul rosu de inchidere | "Propune" deschide formularul peste popup; captura include popup-ul | |
 | 10 | Setari -> Module: opreste modulul "Propuneri" | Dispar intrarea din meniu, butonul "Propune" din bara, fila din Notificari si sub-fila "Propuneri" din Setari | |
 | 11 | Setari -> Dezvoltare -> Propuneri: exporta o propunere si lista filtrata | ZIP cu propunere.json, propunere.txt, imagini (si index.csv pentru lista) | |
+
+## Modificari de testat - marcare zone la editarea unei propuneri (11.11.2026, versiunea 0.5.72)
+
+**Ce s-a adaugat:** la editarea unei propuneri (Setari -> Dezvoltare -> Propuneri -> Editeaza) imaginile se pot marca cu zone, ca la raportul de eroare, cu zoom in fereastra de marcare.
+**Ce face acum:** clic pe o imagine in modul editare deschide marcarea; zonele se salveaza ca imagine noua marcata-...jpg, originalul ramane; Salveaza adauga imaginea la propunere.
+
+1. Deschide o propunere cu imagine, Editeaza, clic pe imagine, deseneaza doua zone, inchide marcarea, Salveaza: propunerea are acum si imaginea marcata.

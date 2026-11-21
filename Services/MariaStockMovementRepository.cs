@@ -280,7 +280,7 @@ public sealed class MariaStockMovementRepository(IConfiguration configuration, I
         var actor = await RepositoryAudit.ActorAsync(accessControl, cancellationToken).ConfigureAwait(false);
         var now = DateTime.UtcNow;
         var nowText = MariaTimeText.Format(now);
-        var day = StockMovementRules.Today;
+        var day = transfer.Date ?? StockMovementRules.Today;
         var (movements, productCodes) = await WriteAsync(async (connection, transaction) =>
         {
             async Task<string> PlateAsync(int id)
@@ -304,7 +304,7 @@ public sealed class MariaStockMovementRepository(IConfiguration configuration, I
             var plan = (transfer.Lines ?? held.Select(entry => new VehicleTransferLine(entry.Key, entry.Value)).ToList())
                 .OrderBy(line => line.ProductId).ToList();
             if (plan.Count == 0) throw new StockMovementOperationException(StockMovementRules.NothingToTransferMessage);
-            var description = TextNormalization.ForStorage(StockMovementRules.TransferDescription(sourcePlate, targetPlate, day));
+            var description = TextNormalization.ForStorage(string.IsNullOrWhiteSpace(transfer.Description) ? StockMovementRules.TransferDescription(sourcePlate, targetPlate, day) : transfer.Description.Trim());
             var destination = transfer.TargetVehicleId is null ? ExitDestination.WarehouseReturn : ExitDestination.Vehicle;
             var created = new List<StockMovement>();
             int? transferOperation = null;
@@ -567,16 +567,27 @@ public sealed class MariaStockMovementRepository(IConfiguration configuration, I
         await using var command = Command(connection, null, """
             SELECT e.product_id,p.name,SUM(e.quantity),
                    SUM((SELECT COALESCE(SUM(r.quantity),0) FROM stock_movements r WHERE r.return_of_movement_id=e.id AND r.voided_utc IS NULL))
-            FROM stock_movements e INNER JOIN products p ON p.id=e.product_id
+            ,COALESCE(sc.name,'')
+            FROM stock_movements e INNER JOIN products p ON p.id=e.product_id LEFT JOIN subcategories sc ON sc.id=p.subcategory_id
             WHERE e.kind=0 AND e.voided_utc IS NULL AND e.destination=@beneficiaryDestination
               AND (@project IS NULL OR e.project_id=@project) AND (@beneficiary IS NULL OR e.beneficiary_id=@beneficiary)
-            GROUP BY e.product_id,p.name ORDER BY p.name,e.product_id
+            GROUP BY e.product_id,p.name,sc.name ORDER BY p.name,e.product_id
             """, ("@project", projectId), ("@beneficiary", beneficiaryId), ("@beneficiaryDestination", (int)ExitDestination.Beneficiary));
         await using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
         var result = new List<NetConsumption>();
         while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
-            result.Add(new(ToInt32(reader.GetInt64(0)), reader.GetString(1), Convert.ToInt32(reader.GetValue(2)), Convert.ToInt32(reader.GetValue(3))));
-        return result;
+            result.Add(new(ToInt32(reader.GetInt64(0)), reader.GetString(1), Convert.ToInt32(reader.GetValue(2)), Convert.ToInt32(reader.GetValue(3)), reader.GetString(4)));
+        await reader.CloseAsync().ConfigureAwait(false);
+        // The returns from a project (the tab Retur) are not tied to an exit: they are added per product to what came back through returns tied to exits.
+        await using var returnsCommand = Command(connection, null, """
+            SELECT product_id,SUM(quantity) FROM stock_movements
+            WHERE kind=1 AND free_entry_type=@returnType AND voided_utc IS NULL AND (@project IS NULL OR project_id=@project) AND (@beneficiary IS NULL OR beneficiary_id=@beneficiary)
+            GROUP BY product_id
+            """, ("@project", projectId), ("@beneficiary", beneficiaryId), ("@returnType", (int)FreeEntryType.ReturnFromProject));
+        var fromProject = new Dictionary<int, int>();
+        await using (var returnsReader = await returnsCommand.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false))
+            while (await returnsReader.ReadAsync(cancellationToken).ConfigureAwait(false)) fromProject[ToInt32(returnsReader.GetInt64(0))] = Convert.ToInt32(returnsReader.GetValue(1));
+        return fromProject.Count == 0 ? result : result.Select(item => fromProject.TryGetValue(item.ProductId, out var extra) ? item with { Returned = item.Returned + extra } : item).ToList();
     }
 
     public async Task<ExitOperationDetails?> GetOperationAsync(int operationId, CancellationToken cancellationToken = default)
@@ -650,6 +661,7 @@ public sealed class MariaStockMovementRepository(IConfiguration configuration, I
                 await ApplyStockAsync(connection, transaction, group.Key, -group.Sum(item => item.Effect), cancellationToken).ConfigureAwait(false);
                 await EnsureVehicleStocksNotWorseAsync(connection, transaction, group.Key, snapshot, cancellationToken).ConfigureAwait(false);
             }
+            await EnsureProjectNetAsync(connection, transaction, movements.Where(item => item.Destination == ExitDestination.Beneficiary).Select(item => (item.ProjectId, item.ProductId)), cancellationToken).ConfigureAwait(false);
             return (movements, codes);
         }, cancellationToken).ConfigureAwait(false);
         var lines = string.Join("; ", voided.Select(item => $"{codes[item.ProductId]} x {item.Quantity}"));
@@ -757,7 +769,7 @@ public sealed class MariaStockMovementRepository(IConfiguration configuration, I
         StockMovementInput value, string operatorName, DateTime now, int? operationId, CancellationToken cancellationToken)
     {
         var nowText = MariaTimeText.Format(now);
-        var productCode = await LockProductAsync(connection, transaction, productId, cancellationToken).ConfigureAwait(false);
+        var productCode = await LockProductAsync(connection, transaction, productId, cancellationToken, requireComplete: !value.SkipParameterCheck).ConfigureAwait(false);
         var (beneficiaryName, projectName) = await ResolveRelationsAsync(connection, transaction, value, cancellationToken).ConfigureAwait(false);
         var (vehiclePlate, sourcePlate) = await ResolveVehiclesAsync(connection, transaction, value, cancellationToken).ConfigureAwait(false);
         // Moves between vehicles and returns are physical: they cannot take more than the vehicle holds. Using a product from a vehicle
@@ -774,6 +786,11 @@ public sealed class MariaStockMovementRepository(IConfiguration configuration, I
             confirmedDuplicate = await CheckInvoiceEntryAsync(connection, transaction, checkedInvoice, productId, productCode, value, cancellationToken).ConfigureAwait(false);
         if (value.ReturnOfMovementId is { } returnOf)
             await CheckReturnAsync(connection, transaction, returnOf, productId, value, cancellationToken).ConfigureAwait(false);
+        if (value is { Kind: StockMovementKind.Entry, FreeType: FreeEntryType.ReturnFromProject, ProjectId: { } returnProject })
+        {
+            var remaining = await ProjectNetAsync(connection, transaction, returnProject, productId, cancellationToken).ConfigureAwait(false);
+            if (value.Quantity!.Value > remaining) throw new StockMovementOperationException(StockMovementRules.ReturnFromProjectTooMuchMessage(Math.Max(0, remaining)));
+        }
         var id = await InsertRowAsync(connection, transaction, productId, value, operatorName, nowText, operationId, cancellationToken).ConfigureAwait(false);
         if (value is { Kind: StockMovementKind.Exit, Destination: ExitDestination.Beneficiary, ProjectId: { } componentProject })
             await LinkComponentAsync(connection, transaction, id, componentProject, productId, value, cancellationToken).ConfigureAwait(false);
@@ -835,6 +852,25 @@ public sealed class MariaStockMovementRepository(IConfiguration configuration, I
     }
 
     // A return takes back an exit of the same product, and not more than is left of it.
+    // What a product has at a project right now: the exits to the project minus the returns of that product (returns tied to an exit of the project and returns from the project).
+    internal static async Task<int> ProjectNetAsync(MySqlConnection connection, MySqlTransaction? transaction, int projectId, int productId, CancellationToken token)
+    {
+        await using var command = Command(connection, transaction, """
+            SELECT (SELECT COALESCE(SUM(quantity),0) FROM stock_movements WHERE kind=0 AND destination=@beneficiary AND voided_utc IS NULL AND project_id=@project AND product_id=@product)
+                 - (SELECT COALESCE(SUM(r.quantity),0) FROM stock_movements r INNER JOIN stock_movements e ON e.id=r.return_of_movement_id WHERE r.voided_utc IS NULL AND e.project_id=@project AND r.product_id=@product)
+                 - (SELECT COALESCE(SUM(quantity),0) FROM stock_movements WHERE kind=1 AND free_entry_type=@returnType AND voided_utc IS NULL AND project_id=@project AND product_id=@product)
+            """, ("@project", projectId), ("@product", productId), ("@beneficiary", (int)ExitDestination.Beneficiary), ("@returnType", (int)FreeEntryType.ReturnFromProject));
+        return Convert.ToInt32(await command.ExecuteScalarAsync(token).ConfigureAwait(false), System.Globalization.CultureInfo.InvariantCulture);
+    }
+
+    // After a change to an exit to a project or to a return from it: no product may be left with more returned than handed over.
+    private static async Task EnsureProjectNetAsync(MySqlConnection connection, MySqlTransaction transaction, IEnumerable<(int? ProjectId, int ProductId)> pairs, CancellationToken token)
+    {
+        foreach (var (projectId, productId) in pairs.Where(pair => pair.ProjectId is not null).Select(pair => (pair.ProjectId!.Value, pair.ProductId)).Distinct())
+            if (await ProjectNetAsync(connection, transaction, projectId, productId, token).ConfigureAwait(false) < 0)
+                throw new StockMovementOperationException(StockMovementRules.ProjectNetNegativeMessage);
+    }
+
     private static async Task CheckReturnAsync(MySqlConnection connection, MySqlTransaction transaction, int returnOf, int productId, StockMovementInput value, CancellationToken token)
     {
         var returnable = await ReturnableAsync(connection, transaction, returnOf, token).ConfigureAwait(false);
@@ -882,6 +918,9 @@ public sealed class MariaStockMovementRepository(IConfiguration configuration, I
         else if (movement.Kind == StockMovementKind.Exit)
             await AuditRecorder.RecordActionAsync(auditTrail, accessControl, AuditEntities.StockMovement, StockMovementRules.ExitAuditAction(movement.Destination),
                 movement.Id.ToString(), target, details, string.Empty, cancellationToken).ConfigureAwait(false);
+        else if (movement.FreeType == FreeEntryType.ReturnFromProject)
+            await AuditRecorder.RecordActionAsync(auditTrail, accessControl, AuditEntities.StockMovement, AuditActions.ReturnFromProject,
+                movement.Id.ToString(), target, identification, string.Empty, cancellationToken).ConfigureAwait(false);
         else if (movement.ReturnOfMovementId is not null)
             await AuditRecorder.RecordActionAsync(auditTrail, accessControl, AuditEntities.StockMovement, AuditActions.ReturnFromBeneficiary,
                 movement.Id.ToString(), target, identification, string.Empty, cancellationToken).ConfigureAwait(false);
@@ -990,6 +1029,8 @@ public sealed class MariaStockMovementRepository(IConfiguration configuration, I
                 await history.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
             if (!usesVehicleStock)
                 await EnsureVehicleStocksNotWorseAsync(connection, transaction, current.ProductId, snapshot, cancellationToken).ConfigureAwait(false);
+            if ((current.Kind == StockMovementKind.Exit && current.Destination == ExitDestination.Beneficiary) || current.FreeType == FreeEntryType.ReturnFromProject)
+                await EnsureProjectNetAsync(connection, transaction, [(current.ProjectId, current.ProductId), (updated.ProjectId, updated.ProductId)], cancellationToken).ConfigureAwait(false);
             var stock = await ApplyStockAsync(connection, transaction, current.ProductId, correction, cancellationToken).ConfigureAwait(false);
             return (current, updated, stock, productCode);
         }, cancellationToken).ConfigureAwait(false);
@@ -1030,6 +1071,8 @@ public sealed class MariaStockMovementRepository(IConfiguration configuration, I
                         throw new StockMovementOperationException(StockMovementRules.StaleMessage);
                 if (current.Kind != StockMovementKind.Exit || current.Destination is ExitDestination.Vehicle or ExitDestination.WarehouseReturn)
                     await EnsureVehicleStocksNotWorseAsync(connection, transaction, current.ProductId, snapshot, token).ConfigureAwait(false);
+                if (current.Kind == StockMovementKind.Exit && current.Destination == ExitDestination.Beneficiary)
+                    await EnsureProjectNetAsync(connection, transaction, [(current.ProjectId, current.ProductId)], token).ConfigureAwait(false);
                 var newStock = await ApplyStockAsync(connection, transaction, current.ProductId, -current.Effect, token).ConfigureAwait(false);
                 await MariaArchivePersistence.InsertAuditAsync(connection, transaction, operation, token).ConfigureAwait(false);
                 return newStock;
@@ -1046,7 +1089,7 @@ public sealed class MariaStockMovementRepository(IConfiguration configuration, I
         await using var command = Command(connection, null, """
             SELECT m.id,m.product_id,p.name,m.quantity,m.movement_date,m.free_entry_type,m.free_supplier_id,fs.name,m.reference,m.description,m.operator
             FROM stock_movements m INNER JOIN products p ON p.id=m.product_id LEFT JOIN suppliers fs ON fs.id=m.free_supplier_id
-            WHERE m.kind=1 AND m.invoice_id IS NULL
+            WHERE m.kind=1 AND m.invoice_id IS NULL AND (m.free_entry_type IS NULL OR m.free_entry_type<>6)
               AND ((@unspecified=1 AND m.free_entry_type IS NULL) OR (@unspecified=0 AND m.free_entry_type IS NOT NULL AND (@type IS NULL OR m.free_entry_type=@type)))
               AND (@supplier IS NULL OR m.free_supplier_id=@supplier) AND (@cutoff IS NULL OR m.movement_date<=@cutoff)
             ORDER BY m.movement_date,m.id

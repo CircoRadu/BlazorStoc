@@ -268,11 +268,13 @@ public sealed class SqlActivitySource : IActivitySource
             if (structure.IsBlocked(entity)) throw new ActivitySourceException($"„{entity}” nu poate fi citit: structura ActivityApp nu mai corespunde (vezi raportul de structură).");
         string T(string column) => structure.Physical(tickets, column) is { } physical ? "t." + Q(physical) : throw new ActivitySourceException("Tichetele nu pot fi citite: structura ActivityApp nu mai corespunde.");
         string TText(string column) => structure.Physical(tickets, column) is { } physical ? "t." + Q(physical) : "CAST(NULL AS nvarchar(300))";
+        // The title and the number may be read from a column of any readable kind (BUG-0023): read as text.
+        string TAsText(string column) => structure.Physical(tickets, column) is { } physical ? "CAST(t." + Q(physical) + " AS nvarchar(max))" : "CAST(NULL AS nvarchar(300))";
         string E(string column) => structure.Physical(events, column) is { } physical ? "e." + Q(physical) : throw new ActivitySourceException("Evenimentele nu pot fi citite: structura ActivityApp nu mai corespunde.");
         string EOptional(string column, string empty) => structure.Physical(events, column) is { } physical ? "e." + Q(physical) : empty;
         var id = T("ID");
         var columns = new List<string> { id, T("IDActivitate"), T("IDClient"), structure.Physical(tickets, "IDPunctDeLucru") is { } point ? "t." + Q(point) : "CAST(NULL AS bigint)", T("DataTicket"),
-            TText("NumeTicket"), TText("Subject"), TText("DescriptionInternal"), TText("ProcesatDe"), E("ID"), EOptional("EndTime", "CAST(NULL AS datetime)"), EOptional("Status", "CAST(NULL AS bigint)"), EOptional("DescriptionInternal", "CAST(NULL AS nvarchar(max))"), EOptional("DataModificareEveniment", "CAST(NULL AS datetime)"), EOptional("LocatieGPS", "CAST(NULL AS nvarchar(100))"), EOptional("Label", "CAST(NULL AS bigint)") };
+            TAsText("NumeTicket"), TAsText("Subject"), TText("DescriptionInternal"), TText("ProcesatDe"), E("ID"), EOptional("EndTime", "CAST(NULL AS datetime)"), EOptional("Status", "CAST(NULL AS bigint)"), EOptional("DescriptionInternal", "CAST(NULL AS nvarchar(max))"), EOptional("DataModificareEveniment", "CAST(NULL AS datetime)"), EOptional("LocatieGPS", "CAST(NULL AS nvarchar(100))"), EOptional("Label", "CAST(NULL AS bigint)") };
         // The extra fields come after the fixed columns, in the order of the structure report.
         const int fixedColumns = 16;
         foreach (var extra in structure.Extras) columns.Add((extra.Table == events ? "e." : "t.") + Q(extra.Column));
@@ -283,9 +285,9 @@ public sealed class SqlActivitySource : IActivitySource
         var keys = structure.Extras.Select(extra => extra.Key).ToArray();
         return await ReadPagesAsync(connection, from, id, select, pageSize,
             reader => new ActivityTicket(Convert.ToInt64(reader.GetValue(0)), Convert.ToInt64(reader.GetValue(1)), reader.IsDBNull(2) ? 0 : Convert.ToInt64(reader.GetValue(2)), reader.IsDBNull(3) ? 0 : Convert.ToInt64(reader.GetValue(3)),
-                reader.IsDBNull(4) ? null : reader.GetDateTime(4), Str(reader, 5), Str(reader, 6), Str(reader, 7), Str(reader, 8), Convert.ToInt64(reader.GetValue(9)), reader.IsDBNull(10) ? null : reader.GetDateTime(10),
+                reader.IsDBNull(4) ? null : reader.GetDateTime(4), Str(reader, 5), Str(reader, 6), Str(reader, 7), Str(reader, 8), Convert.ToInt64(reader.GetValue(9)), DateAt(reader, 10),
                 reader.IsDBNull(11) ? null : Convert.ToInt64(reader.GetValue(11)), reader.IsDBNull(12) ? "" : reader.GetString(12).Trim(), reader.IsDBNull(13) ? null : reader.GetDateTime(13), Str(reader, 14), reader.IsDBNull(15) ? null : Convert.ToInt64(reader.GetValue(15)),
-                keys.Length == 0 ? null : keys.Select((key, index) => (key, value: Str(reader, fixedColumns + index))).ToDictionary(pair => pair.key, pair => pair.value)),
+                keys.Length == 0 ? null : keys.Select((key, index) => (key, value: ExtraValue(reader, fixedColumns + index))).ToDictionary(pair => pair.key, pair => pair.value)),
             ticket => ticket.Id, cancellationToken, where, bind).ConfigureAwait(false);
     }
 
@@ -328,12 +330,21 @@ public sealed class SqlActivitySource : IActivitySource
                 command.Parameters.AddWithValue("@current", ticketId);
                 older = await command.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false) is not null;
             }
-            SampleColumn Make(ActivityColumn column, int index) => new(column.Column, column.DataType, values![index], ActivityContract.KindOf(column.DataType) == ColumnKind.Text);
+            SampleColumn Make(ActivityColumn column, int index) => new(column.Column, column.DataType, values![index], ActivityContract.KindOf(column.DataType) == ColumnKind.Text) { OtherKind = ActivityContract.KindOf(column.DataType) is { } kind && kind != ColumnKind.Text };
             var tables = new List<SampleTable>
             {
                 new(tickets, [.. ticketColumns.Select((column, index) => Make(column, index))]),
                 new(events, [.. eventColumns.Select((column, index) => Make(column, ticketColumns.Count + index))])
             };
+            // The client of the ticket: only its CUI (the code of the partner), which the partner import takes by itself for a company.
+            const string partners = "NomenclatorParteneri";
+            if (structure.Physical(partners, "CodFiscal") is { } cuiColumn && structure.Physical(partners, "ID") is { } partnerId && structure.Physical(tickets, "IDClient") is { } clientColumn)
+            {
+                await using var clientCommand = new SqlCommand($"SELECT TOP 1 p.{Q(cuiColumn)} FROM {Q(partners)} p INNER JOIN {Q(tickets)} t ON p.{Q(partnerId)} = t.{Q(clientColumn)} WHERE {id} = @ticket", sql) { CommandTimeout = 30 };
+                clientCommand.Parameters.AddWithValue("@ticket", ticketId);
+                var cui = ActivityTicketSampleRules.Format(await clientCommand.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false));
+                tables.Add(new SampleTable("Client", [new SampleColumn(cuiColumn, "nvarchar", cui, true)]));
+            }
             string Cell(string table, string contractColumn)
             {
                 var physical = structure.Physical(table, contractColumn);
@@ -414,6 +425,12 @@ public sealed class SqlActivitySource : IActivitySource
         structure.IsBlocked(entity) || structure.Physical(table, column) is not { } physical
             ? throw new ActivitySourceException($"„{entity}” nu poate fi citit: structura ActivityApp nu mai corespunde (vezi raportul de structură).")
             : physical;
+
+    // An extra field of any kind as the application writes it: dates dd.MM.yyyy, flags da/nu, numbers as they are.
+    private static string ExtraValue(SqlDataReader reader, int ordinal) => reader.IsDBNull(ordinal) ? "" : reader.GetValue(ordinal) is string text ? text.Trim() : (ActivityTicketSampleRules.Format(reader.GetValue(ordinal)) ?? "").Trim();
+
+    // A date column of the source as a date and time (date, datetime, datetime2, smalldatetime or datetimeoffset).
+    private static DateTime? DateAt(SqlDataReader reader, int ordinal) => reader.IsDBNull(ordinal) ? null : reader.GetValue(ordinal) switch { DateTime date => date, DateTimeOffset moment => moment.LocalDateTime, _ => null };
 
     private static string Str(SqlDataReader reader, int ordinal) => reader.IsDBNull(ordinal) ? "" : (reader.GetValue(ordinal).ToString() ?? "").Trim();
 

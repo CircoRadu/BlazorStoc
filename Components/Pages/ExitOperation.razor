@@ -1,4 +1,4 @@
-﻿@page "/iesiri/multipla"
+@page "/iesiri/multipla"
 @attribute [Authorize(Policy = "perm:iesire-multipla.view")]
 @rendermode @(new InteractiveServerRenderMode(prerender: false))
 @using BlazorStoc.Services
@@ -31,7 +31,7 @@ else
 @if (error is not null) { <div class="error-banner" role="alert">@error</div> }
 @if (success is not null)
 {
-    <div class="success-banner" role="status">@success@if (savedOperation is { } savedId) { <text> </text><a class="category-table-link" target="_blank" rel="noopener" href="@($"/api/iesiri/{savedId}/bon.pdf")">Deschide bonul de consum (PDF)</a> }</div>
+    <div class="success-banner" role="status">@success</div>
 }
 
 @if (loading)
@@ -53,9 +53,10 @@ else
                     <InputText id="op-reference" @bind-Value="common.Reference" maxlength="@StockMovementRules.MaxReferenceLength" /></label>
             </div>
             <ExitDestinationPicker @ref="picker" Prefix="op" Model="common" Beneficiaries="beneficiaries" Projects="projects" Vehicles="vehicles"
-                                   ShowSource="false" Disabled="busy || preview is not null" UseProject="useProject"
-                                   DestinationChanged="DestinationChangedAsync" BeneficiaryChanged="BeneficiaryChangedAsync"
-                                   ProjectToggled="ToggleProject" ProjectChanged="id => { common.ProjectId = id; return Task.CompletedTask; }" />
+                                   ShowSource="false" Disabled="busy || preview is not null"
+                                   AllowAddProject="true" AddProjectRequested="@(() => { addingProject = true; return Task.CompletedTask; })"
+                                   DestinationChanged="DestinationChangedAsync" BeneficiaryChanged="BeneficiaryChangedAsync" BeneficiariesTaken="ReloadBeneficiariesAsync"
+                                   ProjectChanged="id => { common.ProjectId = id; return Task.CompletedTask; }" />
             <label class="movement-description" for="op-description">Descriere comună (se folosește la liniile fără descriere proprie)
                 <InputTextArea id="op-description" @bind-Value="common.Description" rows="2" maxlength="@StockMovementRules.MaxDescriptionLength" /></label>
 
@@ -101,6 +102,13 @@ else
                 <button type="button" class="primary" @onclick="CheckAsync">@(busy ? "Se verifică…" : "Verifică și salvează")</button>
             </div>
         </fieldset>
+        @if (addingProject && common.BeneficiaryId is { } newProjectBeneficiary)
+        {
+            <AppDialog PanelClass="template-popup" LabelledBy="project-editor-title">
+                <ProjectEditor Original="null" FixedBeneficiaryId="newProjectBeneficiary" FixedBeneficiaryName="@beneficiaries.FirstOrDefault(b => b.Id == newProjectBeneficiary)?.Name"
+                               Saved="ProjectCreatedAsync" Closed="CloseAddProject" />
+            </AppDialog>
+        }
 
         @if (preview is not null)
         {
@@ -147,7 +155,12 @@ else
 
 </PageBoundary>
 
+<BeneficiarySyncOnOpen OnNewBeneficiaries="ReloadBeneficiariesAsync" />
+
 @code {
+    // Beneficiaries entered in ActivityApp a moment ago are taken in the background after the page opened; the list is loaded again when there are new ones.
+    private async Task ReloadBeneficiariesAsync() { try { beneficiaries = (await Beneficiaries.GetBeneficiariesAsync(lifetime.Token)).OrderBy(b => b.Name, StringComparer.CurrentCultureIgnoreCase).ToArray(); } catch (Exception) { } StateHasChanged(); }
+
     /// <summary>Used as dialog content (quick exit from the product list): no page heading, optional starting product, close callback.</summary>
     // From the vehicle page ("Completeaza la nivel"): the exit to this vehicle is prepared with the pieces missing from its target levels.
     [SupplyParameterFromQuery(Name = "vehicul")] public int? FillVehicleId { get; set; }
@@ -184,7 +197,6 @@ else
     private List<Line> lines = [];
     private IReadOnlyList<ExitLinePreview>? preview;
     private string duplicateReason = "";
-    private int? savedOperation;
 
     private static StockMovementInput NewCommon() => new() { Kind = StockMovementKind.Exit, Date = StockMovementRules.Today, Destination = ExitDestination.Beneficiary };
 
@@ -245,6 +257,22 @@ else
         return Task.CompletedTask;
     }
 
+    private bool addingProject;
+    private Task CloseAddProject() { addingProject = false; return Task.CompletedTask; }
+
+    // The project created in the popup joins the list and is selected; the typed exit form stays as it is.
+    private async Task ProjectCreatedAsync(Project created)
+    {
+        addingProject = false;
+        if (common.BeneficiaryId is { } beneficiaryId)
+        {
+            try { projects = await ProjectsRepository.GetForBeneficiaryAsync(beneficiaryId, lifetime.Token); }
+            catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+            catch (Exception ex) { Logger.LogError("Project list loading failed ({ErrorType}).", ex.GetType().Name); }
+        }
+        common.ProjectId = created.Id;
+    }
+
     private async Task BeneficiaryChangedAsync(int? beneficiaryId)
     {
         common.BeneficiaryId = beneficiaryId; common.ProjectId = null;
@@ -255,13 +283,6 @@ else
             catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
             catch (Exception ex) { Logger.LogError("Project list loading failed ({ErrorType}).", ex.GetType().Name); }
         }
-    }
-
-    private Task ToggleProject(bool value)
-    {
-        useProject = value;
-        if (!value) common.ProjectId = null;
-        return Task.CompletedTask;
     }
 
     private async Task ProductChangedAsync(Line line, int? productId)
@@ -309,7 +330,7 @@ else
     private async Task CheckAsync()
     {
         if (busy) return;
-        success = null; savedOperation = null; error = LocalError();
+        success = null; error = LocalError();
         if (error is not null) return;
         busy = true;
         try
@@ -335,7 +356,6 @@ else
         try
         {
             var result = await Movements.CreateExitOperationAsync(BuildLines(duplicates), lifetime.Token);
-            savedOperation = result.OperationId;
             success = $"Operația #{result.OperationId} a fost salvată: {result.Movements.Count} {(result.Movements.Count == 1 ? "ieșire" : "ieșiri")}.";
             preview = null; duplicateReason = "";
             common = NewCommon(); projects = []; useProject = false;

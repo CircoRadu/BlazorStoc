@@ -7,6 +7,8 @@ Captura: duplicat | /facturi | click sel:button.category-table-link.link-like; w
 
 Adaugi manual o intrare în stoc, legată de factura deschisă, pentru un produs care nu a fost preluat. Un produs deja preluat din factură sau o cantitate mai mare decât cea scrisă pe factură se adaugă doar cu un motiv.
 
+Produsul nou se asociază numai unei frunze (alegerea din formular); calea subcategoriei apare pe rândul produsului pregătit.
+
 ## Elemente
 ### Câmpuri
 - Produs * | listă | Alegi produsul (căutare după cod sau denumire).

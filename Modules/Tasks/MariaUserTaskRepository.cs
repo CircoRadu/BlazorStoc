@@ -13,7 +13,7 @@ public sealed class MariaUserTaskRepository(IConfiguration configuration, IAcces
     private const string Select = """
         SELECT t.id, t.beneficiary_id, b.name, t.assigned_user_id, u.username, u.display_name, u.is_active, t.title, t.description, t.status, t.due_date,
                t.created_utc, t.created_by, t.accepted_utc, t.accepted_by, t.finished_utc, t.version,
-               (SELECT COUNT(*) FROM entity_files f WHERE f.owner_kind='task' AND f.owner_id=t.id), t.priority
+               (SELECT COUNT(*) FROM entity_files f WHERE f.owner_kind='task' AND f.owner_id=t.id), t.priority, COALESCE(t.progress_note, ''), t.sort_order
         FROM beneficiary_tasks t
         JOIN beneficiaries b ON b.id=t.beneficiary_id
         JOIN web_users u ON u.id=t.assigned_user_id
@@ -22,6 +22,7 @@ public sealed class MariaUserTaskRepository(IConfiguration configuration, IAcces
     public async Task<IReadOnlyList<UserTask>> GetAllAsync(CancellationToken cancellationToken = default)
     {
         await EnsureAsync("taskuri.view", cancellationToken).ConfigureAwait(false);
+        await BackfillOrderAsync(cancellationToken).ConfigureAwait(false);
         return await ReadListAsync("", [], cancellationToken).ConfigureAwait(false);
     }
 
@@ -34,6 +35,7 @@ public sealed class MariaUserTaskRepository(IConfiguration configuration, IAcces
     public async Task<IReadOnlyList<UserTask>> GetMineAsync(CancellationToken cancellationToken = default)
     {
         if (await CurrentUserIdAsync(cancellationToken).ConfigureAwait(false) is not { } userId) return [];
+        await BackfillOrderAsync(cancellationToken).ConfigureAwait(false);
         return await ReadListAsync("WHERE t.assigned_user_id=@user", [("@user", userId)], cancellationToken).ConfigureAwait(false);
     }
 
@@ -59,6 +61,7 @@ public sealed class MariaUserTaskRepository(IConfiguration configuration, IAcces
     public async Task<UserTask> CreateAsync(UserTaskInput input, CancellationToken cancellationToken = default)
     {
         await EnsureAsync("taskuri.add", cancellationToken).ConfigureAwait(false);
+        await BackfillOrderAsync(cancellationToken).ConfigureAwait(false);
         var value = input.Validated();
         var author = await UsernameAsync(cancellationToken).ConfigureAwait(false);
         var id = await WriteAsync(async (connection, transaction) =>
@@ -66,11 +69,12 @@ public sealed class MariaUserTaskRepository(IConfiguration configuration, IAcces
             await CheckBeneficiaryAsync(connection, transaction, value.BeneficiaryId, cancellationToken).ConfigureAwait(false);
             await CheckUserAsync(connection, transaction, value.AssignedUserId, cancellationToken).ConfigureAwait(false);
             var now = MariaTimeText.Now();
+            var order = value.Status == UserTaskStatus.Done ? 0 : await NextOrderAsync(connection, transaction, value.AssignedUserId, cancellationToken).ConfigureAwait(false);
             await using var command = Command(connection, transaction, """
-                INSERT INTO beneficiary_tasks (beneficiary_id, assigned_user_id, title, description, status, due_date, priority, created_utc, created_by, finished_utc, version)
-                VALUES (@beneficiary, @user, @title, @description, @status, @due, @priority, @created, @author, @finished, 0)
+                INSERT INTO beneficiary_tasks (beneficiary_id, assigned_user_id, title, description, status, due_date, priority, sort_order, created_utc, created_by, finished_utc, version)
+                VALUES (@beneficiary, @user, @title, @description, @status, @due, @priority, @order, @created, @author, @finished, 0)
                 """, ("@beneficiary", value.BeneficiaryId), ("@user", value.AssignedUserId), ("@title", value.Title), ("@description", value.Description),
-                ("@status", (int)value.Status), ("@due", SqlDate(value.DueDate)), ("@priority", (int)value.Priority), ("@created", MariaTimeText.Format(now)), ("@author", author),
+                ("@status", (int)value.Status), ("@due", SqlDate(value.DueDate)), ("@priority", (int)value.Priority), ("@order", order), ("@created", MariaTimeText.Format(now)), ("@author", author),
                 ("@finished", value.Status == UserTaskStatus.Done ? MariaTimeText.Format(now) : null));
             await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
             return checked((int)command.LastInsertedId);
@@ -95,15 +99,19 @@ public sealed class MariaUserTaskRepository(IConfiguration configuration, IAcces
             if (moved) await CheckUserAsync(connection, transaction, value.AssignedUserId, cancellationToken).ConfigureAwait(false);
             var wasDone = original.Status == UserTaskStatus.Done;
             var isDone = value.Status == UserTaskStatus.Done;
+            // A finished task has no place in the list; one that becomes active again, or goes to another user, takes the last place of that user's list.
+            var newOrder = isDone ? 0 : moved || wasDone ? await NextOrderAsync(connection, transaction, value.AssignedUserId, cancellationToken).ConfigureAwait(false) : -1;
             await using var command = Command(connection, transaction, """
                 UPDATE beneficiary_tasks SET assigned_user_id=@user, title=@title, description=@description, status=@status, due_date=@due, priority=@priority,
                     accepted_utc=IF(@moved, NULL, accepted_utc), accepted_by=IF(@moved, NULL, accepted_by),
+                    sort_order=IF(@order >= 0, @order, sort_order),
                     finished_utc=@finished, version=version+1
                 WHERE id=@id AND version=@version
                 """, ("@user", value.AssignedUserId), ("@title", value.Title), ("@description", value.Description), ("@status", (int)value.Status),
-                ("@due", SqlDate(value.DueDate)), ("@priority", (int)value.Priority), ("@moved", moved ? 1 : 0), ("@id", original.Id), ("@version", original.Version),
+                ("@due", SqlDate(value.DueDate)), ("@priority", (int)value.Priority), ("@moved", moved ? 1 : 0), ("@order", newOrder), ("@id", original.Id), ("@version", original.Version),
                 ("@finished", isDone ? (wasDone && original.FinishedUtc is { } kept ? MariaTimeText.Format(kept) : MariaTimeText.Format(MariaTimeText.Now())) : null));
             if (await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false) != 1) throw new UserTaskOperationException(UserTaskRules.ConcurrentMessage);
+            if (!wasDone && (isDone || moved)) await RenumberAsync(connection, transaction, original.AssignedUserId, cancellationToken).ConfigureAwait(false);
             return true;
         }, cancellationToken).ConfigureAwait(false);
         var updated = await LoadAsync(original.Id, cancellationToken).ConfigureAwait(false);
@@ -129,6 +137,7 @@ public sealed class MariaUserTaskRepository(IConfiguration configuration, IAcces
                 await deleteFiles.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
             await using var delete = Command(connection, transaction, "DELETE FROM beneficiary_tasks WHERE id=@id AND version=@version", ("@id", original.Id), ("@version", original.Version));
             if (await delete.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false) != 1) throw new UserTaskOperationException(UserTaskRules.ConcurrentMessage);
+            await RenumberAsync(connection, transaction, original.AssignedUserId, cancellationToken).ConfigureAwait(false);
             return true;
         }, cancellationToken).ConfigureAwait(false);
         var root = MariaAssetPaths.EntityFiles(configuration);
@@ -158,13 +167,17 @@ public sealed class MariaUserTaskRepository(IConfiguration configuration, IAcces
             var finished = status == UserTaskStatus.Done
                 ? (original.Status == UserTaskStatus.Done && original.FinishedUtc is { } kept ? MariaTimeText.Format(kept) : MariaTimeText.Format(MariaTimeText.Now()))
                 : null;
+            var wasDone = original.Status == UserTaskStatus.Done;
+            var isDone = status == UserTaskStatus.Done;
+            var newOrder = isDone ? 0 : wasDone ? await NextOrderAsync(connection, transaction, original.AssignedUserId, cancellationToken).ConfigureAwait(false) : -1;
             await using var command = Command(connection, transaction, """
-                UPDATE beneficiary_tasks SET status=@status, finished_utc=@finished,
+                UPDATE beneficiary_tasks SET status=@status, finished_utc=@finished, sort_order=IF(@order >= 0, @order, sort_order),
                     accepted_utc=IF(@take, @now, accepted_utc), accepted_by=IF(@take, @actor, accepted_by), version=version+1
                 WHERE id=@id AND version=@version
-                """, ("@status", (int)status), ("@finished", finished), ("@take", takenOver ? 1 : 0), ("@now", MariaTimeText.Format(MariaTimeText.Now())),
+                """, ("@status", (int)status), ("@finished", finished), ("@order", newOrder), ("@take", takenOver ? 1 : 0), ("@now", MariaTimeText.Format(MariaTimeText.Now())),
                 ("@actor", actor), ("@id", original.Id), ("@version", original.Version));
             if (await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false) != 1) throw new UserTaskOperationException(UserTaskRules.ConcurrentMessage);
+            if (!wasDone && isDone) await RenumberAsync(connection, transaction, original.AssignedUserId, cancellationToken).ConfigureAwait(false);
             return true;
         }, cancellationToken).ConfigureAwait(false);
         var updated = await LoadAsync(original.Id, cancellationToken).ConfigureAwait(false);
@@ -228,6 +241,117 @@ public sealed class MariaUserTaskRepository(IConfiguration configuration, IAcces
                 string.Empty, cancellationToken).ConfigureAwait(false);
     }
 
+    public async Task<UserTask> SetNoteAsync(UserTask original, string note, CancellationToken cancellationToken = default)
+    {
+        var userId = await CurrentUserIdAsync(cancellationToken).ConfigureAwait(false);
+        var isAssignee = userId == original.AssignedUserId;
+        if (!isAssignee) await EnsureAsync("taskuri.edit", cancellationToken).ConfigureAwait(false);
+        var text = (note ?? "").Replace("\r\n", "\n").Trim();
+        if (text.Length > UserTaskRules.NoteMaxLength) throw new UserTaskOperationException($"Stadiul poate avea cel mult {UserTaskRules.NoteMaxLength} de caractere.");
+        var actor = await UsernameAsync(cancellationToken).ConfigureAwait(false);
+        var takenOver = false;
+        await WriteAsync(async (connection, transaction) =>
+        {
+            UserTaskRules.CheckCurrent(await LockVersionAsync(connection, transaction, original.Id, cancellationToken).ConfigureAwait(false), original);
+            takenOver = isAssignee && !original.IsAccepted && original.IsActive;
+            await using var command = Command(connection, transaction, """
+                UPDATE beneficiary_tasks SET progress_note=@note,
+                    accepted_utc=IF(@take, @now, accepted_utc), accepted_by=IF(@take, @actor, accepted_by), version=version+1
+                WHERE id=@id AND version=@version
+                """, ("@note", text), ("@take", takenOver ? 1 : 0), ("@now", MariaTimeText.Format(MariaTimeText.Now())), ("@actor", actor), ("@id", original.Id), ("@version", original.Version));
+            if (await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false) != 1) throw new UserTaskOperationException(UserTaskRules.ConcurrentMessage);
+            return true;
+        }, cancellationToken).ConfigureAwait(false);
+        var updated = await LoadAsync(original.Id, cancellationToken).ConfigureAwait(false);
+        if (original.ProgressNote != updated.ProgressNote)
+            await AuditRecorder.RecordActionAsync(auditTrail, accessControl, AuditEntities.UserTask, AuditActions.EditUserTaskNote, original.Id.ToString(CultureInfo.InvariantCulture),
+                UserTaskRules.Target(updated), AuditDetails.Changes(new AuditChange("Stadiu", original.ProgressNote.Length == 0 ? "—" : original.ProgressNote, updated.ProgressNote.Length == 0 ? "—" : updated.ProgressNote)),
+                string.Empty, cancellationToken).ConfigureAwait(false);
+        if (takenOver) await RecordAcceptAsync(updated, "preluat prin scrierea stadiului", cancellationToken).ConfigureAwait(false);
+        Publish(AuditActions.EditUserTaskNote, updated);
+        return updated;
+    }
+
+    public async Task MoveInListAsync(UserTask task, int newPosition, CancellationToken cancellationToken = default)
+    {
+        await EnsureAsync("taskuri.edit", cancellationToken).ConfigureAwait(false);
+        await BackfillOrderAsync(cancellationToken).ConfigureAwait(false);
+        var oldPosition = 0;
+        var target = newPosition;
+        await WriteAsync(async (connection, transaction) =>
+        {
+            var ids = new List<int>();
+            await using (var read = Command(connection, transaction, "SELECT id FROM beneficiary_tasks WHERE assigned_user_id=@user AND status<>@done ORDER BY sort_order, id FOR UPDATE", ("@user", task.AssignedUserId), ("@done", (int)UserTaskStatus.Done)))
+            await using (var reader = await read.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false))
+                while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false)) ids.Add(checked((int)reader.GetInt64(0)));
+            oldPosition = ids.IndexOf(task.Id) + 1;
+            if (oldPosition == 0) throw new UserTaskOperationException(UserTaskRules.ConcurrentMessage);
+            target = Math.Clamp(newPosition, 1, ids.Count);
+            ids.RemoveAt(oldPosition - 1);
+            ids.Insert(target - 1, task.Id);
+            for (var index = 0; index < ids.Count; index++)
+            {
+                await using var update = Command(connection, transaction, "UPDATE beneficiary_tasks SET sort_order=@order WHERE id=@id AND sort_order<>@order", ("@order", index + 1), ("@id", ids[index]));
+                await update.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
+            }
+            return true;
+        }, cancellationToken).ConfigureAwait(false);
+        if (oldPosition == target) return;
+        var current = await LoadAsync(task.Id, cancellationToken).ConfigureAwait(false);
+        await AuditRecorder.RecordActionAsync(auditTrail, accessControl, AuditEntities.UserTask, AuditActions.ReorderUserTasks, task.Id.ToString(CultureInfo.InvariantCulture),
+            UserTaskRules.Target(current), AuditDetails.Changes(new AuditChange("Poziție în lista utilizatorului " + current.AssignedUserName, oldPosition.ToString(CultureInfo.InvariantCulture), target.ToString(CultureInfo.InvariantCulture))),
+            string.Empty, cancellationToken).ConfigureAwait(false);
+        Publish(AuditActions.ReorderUserTasks, current);
+    }
+
+    public async Task<IReadOnlyList<UserTaskHistoryEntry>> GetHistoryAsync(int taskId, CancellationToken cancellationToken = default)
+    {
+        // The task is read with the rule of the task itself (its user, or taskuri.view): the journal page is not needed.
+        if (await GetAsync(taskId, cancellationToken).ConfigureAwait(false) is null) return [];
+        await using var connection = await OpenAsync(configuration, cancellationToken).ConfigureAwait(false);
+        await using var command = Command(connection, "SELECT timestamp_utc, actor_username, action, details FROM audit_events WHERE entity_type=@entity AND entity_id=@id ORDER BY timestamp_utc, id", ("@entity", AuditEntities.UserTask), ("@id", taskId.ToString(CultureInfo.InvariantCulture)));
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
+        var result = new List<UserTaskHistoryEntry>();
+        while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
+            result.Add(new(MariaTimeText.Parse(reader.GetString(0)), reader.GetString(1), AuditActions.Normalize(reader.GetString(2)), reader.GetString(3)));
+        return result;
+    }
+
+    // The tasks that existed before the order was introduced (migration 85, whose account has no data rights) are numbered once per run of the application: after the numbers already given, by
+    // deadline and then by date of creation. Cheap and harmless when nothing is left to number.
+    private static volatile bool orderBackfilled;
+
+    private async Task BackfillOrderAsync(CancellationToken token)
+    {
+        if (orderBackfilled) return;
+        await using var connection = await OpenAsync(configuration, token).ConfigureAwait(false);
+        await using var command = Command(connection, null, """
+            UPDATE beneficiary_tasks t
+            JOIN (SELECT id, ROW_NUMBER() OVER (PARTITION BY assigned_user_id ORDER BY (due_date IS NULL), due_date, created_utc DESC, id) AS rn FROM beneficiary_tasks WHERE status<>@done AND sort_order=0) x ON x.id=t.id
+            JOIN (SELECT assigned_user_id, MAX(sort_order) AS mx FROM beneficiary_tasks WHERE status<>@done GROUP BY assigned_user_id) m ON m.assigned_user_id=t.assigned_user_id
+            SET t.sort_order=x.rn+m.mx
+            """, ("@done", (int)UserTaskStatus.Done));
+        await command.ExecuteNonQueryAsync(token).ConfigureAwait(false);
+        orderBackfilled = true;
+    }
+
+    // The place after the last active task of the user.
+    private static async Task<int> NextOrderAsync(MySqlConnection connection, MySqlTransaction transaction, int userId, CancellationToken token)
+    {
+        await using var command = Command(connection, transaction, "SELECT COALESCE(MAX(sort_order), 0) + 1 FROM beneficiary_tasks WHERE assigned_user_id=@user AND status<>@done", ("@user", userId), ("@done", (int)UserTaskStatus.Done));
+        return Convert.ToInt32(await command.ExecuteScalarAsync(token).ConfigureAwait(false));
+    }
+
+    // The active tasks of the user are numbered 1, 2, 3... again, in their order (after one left the list).
+    private static async Task RenumberAsync(MySqlConnection connection, MySqlTransaction transaction, int userId, CancellationToken token)
+    {
+        await using var command = Command(connection, transaction, """
+            UPDATE beneficiary_tasks t JOIN (SELECT id, ROW_NUMBER() OVER (ORDER BY sort_order, id) AS rn FROM beneficiary_tasks WHERE assigned_user_id=@user AND status<>@done) x ON x.id=t.id
+            SET t.sort_order=x.rn WHERE t.sort_order<>x.rn
+            """, ("@user", userId), ("@done", (int)UserTaskStatus.Done));
+        await command.ExecuteNonQueryAsync(token).ConfigureAwait(false);
+    }
+
     // ---- Used by the file store (same module): a user who adds a file to the task takes it over too.
     internal static async Task<bool> TakeOverAsync(MySqlConnection connection, MySqlTransaction transaction, int taskId, int userId, string actor, CancellationToken token)
     {
@@ -284,7 +408,7 @@ public sealed class MariaUserTaskRepository(IConfiguration configuration, IAcces
             (UserTaskStatus)Convert.ToInt32(reader.GetValue(9)), reader.IsDBNull(10) ? null : DateOnly.FromDateTime(reader.GetDateTime(10)),
             MariaTimeText.Parse(reader.GetString(11)), reader.GetString(12),
             MariaTimeText.ParseOrNull(reader.IsDBNull(13) ? null : reader.GetString(13)), reader.IsDBNull(14) ? null : reader.GetString(14),
-            MariaTimeText.ParseOrNull(reader.IsDBNull(15) ? null : reader.GetString(15)), Convert.ToInt64(reader.GetValue(16)), Convert.ToInt32(reader.GetValue(17)), (UserTaskPriority)Convert.ToInt32(reader.GetValue(18)));
+            MariaTimeText.ParseOrNull(reader.IsDBNull(15) ? null : reader.GetString(15)), Convert.ToInt64(reader.GetValue(16)), Convert.ToInt32(reader.GetValue(17)), (UserTaskPriority)Convert.ToInt32(reader.GetValue(18)), reader.GetString(19), Convert.ToInt32(reader.GetValue(20)));
     }
 
     private static async Task<long> LockVersionAsync(MySqlConnection connection, MySqlTransaction transaction, int id, CancellationToken token)

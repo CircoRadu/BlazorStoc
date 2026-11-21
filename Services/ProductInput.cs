@@ -22,6 +22,9 @@ public sealed class ProductInput
     // chosen values (Name then only carries the preview); for a subcategory without parameters both stay empty.
     public string BaseModel { get; set; } = "";
     public List<ProductParameterChoice> Parameters { get; set; } = [];
+    // Only the stock import (Modules/EspImport) sets this: the product is created in a subcategory with required parameters without them (its code stays as typed); it is then
+    // incomplete, so every stock movement is refused for it until it is completed in the product editor.
+    public bool AllowIncomplete { get; set; }
 
     public ProductInput Validated(Product? original = null)
     {
@@ -31,6 +34,7 @@ public sealed class ProductInput
             Name = TextNormalization.ForObjectNameOrCode(Name.Trim().Length == 0 && baseModel.Length > 0 ? baseModel : Name),
             BaseModel = baseModel,
             Parameters = [.. Parameters],
+            AllowIncomplete = AllowIncomplete,
             Description = TextNormalization.ForStorage(Description),
             Category = TextNormalization.ForObjectNameOrCode(Category),
             Subcategory = TextNormalization.ForObjectNameOrCode(Subcategory),

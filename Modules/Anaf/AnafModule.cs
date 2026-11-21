@@ -12,7 +12,7 @@ public sealed class AnafModule : IModule
 
     public string Id => ModuleId;
     public string Name => "ANAF (date firme)";
-    public Version Version { get; } = new(1, 0, 0);
+    public Version Version { get; } = new(1, 1, 1);
     public IReadOnlyList<ModuleNavItem> Nav { get; } = [];
 
     public void Register(IServiceCollection services, IConfiguration configuration)
@@ -20,6 +20,9 @@ public sealed class AnafModule : IModule
         services.AddHttpClient(AnafService.ClientName, client => client.Timeout = Timeout.InfiniteTimeSpan)
             .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler { AllowAutoRedirect = false });
         services.AddSingleton<AnafStore>();
+        services.AddSingleton<AnafAuthStore>();
+        services.AddScoped<IAnafAuthService>(provider => new GuardedAnafAuthService(
+            ActivatorUtilities.CreateInstance<AnafAuthService>(provider), provider.GetRequiredService<ModuleRegistry>()));
         services.AddScoped<IAnafService>(provider => new GuardedAnafService(
             ActivatorUtilities.CreateInstance<AnafService>(provider), provider.GetRequiredService<ModuleRegistry>()));
         services.AddScoped<ICompanyDataLookup>(provider => new AnafCompanyLookup(provider.GetRequiredService<IAnafService>()));
@@ -30,6 +33,7 @@ public sealed class AnafModule : IModule
     public void RegisterUnavailable(IServiceCollection services)
     {
         services.AddScoped<IAnafService, UnavailableAnafService>();
+        services.AddScoped<IAnafAuthService, UnavailableAnafAuthService>();
         services.AddScoped<ICompanyDataLookup, UnavailableCompanyLookup>();
         services.AddScoped<ICompanyDataLookupFactory, UnavailableCompanyLookupFactory>();
     }

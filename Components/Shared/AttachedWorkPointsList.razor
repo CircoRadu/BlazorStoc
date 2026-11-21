@@ -1,0 +1,70 @@
+@namespace BlazorStoc.Components.Shared
+@using BlazorStoc.Services
+@inject IAttachedWorkPointRepository Repository
+@inject ILogger<AttachedWorkPointsList> Logger
+@implements IDisposable
+@* The content of the popup "Puncte de lucru arondate" of one work point: the list of its attached work points with the icons to add, edit and delete. Adding and editing open their own popup
+   (AttachedWorkPointEditor), which the page owns; a deletion is one step (the audit trail receives AttachedWorkPointRules.DeleteReason). *@
+<section class="product-editor attached-list" aria-labelledby="attached-list-title">
+    <div class="catalog-heading"><h2 id="attached-list-title">Puncte de lucru arondate la «@Parent.Name» <span>@Items.Count</span></h2><span class="heading-actions"><HelpButton Topic="puncte-de-lucru-editor" About="Punctele de lucru arondate" /><button type="button" class="danger" data-head-close @onclick="() => Closed.InvokeAsync()">Închide</button></span></div>
+    <p class="form-note">Componente ale punctului de lucru (de exemplu clădirile unei școli), fiecare cu numele ei și cu adresă și/sau coordonate GPS proprii.</p>
+    @if (error is not null) { <div class="error-banner" role="alert">@error</div> }
+    @if (CanManage) { <div class="editor-actions"><button type="button" class="refresh act-confirm" id="attached-add-new" disabled="@busy" @onclick="() => AddRequested.InvokeAsync()">+ Adaugă punct arondat</button></div> }
+    @if (Items.Count == 0)
+    {
+        <p class="muted" id="attached-empty">Nu există puncte de lucru arondate la acest punct de lucru.</p>
+    }
+    else
+    {
+        <Paged Items="Items" Id="attached-work-points-page-size" Context="pageRows">
+            <div class="table-scroll"><table id="attached-table"><thead><tr><th>NUME</th><th>ADRESĂ</th><th>COORDONATE GPS</th><th>TELEFON</th><th>PERSOANĂ DE CONTACT</th>@if (CanManage) { <th></th> }</tr></thead><tbody>
+                @foreach (var point in pageRows)
+                {
+                    <tr @key="point.Id"><td><strong>@point.Name</strong></td><td>@point.Address</td><td>@(point.HasCoordinates ? WorkPointCoordinates.Format(point.Latitude, point.Longitude) : "")</td><td>@point.Phone</td><td>@point.ContactPerson</td>
+                        @if (CanManage)
+                        {
+                            <td class="row-actions">
+                                <button class="row-icon edit" disabled="@busy" aria-label="Editează punctul arondat @point.Name" title="Editează punctul arondat @point.Name" @onclick="() => EditRequested.InvokeAsync(point)"></button>
+                                <button class="row-icon delete" disabled="@busy" aria-label="Șterge punctul arondat @point.Name" title="Șterge punctul arondat @point.Name" @onclick="() => DeleteAsync(point)"></button>
+                            </td>
+                        }
+                    </tr>
+                }
+            </tbody></table></div>
+        </Paged>
+    }
+</section>
+
+@code {
+    [Parameter, EditorRequired] public WorkPoint Parent { get; set; } = default!;
+    [Parameter] public IReadOnlyList<AttachedWorkPoint> Items { get; set; } = [];
+    [Parameter] public bool CanManage { get; set; }
+    [Parameter] public EventCallback AddRequested { get; set; }
+    [Parameter] public EventCallback<AttachedWorkPoint> EditRequested { get; set; }
+    [Parameter] public EventCallback Changed { get; set; }
+    [Parameter] public EventCallback Closed { get; set; }
+
+    private bool busy;
+    private string? error;
+    private readonly CancellationTokenSource lifetime = new();
+
+    private async Task DeleteAsync(AttachedWorkPoint point)
+    {
+        if (busy) return;
+        busy = true;
+        error = null;
+        try { await Repository.DeleteAsync(point, lifetime.Token); }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (WorkPointOperationException exception) { error = exception.Message; }
+        catch (AccessDeniedException exception) { error = exception.Message; }
+        catch (Exception exception)
+        {
+            Logger.LogError("Attached work point deletion failed ({ErrorType}).", exception.GetType().Name);
+            error = "Punctul arondat nu a putut fi șters.";
+        }
+        finally { busy = false; }
+        await Changed.InvokeAsync();
+    }
+
+    public void Dispose() { lifetime.Cancel(); lifetime.Dispose(); }
+}

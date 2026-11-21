@@ -5,6 +5,8 @@
 @inject AuthenticationStateProvider Auth
 @inject IOwnAccountService Account
 @inject IUserTaskAlerts TaskAlerts
+@inject BlazorStoc.Modules.Announcements.IAnnouncementService Announcements
+@inject BlazorStoc.Modules.ModuleRegistry Modules
 @* The name of the signed-in user in the top bar opens an overlay over the page with the options of their account: the state of their authenticator, a change of their own password
    (a window over the page) and the sign-out (the confirmation window of the layout). Every user has it; it needs no right of the permission matrix. *@
 
@@ -20,6 +22,15 @@
             <div class="account-head"><strong>@display</strong><small>@name · @role</small></div>
             @if (tasks.HasUser) { <a class="account-item" role="menuitem" href="/taskurile-mele" @onclick="Close">Taskurile mele @if (tasks.NotAccepted > 0) { <span class="account-badge">@tasks.NotAccepted</span> }</a> }
             <a class="account-item" role="menuitem" href="/Account/TwoFactor" @onclick="Close">Autentificatorul meu</a>
+            <a class="account-item" role="menuitem" href="/setari-afisare" @onclick="Close">Setări afișare</a>
+            <a class="account-item" role="menuitem" href="/personalizare-pagina-principala" @onclick="Close">Personalizare dashboard</a>
+            @if (announcementsAvailable)
+            {
+                <div class="account-item account-toggle-row" role="menuitem" id="account-announcements">
+                    <span>Vizibilitate anunțuri generale</span>
+                    <ToggleSwitch Id="account-announcements-toggle" Compact="true" Value="showGeneral" ValueChanged="SetShowGeneralAsync" AriaLabel="Vizibilitate anunțuri generale" Title="@(showGeneral ? "Anunțurile generale se afișează la pornire" : "Anunțurile generale nu se afișează la pornire")" />
+                </div>
+            }
             <button type="button" class="account-item" role="menuitem" disabled="@(!canChangePassword)" @onclick="OpenPassword"
                     title="@(canChangePassword ? "Schimbă parola contului tău" : "Parola administratorului din configurare se schimbă din fișierul de configurare")">Schimbă parola</button>
             @if (!canChangePassword) { <span class="account-note">Parola acestui cont este în fișierul de configurare.</span> }
@@ -34,6 +45,7 @@
     private bool open, changingPassword, canChangePassword;
     private string name = "", display = "", role = "Utilizator";
     private UserTaskAlertSummary tasks = UserTaskAlertSummary.Empty;
+    private bool announcementsAvailable, showGeneral = true;
 
     protected override async Task OnInitializedAsync()
     {
@@ -52,7 +64,22 @@
     private void OnTasksChanged() => InvokeAsync(async () => { tasks = await TaskAlerts.GetAsync(); StateHasChanged(); });
     public void Dispose() => TaskAlerts.Changed -= OnTasksChanged;
 
-    private void Toggle() => open = !open;
+    // The preference "Nu mai afisa anunturile la pornire" of the window of the announcements is switched back on here; it is read again at every opening (the window may have changed it).
+    private async Task Toggle()
+    {
+        open = !open;
+        if (!open) return;
+        announcementsAvailable = Modules.IsAvailable(BlazorStoc.Modules.Announcements.AnnouncementsModule.ModuleId);
+        if (!announcementsAvailable) return;
+        try { showGeneral = !await Announcements.GetHideNormalAsync(); }
+        catch (Exception exception) when (exception is not OperationCanceledException) { announcementsAvailable = false; }
+    }
+
+    private async Task SetShowGeneralAsync(bool show)
+    {
+        try { await Announcements.SetHideNormalAsync(!show); showGeneral = show; }
+        catch (Exception exception) when (exception is not OperationCanceledException) { showGeneral = !show; }
+    }
     private void Close() => open = false;
     private void OpenPassword() { open = false; changingPassword = true; }
     private void ClosePassword() => changingPassword = false;

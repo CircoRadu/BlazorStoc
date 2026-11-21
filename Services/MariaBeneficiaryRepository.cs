@@ -43,6 +43,8 @@ public sealed class MariaBeneficiaryRepository(
             await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
             var createdId = checked((int)command.LastInsertedId);
             await InsertPrimaryWorkPointAsync(connection, transaction, createdId, value, cancellationToken).ConfigureAwait(false);
+            // Every beneficiary has the projects of the mandatory types of Nomenclator -> Proiecte obligatorii.
+            await MariaBeneficiaryProjectTypeRepository.EnsureAsync(connection, transaction, createdId, cancellationToken).ConfigureAwait(false);
             return Build(createdId, value, 0);
         }, cancellationToken, value).ConfigureAwait(false);
         await AuditRecorder.RecordCreateAsync(auditTrail, accessControl, AuditEntities.Beneficiary, beneficiary.Id.ToString(),
@@ -90,8 +92,10 @@ public sealed class MariaBeneficiaryRepository(
         // archive directory); read before the archive operation starts and re-checked inside the transaction.
         var workPoints = new List<WorkPoint>();
         IReadOnlyList<ServicePhoto> photos;
+        IReadOnlyList<AttachedWorkPoint> attached;
         await using (var readConnection = await MariaDb.OpenAsync(configuration, cancellationToken).ConfigureAwait(false))
         {
+            attached = await MariaAttachedWorkPointRepository.ReadForBeneficiaryAsync(readConnection, null, original.Id, cancellationToken).ConfigureAwait(false);
             await using (var command = Command(readConnection, null,
                 $"SELECT {MariaWorkPointRepository.Columns} FROM beneficiary_work_points WHERE beneficiary_id=@id ORDER BY id", ("@id", original.Id)))
             await using (var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false))
@@ -107,7 +111,7 @@ public sealed class MariaBeneficiaryRepository(
         }
         var liveRoot = MariaAssetPaths.ServicePhotos(configuration);
         var archiveRoot = MariaAssetPaths.ArchiveFiles(configuration);
-        await archiver.ExecuteAsync(ArchiveRequests.Beneficiary(original, motif, workPoints, photos), async (operation, token) =>
+        await archiver.ExecuteAsync(ArchiveRequests.Beneficiary(original, motif, workPoints, photos, attached), async (operation, token) =>
         {
             var prepared = await ServicePhotoArchive.PrepareAsync(liveRoot, archiveRoot, photos, operation, token).ConfigureAwait(false);
             try
@@ -119,8 +123,20 @@ public sealed class MariaBeneficiaryRepository(
                         "SELECT EXISTS(SELECT 1 FROM stock_movements WHERE beneficiary_id=@id)", ("@id", original.Id)))
                         BeneficiaryRules.CheckDelete(Convert.ToBoolean(await relations.ExecuteScalarAsync(token).ConfigureAwait(false)));
                     await using (var projects = Command(connection, transaction,
-                        "SELECT COUNT(*) FROM projects WHERE beneficiary_id=@id", ("@id", original.Id)))
+                        """
+                        SELECT COUNT(*) FROM projects p WHERE p.beneficiary_id=@id AND NOT (p.mandatory_type_id IS NOT NULL AND p.observations=''
+                            AND NOT EXISTS (SELECT 1 FROM stock_movements x WHERE x.project_id=p.id)
+                            AND NOT EXISTS (SELECT 1 FROM project_observations x WHERE x.project_id=p.id)
+                            AND NOT EXISTS (SELECT 1 FROM project_components x WHERE x.project_id=p.id)
+                            AND NOT EXISTS (SELECT 1 FROM offers x WHERE x.project_id=p.id)
+                            AND NOT EXISTS (SELECT 1 FROM project_reservations x WHERE x.project_id=p.id)
+                            AND NOT EXISTS (SELECT 1 FROM project_deadlines x WHERE x.project_id=p.id))
+                        """, ("@id", original.Id)))
                         BeneficiaryRules.CheckNoLiveProjects(Convert.ToInt32(await projects.ExecuteScalarAsync(token).ConfigureAwait(false)));
+                    // What is left are mandatory projects nobody used: they go with the beneficiary.
+                    await using (var unusedMandatory = Command(connection, transaction,
+                        "DELETE FROM projects WHERE beneficiary_id=@id AND mandatory_type_id IS NOT NULL", ("@id", original.Id)))
+                        await unusedMandatory.ExecuteNonQueryAsync(token).ConfigureAwait(false);
                     await using (var tasks = Command(connection, transaction,
                         "SELECT COUNT(*) FROM beneficiary_tasks WHERE beneficiary_id=@id", ("@id", original.Id)))
                         BeneficiaryRules.CheckNoTasks(Convert.ToInt32(await tasks.ExecuteScalarAsync(token).ConfigureAwait(false)));
@@ -134,7 +150,12 @@ public sealed class MariaBeneficiaryRepository(
                         "work_point_id IN (SELECT id FROM beneficiary_work_points WHERE beneficiary_id=@id)", token, ("@id", original.Id)).ConfigureAwait(false);
                     if (!currentPhotos.Select(photo => photo.Id).Order().SequenceEqual(photos.Select(photo => photo.Id).Order()))
                         throw new BeneficiaryOperationException("Beneficiarul s-a schimbat între timp. Actualizează lista.");
+                    var currentAttached = await MariaAttachedWorkPointRepository.ReadForBeneficiaryAsync(connection, transaction, original.Id, token).ConfigureAwait(false);
+                    if (!currentAttached.SequenceEqual(attached)) throw new BeneficiaryOperationException("Beneficiarul s-a schimbat între timp. Actualizează lista.");
                     await MariaArchivePersistence.InsertAsync(connection, transaction, operation, prepared, token).ConfigureAwait(false);
+                    await using (var deleteAttached = Command(connection, transaction,
+                        "DELETE FROM work_point_attached WHERE work_point_id IN (SELECT id FROM beneficiary_work_points WHERE beneficiary_id=@id)", ("@id", original.Id)))
+                        await deleteAttached.ExecuteNonQueryAsync(token).ConfigureAwait(false);
                     await using (var deletePhotos = Command(connection, transaction,
                         "DELETE FROM service_photos WHERE work_point_id IN (SELECT id FROM beneficiary_work_points WHERE beneficiary_id=@id)", ("@id", original.Id)))
                         await deletePhotos.ExecuteNonQueryAsync(token).ConfigureAwait(false);

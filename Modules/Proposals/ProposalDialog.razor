@@ -7,16 +7,7 @@
 @* Propune o modificare: the popup opened by the menu entry under "Raportează o eroare" or by the button "Propune" of the bar above any popup (wwwroot/bug-report.js). The script photographs
    the page BEFORE the popup shows and hands the picture to Opened; Ctrl+V pictures arrive through AddPasted. Three tabs: the form, "Propunerile mele" and "Toate propunerile" (every proposal,
    text only, with the answers). A proposal opens in the same popup: its data, the answers and, for the author and the administrator, the pictures and the box of a new answer. *@
-<dialog id="proposal-dialog" class="delete-dialog bug-dialog proposal-dialog" aria-labelledby="proposal-title">
-    <div class="dialog-head"><h2 id="proposal-title">@(viewing is null ? "Propune o modificare" : $"{viewing.Number} – {viewing.Title}")</h2><HelpButton Topic="propunere-modificare" About="Propunerile de modificări" /></div>
-    @if (viewing is null)
-    {
-        <div class="bug-tabs" role="tablist" aria-label="Propuneri">
-            <button type="button" role="tab" id="proposal-tab-new" class="settings-tab @(tab == "new" ? "active" : "")" aria-selected="@(tab == "new")" @onclick="@(() => SelectTab("new"))">Propunere nouă</button>
-            <button type="button" role="tab" id="proposal-tab-mine" class="settings-tab @(tab == "mine" ? "active" : "")" aria-selected="@(tab == "mine")" @onclick="@(() => SelectTab("mine"))">Propunerile mele @if (mine is not null) { <span class="count-badge">@mine.Count</span> }</button>
-            <button type="button" role="tab" id="proposal-tab-all" class="settings-tab @(tab == "all" ? "active" : "")" aria-selected="@(tab == "all")" @onclick="@(() => SelectTab("all"))">Toate propunerile @if (board is not null) { <span class="count-badge">@board.Count</span> }</button>
-        </div>
-    }
+<AppDialog Floating="AnnotatorView" Native="true" Id="proposal-dialog" PanelClass="bug-dialog proposal-dialog" Title="@(viewing is null ? "Propune o modificare" : $"{viewing.Number} – {viewing.Title}")" TitleId="proposal-title" HelpTopic="propunere-modificare" HelpAbout="Propunerile de modificări" ShowModuleActions="false" OnClose="CloseAsync">
     @if (error is not null) { <div class="error-banner" role="alert" id="proposal-error">@error</div> }
 
     @if (viewing is not null)
@@ -54,7 +45,6 @@
             <div class="editor-actions"><button type="button" class="primary" id="proposal-note-send" disabled="@(busy || newNote.Trim().Length == 0)" @onclick="SendNoteAsync">@(busy ? "Se trimite…" : "Trimite răspunsul")</button></div>
         }
         <div class="editor-actions">
-            <button type="button" class="refresh act-nav" id="proposal-back" @onclick="BackToList">Înapoi la listă</button>
             <button type="button" class="refresh act-close" id="proposal-close-view" @onclick="CloseAsync">Închide</button>
         </div>
     }
@@ -62,7 +52,7 @@
     {
         @if (sent is not null)
         {
-            <div class="success-banner" role="status" id="proposal-sent">Propunerea <strong>@sent.Number</strong> a fost trimisă. Mulțumim! O găsești în „Propunerile mele”, iar răspunsurile administratorului apar acolo și în Notificări.</div>
+            <div class="success-banner" role="status" id="proposal-sent">Propunerea <strong>@sent.Number</strong> a fost trimisă. Mulțumim! Răspunsurile administratorului apar în Notificări, fila „Propuneri”.</div>
             <div class="editor-actions">
                 <button type="button" class="refresh act-confirm" id="proposal-another" @onclick="NewProposal">Propune altceva</button>
                 <button type="button" class="refresh act-close" id="proposal-close-sent" @onclick="CloseAsync">Închide</button>
@@ -71,6 +61,11 @@
         else
         {
             <p class="muted bug-intro">Spune-ne ce ai vrea să se schimbe sau ce ai vrea să poți face. Fereastra păstrează ce ai scris dacă o închizi; propunerea pleacă doar când apeși <strong>Trimite propunerea</strong>. O pot vedea toți utilizatorii (textul), iar imaginile doar tu și administratorii.</p>
+            @if (draftKept)
+            {
+                <div class="success-banner" role="status" id="proposal-draft-note">Fereastra a păstrat ciorna ta nesalvată (propunerea nu a fost trimisă).
+                    <span class="editor-actions"><button type="button" class="refresh act-nav" id="proposal-draft-new" @onclick="StartFresh">Începe o propunere nouă</button></span></div>
+            }
             <div class="editor-grid bug-form">
                 <label>Tip
                     <select id="proposal-kind" @bind="kind" disabled="@busy">
@@ -81,7 +76,7 @@
                         @foreach (var item in ProposalRules.Importances) { <option value="@item">@item</option> }
                     </select></label>
                 <label class="wide">Zona aplicației
-                    <input id="proposal-area" maxlength="300" @bind="areaTitle" @bind:event="oninput" disabled="@busy" placeholder="Pagina sau modulul la care se referă; lasă „Toată aplicația” dacă e general" /></label>
+                    <input id="proposal-area" maxlength="300" value="@areaTitle" @oninput="AreaTyped" disabled="@busy" placeholder="Pagina sau modulul la care se referă; lasă „Toată aplicația” dacă e general" /></label>
                 <label class="wide">Titlu scurt
                     <input id="proposal-title-input" maxlength="@ProposalRules.MaxTitle" @bind="title" @bind:event="oninput" @bind:after="SearchSimilarAsync" disabled="@busy" placeholder="Ex.: Căutare după CUI în lista de furnizori" /></label>
                 @if (similar.Count > 0)
@@ -116,13 +111,13 @@
                 {
                     var item = image;
                     <figure class="bug-image">
-                        <button type="button" class="bug-image-zoom" aria-label="Mărește imaginea @item.Label" title="Mărește imaginea @item.Label" @onclick="() => zoomedUrl = new Picture(item.Label, item.ZoomUrl)">
+                        <button type="button" class="bug-image-zoom" aria-label="Marchează zone pe imaginea @item.Label" title="Deschide imaginea mărită și marchează zone" @onclick="() => annotating = item">
                             @if (item.DataUrl is not null) { <img src="@item.DataUrl" alt="@item.Label" /> }
                             else { <span class="bug-image-large">@item.Name · @(item.Bytes.Length / 1024) KB</span> }
                             <span class="bug-zoom-plus" aria-hidden="true">+</span>
                         </button>
                         <figcaption>@item.Label</figcaption>
-                        <button type="button" class="row-icon delete" aria-label="Scoate imaginea @item.Label din propunere" title="Scoate imaginea @item.Label din propunere" disabled="@busy" @onclick="() => images.Remove(item)"></button>
+                        <button type="button" class="row-icon delete" aria-label="Scoate imaginea @item.Label din propunere" title="Scoate imaginea @item.Label din propunere" disabled="@busy" @onclick="() => RemoveImage(item)"></button>
                     </figure>
                 }
             </div>
@@ -143,68 +138,11 @@
             </div>
         }
     }
-    else if (tab == "mine")
-    {
-        <p class="muted bug-intro">Propunerile tale, cele mai noi primele. Starea și răspunsurile le dă administratorul.</p>
-        @if (mine is null) { <div class="empty-state" role="status"><div class="spinner"></div><h3>Se încarcă</h3></div> }
-        else if (mine.Count == 0) { <p class="muted" id="proposal-mine-empty">Nu ai făcut nicio propunere.</p> }
-        else
-        {
-        <Paged Items="mine" Id="proposal-mine-size" Context="pageRows" DefaultSize="10">
-            <div class="table-scroll">
-                <table class="bug-mine" id="proposal-mine-table">
-                    <thead><tr><th>Număr</th><th>Titlu</th><th>Tip</th><th>Stare</th><th>Creat</th><th><span class="sr-only">Operații</span></th></tr></thead>
-                    <tbody>
-                        @foreach (var item in pageRows)
-                        {
-                            var proposal = item;
-                            <tr>
-                                <td>@proposal.Number</td><td>@proposal.Title</td><td>@proposal.Kind</td><td>@proposal.State@(proposal.ImplementedVersion.Length > 0 ? $" ({proposal.ImplementedVersion})" : "")</td><td>@ProposalRules.Display(proposal.CreatedUtc)</td>
-                                <td class="row-actions"><button type="button" class="row-icon view" aria-label="Deschide propunerea @proposal.Number" title="Deschide propunerea @proposal.Number" @onclick="() => OpenAsync(proposal)"></button></td>
-                            </tr>
-                        }
-                    </tbody>
-                </table>
-            </div>
-        </Paged>
-        }
-        <div class="editor-actions"><button type="button" class="refresh act-close" id="proposal-close-mine" @onclick="CloseAsync">Închide</button></div>
-    }
-    else
-    {
-        <div class="proposal-filter">
-            <label class="search-box"><span>⌕</span><input id="proposal-search" aria-label="Caută în propuneri" placeholder="Caută în titlu și descriere…" @bind="boardText" @bind:event="onchange" @bind:after="LoadBoardAsync" /></label>
-            <ToggleSwitch Id="proposal-only-open" Value="onlyOpen" ValueChanged="OnlyOpenChangedAsync" OnText="Doar cele deschise" OffText="Toate, și cele închise" />
-        </div>
-        @if (board is null) { <div class="empty-state" role="status"><div class="spinner"></div><h3>Se încarcă</h3></div> }
-        else if (board.Count == 0) { <p class="muted" id="proposal-all-empty">Nicio propunere pentru filtrul ales.</p> }
-        else
-        {
-        <Paged Items="board" Id="proposal-all-size" Context="pageRows" DefaultSize="10">
-            <div class="table-scroll">
-                <table class="bug-mine" id="proposal-all-table">
-                    <thead><tr><th>Număr</th><th>Titlu</th><th>Tip</th><th>Stare</th><th>Autor</th><th>Creat</th><th><span class="sr-only">Operații</span></th></tr></thead>
-                    <tbody>
-                        @foreach (var item in pageRows)
-                        {
-                            var proposal = item;
-                            <tr>
-                                <td>@proposal.Number</td><td>@proposal.Title</td><td>@proposal.Kind</td><td>@proposal.State@(proposal.ImplementedVersion.Length > 0 ? $" ({proposal.ImplementedVersion})" : "")</td><td>@proposal.UserName</td><td>@ProposalRules.Display(proposal.CreatedUtc)</td>
-                                <td class="row-actions"><button type="button" class="row-icon view" aria-label="Deschide propunerea @proposal.Number" title="Deschide propunerea @proposal.Number" @onclick="() => OpenAsync(proposal)"></button></td>
-                            </tr>
-                        }
-                    </tbody>
-                </table>
-            </div>
-        </Paged>
-        }
-        <div class="editor-actions"><button type="button" class="refresh act-close" id="proposal-close-all" @onclick="CloseAsync">Închide</button></div>
-    }
     @if (zoomedUrl is not null)
     {
         <ImageLightbox Src="@zoomedUrl.Url" Title="@zoomedUrl.Name" Closed="() => zoomedUrl = null" />
     }
-</dialog>
+</AppDialog>
 
 @code {
     private sealed record Picture(string Name, string Url);
@@ -212,10 +150,14 @@
     private sealed class PendingImage(string kind, string name, byte[] bytes, string contentType)
     {
         public string Kind { get; } = kind;
-        public string Name { get; } = name;
-        public byte[] Bytes { get; } = bytes;
-        public string? DataUrl { get; } = bytes.Length <= 1_500_000 ? $"data:{contentType};base64,{Convert.ToBase64String(bytes)}" : null;
-        public string ZoomUrl => DataUrl ?? $"data:{contentType};base64,{Convert.ToBase64String(bytes)}";
+        public string Name { get; private set; } = name;
+        public string Id { get; } = Guid.NewGuid().ToString("N");
+        public byte[] Bytes { get; private set; } = bytes;
+        private string mime = contentType;
+        public string? DataUrl { get; private set; } = bytes.Length <= 1_500_000 ? $"data:{contentType};base64,{Convert.ToBase64String(bytes)}" : null;
+        // The picture marked in the window of marking replaces the bytes (JPEG); the original stays in the script until the form is left.
+        public void Replace(byte[] marked, string type) { Bytes = marked; mime = type; Name = Path.ChangeExtension(Name, ".jpg"); DataUrl = marked.Length <= 1_500_000 ? $"data:{type};base64,{Convert.ToBase64String(marked)}" : null; }
+        public string ZoomUrl => DataUrl ?? $"data:{mime};base64,{Convert.ToBase64String(Bytes)}";
         public string Label => Kind switch { ReportImageRules.KindScreenshot => "Captura paginii", ReportImageRules.KindFile => Name, _ => "Imagine lipită" };
     }
 
@@ -223,7 +165,7 @@
     private readonly List<PendingImage> images = [];
     private DotNetObjectReference<ProposalDialog>? self;
     private string tab = "new", kind = ProposalRules.KindChange, importance = ProposalRules.ImportanceMedium, title = "", description = "", benefit = "", areaTitle = "", areaRoute = "", boardText = "", newNote = "";
-    private bool busy, capturedAuto = true, confirmDiscard, onlyOpen = true, canAnswer;
+    private bool busy, capturedAuto = true, confirmDiscard, onlyOpen = true, canAnswer, draftKept;
     private string? error;
     private Proposal? sent, viewing;
     private IReadOnlyList<Proposal>? mine, board;
@@ -231,6 +173,15 @@
     private IReadOnlyList<ProposalNote> notes = [];
     private List<Picture> viewImages = [];
     private Picture? zoomedUrl;
+    private PendingImage? annotating;
+    private RenderFragment? AnnotatorView => annotating is not { } shown ? null : @<ImageAnnotator @key="shown.Id" ImageId="@shown.Id" Label="@shown.Label" Src="@shown.ZoomUrl" MaxBytes="ReportImageRules.MaxImageBytes" Applied="AppliedAsync" Closed="() => annotating = null" />;
+    private void RemoveImage(PendingImage item) { images.Remove(item); if (annotating == item) annotating = null; _ = ForgetAsync(item.Id); }
+    private async Task ForgetAsync(string id) { try { await JS.InvokeVoidAsync("imageAnnotate.forget", id); } catch (Exception exception) when (exception is JSException or InvalidOperationException or TaskCanceledException or JSDisconnectedException) { } }
+    private Task AppliedAsync((string ImageId, byte[] Bytes, string ContentType) marked)
+    {
+        images.FirstOrDefault(item => item.Id == marked.ImageId)?.Replace(marked.Bytes, marked.ContentType);
+        return Task.CompletedTask;
+    }
     private readonly CancellationTokenSource lifetime = new();
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
@@ -253,7 +204,8 @@
     [JSInvokable]
     public async Task Opened(IJSStreamReference? screenshot, string pageRoute, string pageName, string tech)
     {
-        if (areaTitle.Length == 0 || sent is not null) { areaRoute = pageRoute; areaTitle = PageArea(pageName); }
+        // BUG-0036: the area is the page the window was opened from; a kept draft follows the page too, unless the user wrote the area by hand.
+        if (areaTitle.Length == 0 || sent is not null || !areaTyped) { areaRoute = pageRoute; areaTitle = PageArea(pageName); areaTyped = false; }
         images.RemoveAll(item => item.Kind == ReportImageRules.KindScreenshot);
         capturedAuto = false;
         if (screenshot is not null)
@@ -270,7 +222,9 @@
             catch (Exception exception) when (exception is not OperationCanceledException) { Logger.LogWarning("The capture of the page could not be read ({ErrorType}).", exception.GetType().Name); }
         }
         if (sent is not null) ResetForm();
-        viewing = null; zoomedUrl = null; tab = "new"; error = null; confirmDiscard = false;
+        // BUG-0039: a draft that was closed with "Închide (păstrează ciorna)" (or whose sending was refused) is still in the form: the window says so and offers a clean start.
+        draftKept = sent is null && (title.Length > 0 || description.Length > 0 || benefit.Length > 0);
+        viewing = null; zoomedUrl = null; annotating = null; tab = "new"; error = null; confirmDiscard = false;
         await InvokeAsync(StateHasChanged);
     }
 
@@ -446,12 +400,16 @@
 
     private void ResetForm(bool keepSent = false)
     {
+        draftKept = false;
         title = description = benefit = ""; kind = ProposalRules.KindChange; importance = ProposalRules.ImportanceMedium; confirmDiscard = false; similar = [];
         images.RemoveAll(item => item.Kind != ReportImageRules.KindScreenshot || keepSent);
         if (!keepSent) sent = null;
     }
 
     private void NewProposal() { sent = null; ResetForm(); error = null; }
+    private bool areaTyped;
+    private void AreaTyped(ChangeEventArgs args) { areaTitle = args.Value?.ToString() ?? ""; areaTyped = true; }
+    private void StartFresh() { ResetForm(); draftKept = false; error = null; }
 
     private void AskDiscard()
     {

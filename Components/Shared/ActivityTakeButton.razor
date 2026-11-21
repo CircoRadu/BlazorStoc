@@ -1,0 +1,85 @@
+@implements IDisposable
+@inject IServiceProvider Services
+@* "Preia din ActivityApp": a small button put beside the label of a beneficiary choice. It is shown only when the import runs and the user may add beneficiaries. A press opens a window that takes the
+   partners new in ActivityApp as beneficiaries now, shows the progress and then the result; when something new was taken, OnTaken runs (the page loads its list again). *@
+@if (canTake)
+{
+    <button type="button" class="refresh act-reload take-button" id="take-activityapp" title="Preia acum din ActivityApp beneficiarii introduși acolo și încă absenți la noi" @onclick="OpenAsync">Preia din ActivityApp</button>
+}
+@if (open)
+{
+    <AppDialog Title="Preluare din ActivityApp" TitleId="take-title" HelpTopic="beneficiari-preluare-activityapp" HelpAbout="Preluare beneficiari din ActivityApp" PanelClass="take-dialog" Locked="@running" ShowClose="@(!running)" OnClose="CloseAsync">
+        <div id="take-progress" role="status" aria-live="polite">
+            <p><strong>@stage</strong></p>
+            @if (running)
+            {
+                @if (total > 0) { <ProgressBar Percent="percent" Label="Progresul preluării" /><small>@done din @total</small> }
+                else { <div class="spinner" aria-hidden="true"></div> }
+            }
+        </div>
+        @if (result is not null)
+        {
+            <div id="take-result">
+                @if (!result.Completed) { <div class="error-banner" role="alert">@result.Message</div> }
+                else
+                {
+                    <ul class="take-summary">
+                        <li><span class="count-badge">@result.Created</span> beneficiari noi creați</li>
+                        <li><span class="count-badge">@result.Linked</span> legați de beneficiari existenți</li>
+                        <li><span class="count-badge">@result.Waiting</span> în așteptare (de verificat sau de acceptat)</li>
+                        <li><span class="count-badge">@result.Problems</span> cu probleme</li>
+                    </ul>
+                    @if (result.NewNames.Count > 0)
+                    {
+                        <p><strong>Beneficiari noi</strong></p>
+                        <ul class="take-names">@foreach (var name in result.NewNames.Take(30)) { <li>@name</li> }</ul>
+                        @if (result.NewNames.Count > 30) { <small>și încă @(result.NewNames.Count - 30)</small> }
+                    }
+                    else { <p class="muted">Nu există beneficiari noi în ActivityApp.</p> }
+                }
+            </div>
+        }
+        <div class="editor-actions"><button type="button" class="refresh act-close" disabled="@running" @onclick="CloseAsync">Închide</button></div>
+    </AppDialog>
+}
+
+@code {
+    [Parameter] public EventCallback OnTaken { get; set; }
+    private readonly CancellationTokenSource lifetime = new();
+    private bool canTake, open, running;
+    private string stage = "";
+    private int done, total, percent;
+    private PartnerTakeResult? result;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender || Services.GetService<IBeneficiaryTakeService>() is not { } service) return;
+        try { canTake = await service.CanTakeAsync(lifetime.Token); } catch (Exception) { canTake = false; }
+        if (canTake) await InvokeAsync(StateHasChanged);
+    }
+
+    private async Task OpenAsync()
+    {
+        if (running || Services.GetService<IBeneficiaryTakeService>() is not { } service) return;
+        open = true; running = true; result = null; stage = "Se pornește preluarea…"; done = total = percent = 0;
+        var progress = new Progress<PartnerTakeProgress>(value => { stage = value.Stage; done = value.Done; total = value.Total; percent = value.Percent; _ = InvokeAsync(StateHasChanged); });
+        StateHasChanged();
+        try { result = await service.TakeAsync(progress, lifetime.Token); }
+        catch (OperationCanceledException) { result = new PartnerTakeResult(false, 0, 0, 0, 0, [], "Preluarea a fost întreruptă."); }
+        catch (AccessDeniedException exception) { result = new PartnerTakeResult(false, 0, 0, 0, 0, [], exception.Message); }
+        catch (Exception) { result = new PartnerTakeResult(false, 0, 0, 0, 0, [], "Preluarea nu s-a putut face. Reîncearcă peste câteva minute."); }
+        running = false;
+        stage = result.Completed ? "Preluarea s-a încheiat." : "Preluarea nu s-a încheiat.";
+        StateHasChanged();
+    }
+
+    private async Task CloseAsync()
+    {
+        if (running) return;
+        var created = result is { Completed: true, Created: > 0 };
+        open = false; result = null;
+        if (created) await OnTaken.InvokeAsync();
+    }
+
+    public void Dispose() { lifetime.Cancel(); lifetime.Dispose(); }
+}

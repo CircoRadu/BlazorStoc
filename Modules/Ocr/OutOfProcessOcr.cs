@@ -20,7 +20,7 @@ internal sealed class OutOfProcessInvoicePdfReader(OcrWorkerRunner runner, Modul
 {
     private static Exception Failed(string message) => new InvoiceAnalysisException(message);
 
-    public async Task<InvoiceReadResult> ReadAsync(Stream pdfStream, CancellationToken cancellationToken = default)
+    public async Task<InvoiceReadResult> ReadAsync(Stream pdfStream, CancellationToken cancellationToken = default, IProgress<int>? progress = null)
     {
         using var buffered = new MemoryStream();
         await pdfStream.CopyToAsync(buffered, cancellationToken).ConfigureAwait(false);
@@ -33,7 +33,7 @@ internal sealed class OutOfProcessInvoicePdfReader(OcrWorkerRunner runner, Modul
             var pictures = new List<byte[]>();
             for (var index = 0; File.Exists(Path.Combine(folder, OcrFiles.Preview(index))); index++) pictures.Add(File.ReadAllBytes(Path.Combine(folder, OcrFiles.Preview(index))));
             return (read, pictures);
-        }, cancellationToken), Failed).ConfigureAwait(false);
+        }, cancellationToken, progress), Failed).ConfigureAwait(false);
         return new InvoiceReadResult(document, previews, bytes);
     }
 
@@ -50,14 +50,14 @@ internal sealed class OutOfProcessInvoicePdfReader(OcrWorkerRunner runner, Modul
 
 internal sealed class OutOfProcessInventoryPickupOcrService(OcrWorkerRunner runner, ModuleRegistry modules, IWebHostEnvironmentTessdataPath tessdata) : IInventoryPickupOcrService
 {
-    public async Task<InventoryPickupScanResult> ScanAsync(Stream pdfStream, CancellationToken cancellationToken = default)
+    public async Task<InventoryPickupScanResult> ScanAsync(Stream pdfStream, CancellationToken cancellationToken = default, IProgress<int>? progress = null)
     {
         using var buffered = new MemoryStream();
         await pdfStream.CopyToAsync(buffered, cancellationToken).ConfigureAwait(false);
         if (buffered.Length > InventoryPickupOcrRules.MaxFileSizeBytes) throw new InventoryPickupOcrException(InventoryPickupOcrRules.TooLargeMessage);
         var bytes = buffered.ToArray();
         return await OcrGuard.RunAsync(modules, () => runner.RunAsync(OcrOperations.InventoryScan, tessdata.Path, bytes, null,
-            folder => OcrJson.Read<InventoryPickupScanResult>(File.ReadAllText(Path.Combine(folder, OcrFiles.Result))), cancellationToken),
+            folder => OcrJson.Read<InventoryPickupScanResult>(File.ReadAllText(Path.Combine(folder, OcrFiles.Result))), cancellationToken, progress),
             message => new InventoryPickupOcrException(message)).ConfigureAwait(false);
     }
 }
@@ -65,12 +65,12 @@ internal sealed class OutOfProcessInventoryPickupOcrService(OcrWorkerRunner runn
 // Stand-ins while the module is switched off or did not start: the pages that inject the readers are still created and say that recognition is out.
 internal sealed class UnavailableInvoicePdfReader : IInvoicePdfReader
 {
-    public Task<InvoiceReadResult> ReadAsync(Stream pdfStream, CancellationToken cancellationToken = default) =>
+    public Task<InvoiceReadResult> ReadAsync(Stream pdfStream, CancellationToken cancellationToken = default, IProgress<int>? progress = null) =>
         Task.FromException<InvoiceReadResult>(new InvoiceAnalysisException(OcrRules.UnavailableMessage));
 }
 
 internal sealed class UnavailableInventoryPickupOcrService : IInventoryPickupOcrService
 {
-    public Task<InventoryPickupScanResult> ScanAsync(Stream pdfStream, CancellationToken cancellationToken = default) =>
+    public Task<InventoryPickupScanResult> ScanAsync(Stream pdfStream, CancellationToken cancellationToken = default, IProgress<int>? progress = null) =>
         Task.FromException<InventoryPickupScanResult>(new InventoryPickupOcrException(OcrRules.UnavailableMessage));
 }

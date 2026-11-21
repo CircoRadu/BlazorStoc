@@ -922,3 +922,34 @@ Taskuri: prioritate, ordonare, editare de utilizator; popup-uri uniforme (0.5.58
 Modulul Propuneri (0.5.61) (09.11.2026): Notificari pentru rapoartele de erori; help si capturi pentru ferestrele noi; verificare in browser ca utilizator simplu, tema intunecata, telefon.
 
 Bara popup-ului ancorata de popup (BUG-0006) (09.11.2026): Pachet cu corectia (0.5.62), la cerere; verificare in aplicatie pe telefon.
+
+Taskuri: taburi pe utilizator, ordine proprie, stadiu si jurnal al taskului (10.11.2026): Taskuri: tragerea cu mouse-ul a randurilor (task-order.js) verificata doar sintactic si prin tastatura in teste; de incercat in browser real
+
+### 10.11.2026 - Fereastra Tichet exemplu cu ActivityApp real (ActivityImport 0.15.0)
+- Motiv: baza de test nu are un ActivityApp real de unde sa se citeasca tichetul exemplu; fluxul (alegere, mutare, camp nou, sumar) este verificat cu teste de componenta, iar suspendarea importului cu MariaDB. Pasii sunt in Teste utilizator/18 (modificarile 10.11.2026).
+
+Setari: Spatiu pe disc, popup propuneri/erori, marcarea zonelor, mutare/redimensionare ferestre (0.5.67) (10.11.2026): Preview-ul 5087 si pachetul 0.5.66 nu contin aceste modificari; help .help/capturi in docs/HELP_DE_REGENERAT.md
+
+Dezvoltator (cont), stergere in bloc, popup propunere fara taburi, editare continut, capturi mari (0.5.68) (10.11.2026): Marcarea unui cont obisnuit (nu administrator) ca dezvoltator verificata doar prin test MariaDB; help .help/capturi in docs/HELP_DE_REGENERAT.md
+
+Ferestre unitare: bara de prindere, redimensionare, Ajutor si marcare pe structura comuna (0.5.69) (10.11.2026): Ferestrele cu antetul scris in continut (aprox. 60 de utilizari AppDialog fara Title) au bara de prindere deasupra, nu antet in AppDialog; migrarea lor pe Title ramane de facut pe module
+
+Bara ferestrelor template v2 pentru toate dialogurile (0.5.70) (10.11.2026): Verificare vizuala pe ferestrele reale din module cu date (Facturi, Mișcari): doar clasele au fost comparate in harness
+
+BUG-0021, BUG-0022, BUG-0023 (versiunea 0.5.75) (12.11.2026): Fereastra Tichet exemplu cu date reale ActivityApp (necesita autentificare Windows): de verificat de utilizator.
+
+BUG-0024, informatii obligatorii si format observatii (versiunea 0.5.76) (12.11.2026): Fereastra Tichet exemplu cu date reale ActivityApp (autentificare Windows) si observatiile aldine in Mentenanta: de verificat de utilizator.
+
+Versiunea 0.5.87: ANAF cu sub-taburi (Preluare date firme, E-Factura) si ajutorul actualizat (14.11.2026): Autentificarea reala in ANAF (E-Factura) nu e testata: cere cont ANAF, certificat calificat si o adresa de raspuns HTTPS inregistrata la ANAF; tokenul obtinut nu e folosit inca pentru facturi.
+
+Invatare OCR la preluarea inventarului (etapele 1-3) (16.11.2026): Preluare end-to-end cu un scan real si produse reale (salvarea corectiilor din pagina de preluare) si etapa 4 (folosirea invatarii la citire)
+
+Invatare OCR etapa 4 si 5 (calibrare pe cifre, teste) (16.11.2026): Preluarea completa pana la salvarea corectiilor in browser nu a mers: backup-ul de siguranta nu ruleaza pe instanta de test, deci salvarea e acoperita doar de testul MariaDB
+
+Teme de culori, progres facturi/oferte, PROP-0039/40/41/42 (versiunea 0.5.99) (18.11.2026): Verificari: grupurile display, elcomtur, xml, offers, ocrworker, MariaDB consum net; pagina de test pentru palete si aplicare imediata
+
+Bonuri de consum ale proiectelor (versiunea 0.6.1) (18.11.2026): Verificari: grupurile notes, help, structure, moduleversions, package; MariaDB (generare, inactivare, stergere, jurnal); browser pe instanta de test (generare, eroare fara echipamente, cautare, stergere, PDF)
+
+Tab Retur, echipamente proiect cu istoric, bon pe cantitatea neta (versiunea 0.6.1) (18.11.2026): Verificari: MariaDB (retur din proiect, limite, jurnal, protectii storno/stergere, retur din vehicul cu descriere, bon net), reguli, grupurile notes/help/structure/moduleversions; browser pe instanta de test (tab Retur, descriere automata, retur salvat, echipamente si istoric)
+
+PROP-0043, PROP-0044, PROP-0045 (versiunea 0.6.3) (20.11.2026): Descarca toate cu folder ales si tiparirea efectiva nu pot fi parcurse in browser headless; capturile de help pentru bon-consum sunt de facut (docs/HELP_DE_REGENERAT.md).

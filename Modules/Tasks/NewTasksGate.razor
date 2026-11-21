@@ -1,0 +1,125 @@
+@using BlazorStoc.Modules
+@using BlazorStoc.Components.Shared
+@implements IDisposable
+@inject IUserTaskRepository Repository
+@inject IUserTaskAlerts Alerts
+@inject IAccessControl Access
+@inject ModuleRegistry Modules
+@inject ForcedDialogGate Gate
+@inject ILogger<NewTasksGate> Logger
+@* In the layout of every page (an interactive island): the tasks the administrator gave to the signed-in user and that were not taken over yet are shown in a window over the page,
+   at the sign-in and, while the session is open, at the moment the administrator adds one (UserTaskAlerts.Changed). The window cannot be closed (no Escape, no backdrop, no round button)
+   and "Închide" stays off until every task is taken over; ForcedDialogGate keeps the circuit on its page meanwhile. The page behind is never touched. *@
+@if (open)
+{
+    <AppDialog Title="Taskuri noi primite" Tone="alert" Locked="true" Alert="true" Size="AppDialogSize.L" BackdropClass="front" ShowModuleActions="false" PanelClass="new-tasks-gate" HelpTopic="taskuri-noi">
+        <ChildContent>
+            <p class="muted new-tasks-gate-note">@(pending.Count == 0 ? "Toate taskurile au fost preluate." : "Ai taskuri noi de la administrator. Preia-le pe toate ca să poți continua.")</p>
+            @if (error is not null) { <div class="error-banner new-tasks-gate-error" role="alert">@error</div> }
+            @if (pending.Count > 0)
+            {
+                <div class="table-scroll"><table id="new-tasks-gate-table"><thead><tr><th>BENEFICIAR</th><th>TITLU</th><th>PRIORITATE</th><th>TERMEN</th><th>DE LA</th><th><span class="sr-only">Acțiuni</span></th></tr></thead><tbody>
+                @foreach (var task in pending)
+                {
+                    <tr @key="task.Id" class="task-row-new">
+                        <td>@task.BeneficiaryName</td>
+                        <td><strong>@task.Title</strong><br /><small class="muted" title="@task.Description">@Shorten(task.Description)</small></td>
+                        <td><span class="task-prio @UserTaskRules.PriorityClass(task.Priority)">@UserTaskRules.PriorityLabel(task.Priority)</span></td>
+                        <td>@(task.DueDate is { } due ? due.ToString("dd.MM.yyyy", System.Globalization.CultureInfo.InvariantCulture) : "—")</td>
+                        <td>@task.CreatedBy</td>
+                        <td><button type="button" class="row-icon check" disabled="@busy" aria-label="@($"Preia taskul {task.Title}")" title="@($"Preia taskul {task.Title}")" @onclick="() => AcceptAsync(task)"></button></td>
+                    </tr>
+                }
+                </tbody></table></div>
+            }
+        </ChildContent>
+        <Footer>
+            <div class="editor-actions">
+                <button type="button" class="primary" id="new-tasks-gate-accept-all" disabled="@(busy || pending.Count == 0)" @onclick="AcceptAllAsync">Preia toate</button>
+                <button type="button" class="refresh act-close" id="new-tasks-gate-close" disabled="@(pending.Count > 0)" title="@(pending.Count > 0 ? "Se activează după ce preiei toate taskurile" : "Închide")" @onclick="CloseDialog">Închide</button>
+            </div>
+        </Footer>
+    </AppDialog>
+}
+
+@code {
+    private readonly CancellationTokenSource lifetime = new();
+    private IReadOnlyList<UserTask> pending = [];
+    private bool open;
+    private bool busy;
+    private string? error;
+
+    protected override async Task OnInitializedAsync()
+    {
+        Alerts.Changed += OnChanged;
+        await ReloadAsync();
+    }
+
+    private void OnChanged() => _ = InvokeAsync(async () => { await ReloadAsync(); StateHasChanged(); });
+
+    private async Task ReloadAsync()
+    {
+        try
+        {
+            if (!Modules.IsAvailable(TasksModule.ModuleId) || await Access.GetUserIdAsync(lifetime.Token) is null) { pending = []; open = false; }
+            else
+            {
+                var mine = await Repository.GetMineAsync(lifetime.Token);
+                pending = [.. mine.Where(task => task.IsActive && !task.IsAccepted).OrderByDescending(task => task.CreatedUtc)];
+                // Any task waiting (also one that arrived after the window was closed) opens the window again.
+                if (pending.Count > 0) open = true;
+            }
+        }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            Logger.LogDebug("New tasks loading failed ({ErrorType}).", exception.GetType().Name);
+        }
+        Gate.Active = open && pending.Count > 0;
+    }
+
+    private async Task AcceptAsync(UserTask task)
+    {
+        if (busy) return;
+        busy = true; error = null;
+        try { await Repository.AcceptAsync(task, lifetime.Token); }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (Exception exception) when (exception is UserTaskOperationException or AccessDeniedException) { error = exception.Message; }
+        catch (Exception exception)
+        {
+            Logger.LogError("Taking over a task failed ({ErrorType}).", exception.GetType().Name);
+            error = "Taskul nu a putut fi preluat.";
+        }
+        finally { busy = false; }
+        await ReloadAsync();
+    }
+
+    private async Task AcceptAllAsync()
+    {
+        if (busy) return;
+        busy = true; error = null;
+        try
+        {
+            foreach (var task in pending.ToList())
+            {
+                try { await Repository.AcceptAsync(task, lifetime.Token); }
+                catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { return; }
+                catch (Exception exception) when (exception is UserTaskOperationException or AccessDeniedException) { error = exception.Message; }
+                catch (Exception exception) { Logger.LogError("Taking over a task failed ({ErrorType}).", exception.GetType().Name); error = "Unele taskuri nu au putut fi preluate."; }
+            }
+        }
+        finally { busy = false; }
+        await ReloadAsync();
+    }
+
+    private void CloseDialog()
+    {
+        if (pending.Count > 0) return;
+        open = false;
+        Gate.Active = false;
+    }
+
+    private static string Shorten(string text) => text.Length <= 90 ? text : text[..87] + "…";
+
+    public void Dispose() { Alerts.Changed -= OnChanged; Gate.Active = false; lifetime.Cancel(); lifetime.Dispose(); }
+}

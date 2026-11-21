@@ -53,8 +53,8 @@ public static partial class Breadcrumbs
             case "produse" when parts.Length >= 2 && parts[1] == "preluare-factura":
                 return parts.Length > 2 ? Chain(new("Produse"), new("Preluare factură", "/produse/preluare-factura"), new("Factură")) : Chain(new("Produse"), new("Preluare factură"));
             case "iesiri": return Chain(new("Produse"), new("Ieșire multiplă"));
-            case "consum": return Chain(new("Produse"), new("Export consum"));
-            case "inventar": return Chain(new("Inventar"), parts.Length > 1 ? new("Preluare inventar") : new("Generare situație"));
+            case "consum": return parts.Length > 1 && parts[1] == "bon" ? Chain(new("Produse"), new("Generează bon de consum")) : Chain(new("Produse"), new("Export consum"));
+            case "inventar": return Chain(new("Inventar"), parts.Length > 1 ? (parts[1] == "invatare-ocr" ? new("Învățare OCR") : new("Preluare inventar")) : new("Generare situație"));
             case "categorii": return Chain(new("Administrare"), new("Categorii"));
             case "beneficiari": return parts.Length == 1 ? Chain(new("Administrare"), new("Beneficiari")) : Chain(new("Administrare"), new("Beneficiari", "/beneficiari"), new("Fișa beneficiarului"));
             case "proiecte":

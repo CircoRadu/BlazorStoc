@@ -5,6 +5,8 @@ Captura: editare | /vehicule | click sel:button.row-icon.edit[aria-label*='Edite
 
 Formularul pentru un vehicul nou sau pentru editarea unuia existent. Se deschide deasupra registrului sau fișei vehiculului.
 
+Adăugarea unui vehicul se face într-o fereastră peste pagină.
+
 ## Elemente
 ### Câmpuri
 - Număr de înmatriculare * | câmp | În forma AA-OOO-AAA: 1–2 litere, 2–3 cifre, 3 litere (de exemplu HD-01-FDG, B-123-ABC). Nu poate exista de două ori.

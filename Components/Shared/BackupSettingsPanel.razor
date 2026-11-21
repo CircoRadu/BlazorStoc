@@ -121,8 +121,7 @@
 
 @if (pendingRemoval is not null)
 {
-    <div class="delete-overlay">
-        <section class="delete-dialog delete-confirmation-dialog" role="dialog" aria-modal="true" aria-labelledby="retention-confirm-title">
+    <AppDialog PanelClass="delete-confirmation-dialog" LabelledBy="retention-confirm-title" OnClose="CancelRemoval">
             <h2 id="retention-confirm-title">Ștergi @pendingRemoval.Count @(pendingRemoval.Count == 1 ? "pachet vechi" : "pachete vechi") de pe server?</h2>
             <p>Cu pragul de @retentionDays zile, salvarea șterge acum pachetele de mai jos (toate tipurile, inclusiv copiile de siguranță dinaintea restaurărilor). Ultimele @BackupSettingsRules.KeepNewest pachete se păstrează oricum.</p>
             <ul class="retention-list">
@@ -136,8 +135,7 @@
                 <button type="button" class="danger" disabled="@busy" @onclick="ConfirmRemovalAsync">@(busy ? "Se salvează…" : "Salvează și șterge")</button>
                 <button type="button" disabled="@busy" @onclick="CancelRemoval">Renunță (nu se salvează)</button>
             </div>
-        </section>
-    </div>
+    </AppDialog>
 }
 
 @code {

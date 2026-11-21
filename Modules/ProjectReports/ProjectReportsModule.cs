@@ -12,7 +12,7 @@ public sealed class ProjectReportsModule : IModule
 
     public string Id => ModuleId;
     public string Name => "Situația proiectului și export consum";
-    public Version Version { get; } = new(1, 0, 0);
+    public Version Version { get; } = new(1, 1, 2);
     // The links are in the stock menu ("Export consum"), on the main page and on the project page, each shown only while the module is available.
     public IReadOnlyList<ModuleNavItem> Nav { get; } = [];
 

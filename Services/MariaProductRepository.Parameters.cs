@@ -35,6 +35,8 @@ public sealed partial class MariaProductRepository
         // The position is the place in the chain (ancestors first, then the own parameters). Every parameter needs a value and every family exactly one of its members; the value of a family goes at the place of its first member.
         var slots = ProductParameterRules.Slots(definitions.Select((item, index) => new SubcategoryParameter(item.Id, "", subcategory, item.Name, item.Unit, item.Kind, index, 0, [], item.FamilyId)), families);
         if (slots.Count == 0) return new ParameterResolution(value.Name, null, []);
+        // A product taken frozen by the stock import is created without parameters (and so without a model): it is incomplete until it is completed.
+        if (value.AllowIncomplete && value.BaseModel.Length == 0 && value.Parameters.Count == 0) return new ParameterResolution(value.Name, null, []);
         var chosenIds = value.Parameters.Select(item => item.ParameterId).Where(id => definitions.Any(item => item.Id == id)).ToHashSet();
         var baseModel = value.BaseModel.Length == 0
             ? throw new ProductOperationException(ProductParameterRules.RequiredMessage(subcategory, slots.Select(slot => slot.Name)))

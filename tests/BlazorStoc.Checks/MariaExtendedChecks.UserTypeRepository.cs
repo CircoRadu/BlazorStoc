@@ -54,6 +54,19 @@ public static partial class MariaExtendedChecks
             await Rejects<UserOperationException>(() => repository.UpdateAsync(type, edit), "A stale type edit is rejected");
             type = updated;
 
+            // PROP-0013: the keys of the reports of errors and of the proposals belong to the accounts marked as developers, whatever their type.            Check(!keys.Contains("setari-propuneri.view") && !keys.Contains("setari-bug-raport.view"), "A user that is not a developer has no key of the reports and the proposals");            var marked = await users.SetDeveloperAsync(user, true);            keys = await permissions.GetKeysAsync(principal);            Check(marked.IsDeveloper && keys.Contains("setari-propuneri.view") && keys.Contains("setari-bug-raport.edit") && keys.Contains("setari-propuneri.export"), "A developer sees the reports and the proposals even with a limited type, at once");            Check((await users.GetUsersAsync()).First(item => item.Id == user.Id).IsDeveloper, "The list of accounts tells which ones are developers");            await Rejects<UserOperationException>(() => users.SetDeveloperAsync(user, false), "A stale mark of a developer is rejected");            var revoked = await users.SetDeveloperAsync(marked, false);            keys = await permissions.GetKeysAsync(principal);            Check(!revoked.IsDeveloper && !keys.Contains("setari-propuneri.view") && !keys.Contains("setari-bug-raport.view"), "Revoking the developer right takes the keys back at once");            var devEvents = (await audit.GetEventsAsync()).Where(item => item.TimestampUtc > since && item.EntityType == AuditEntities.User).Select(item => item.Action).ToList();            Check(devEvents.Contains(AuditActions.GrantDeveloper) && devEvents.Contains(AuditActions.RevokeDeveloper), "Granting and revoking the developer right are journaled with their own actions");            user = revoked;
+            Check(!keys.Contains("setari-propuneri.view") && !keys.Contains("setari-bug-raport.view"), "A user that is not a developer has no key of the reports and the proposals");
+            var marked = await users.SetDeveloperAsync(user, true);
+            keys = await permissions.GetKeysAsync(principal);
+            Check(marked.IsDeveloper && keys.Contains("setari-propuneri.view") && keys.Contains("setari-bug-raport.edit") && keys.Contains("setari-propuneri.export"), "A developer sees the reports and the proposals even with a limited type, at once");
+            Check((await users.GetUsersAsync()).First(item => item.Id == user.Id).IsDeveloper, "The list of accounts tells which ones are developers");
+            await Rejects<UserOperationException>(() => users.SetDeveloperAsync(user, false), "A stale mark of a developer is rejected");
+            var revoked = await users.SetDeveloperAsync(marked, false);
+            keys = await permissions.GetKeysAsync(principal);
+            Check(!revoked.IsDeveloper && !keys.Contains("setari-propuneri.view") && !keys.Contains("setari-bug-raport.view"), "Revoking the developer right takes the keys back at once");
+            var devEvents = (await audit.GetEventsAsync()).Where(item => item.TimestampUtc > since && item.EntityType == AuditEntities.User).Select(item => item.Action).ToList();
+            Check(devEvents.Contains(AuditActions.GrantDeveloper) && devEvents.Contains(AuditActions.RevokeDeveloper), "Granting and revoking the developer right are journaled with their own actions");
+            user = revoked;
             // Guards.
             await Rejects<UserOperationException>(() => repository.DeleteAsync(type, "Ext stergere tip"), "A type with users cannot be deleted");
             var system = (await repository.GetAsync(administrator))!;
@@ -74,8 +87,8 @@ public static partial class MariaExtendedChecks
             var refreshed = new ClaimsPrincipal(new ClaimsIdentity([new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()), new Claim(ClaimTypes.Name, user.Username),
                 new Claim(ClaimTypes.Role, user.Role)], "test"));
             var refreshedKeys = await permissions.GetKeysAsync(refreshed);
-            Check(user.Role == AccessRoles.Administrator && refreshedKeys.Count == Permissions.AllKeys.Count,
-                $"A user moved to the Administrator type has the role and, at the next sign-in, every key (role {user.Role}, {refreshedKeys.Count} of {Permissions.AllKeys.Count} keys)");
+            Check(user.Role == AccessRoles.Administrator && refreshedKeys.Count == Permissions.AllKeys.Count(key => !Permissions.IsDeveloperOnly(key)),
+                $"A user moved to the Administrator type has the role and, at the next sign-in, every key except those of the developers (role {user.Role}, {refreshedKeys.Count} of {Permissions.AllKeys.Count} keys)");
             Check(movedKeys.SetEquals(Permissions.GrantableKeys),
                 $"Until that sign-in the session keeps its old role: every grantable key but none of the administrator-only ones ({movedKeys.Count} of {Permissions.GrantableKeys.Count})");
             Check((await audit.GetEventsAsync()).Count(item => item.TimestampUtc > since && item.EntityType == AuditEntities.User && item.Action == AuditActions.ChangeUserType) == 1,

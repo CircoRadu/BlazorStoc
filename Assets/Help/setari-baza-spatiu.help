@@ -1,0 +1,17 @@
+# Setări · Bază de date · Spațiu
+Ruta: /setari
+Tab: Spațiu
+Cautare: spatiu disc ocupat baza de date imagini fisiere backup partitie recalculeaza
+
+Arată cât spațiu ocupă aplicația pe disc și cât rămâne liber pe partiții. Măsurătoarea se face la cerere (directoarele pot fi mari), nu automat. Secțiunile din Stare și Conexiune sunt restrânse la deschidere.
+
+## Elemente
+### Măsurătoarea
+- Recalculează | buton | Măsoară din nou; data măsurătorii apare în titlu.
+- Total ocupat de aplicație | text | Suma categoriilor din defalcare.
+- Partiția | secțiune | Pe fiecare partiție: spațiul liber, procentul ocupat și cât din el ocupă aplicația, cu toate fișierele ei.
+- Defalcare pe tipuri de fișiere | tabel | Tip, dimensiune, număr de fișiere și unde se află (aplicația, baza de date, imagini, fișiere adăugate, backup-uri, fișierele aplicației, altele).
+
+## Flux: Cum aflu ce ocupă spațiul
+1. Deschide fila „Spațiu” și apasă „Recalculează”.
+2. Deschide partiția și defalcarea pe tipuri.

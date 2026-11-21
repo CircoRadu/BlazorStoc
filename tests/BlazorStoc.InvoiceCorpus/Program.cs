@@ -155,7 +155,7 @@ foreach (var file in files)
             Console.WriteLine($"  TEMPLATE MATCH layout {match.Score:P0}, supplier match {match.SupplierMatch}, file supplier CUI '{analysis.SupplierCui}'");
             var reading = InvoicePickupReader.Read(definition, read.Document);
             foreach (var field in reading.Extraction.Fields) Console.WriteLine($"  TEMPLATE FIELD {field.Meaning,-18} {field.Name} = {field.Value}");
-            foreach (var column in reading.Extraction.Columns) Console.WriteLine($"  TEMPLATE COLUMN {column.Id} x={column.Left,6:F1}-{column.Right,6:F1} [{column.Meaning}] {column.Label}");
+            foreach (var column in reading.Extraction.Columns) Console.WriteLine($"  TEMPLATE COLUMN {column.Id} x={column.Left,6:F1}-{column.Right,6:F1} [{column.Meaning}] {column.Label}  zone y={column.ZoneTop:F1}-{column.ZoneBottom:F1} (page {column.ZoneBottomPage})");
             foreach (var row in reading.Extraction.Rows)
                 Console.WriteLine($"  TEMPLATE ROW p{row.Page} y={row.Top:F1}-{row.Bottom:F1}: " + string.Join(" | ", reading.Extraction.Columns.Select(column => row.Cells[column.Id])));
             foreach (var line in reading.Separators) Console.WriteLine($"  TEMPLATE LINE p{line.Page} y={line.Y:F1} x={line.Left:F0}-{line.Right:F0}");

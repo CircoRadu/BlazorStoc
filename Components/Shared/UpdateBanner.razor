@@ -6,7 +6,7 @@
 @inject NavigationManager Navigation
 @* Above every page, for everybody: an update of the application is about to start (or runs), so what is being worked on must be saved. For the administrator also: the last update
    failed and nobody has taken note of it yet. *@
-@if (Coordinator.Current is { } update)
+@if (Coordinator.Current is { Immediate: false } update)
 {
     <div class="error-banner update-notice" role="alert" id="update-notice">
         @if (!update.Launched)
@@ -46,7 +46,7 @@ else if (failure is not null)
     // Every second, only while a notice is shown (its countdown); the journal is not read again for that.
     private void Tick()
     {
-        if (disposed || Coordinator.Current is null) return;
+        if (disposed || Coordinator.Current is not { Immediate: false }) return;
         _ = InvokeAsync(() => { if (!disposed) StateHasChanged(); });
     }
 

@@ -1,0 +1,37 @@
+# Setări afișare
+Ruta: /setari-afisare
+Cautare: setari afisare marime font text imagini iconite titluri taburi tabel gear roata tema personala butoane campuri meniu bara dialog slider
+
+Pagina din meniul numelui tău din bara de sus. Aici îți alegi mărimea elementelor vizuale ale aplicației (titluri, text, taburi, tabele, butoane, câmpuri, meniu, bara de sus, ferestre); setările sunt păstrate pe contul tău, în baza de date, și se aplică de fiecare dată când te autentifici, de pe orice calculator. Fiecare tabel de date poate avea și setări proprii, din iconița cu roată de pe marginea de sus a tabelului (ea apare automat la toate tabelele); ele înlocuiesc setările globale numai pentru câmpurile pe care le-ai ales.
+
+## Elemente
+### Reguli globale
+- Normal, Mare, Foarte mare | butoane | Setează dintr-o dată toate valorile la 100%, 125% sau 200%.
+- Secțiuni | zone pliabile | Elementele sunt grupate în secțiuni, închise implicit; fiecare secțiune are propria previzualizare, care se schimbă pe loc când muți un slider. Modificările se văd mai întâi numai în previzualizări; aplicația nu se schimbă până nu apeși „Aplică modificările”.
+- Titluri de pagină | slider | Mărimea titlului din partea de sus a fiecărei pagini (între 100% și 500% din mărimea implicită, în pași de 5%; procentul apare lângă titlul sliderului).
+- Text general și titluri de secțiuni | slider | Mărimea paragrafelor, a notelor explicative și a titlurilor de secțiune (cu numărătoarea din ele), în afara tabelelor, taburilor și ferestrelor.
+- Text taburi | slider | Mărimea taburilor și subtaburilor, cu numărătoarea din ele.
+- Text tabele | slider | Mărimea textului din celulele tuturor tabelelor, cu tot ce e în ele (legături, insigne, note mici).
+- Antet tabele | slider | Mărimea antetelor de coloană din toate tabelele.
+- Imagini din tabele | slider | Mărimea imaginilor mici de pe rândurile tabelelor (de exemplu poza produsului).
+- Iconițe din tabele | slider | Mărimea iconițelor de acțiune (editare, ștergere etc.) de pe rândurile tuturor tabelelor.
+- Butoane | slider | Mărimea butoanelor din pagini (în afara tabelelor și ferestrelor).
+- Câmpuri de formular | slider | Mărimea câmpurilor de text, a listelor de alegere și a etichetelor lor.
+- Meniul principal (stânga) | slider | Mărimea întregului meniu din partea stângă (text, iconițe și spații); bara laterală se lărgește odată cu el.
+- Bara de sus | slider | Mărimea barei de sus (traseul paginii, butoanele și contul).
+- Ferestre (dialoguri) | slider | Mărimea ferestrelor care se deschid peste pagină, cu tot ce e în ele.
+- Paletă de culori | alegere | În secțiunea „Culori (tema luminoasă)” alegi una dintre palete: Verde original, Salvie, Albastru ceață, Indigo discret, Lavandă, Nisip cald sau Ardezie. Fiecare opțiune arată o mostră cu propriile culori; toate sunt tonuri calme, apropiate de aspectul original. Paleta se păstrează pe contul tău și se aplică numai temei luminoase. Șterge regulile globale și setările proprii ale tuturor tabelelor: aplicația revine la aspectul implicit.
+- Resetează (în colțul secțiunii) | buton | Readuce câmpurile acelei secțiuni la valorile implicite, în previzualizare; se aplică după „Aplică modificările”.
+- Aplică modificările | buton | Salvează pe contul tău tot ce ai ales și îl aplică în toată aplicația. Este activ numai când ai modificări neaplicate.
+- Resetează tot | buton | Readuce toate valorile la cele implicite, inclusiv setările proprii ale tabelelor, în previzualizare; se aplică după „Aplică modificările”.
+### Roata de pe un tabel
+- Roata | buton | Deschide setările acestui tabel: text, antet, imagini, iconițe. Cât timp un slider nu a fost mișcat, arată valoarea regulilor globale, marcată „(global)”.
+- Global | buton | Dă înapoi regulilor globale valoarea acelui câmp pentru tabelul respectiv.
+- Resetează tabelul | buton | Scoate setările proprii ale tabelului; tabelul folosește din nou regulile globale.
+
+## Flux: Cum îmi aleg aspectul aplicației
+1. Deschide meniul numelui tău din bara de sus și alege „Setări afișare”.
+2. Apasă o presetare (Normal, Mare sau Foarte mare) sau deschide o secțiune și mută sliderele; previzualizarea secțiunii se schimbă pe loc, dar aplicația rămâne neschimbată.
+3. Când ești mulțumit, apasă „Aplică modificările”; până atunci poți readuce o secțiune la valorile implicite cu butonul „Resetează” din colțul ei.
+4. Pentru un singur tabel, apasă roata de pe marginea lui de sus; valorile alese acolo înlocuiesc regulile globale numai pentru acel tabel.
+5. „Resetează tabelul” revine la regulile globale, iar „Resetează tot” (din Setări afișare) revine la aspectul implicit.

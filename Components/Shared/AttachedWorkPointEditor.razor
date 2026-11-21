@@ -1,0 +1,192 @@
+@namespace BlazorStoc.Components.Shared
+@using BlazorStoc.Services
+@inject IAttachedWorkPointRepository Repository
+@inject ILogger<AttachedWorkPointEditor> Logger
+@implements IDisposable
+@* The popup of an attached work point (component of a work point). The name is always there; the four pieces of information (GPS coordinates, address, phone, contact person) are added with the
+   "+" icons, each one can be edited and deleted with its icons. The last one of the address / the coordinates cannot be deleted alone (the point must keep one of them): it goes with the point. *@
+<UnsavedChangesTracker @ref="tracker" Subject="@(PopupSubject.Of("punct de lucru arondat", Original?.Name))" Adding="@(Original is null)" Snapshot="CurrentSnapshot" Discard="DiscardAsync" />
+<section class="product-editor attached-editor" aria-labelledby="attached-editor-title">
+    <div class="catalog-heading"><h2 id="attached-editor-title">@(Original is null ? $"Adaugă punct de lucru arondat la «{Parent.Name}»" : $"Editează punctul arondat «{Original.Name}»")</h2><span class="heading-actions"><HelpButton Topic="puncte-de-lucru-editor" About="Punctul de lucru arondat" /><button type="button" class="danger" disabled="@saving" @onclick="CloseAsync" data-head-close>Închide</button></span></div>
+    @if (error is not null) { <div class="error-banner" role="alert">@error</div> }
+    <EditForm Model="state" OnSubmit="SaveAsync" FormName="attached-work-point-editor">
+        <fieldset disabled="@saving">
+            <div class="editor-grid">
+                <label for="attached-name" class="full-width">Nume *<input id="attached-name" @bind="state.Name" @bind:event="oninput" maxlength="200" autocomplete="off" /><small>De exemplu «Clădire învățământ primar» sau «Grădiniță».</small></label>
+            </div>
+            <div class="attached-infos" id="attached-infos">
+                @foreach (var info in Infos)
+                {
+                    var key = info.Key;
+                    <div class="attached-info" data-info="@key" @key="key">
+                        @if (Has(key) && editing != key)
+                        {
+                            <span class="attached-info-label">@info.Label</span>
+                            <span class="attached-info-value" id="attached-value-@key">@ValueOf(key)</span>
+                            <button type="button" class="row-icon edit" id="attached-edit-@key" aria-label="Editează @info.Label.ToLowerInvariant()" title="Editează @info.Label.ToLowerInvariant()" @onclick="() => StartEdit(key)"></button>
+                            <button type="button" class="row-icon delete" id="attached-delete-@key" disabled="@(!CanDelete(key))" aria-label="Șterge @info.Label.ToLowerInvariant()"
+                                    title="@(CanDelete(key) ? $"Șterge {info.Label.ToLowerInvariant()}" : "Ultima informație de locație (adresă sau coordonate) se șterge doar odată cu punctul arondat")" @onclick="() => Remove(key)"></button>
+                        }
+                        else if (editing == key)
+                        {
+                            <label class="attached-info-edit" for="attached-input-@key"><span class="attached-info-label">@info.Label</span>
+                                <input id="attached-input-@key" @bind="draft" @bind:event="oninput" maxlength="@info.MaxLength" autocomplete="off" placeholder="@info.Placeholder" inputmode="@info.InputMode" /></label>
+                            @if (key == "gps")
+                            {
+                                <small class="attached-info-hint">Poți lipi coordonatele copiate dintr-o hartă (de exemplu 45.7489, 21.2087) sau poți trage pinul pe hartă.</small>
+                                <MapHolder Latitude="HolderLatitude" Longitude="HolderLongitude" Name="@state.Name" Address="@state.Address" PositionChanged="PinMoved" AriaLabel="Harta punctului arondat" />
+                            }
+                            @if (infoError is not null) { <div class="error-banner" role="alert">@infoError</div> }
+                            <span class="attached-info-actions">
+                                <button type="button" class="primary" id="attached-apply-@key" @onclick="ApplyEdit">Aplică</button>
+                                <button type="button" class="danger" id="attached-cancel-@key" @onclick="CancelEdit">Renunță</button>
+                            </span>
+                        }
+                    </div>
+                }
+            </div>
+            <div class="attached-add" id="attached-add" role="group" aria-label="Adaugă informații">
+                @foreach (var info in Infos.Where(item => !Has(item.Key)))
+                {
+                    var key = info.Key;
+                    <button type="button" class="row-icon add attached-add-button" id="attached-add-@key" disabled="@(editing is not null)" aria-label="Adaugă @info.Label.ToLowerInvariant()" title="Adaugă @info.Label.ToLowerInvariant()" @onclick="() => StartAdd(key)"></button><span class="attached-add-label">@info.Label</span>
+                }
+            </div>
+            <p class="form-note">Punctul arondat are nevoie de nume și cel puțin adresă sau coordonate GPS. Adresa nu se preia de la punctul de lucru: rămâne necompletată dacă nu o adaugi.</p>
+            <div class="editor-actions"><button class="primary" type="submit">@(saving ? "Se salvează…" : "Salvează punctul arondat")</button><button class="danger" type="button" @onclick="CloseAsync">Anulează</button></div>
+        </fieldset>
+    </EditForm>
+</section>
+
+@code {
+    [Parameter, EditorRequired] public WorkPoint Parent { get; set; } = default!;
+    [Parameter] public AttachedWorkPoint? Original { get; set; }
+    [Parameter] public EventCallback<AttachedWorkPoint> Saved { get; set; }
+    [Parameter] public EventCallback Closed { get; set; }
+
+    private sealed class State { public string Name { get; set; } = ""; public string Address { get; set; } = ""; public string Phone { get; set; } = ""; public string Contact { get; set; } = ""; public string Coordinates { get; set; } = ""; }
+    private sealed record Info(string Key, string Label, int MaxLength, string Placeholder, string InputMode);
+
+    private static readonly Info[] Infos =
+    [
+        new("gps", "Coordonate GPS", 60, "45.7489, 21.2087", "text"),
+        new("address", "Adresă", 300, "", "text"),
+        new("phone", "Telefon", 20, "", "tel"),
+        new("contact", "Persoană de contact", 200, "", "text")
+    ];
+
+    private readonly State state = new();
+    private bool hasGps, hasAddress, hasPhone, hasContact;
+    private string? editing, error, infoError;
+    private string draft = "";
+    private bool addingNew;      // the open piece of information was not there before this edit (cancel removes it again)
+    private bool saving;
+    private UnsavedChangesTracker? tracker;
+    private readonly CancellationTokenSource lifetime = new();
+
+    private decimal? HolderLatitude => WorkPointCoordinates.TryParse(editing == "gps" ? draft : state.Coordinates, out var lat, out _, out _) ? lat : null;
+    private decimal? HolderLongitude => WorkPointCoordinates.TryParse(editing == "gps" ? draft : state.Coordinates, out _, out var lng, out _) ? lng : null;
+
+    protected override void OnInitialized()
+    {
+        if (Original is null) return;
+        state.Name = Original.Name; state.Address = Original.Address; state.Phone = Original.Phone; state.Contact = Original.ContactPerson;
+        state.Coordinates = WorkPointCoordinates.Format(Original.Latitude, Original.Longitude);
+        hasGps = Original.HasCoordinates; hasAddress = Original.HasAddress; hasPhone = Original.Phone.Length > 0; hasContact = Original.ContactPerson.Length > 0;
+    }
+
+    private bool Has(string key) => key switch { "gps" => hasGps, "address" => hasAddress, "phone" => hasPhone, _ => hasContact };
+    private string ValueOf(string key) => key switch { "gps" => state.Coordinates, "address" => state.Address, "phone" => state.Phone, _ => state.Contact };
+    // The last one of the address / the coordinates cannot be deleted alone.
+    private bool CanDelete(string key) => key is "phone" or "contact" || (key == "gps" ? hasAddress : hasGps);
+
+    private void SetHas(string key, bool value)
+    {
+        switch (key) { case "gps": hasGps = value; break; case "address": hasAddress = value; break; case "phone": hasPhone = value; break; default: hasContact = value; break; }
+    }
+
+    private void SetValue(string key, string value)
+    {
+        switch (key) { case "gps": state.Coordinates = value; break; case "address": state.Address = value; break; case "phone": state.Phone = value; break; default: state.Contact = value; break; }
+    }
+
+    private void StartAdd(string key) { editing = key; addingNew = true; draft = ""; infoError = null; }
+    private void StartEdit(string key) { editing = key; addingNew = false; draft = ValueOf(key); infoError = null; }
+    private void CancelEdit() { editing = null; infoError = null; }
+
+    private void ApplyEdit()
+    {
+        if (editing is null) return;
+        var value = draft.Trim();
+        infoError = null;
+        if (value.Length == 0) { infoError = editing == "gps" ? "Completează coordonatele (latitudine, longitudine)." : "Completează valoarea sau apasă «Renunță»."; return; }
+        if (editing == "gps")
+        {
+            if (!WorkPointCoordinates.TryParse(value, out var latitude, out var longitude, out var coordinatesError)) { infoError = coordinatesError; return; }
+            value = WorkPointCoordinates.Format(latitude, longitude);
+        }
+        else if (editing == "phone" && !BeneficiaryRules.PhonePattern.IsMatch(BeneficiaryRules.NormalizePhone(value)))
+        { infoError = "Numărul de telefon trebuie să conțină 7–15 cifre, opțional precedate de +."; return; }
+        SetValue(editing, value);
+        SetHas(editing, true);
+        editing = null;
+    }
+
+    private void Remove(string key)
+    {
+        if (!CanDelete(key)) return;
+        SetValue(key, "");
+        SetHas(key, false);
+        if (editing == key) editing = null;
+    }
+
+    private Task PinMoved((decimal Latitude, decimal Longitude) position)
+    {
+        draft = WorkPointCoordinates.Format(position.Latitude, position.Longitude);
+        return Task.CompletedTask;
+    }
+
+    private string CurrentSnapshot() => string.Join('\u001f', state.Name, hasAddress ? state.Address : "", hasPhone ? state.Phone : "", hasContact ? state.Contact : "", hasGps ? state.Coordinates : "");
+    private Task DiscardAsync() => Closed.InvokeAsync();
+    private Task CloseAsync() => saving ? Task.CompletedTask : tracker is null ? Closed.InvokeAsync() : tracker.RunAfterConfirmAsync(() => Closed.InvokeAsync());
+
+    private AttachedWorkPointInput BuildInput() => new()
+    {
+        Name = state.Name,
+        Address = hasAddress ? state.Address : "",
+        Phone = hasPhone ? state.Phone : "",
+        ContactPerson = hasContact ? state.Contact : "",
+        UseCoordinates = hasGps,
+        CoordinatesText = hasGps ? state.Coordinates : ""
+    };
+
+    private async Task SaveAsync()
+    {
+        if (saving) return;
+        error = null;
+        if (editing is not null) { error = "Aplică sau renunță la informația deschisă înainte de salvare."; return; }
+        var input = BuildInput();
+        if (string.IsNullOrWhiteSpace(input.Name)) { error = "Completează numele punctului arondat."; return; }
+        if (!hasAddress && !hasGps) { error = AttachedWorkPointRules.NeedsLocationMessage; return; }
+        saving = true;
+        AttachedWorkPoint? saved = null;
+        try
+        {
+            saved = Original is null
+                ? await Repository.CreateAsync(Parent, input, lifetime.Token)
+                : await Repository.UpdateAsync(Original, input, lifetime.Token);
+        }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (WorkPointOperationException exception) { error = exception.Message; }
+        catch (AccessDeniedException exception) { error = exception.Message; }
+        catch (Exception exception)
+        {
+            Logger.LogError("Attached work point saving failed ({ErrorType}).", exception.GetType().Name);
+            error = "Punctul arondat nu a putut fi salvat. Datele formularului au fost păstrate; actualizează pagina înainte să reîncerci.";
+        }
+        finally { saving = false; }
+        if (saved is not null) { tracker?.Rebase(); await Saved.InvokeAsync(saved); }
+    }
+
+    public void Dispose() { lifetime.Cancel(); lifetime.Dispose(); }
+}

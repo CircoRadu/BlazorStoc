@@ -7,6 +7,7 @@
 @using BlazorStoc.Services
 @inject IElcomturImportService Import
 @inject IElcomturBalanceRepository Balances
+@inject IServiceProvider Services
 @inject IJSRuntime Js
 @inject ILogger<ElcomturImport> Logger
 @implements IAsyncDisposable
@@ -24,7 +25,7 @@
     <div class="catalog-body" id="elcomtur-info">
         @if (!infoLoaded) { <p class="muted" role="status">Se citește…</p> }
         else if (info is null) { <p class="muted">Nu s-a făcut nicio preluare: beneficiarii nu au balanță Elcomtur.</p> }
-        else { <p>Date din backup-ul de la <strong>@StockMovementRules.DisplayDate(info.DataDate)</strong> (firma <strong>@info.Firm</strong>), preluate la @info.ImportedUtc.ToLocalTime().ToString("dd.MM.yyyy HH:mm") de @info.ImportedBy; @info.Beneficiaries beneficiari cu balanță.</p> }
+        else { <p>Date din backup-ul de la <strong>@StockMovementRules.DisplayDate(info.DataDate)</strong> (firma <strong>@ElcomturFirmNames.Display(info.Firm, autoSettings)</strong>), preluate la @info.ImportedUtc.ToLocalTime().ToString("dd.MM.yyyy HH:mm") de @info.ImportedBy; @info.Beneficiaries beneficiari cu balanță.</p> }
     </div>
 </section>
 
@@ -100,8 +101,10 @@
 
     protected override async Task OnInitializedAsync() => await LoadInfoAsync();
 
+    private ElcomturAutoSettings? autoSettings;
     private async Task LoadInfoAsync()
     {
+        try { autoSettings = await (Services.GetService<IElcomturAutoService>()?.GetAsync() ?? Task.FromResult<ElcomturAutoSettings?>(null)!); } catch (Exception) { autoSettings = null; }
         try { info = await Balances.GetInfoAsync(); }
         catch (Exception exception) when (exception is not OperationCanceledException) { Report(exception); }
         infoLoaded = true;

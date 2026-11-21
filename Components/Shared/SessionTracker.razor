@@ -9,6 +9,7 @@
 @inject IJSRuntime JS
 @inject IDatabaseAccountService DatabaseAccounts
 @inject IAccessControl Access
+@inject ForcedDialogGate ForcedGate
 @* No markup: tells the registry of the open sessions (Setari -> Baza de date -> Stare) who is signed in on this circuit, on which page, and, once, from which address
    and browser (the page reports them itself, see Startup/SessionEndpoints.cs). Placed in the layout as an interactive island, so every page of the application has it. *@
 
@@ -21,6 +22,8 @@
     // settings (Startup/DefaultPasswordGate.cs does the same for a page that is loaded).
     private async ValueTask GuardNavigationAsync(Microsoft.AspNetCore.Components.Routing.LocationChangingContext context)
     {
+        // A window the user must answer first (new tasks to take over) keeps the circuit on its page.
+        if (ForcedGate.Active) { context.PreventNavigation(); return; }
         var path = new Uri(context.TargetLocation, UriKind.RelativeOrAbsolute).IsAbsoluteUri ? new Uri(context.TargetLocation).AbsolutePath : context.TargetLocation.Split('?', '#')[0];
         if (BlazorStoc.Startup.DefaultPasswordGate.IsAllowedPath(path)) return;
         try

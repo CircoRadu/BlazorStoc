@@ -1,0 +1,15 @@
+# Generarea bonului de consum
+Cautare: bon de consum genereaza proiect bonuri anterioare inactive sterge
+
+Fereastra care se deschide din iconița de bon a unui proiect. Bonul nu se generează singur: se creează doar când apeși „Generează bonul”.
+
+## Elemente
+### Fereastra
+- Bonurile anterioare ale proiectului | alegere | Apare doar când proiectul are deja bonuri: „Păstrează-le ca inactive” (implicit, pentru trasabilitate) sau „Șterge-le”. | sel: #note-previous-keep
+- Generează bonul | buton | Creează bonul cu echipamentele predate proiectului până acum. | sel: #note-generate-confirm
+- Renunță | buton | Închide fereastra fără să genereze nimic.
+
+## Flux: Cum generez bonul unui proiect
+1. În pagina beneficiarului, apasă iconița de bon de pe rândul proiectului.
+2. Alege ce se întâmplă cu bonurile anterioare, dacă există.
+3. Apasă „Generează bonul”; bonul nou este activ și se vede în secțiunea „Bonuri de consum”.

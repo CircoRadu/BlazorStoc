@@ -1,5 +1,5 @@
 ﻿@page "/setari"
-@attribute [Authorize(Policy = "perm:setari-facturi.view|setari-anaf.view|setari-notificari.view|setari-harta.view|setari-backup.view|setari-module.view|setari-jurnal.view|setari-bug-raport.view|setari-actualizare.view|setari-import-activityapp.view|setari-import-elcomtur.view|utilizatori.view|tipuri-utilizatori.view")]
+@attribute [Authorize(Policy = "perm:setari-facturi.view|setari-anaf.view|setari-notificari.view|setari-harta.view|setari-backup.view|setari-module.view|setari-jurnal.view|setari-bug-raport.view|setari-anunturi.view|setari-actualizare.view|setari-import-activityapp.view|setari-import-elcomtur.view|setari-import-espstoc.view|utilizatori.view|tipuri-utilizatori.view")]
 @rendermode @(new InteractiveServerRenderMode(prerender: false))
 @using BlazorStoc.Services
 @inject BlazorStoc.Services.IDatabaseAccountService DatabaseAccountsGate
@@ -20,7 +20,7 @@
         <div class="settings-dashboard" id="settings-dashboard">
             @foreach (var tab in VisibleTabs)
             {
-                <button type="button" class="settings-tile" id="tile-@tab.Id" aria-label="@tab.Title" @onclick="() => SelectTab(tab.Id)"><span class="main-menu-icon" aria-hidden="true">@TileIcon(tab.Id)</span><strong>@tab.Title</strong><small>@TileText(tab.Id)</small></button>
+                <button type="button" class="settings-tile" id="tile-@tab.Id" aria-label="@tab.Title" @onclick="() => SelectTab(tab.Id)"><span class="main-menu-icon" aria-hidden="true">@TileIcon(tab.Id)</span><strong>@tab.Title@if (tab.Id == BugTab) { <DevelopmentBadge Kind="DevelopmentBadgeKind.Total" Id="tile-dezvoltare-badge" /> }</strong><small>@TileText(tab.Id)</small></button>
             }
         </div>
     }
@@ -60,7 +60,15 @@
     @if (activeTab == AnafTab && allowedTabs.Contains(AnafTab))
     {
         <div role="tabpanel" id="panel-@AnafTab" aria-labelledby="tab-@AnafTab" class="settings-body">
-            <ModuleGate ModuleId="@BlazorStoc.Modules.Anaf.AnafModule.ModuleId" Section="Configurare ANAF"><AnafConfigurator /></ModuleGate>
+            @SubtabBar(AnafSubtabs, "Secțiuni ANAF")
+            @if (anafSubtab == AnafInvoiceSubtab)
+            {
+                <div role="tabpanel" id="subpanel-@AnafInvoiceSubtab" aria-labelledby="subtab-@AnafInvoiceSubtab"><ModuleGate ModuleId="@BlazorStoc.Modules.Anaf.AnafModule.ModuleId" Section="Autentificare ANAF"><AnafAuthPanel Result="@AnafAuthResult" /></ModuleGate></div>
+            }
+            else
+            {
+                <div role="tabpanel" id="subpanel-@AnafCompaniesSubtab" aria-labelledby="subtab-@AnafCompaniesSubtab"><ModuleGate ModuleId="@BlazorStoc.Modules.Anaf.AnafModule.ModuleId" Section="Configurare ANAF"><AnafConfigurator /></ModuleGate></div>
+            }
         </div>
     }
     else if (activeTab == ActivityImportTab && allowedTabs.Contains(ActivityImportTab))
@@ -73,6 +81,12 @@
     {
         <div role="tabpanel" id="panel-@ElcomturTab" aria-labelledby="tab-@ElcomturTab" class="settings-body">
             <ModuleGate ModuleId="@BlazorStoc.Modules.Elcomtur.ElcomturModule.ModuleId" Section="Import Elcomtur"><ElcomturAutoPanel /></ModuleGate>
+        </div>
+    }
+    else if (activeTab == EspImportTab && allowedTabs.Contains(EspImportTab))
+    {
+        <div role="tabpanel" id="panel-@EspImportTab" aria-labelledby="tab-@EspImportTab" class="settings-body">
+            <ModuleGate ModuleId="@BlazorStoc.Modules.EspImport.EspImportModule.ModuleId" Section="Preluare stoc ESPStoc"><EspImportPanel /></ModuleGate>
         </div>
     }
     else if (activeTab == NotificationsTab && allowedTabs.Contains(NotificationsTab))
@@ -113,9 +127,13 @@
     {
         <div role="tabpanel" id="panel-@DatabaseTab" aria-labelledby="tab-@DatabaseTab" class="settings-body">
             @SubtabBar(DatabaseSubtabs, "Secțiuni bază de date")
-            @if (databaseSubtab == DatabaseConnectionSubtab)
+            @if (databaseSubtab == DatabaseSpaceSubtab)
             {
-                <div role="tabpanel" id="subpanel-@DatabaseConnectionSubtab" aria-labelledby="subtab-@DatabaseConnectionSubtab"><DatabaseServerPanel Changed="ServerChanged" /><DatabaseConnectionPanel @key="@($"connection-{connectionRevision}")" /><ApplicationPanel @key="@($"application-{connectionRevision}")" /><ReverseProxyPanel /><DatabaseAccountsPanel /></div>
+                <div role="tabpanel" id="subpanel-@DatabaseSpaceSubtab" aria-labelledby="subtab-@DatabaseSpaceSubtab"><DiskUsagePanel /></div>
+            }
+            else if (databaseSubtab == DatabaseConnectionSubtab)
+            {
+                <div role="tabpanel" id="subpanel-@DatabaseConnectionSubtab" aria-labelledby="subtab-@DatabaseConnectionSubtab" class="db-stack"><DatabaseServerPanel Changed="ServerChanged" /><DatabaseConnectionPanel @key="@($"connection-{connectionRevision}")" /><ApplicationPanel @key="@($"application-{connectionRevision}")" /><ReverseProxyPanel /><DatabaseAccountsPanel /></div>
             }
             else
             {
@@ -153,6 +171,12 @@
             <ModuleGate ModuleId="@BlazorStoc.Modules.Journal.JournalModule.ModuleId" Section="Jurnal activitate"><JournalSettingsPanel /></ModuleGate>
         </div>
     }
+    else if (activeTab == AnnouncementsTab && allowedTabs.Contains(AnnouncementsTab))
+    {
+        <div role="tabpanel" id="panel-@AnnouncementsTab" aria-labelledby="tab-@AnnouncementsTab" class="settings-body">
+            <ModuleGate ModuleId="@BlazorStoc.Modules.Announcements.AnnouncementsModule.ModuleId" Section="Anunțuri"><BlazorStoc.Modules.Announcements.AnnouncementsPanel /></ModuleGate>
+        </div>
+    }
     else if (activeTab == BugTab && allowedTabs.Contains(BugTab))
     {
         <div role="tabpanel" id="panel-@BugTab" aria-labelledby="tab-@BugTab" class="settings-body">
@@ -183,7 +207,11 @@
     {
         <div role="tabpanel" id="panel-@UsersTab" aria-labelledby="tab-@UsersTab" class="settings-body">
             @SubtabBar(UserSubtabs, "Secțiuni utilizatori")
-            @if (userSubtab == UserTypesSubtab)
+            @if (userSubtab == DevelopersSubtab && canUsers)
+            {
+                <div role="tabpanel" id="subpanel-@DevelopersSubtab" aria-labelledby="subtab-@DevelopersSubtab"><DevelopersPanel /></div>
+            }
+            else if (userSubtab == UserTypesSubtab)
             {
                 <div role="tabpanel" id="subpanel-@UserTypesSubtab" aria-labelledby="subtab-@UserTypesSubtab"><UserTypesPanel /></div>
             }
@@ -203,14 +231,23 @@
     private void ServerChanged() => connectionRevision++;
 
     private const string AnafTab = "anaf";
+    // ANAF is one tab with two sub-tabs: the lookup of company data (the configurator) and the invoice side (the authentication with ANAF).
+    private const string AnafCompaniesSubtab = "firme";
+    private const string AnafInvoiceSubtab = "factura";
+    private static readonly (string Id, string Title)[] AnafSubtabs = [(AnafCompaniesSubtab, "Preluare date firme"), (AnafInvoiceSubtab, "E-Factura")];
+    private string anafSubtab = AnafCompaniesSubtab;
+    // Set by the return from ANAF (?anafauth=ok|refuzat|eroare).
+    [SupplyParameterFromQuery(Name = "anafauth")] public string? AnafAuthResult { get; set; }
     private const string ActivityImportTab = "preluare-activityapp";
     private const string ElcomturTab = "preluare-elcomtur";
+    private const string EspImportTab = "preluare-espstoc";
     private const string NotificationsTab = SettingsNavigation.NotificationsTab;
     private const string MapTab = SettingsNavigation.MapTab;
     private const string InvoicesTab = SettingsNavigation.InvoicesTab;
     private const string BackupTab = "backup";
     private const string JournalTab = "jurnal";
     private const string BugTab = "dezvoltare";
+    private const string AnnouncementsTab = "anunturi";
     private const string DevErrorsSubtab = "erori", DevProposalsSubtab = "propuneri";
     private static readonly (string Id, string Title)[] DevSubtabs = [(DevErrorsSubtab, "Erori"), (DevProposalsSubtab, "Propuneri")];
     private string devSubtab = DevErrorsSubtab;
@@ -221,17 +258,19 @@
     private const string AuthTab = "autentificare";
     private const string DatabaseStatusSubtab = "stare";
     private const string DatabaseConnectionSubtab = "conexiune";
-    private static readonly (string Id, string Title)[] DatabaseSubtabs = [(DatabaseStatusSubtab, "Stare"), (DatabaseConnectionSubtab, "Conexiune")];
+    private const string DatabaseSpaceSubtab = "spatiu";
+    private static readonly (string Id, string Title)[] DatabaseSubtabs = [(DatabaseStatusSubtab, "Stare"), (DatabaseSpaceSubtab, "Spațiu"), (DatabaseConnectionSubtab, "Conexiune")];
     private string databaseSubtab = DatabaseStatusSubtab;
     // Users is one tab with two sub-tabs: the accounts and the user types (their rights). The old tab id of the types keeps working in addresses.
     private const string UsersTab = "utilizatori";
     private const string LegacyUserTypesTab = "tipuri-utilizatori";
     private const string UserAccountsSubtab = "conturi";
     private const string UserTypesSubtab = "tipuri";
+    private const string DevelopersSubtab = "dezvoltatori";
     private bool canUsers, canUserTypes;
-    private static readonly (string Id, string Title)[] UserSubtabsBoth = [(UserAccountsSubtab, "Utilizatori"), (UserTypesSubtab, "Tipuri de utilizatori")];
-    private static readonly (string Id, string Title)[] UserSubtabsAccounts = [UserSubtabsBoth[0]];
-    private static readonly (string Id, string Title)[] UserSubtabsTypes = [UserSubtabsBoth[1]];
+    private static readonly (string Id, string Title)[] UserSubtabsBoth = [(UserAccountsSubtab, "Utilizatori"), (DevelopersSubtab, "Dezvoltatori"), (UserTypesSubtab, "Tipuri de utilizatori")];
+    private static readonly (string Id, string Title)[] UserSubtabsAccounts = [UserSubtabsBoth[0], UserSubtabsBoth[1]];
+    private static readonly (string Id, string Title)[] UserSubtabsTypes = [UserSubtabsBoth[2]];
     // Only the sub-tabs the signed-in user has the right to (static arrays: the sub-tab bar tells them apart by reference).
     private (string Id, string Title)[] UserSubtabs => canUsers && canUserTypes ? UserSubtabsBoth : canUsers ? UserSubtabsAccounts : UserSubtabsTypes;
     private string userSubtab = UserAccountsSubtab;
@@ -243,12 +282,12 @@
     private const string BackupTimeSubtab = "backup-time";
     private static readonly (string Id, string Title)[] BackupSubtabs = [(BackupMainSubtab, "Backup și restaurare"), (NasTab, "Backup NAS"), (BackupTimeSubtab, "Verificare oră")];
     private string backupSubtab = BackupMainSubtab;
-    private static readonly (string Id, string Title)[] Tabs = [(AnafTab, "Preluare date ANAF"), (ActivityImportTab, "Preluare date ActivityApp"), (ElcomturTab, "Preluare date Elcomtur"), (NotificationsTab, "Notificări"), (MapTab, "Hartă"), (InvoicesTab, "Facturi"), (BackupTab, "Backup"), (JournalTab, "Jurnal activitate"), (BugTab, "Dezvoltare"), (CatalogTab, "Catalog"), (ModulesTab, "Module"), (UpdateTab, "Actualizare"), (UsersTab, "Utilizatori"), (AuthTab, "Autentificare"), (DatabaseTab, "Bază de date")];
+    private static readonly (string Id, string Title)[] Tabs = [(AnafTab, "ANAF"), (ActivityImportTab, "Preluare date ActivityApp"), (ElcomturTab, "Preluare date Elcomtur"), (EspImportTab, "Preluare stoc ESPStoc"), (NotificationsTab, "Notificări"), (MapTab, "Hartă"), (InvoicesTab, "Facturi"), (BackupTab, "Backup"), (JournalTab, "Jurnal activitate"), (BugTab, "Dezvoltare"), (AnnouncementsTab, "Anunțuri"), (CatalogTab, "Catalog"), (ModulesTab, "Module"), (UpdateTab, "Actualizare"), (UsersTab, "Utilizatori"), (AuthTab, "Autentificare"), (DatabaseTab, "Bază de date")];
     // The key that opens each tab (what the user type of the signed-in user allows).
     private static readonly Dictionary<string, string> TabKeys = new()
     {
-        [AnafTab] = "setari-anaf.view", [ActivityImportTab] = "setari-import-activityapp.view", [ElcomturTab] = "setari-import-elcomtur.view", [NotificationsTab] = "setari-notificari.view", [MapTab] = "setari-harta.view",
-        [InvoicesTab] = "setari-facturi.view", [BackupTab] = "setari-backup.view", [ModulesTab] = "setari-module.view", [JournalTab] = "setari-jurnal.view", [BugTab] = "setari-bug-raport.view", [UpdateTab] = "setari-actualizare.view"
+        [AnafTab] = "setari-anaf.view", [ActivityImportTab] = "setari-import-activityapp.view", [ElcomturTab] = "setari-import-elcomtur.view", [EspImportTab] = "setari-import-espstoc.view", [NotificationsTab] = "setari-notificari.view", [MapTab] = "setari-harta.view",
+        [InvoicesTab] = "setari-facturi.view", [BackupTab] = "setari-backup.view", [ModulesTab] = "setari-module.view", [JournalTab] = "setari-jurnal.view", [BugTab] = "setari-bug-raport.view", [AnnouncementsTab] = "setari-anunturi.view", [UpdateTab] = "setari-actualizare.view"
     };
     private readonly HashSet<string> allowedTabs = [];
     // The open section; null shows the dashboard of the sections.
@@ -260,12 +299,14 @@
         AnafTab => "⌕",
         ActivityImportTab => "⇅",
         ElcomturTab => "⇩",
+        EspImportTab => "⇆",
         NotificationsTab => "✉",
         MapTab => "⌖",
         InvoicesTab => "▤",
         BackupTab => "⤓",
         JournalTab => "≡",
         BugTab => "⚑",
+        AnnouncementsTab => "✉",
         CatalogTab => "⊞",
         ModulesTab => "▦",
         UpdateTab => "↻",
@@ -277,9 +318,10 @@
 
     private static string TileText(string id) => id switch
     {
-        AnafTab => "Interogarea serviciului public ANAF pentru datele firmelor.",
+        AnafTab => "Preluarea datelor firmelor din serviciul public ANAF și autentificarea aplicației în ANAF pentru facturi.",
         ActivityImportTab => "Conexiunea la ActivityApp, tichetele preluate, corespondența câmpurilor și programarea importului.",
         ElcomturTab => "Preluarea automată, zilnică, a backup-ului Elcomtur de pe un director (NAS), firma preluată și alerta de backup lipsă.",
+        EspImportTab => "Preluarea stocului din aplicația veche ESPStoc și stabilirea punctului zero al gestiunii (produse, cantități, imagini).",
         NotificationsTab => "Șabloanele de notificări și setările lor.",
         MapTab => "Furnizorul și aspectul hărții de mentenanță.",
         InvoicesTab => "Șabloanele de citire a facturilor.",
@@ -287,6 +329,7 @@
         ModulesTab => "Starea modulelor și oprirea sau pornirea lor.",
         JournalTab => "Câte evenimente recente arată implicit pagina Jurnal activitate.",
         BugTab => "Rapoartele de eroare și propunerile de modificări trimise de utilizatori: stare, răspunsuri și export ZIP.",
+        AnnouncementsTab => "Anunțuri pentru utilizatori: editor cu formatare și poze, previzualizare, ciorne, publicare, republicare și ștergere.",
         CatalogTab => "Adâncimea maximă a arborelui de subcategorii.",
         UpdateTab => "Versiunea aplicației, pachetele de actualizare și istoricul lor.",
         UsersTab => "Conturile utilizatorilor și drepturile fiecărui tip de utilizator.",
@@ -407,7 +450,7 @@
     }
 
     private string CurrentSubtab((string Id, string Title)[] subtabs) =>
-        subtabs == MapSubtabs ? mapSubtab : subtabs == InvoiceSubtabs ? invoiceSubtab : subtabs == BackupSubtabs ? backupSubtab : subtabs == DatabaseSubtabs ? databaseSubtab : subtabs == UserSubtabs ? userSubtab : subtabs == DevSubtabs ? devSubtab : notificationSubtab;
+        subtabs == AnafSubtabs ? anafSubtab : subtabs == MapSubtabs ? mapSubtab : subtabs == InvoiceSubtabs ? invoiceSubtab : subtabs == BackupSubtabs ? backupSubtab : subtabs == DatabaseSubtabs ? databaseSubtab : subtabs == UserSubtabs ? userSubtab : subtabs == DevSubtabs ? devSubtab : notificationSubtab;
 
     // Deep links (for example from the Journal) open the named tab, sub-tab and object; later clicks on the tabs win.
     [SupplyParameterFromQuery(Name = SettingsNavigation.TabParameter)] public string? TabQuery { get; set; }
@@ -441,6 +484,7 @@
         if (allowedTabs.Contains(BackupTab) && TabQuery == NasTab) { activeTab = BackupTab; backupSubtab = NasTab; }
         if (BackupSubtabs.Any(tab => tab.Id == SubtabQuery)) { backupSubtab = SubtabQuery!; if (isAdmin && TabQuery is null or BackupTab) activeTab = BackupTab; }
         if (allowedTabs.Contains(DatabaseTab) && TabQuery == DatabaseTab && DatabaseSubtabs.Any(tab => tab.Id == SubtabQuery)) databaseSubtab = SubtabQuery!;
+        if (TabQuery == AnafTab && AnafSubtabs.Any(tab => tab.Id == SubtabQuery)) anafSubtab = SubtabQuery!;
         if (NotificationSubtabs.Any(tab => tab.Id == SubtabQuery)) notificationSubtab = SubtabQuery!;
         if (MapSubtabs.Any(tab => tab.Id == SubtabQuery)) mapSubtab = SubtabQuery!;
         if (TabQuery == BugTab && DevSubtabs.Any(tab => tab.Id == SubtabQuery)) devSubtab = SubtabQuery!;
@@ -477,6 +521,14 @@
             builder.AddAttribute(seq++, "tabindex", selected ? "0" : "-1");
             builder.AddAttribute(seq++, "onclick", EventCallback.Factory.Create(this, () => SelectSubtab(subtabs, id)));
             builder.AddContent(seq++, subtab.Title);
+            if (subtab.Id == DevErrorsSubtab || subtab.Id == DevProposalsSubtab)
+            {
+                builder.AddContent(seq++, " ");
+                builder.OpenComponent<DevelopmentBadge>(seq++);
+                builder.AddAttribute(seq++, "Kind", subtab.Id == DevErrorsSubtab ? DevelopmentBadgeKind.Errors : DevelopmentBadgeKind.Proposals);
+                builder.AddAttribute(seq++, "Id", "subtab-" + subtab.Id + "-badge");
+                builder.CloseComponent();
+            }
             builder.CloseElement();
         }
         builder.CloseElement();
@@ -509,7 +561,8 @@
 
     private void SelectSubtab((string Id, string Title)[] subtabs, string id)
     {
-        if (subtabs == MapSubtabs) mapSubtab = id;
+        if (subtabs == AnafSubtabs) anafSubtab = id;
+        else if (subtabs == MapSubtabs) mapSubtab = id;
         else if (subtabs == BackupSubtabs) backupSubtab = id;
         else if (subtabs == DatabaseSubtabs) databaseSubtab = id;
         else if (subtabs == UserSubtabs) userSubtab = id;

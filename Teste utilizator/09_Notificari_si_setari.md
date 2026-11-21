@@ -4,6 +4,16 @@ Fluxul: Setari (administrator: ANAF, notificari, harta, Facturi) -> sabloane de 
 
 ## Modificari de testat
 
+### 10.11.2026 - Setari: Baza de date (fila Spatiu, sectiuni restranse), Preluare ANAF, detaliul propunerilor si erorilor in popup
+**Ce s-a adaugat:** (1) Setari -> Baza de date: fila noua "Spatiu" (cat ocupa aplicatia pe disc, defalcat pe baza de date, imagini, fisiere adaugate, backup-uri, fisierele aplicatiei, altele; spatiul liber al partitiei; "Recalculeaza"); sectiunile din Stare si Conexiune sunt restranse implicit si lipite fara goluri; (2) Setari -> Preluare date ANAF: cele 5 sectiuni sunt restranse implicit; (3) Setari -> Dezvoltare -> Erori / Propuneri: detaliul se deschide intr-un popup (vizualizare cu butoanele Editeaza si Exporta; editare cu Salveaza / Renunta), iar pe fiecare rand sunt iconitele vizualizare, editare, export (ZIP) si stergere; (4) tabelele de erori si propuneri se actualizeaza singure cand se adauga, se schimba sau se sterge o intrare.
+**Ce face acum:** totalul "Ocupat de aplicatie" din fila Spatiu este suma categoriilor si coincide cu cifra de pe partitie; iconita de editare deschide popup-ul direct in editare, iconita de export descarca ZIP-ul randului fara sa deschida nimic; o editare cu modificari nesalvate cere confirmare la inchidere.
+Pasi: Setari -> Baza de date -> Spatiu -> "Recalculeaza" si compara totalul cu cifra de pe partitie; Stare si Conexiune: sectiunile sunt inchise, lipite una de alta; Setari -> Dezvoltare -> Propuneri: ochi (popup vizualizare), creion (popup editare, schimba starea si salveaza), export (se descarca PROP-xxxx.zip), la fel pe Erori; deschide un tabel si adauga din meniu o propunere/o eroare noua: tabelul se actualizeaza singur in cateva secunde.
+
+### 10.11.2026 - Ferestre (popup): mutare, redimensionare, marcarea zonelor pe imagini
+**Ce s-a adaugat:** orice fereastra se muta tragand de antet si se redimensioneaza din coltul dreapta-jos (dublu-clic pe antet = centrare, pe mÃ¢ner = dimensiunea implicita; oprite sub 720 px latime); distanta dintre marginea de sus si butoanele barei este de 3 px; in formularele "Raporteaza o eroare" si "Propune o modificare" un clic pe o imagine o deschide intr-o fereastra de marcare plutitoare: tragi dreptunghiuri numerotate 1..N (cel mult 10), fiecare se poate doar sterge (butonul x din afara coltului dreapta-sus), numerele se refac singure, imaginea trimisa are zonele desenate pe ea.
+**Ce face acum:** descrierea din popup ramane accesibila cat timp marchezi imaginea; la trimitere se salveaza imaginea marcata (JPEG).
+Pasi: deschide "Propune o modificare" -> clic pe imaginea paginii -> deseneaza 3 zone, sterge-o pe cea din mijloc (cea de-a treia devine 2) -> inchide fereastra de marcare, completeaza titlul si descrierea, trimite -> in "Propunerile mele" deschide propunerea si verifica zonele pe imagine; trage popup-ul de antet si redimensioneaza-l din colt.
+
 ### 05.11.2026 - Setari -> Preluare Elcomtur: preluare automata a backup-ului Elcomtur
 **Ce s-a adaugat:** tab nou "Preluare Elcomtur" in Setari (langa "Preluare ActivityApp", doar administrator): comutator On/Off "Preluare automata", directorul cu backup-urile Elcomtur (cale de retea \\server\partajare\folder cu cont si parola, sau director local), masca numelui de fisier (ex. *elcomtur*), firma de preluat (aleasa din firmele backup-ului, cu numele: "firma1 - Electric Standard Prest SRL"), pragul de alerta in zile, butoanele Salveaza, Testeaza conexiunea, Citeste firmele din backup, Verifica acum si Preia ultimul backup acum. In fiecare zi la 04:00 se cauta in director cel mai recent fisier care corespunde mastii; daca e mai nou decat ultima preluare se copiaza pe server, se verifica integritatea tuturor fisierelor din arhiva si se preiau balantele. Pe server raman ultimele 2 backup-uri preluate. Operatiile sunt jurnalizate (Modificare setari preluare automata Elcomtur, Testare director backup Elcomtur, Verificare backup Elcomtur, Preluare automata backup Elcomtur, Esec preluare automata Elcomtur) si au notificari: "Elcomtur: backup preluat" (ramane 3 zile), "Elcomtur: preluare esuata" (cu cauza, se inchide la prima verificare reusita) si "Elcomtur: backup lipsa" (cand de pragul de zile nu a aparut un backup nou; se inchide la urmatoarea preluare, si cea manuala).
 **Ce face acum:** o singura incercare pe zi (la 04:00 sau la prima pornire a serverului dupa aceea); "Verifica acum" face aceeasi verificare oricand (preia numai un fisier mai nou decat ultima preluare), iar "Preia ultimul backup acum" preia cel mai recent fisier chiar daca nu e mai nou. Un fisier modificat acum mai putin de 5 minute nu se preia (programul Elcomtur il scrie inca). Un fisier corupt nu se preia: balantele raman cele vechi si apare notificarea de esec.
@@ -471,3 +481,77 @@ Pasi:
 | 6 | Autentifica-te prin adresa https | Login reuseste, sesiunea se pastreaza, paginile se incarca fara reconectari | |
 | 7 | Deschide direct `http://ip-vm:port` din alt calculator | Autentificarea nu reuseste (cookie Secure): accesul se face doar prin proxy | |
 | 8 | Opreste comutatorul, salveaza, reporneste | Aplicatia functioneaza din nou pe HTTP direct | |
+
+## Modificari de testat - changelog pe categorii (11.11.2026, versiunea 0.5.72, PROP-0019)
+
+**Ce s-a adaugat:** versiunile noi din changelog se impart in Functionalitati noi, Bugs si Diverse; migrarea 87 adauga versiunea de rezolvare a rapoartelor de eroare; scriptul tools/changelog-draft.ps1 listeaza PROP/BUG-urile versiunii.
+**Ce face acum:** Setari -> Actualizare -> Istoric -> iconita changelog arata categoriile cu titlu pentru versiunea 0.5.72; versiunile vechi raman plate.
+
+1. Deschide Istoric -> "Vezi changelog" pentru 0.5.72: apar cele trei categorii. Pentru 0.5.71 lista ramane simpla.
+2. Treci un raport de eroare pe Rezolvat, apoi ruleaza tools/changelog-draft.ps1 -Version 0.5.72: raportul apare sub Bugs (BUG-xxxx).
+
+## Modificari de testat - descarcare pachet backup (11.11.2026, PROP-0020)
+
+**Ce s-a adaugat:** in Setari -> Backup, pe fiecare pachet din tabel, iconita de descarcare (sageata in jos). Un pachet care are alaturi fisierul de suma de control vine intr-o arhiva cu ambele fisiere; unul singur vine asa cum este.
+**Ce face acum:** pachetul se descarca de pe server; unul aflat doar pe NAS este adus mai intai pe server (verificat prin suma de control, ca la restaurare) si apoi descarcat. Fiecare descarcare apare in jurnal ca "Descarcare pachet backup".
+
+| Pas | Ce faci | Ce trebuie sa vezi | OK |
+|---|---|---|---|
+| 1 | Setari -> Backup, iconita de descarcare pe un pachet de pe server | Browserul salveaza arhiva `<nume>-cu-suma-de-control.zip` (pachet + .sha256) sau pachetul simplu | |
+| 2 | Pe un pachet doar pe NAS, iconita de descarcare | Mesaj "Se aduce pachetul de pe NAS...", apoi descarcarea; pachetul apare si pe server | |
+| 3 | Jurnal activitate | Intrare "Descarcare pachet backup" cu pachetul si daca a fost arhiva | |
+| 4 | Cu un cont fara dreptul de a modifica setarile de backup, deschide adresa /api/backup/<nume> | Acces refuzat | |
+
+## Modificari de testat - actualizare cu notificare sau imediata (12.11.2026, versiunea 0.5.77)
+
+**Ce s-a adaugat:** in Setari -> Actualizare, dupa verificarea unui pachet, butonul "Aplica actualizarea" se numeste "Actualizeaza cu notificare utilizatori" si are acelasi efect; butonul nou "Actualizare imediata".
+
+**Ce face acum:** "Actualizeaza cu notificare utilizatori" anunta utilizatorii in banner si porneste dupa 60 de secunde (poate fi anulata); "Actualizare imediata" porneste actualizarea acum, fara banner si fara intarziere. Ambele cer motivul si intra in jurnal ("Actualizare aplicatie"; la cea imediata "Porneste in: imediat, fara anunt").
+
+| Pas | Ce faci | Ce trebuie sa vezi | OK |
+|---|---|---|---|
+| 1 | Incarca un pachet valid si scrie motivul | Apar doua butoane: "Actualizeaza cu notificare utilizatori" si "Actualizare imediata", cu explicatia lor | |
+| 2 | Apasa "Actualizeaza cu notificare utilizatori" | Bannerul cu numaratoare apare pentru toti, butonul "Anuleaza actualizarea" merge, la sfarsit aplicatia se actualizeaza | |
+| 3 | Pe alt pachet apasa "Actualizare imediata" | Nu apare banner la alti utilizatori, nu exista numaratoare; actualizarea porneste pe loc | |
+| 4 | Deschide Jurnal activitate | Intrarea "Actualizare aplicatie" cu motivul; la cea imediata, "Porneste in: imediat, fara anunt" | |
+
+## Modificari de testat: fereastra de anunt al actualizarii (13.11.2026)
+
+**Ce s-a adaugat:** la o actualizare cu anunt, ceilalti utilizatori conectati primesc o fereastra deasupra paginii si a oricarei ferestre deschise.
+**Ce face acum:** "Am inteles" si "Inchide" o inchid, actualizarea continua; "Am nevoie de mai mult timp" intrerupe actualizarea pentru toti, iar cel care a pornit-o primeste mesajul "Actualizare intrerupta" cu numele utilizatorului. Cel care porneste actualizarea nu primeste avertizarea.
+
+| Nr | Pas | Rezultat asteptat | OK |
+|----|-----|-------------------|----|
+| 1 | Cu doi utilizatori conectati, porneste o actualizare cu anunt (alt pachet) | Al doilea utilizator vede fereastra cu numaratoare; primul nu | |
+| 2 | La al doilea apasa "Am nevoie de mai mult timp" | Ferestrele se inchid; primul vede "Actualizare intrerupta, utilizatorul X are nevoie de mai mult timp" | |
+| 3 | Jurnal activitate | Intrare "Intrerupere actualizare aplicatie" cu numele utilizatorului | |
+
+### 14.11.2026 - Setari -> ANAF: sub-taburi "Preluare date firme" si "Factura" (autentificare ANAF)
+**Ce s-a adaugat:** tile-ul/tabul "Preluare date ANAF" se numeste acum "ANAF" si are doua sub-taburi: "Preluare date firme" (configuratorul de pana acum, neschimbat) si "E-Factura" (autentificarea aplicatiei in ANAF, OAuth2 e-Factura): client id, client secret (se pastreaza criptat, nu se mai afiseaza), adresa de raspuns (HTTPS), mediu productie/test, butoanele Autentifica-te in ANAF, Reinnoieste tokenul, Deconecteaza. Operatiile sunt jurnalizate (Modificare setari autentificare ANAF, Autentificare in ANAF, Reinnoire token ANAF, Deconectare autentificare ANAF).
+**Ce face acum:** dupa salvarea setarilor, "Autentifica-te in ANAF" te duce pe pagina ANAF (certificat calificat); ANAF te aduce inapoi la /anaf/autentificare/raspuns (adresa trebuie inregistrata la ANAF ca redirect) si pagina arata starea si data expirarii tokenului.
+| Nr | Pas | Rezultat asteptat | Rezultat |
+|----|-----|-------------------|----------|
+| 1 | Setari -> ANAF | Doua sub-taburi: Preluare date firme (ca inainte) si E-Factura | |
+| 2 | E-Factura: completeaza client id, secret, adresa HTTPS de raspuns, Salveaza | Mesaj de salvare; secretul nu mai apare | |
+| 3 | Autentifica-te in ANAF cu datele reale inregistrate la ANAF | Revii pe E-Factura cu "Autentificat" si data expirarii (necesita cont/certificat ANAF real) | |
+
+## Modificari de testat (17.11.2026) - PROP-0037 / PROP-0035
+**Ce s-a adaugat:** în Setări afișare, între presetări și secțiuni, comutatorul "Arată buton particularizare tabel"; în Preluare date Elcomtur firma apare cu numele ei.
+**Ce face acum:**
+1. Meniul contului -> Setări afișare: pune comutatorul pe Off; pe orice tabel dispare roata de setări. Pune-l pe On: reapare. Setările făcute înainte pentru un tabel se păstrează.
+2. Preluare date Elcomtur (și fișa beneficiarului, tabul Balanță): la "firma ..." apare numele firmei (după ce preluarea automată a citit firma o dată); altfel rămâne firma1.
+
+## Modificari de testat (17.11.2026) - PROP-0036
+**Ce s-a adaugat:** migrarea 92 (istoric al totalului platilor restante, o valoare la fiecare preluare Elcomtur); butonul "Arată evoluție balanță" sub "Total plăți restante" (Notificări → Balanțe restante) și fereastra cu grafic.
+**Ce face acum:**
+1. Fă o preluare Elcomtur (Administrare → Preluare date Elcomtur sau cea automată); totalul de la acea preluare se notează. La prima preluare după actualizare se notează și totalul dinainte.
+2. Notificări → Balanțe restante: apasă "Arată evoluție balanță": bare verticale, cu valoarea deasupra și data backup-ului dedesubt (roșu = a crescut, verde = a scăzut, gri = prima).
+3. Schimbă perioada: Anul curent / Ultimele 6 luni / Ultimele 3 luni; o preluare a aceleiași date și firme înlocuiește bara ei.
+Istoricul începe de la preluările făcute după această versiune (nu există valori mai vechi).
+
+## Modificari de testat (17.11.2026) - BUG-0053
+**Ce s-a adaugat:** roata de setari a tabelelor este intr-un rand rezervat in pagina, deasupra antetului tabelului, in dreapta holderului.
+**Ce face acum:**
+1. Deschide Categorii (deschide o categorie), Beneficiari, Furnizori, Facturi, Jurnal, Registru vehicule: roata e deasupra antetului tabelului, la marginea dreapta, si nu acopera nimic; intre elementele de sus (cautare, comutatoare) si antet este spatiu pentru ea.
+2. Setari afisare: comutatorul "Arata buton particularizare tabel" pe Off: roata dispare si spatiul rezervat dispare odata cu ea (tabelul urca). Pe On: reapar.
+3. Categoriile pliate nu au roata; apare cand le deschizi.

@@ -11,7 +11,7 @@
    the supervisor of the preview or the Windows service); the page then waits for the new address and opens it. *@
 
 <section class="catalog application-hosting">
-    <div class="catalog-heading"><h2>Aplicația</h2><small>Adresa la care intri în aplicație din browser: calculatorul acesta și portul ales aici.</small></div>
+    <details class="catalog-collapse"><summary class="catalog-heading"><h2>Aplicația</h2><small>Adresa la care intri în aplicație din browser: calculatorul acesta și portul ales aici.</small></summary>
     <div class="catalog-body">
     @if (loading) { <div class="empty-state" role="status"><div class="spinner"></div><h3>Se încarcă</h3></div> }
     else
@@ -37,6 +37,7 @@
         </div>
     }
     </div>
+</details>
 </section>
 @if (mode != Mode.None)
 {

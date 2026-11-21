@@ -17,7 +17,7 @@
 @if (editing is not null)
 {
     <section class="product-editor" aria-labelledby="invoice-editor-title">
-        <div class="catalog-heading"><h2 id="invoice-editor-title">Editează factura @editing.Number</h2><span class="heading-actions"><HelpButton Topic="facturi-editare" About="Editarea facturii" /><button type="button" class="danger" disabled="@saving" @onclick="CloseEditor">Închide</button></span></div>
+        <div class="catalog-heading"><h2 id="invoice-editor-title">Editează factura @editing.Number</h2><span class="heading-actions"><HelpButton Topic="facturi-editare" About="Editarea facturii" /><button type="button" class="danger" disabled="@saving" @onclick="CloseEditor" data-head-close>Închide</button></span></div>
         @if (editorError is not null) { <div class="error-banner" role="alert">@editorError</div> }
         <fieldset disabled="@saving">
             <div class="editor-grid">
@@ -63,8 +63,9 @@ else
     else if (Filtered.Count == 0) { <div class="empty-state"><span class="empty-icon">▤</span><h3>Nu există facturi pentru filtrele curente</h3><p>Facturile apar aici după „Preluare factură” din Produse.</p></div> }
     else
     {
-        <div class="table-scroll"><table><thead><tr><th>NR. FACTURĂ</th><th>FURNIZOR</th><th>DATA EMITERII</th><th class="number">INTRĂRI ÎN STOC</th><th>PRELUATĂ DE</th><th>LA DATA</th><th><span class="sr-only">Acțiuni</span></th></tr></thead><tbody>
-        @foreach (var invoice in Filtered)
+        <Paged Items="Filtered" Id="supplier-invoices-size" Context="pageRows" Sorts="Sorts">
+        <div class="table-scroll"><table><thead><tr><SortTh Key="number">NR. FACTURĂ</SortTh><SortTh Key="supplier">FURNIZOR</SortTh><SortTh Key="date">DATA EMITERII</SortTh><SortTh Key="entries" Class="number">INTRĂRI ÎN STOC</SortTh><SortTh Key="by">PRELUATĂ DE</SortTh><SortTh Key="at">LA DATA</SortTh><th><span class="sr-only">Acțiuni</span></th></tr></thead><tbody>
+        @foreach (var invoice in pageRows)
         {
             <tr @key="invoice.Id">
                 <td><button type="button" class="category-table-link link-like" title="Arată produsele preluate din factură" @onclick="() => OpenAsync(invoice)"><strong>@invoice.Number</strong></button></td>
@@ -82,15 +83,14 @@ else
             </tr>
         }
         </tbody></table></div>
+        </Paged>
     }
 </section>
 }
 
 @if (openInvoice is { } shown)
 {
-    <div class="delete-overlay">
-        <section class="delete-dialog" role="dialog" aria-modal="true" aria-labelledby="invoice-entries-title">
-            <div class="dialog-head"><h2 id="invoice-entries-title">Factura @shown.Number</h2><HelpButton Topic="facturi-detaliu" About="Factura deschisă" /></div>
+    <AppDialog TitleId="invoice-entries-title" HelpTopic="facturi-detaliu" HelpAbout="Factura deschisă" OnClose="CloseEntries"><TitleContent>Factura @shown.Number</TitleContent><ChildContent>
             <p class="delete-object"><strong>@shown.SupplierName</strong> · emisă la @StockMovementRules.DisplayDate(shown.Date)</p>
             @if (entriesLoading) { <div role="status"><div class="spinner"></div></div> }
             else if (entriesError is not null) { <div class="validation-message" role="alert">@entriesError</div> }
@@ -105,8 +105,8 @@ else
                 @if (CanAddManually) { <button type="button" class="refresh act-confirm" @onclick="() => manualFor = shown">Adaugă produs manual</button> }
                 <button type="button" class="primary" @onclick="CloseEntries">Închide</button>
             </div>
-        </section>
-    </div>
+</ChildContent>
+</AppDialog>
 }
 
 @if (manualFor is not null)
@@ -214,6 +214,7 @@ else
         finally { deleteBusy = false; }
     }
 
+    private static readonly IReadOnlyDictionary<string, Func<SupplierInvoice, IComparable?>> Sorts = new Dictionary<string, Func<SupplierInvoice, IComparable?>> { ["number"] = item => item.Number, ["supplier"] = item => item.SupplierName, ["date"] = item => item.Date, ["entries"] = item => item.MovementCount, ["by"] = item => item.CreatedBy, ["at"] = item => item.CreatedUtc };
     private List<SupplierInvoice> Filtered => SupplierInvoiceSearch.Filter(invoices, query, supplierId, fromDate, toDate, withoutEntries).ToList();
 
     protected override async Task OnInitializedAsync()

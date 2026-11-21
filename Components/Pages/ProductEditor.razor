@@ -11,7 +11,7 @@
 
 <UnsavedChangesTracker @ref="tracker" Subject="@(BlazorStoc.Services.PopupSubject.Of("produs", Original?.Name))" Adding="@(Original is null)" Snapshot="CurrentSnapshot" Discard="DiscardAsync" />
 <section class="product-editor" aria-labelledby="editor-title">
-    <div class="catalog-heading"><h2 id="editor-title">@(Original is null ? (Staging ? "Pregătește produs nou" : "Adaugă produs") : $"Editează produsul {Original.Name}")</h2><span class="heading-actions"><HelpButton Topic="produse-editor" About="Formularul de produs" /><button type="button" class="danger" disabled="@saving" @onclick="Close">Închide</button></span></div>
+    <div class="catalog-heading"><h2 id="editor-title">@(Original is null ? (Staging ? "Pregătește produs nou" : "Adaugă produs") : $"Editează produsul {Original.Name}")</h2><span class="heading-actions"><HelpButton Topic="produse-editor" About="Formularul de produs" /><button type="button" class="danger" disabled="@saving" @onclick="Close" data-head-close>Închide</button></span></div>
     @if (error is not null) { <div class="error-banner" role="alert">@error</div> }
     <EditForm Model="input" OnValidSubmit="SaveAsync" FormName="product-editor">
         <DataAnnotationsValidator />
@@ -22,7 +22,7 @@
                 @if (InvoiceAmbiguity.Found(CodeText) is { Length: > 0 } codeDoubt) { <p class="uncertain-note full-width" id="product-code-doubt" role="status"><span class="uncertain-badge">⚠ caractere nesigure: @codeDoubt</span> Codul conține caractere care se confundă ușor cu litere sau cifre (o liniuță verticală în loc de I, l sau 1 etc.). Verifică-l: căutarea imaginii folosește exact acest cod.</p> }
                 <GroupTreePicker Id="product-group" Categories="Categories" Nodes="treeNodes" Flat="CurrentGroups" Category="@input.Category" Subcategory="@input.Subcategory" Disabled="saving" Picked="GroupPickedAsync" />
                 <ValidationMessage class="full-width" For="() => input.Subcategory" />
-                <p class="form-note full-width">Poți selecta numai categorii și subcategorii existente. Pentru o structură nouă, folosește pagina <a href="/categorii">Categorii și subcategorii</a>@if (Original is null) { <text> sau <button type="button" class="refresh act-confirm" @onclick="OpenCategories">Adaugă categorie / subcategorie</button> (se deschide într-o fereastră separată)</text> }.</p>
+                <p class="form-note full-width">Selectează o categorie și o subcategorie existente sau <button type="button" class="refresh act-confirm" @onclick="OpenCategories">Adaugă categorie / subcategorie</button> (se deschide într-o fereastră separată, fără să pierzi ce ai completat).</p>
                 @if (!HasSelectableGroup) { <p class="validation-message full-width" role="alert">Nu există nicio combinație categorie–subcategorie disponibilă. Creează mai întâi o subcategorie în pagina dedicată.</p> }
                 @if (HasParameters)
                 {
@@ -103,12 +103,10 @@
 </section>
 @if (categoriesOpen)
 {
-    <div class="invoice-modal-backdrop front">
-        <div class="invoice-modal wide" role="dialog" aria-modal="true" aria-label="Categorii și subcategorii">
+    <AppDialog PanelClass="invoice-modal wide" BackdropClass="front" Label="Categorii și subcategorii">
             <div class="catalog-heading"><h3>Categorii și subcategorii</h3><button type="button" class="primary" @onclick="CloseCategoriesAsync">Gata, înapoi la produs</button></div>
             <iframe class="categories-frame" src="/categorii/fereastra" title="Categorii și subcategorii"></iframe>
-        </div>
-    </div>
+    </AppDialog>
 }
 @if (pendingChanges is not null && Original is not null)
 {

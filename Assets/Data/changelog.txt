@@ -1,3 +1,438 @@
+## 0.6.19 | 21.11.2026
+### Funcționalități noi
+- Personalizare dashboard: lățimea zonelor. Un slider „Lățime zone” stabilește lățimea tuturor zonelor (la capăt este automată), iar fiecare zonă are propriul slider „Lățime zonă”, care are prioritate peste cel global; „Lățime globală” o readuce la valoarea globală. Zonele fără lățime proprie urmează lățimea globală. Cu o lățime aleasă, zonele au exact acea lățime și stau centrate pe pagină, inclusiv prima zonă.
+### Bugs
+- Anunțuri: un anunț general se arată o singură dată unui utilizator: este marcat văzut în clipa afișării, nu la închiderea ferestrei (înainte putea reapărea dacă pagina era reîncărcată sau sesiunea se încheia cu fereastra deschisă).
+### Diverse
+- Actualizarea adaugă o coloană în tabelul zonelor dashboard-ului (lățimea zonei).
+
+## 0.6.18 | 21.11.2026
+### Funcționalități noi
+- Personalizare dashboard: zonele pot sta și pe rânduri diferite ale paginii. Fiecare zonă (în afară de prima) are câmpul „Așezare”: lângă zona dinainte, pe rând nou centrată, pe rând nou la stânga sau pe rând nou la dreapta. O zonă de pe rând nou păstrează lățimea de care au nevoie tile-urile ei, cu același padding, și nu se întinde pe toată pagina.
+### Diverse
+- Actualizarea adaugă o coloană în tabelul zonelor dashboard-ului (așezarea zonei).
+
+## 0.6.17 | 21.11.2026
+### Funcționalități noi
+- Personalizare dashboard: la un spațiu liber din caroiaj poți alege o culoare (câmpul „Culoare” de pe rândul spațiului, „Fără culoare” îl lasă transparent); pe dashboard spațiul apare ca o bandă colorată.
+
+## 0.6.16 | 21.11.2026
+### Bugs
+- Personalizare dashboard: sliderul „Înălțime spațiu” modifică acum spațiul dintre rândurile de tile-uri (în editor și pe dashboard), nu doar rândurile „+ Spațiu”, deci orice valoare se vede imediat.
+
+## 0.6.15 | 21.11.2026
+### Bugs
+- Personalizare dashboard: sliderul „Lățime tile” se oprește la lățimea pe care o poate avea o coloană în zona cea mai îngustă, ca fiecare pas să schimbe ceva (înainte valorile mai mari decât spațiul nu aveau efect); la capăt lățimea este automată.
+- Rotița de setări a tabelelor rămâne deasupra antetului și când un banner apare sau dispare deasupra tabelului (înainte putea ajunge în primul rând).
+### Diverse
+- Personalizare dashboard: sub slidere apare o notă când nu există niciun „+ Spațiu” în caroiaj, pentru că înălțimea spațiului se vede doar la rândurile de spațiu.
+- Ieșire multiplă: coloana „Produs” este cu 40% mai îngustă, „Descriere” stă la 10 px de „Sursa”, iar câmpul de descriere de pe rând este de 2,5 ori mai lung.
+
+## 0.6.14 | 21.11.2026
+### Diverse
+- Anunțuri: în tabel, valorile din coloana „Văzut / citit” sunt centrate sub antet, iar iconița „cine a citit” stă la 5 px de valoare.
+
+## 0.6.13 | 21.11.2026
+### Funcționalități noi
+- Anunțuri: tabelul are coloană separată „Activ” cu comutator (activează un draft sau un anunț arhivat, dezactivează unul activ) și iconiță de republicare fără modificări, care trimite din nou anunțul celor vizați.
+- Anunțuri: un anunț obligatoriu nu mai are „Închide”, „Următorul” sau închidere cu Escape; fereastra se închide doar cu „Am citit”. „Am citit” există doar la anunțurile obligatorii.
+- Anunțuri: în tabel, la un anunț obligatoriu, iconița din coloana „Văzut / citit” arată cine l-a citit, cu data și ora; la cele generale coloana arată doar câți l-au văzut.
+- Anunțuri: bara ferestrei spune „ANUNȚ GENERAL” (în culoarea temei) la un anunț general și „ANUNȚ IMPORTANT” (roșu) la unul obligatoriu.
+- Anunțuri: în meniul numelui tău există „Vizibilitate anunțuri generale”, cu comutator On/Off: dacă ai oprit anunțurile din fereastră, de aici le repornești.
+- Anunțuri: cele două categorii se numesc „General” și „Obligatoriu”; comutatorul „Nu mai afișa anunțurile la pornire” apare doar peste un anunț general, nu și peste unul obligatoriu.
+### Diverse
+- Anunțuri: tabelul are „Tip și audiență” într-o singură coloană și nu mai arată numărul anunțului, ca să încapă pe lățimea paginii.
+
+## 0.6.12 | 21.11.2026
+### Bugs
+- Anunțuri: după delogare și relogare în același tab, anunțurile active nevăzute apar din nou la autentificare (înainte fereastra nu mai apărea).
+
+## 0.6.11 | 21.11.2026
+### Funcționalități noi
+- Anunțuri: pe fiecare rând din tabel există un comutator Activ/Inactiv: On activează un draft sau un anunț arhivat așa cum e salvat (cei vizați îl primesc din nou), Off îl dezactivează.
+- Anunțuri: fereastra de anunț arată deasupra titlului „Publicat de:” cu numele utilizatorului (prima literă mare), data și ora publicării.
+### Diverse
+- Actualizarea adaugă o coloană în tabelul de anunțuri (cine a publicat).
+
+## 0.6.10 | 21.11.2026
+### Funcționalități noi
+- Anunțuri: administratorii pot scrie anunțuri cu text formatat (aldin, cursiv, titluri, liste, link, culoare, aliniere) și poze, le previzualizează, le salvează ca draft, le publică și le republică. Anunțul ajunge la toți utilizatorii sau la cei selectați, cu dată opțională „valabil până”.
+- Anunțuri: după autentificare, o singură dată pe sesiune, utilizatorul vede anunțurile active nevăzute, pe rând („1 din 3”). Un anunț normal se poate opri din comutatorul „Nu mai afișa anunțurile la pornire”; unul obligatoriu revine la fiecare autentificare până apeși „Am citit”. Pozele din anunț apar mici, cu iconiță de mărire.
+- Anunțuri: „Încarcă anunț” primește o arhivă ZIP (anunt.json, continut.html, imagini) și o deschide ca draft nou; „Descarcă ca ZIP” pe un rând dă anunțul în același format.
+### Bugs
+- Dashboard: titlul paginii principale nu mai arată textul `@if (userName.Length > 0)`, ci „Dashboard” și numele utilizatorului, cu 10 px între ele. Meniul lateral: „Dashboard” este fix în partea de sus pe toate paginile (și deasupra meniului de categorii de produse), cu 15 px față de antet și 15 px față de meniul de sub el.
+### Diverse
+- Jurnalul are acțiuni proprii pentru anunțuri: creare, publicare, modificare, arhivare, republicare, ștergere și confirmare citire.
+
+## 0.6.9 | 21.11.2026
+### Funcționalități noi
+- Dashboard: tile-urile au antet cu iconița și categoria din care face parte opțiunea, iar titlul și descrierea stau în corpul tile-ului (Baza de date pe un singur rând, nu „Setări - Baza de date”); înălțimea lor e restrânsă, ca la categorii.
+- Dashboard: numele utilizatorului apare lângă titlu, cu prima literă mare.
+- Dashboard: moștenește setările globale de afișare (text, antet, iconițe) și are rotiță proprie ca tabelele, pentru text, antetul tile-urilor și iconițe.
+### Bugs
+- Dashboard: după salvare, tile-urile din zone diferite nu își mai pierd locul în caroiaj.
+### Diverse
+- Dashboard: zonele au aceeași înălțime, cea a zonei celei mai înalte.
+- Inventar: categoriile din selecție și din raportul de inventar urmează ordinea din meniul Stoc, nu alfabetul.
+
+## 0.6.8 | 21.11.2026
+### Funcționalități noi
+- Personalizare dashboard: o opțiune pornită nu mai intră direct în caroiaj, ci într-o zonă de așteptare deasupra rândurilor; de acolo o tragi unde vrei (și poți pune înapoi un tile din caroiaj). Ce rămâne în zona de așteptare se salvează, dar nu apare pe dashboard.
+- Personalizare dashboard: dashboard-ul se poate împărți în zone așezate una lângă alta; fiecare zonă are titlu obligatoriu și propriul caroiaj (număr de tile-uri pe rând, rânduri, etichete și spații). Tile-urile, rândurile și zonele se mută cu drag and drop, iar o zonă ștearsă își trimite tile-urile în zona de așteptare.
+- Personalizare dashboard: trei slidere, lățimea tile-urilor, înălțimea tile-urilor și înălțimea spațiilor dintre rânduri, se aplică unitar la tot dashboard-ul; „Dimensiuni standard” le resetează.
+- Dashboard: fiecare zonă are chenar rotunjit cu umbră 3D, iar tile-urile au umbră; tile-urile rămân în zonă.
+
+## 0.6.7 | 21.11.2026
+### Funcționalități noi
+- Personalizare dashboard: cine nu și-a aranjat încă un dashboard începe de la cel activ, cel standard (tile-urile lui sunt deja în aranjare), iar în secțiunea de caroiaj există butonul „Golește dashboard” (un dashboard gol salvat rămâne gol, e alegerea utilizatorului) și „Revino la dashboard-ul standard”.
+- Personalizare dashboard: „Preluare ofertă” este acum o acțiune a categoriei Oferte (subsecțiunea „Acțiuni”), nu o intrare de meniu.
+### Diverse
+- Personalizare dashboard: tragerea tile-urilor și a rândurilor în caroiaj funcționează acum în browser, ca la categorii: celula țintă se evidențiază, iar tile-ul se mută sau schimbă locul cu altul.
+- Personalizare dashboard: rotița de afișare a tabelelor nu mai apare peste antetul secțiunilor.
+
+## 0.6.6 | 21.11.2026
+### Funcționalități noi
+- Personalizare dashboard: poți alege câte tile-uri stau pe un rând, de la 2 la 8 (implicit 4); alegerea se salvează pe contul tău.
+- Personalizare dashboard: opțiunile sunt pe categorii pliabile, cu insigne (câte sunt pe dashboard și câte libere), fiecare categorie având „Intrări meniu principal” și „Acțiuni”. Tile-uri noi: paginile din Setări și acțiunile principale (Adaugă produs, beneficiar, furnizor, vehicul, categorie, proiect, punct de lucru, contract de mentenanță, analiză de risc); fiecare are iconiță proprie și deschide direct formularul respectiv (acolo unde trebuie un beneficiar, ți-l cere întâi).
+- Personalizare dashboard: în caroiaj poți adăuga etichete (cu text și culoare de font la alegere) și spații de 15 px între rânduri, poți muta rânduri întregi și scoate un tile cu iconița de ștergere (comutatorul lui trece pe Off).
+- Personalizare dashboard: la secțiunea Oferte poți alege și „Preluare ofertă” ca tile, cu iconiță proprie, chiar dacă în meniul din stânga nu e un copil separat.
+### Diverse
+- Meniul din stânga: eticheta „Spațiu de lucru” are culoarea temei, cu 20 px deasupra și 20 px dedesubt față de „Dashboard” și de prima intrare.
+
+## 0.6.5 | 21.11.2026
+### Funcționalități noi
+- Dashboard personalizabil: din meniul numelui tău, „Personalizare dashboard” te lasă să alegi opțiunile de meniu care apar ca tile-uri pe pagina principală (cu iconița lor) și să le așezi cu drag and drop într-un caroiaj, pe rândurile și coloanele dorite; alegerea se păstrează pe contul tău. Fără nicio alegere, rămâne dashboard-ul standard.
+### Diverse
+- Opțiunile din meniul lateral au acum iconițe, iar „Pagina principală” se numește „Dashboard”.
+- Butonul „Actualizează aplicația” apare în bara de sus pentru conturile cu drept de actualizare.
+- Actualizarea adaugă un tabel nou (pornește gol) și două coloane pentru locul tile-urilor.
+- Butonul „Dezvoltare” apare în bara de sus, înaintea „Actualizează aplicația”, pentru conturile de dezvoltator și duce în pagina de dezvoltare.
+- Intrări/ieșiri produs: lupele de lângă beneficiar și vehicul au dispărut; filtrarea se face din bara de filtre.
+- Fișa beneficiarului: toate taburile au aceeași înălțime, iar tabul „Proiecte” arată numărul de proiecte.
+- Administrare vehicule: numărul vehiculului este mai mare și își schimbă aspectul la trecerea mouse-ului, ca să se vadă că se poate apăsa.
+- Setări → Backup: pragul minim de păstrare a pachetelor vechi este acum 4 zile (înainte 7).
+- Lângă alegerea beneficiarului (Ieșire multiplă, adăugarea unei ieșiri din Intrări/ieșiri produs, Bon de consum, Export consum, Ofertă, Analiză de risc, Task utilizator) și în lista Beneficiari apare butonul „Preia din ActivityApp”: preia imediat beneficiarii introduși în ActivityApp și încă absenți, într-o fereastră cu progres și rezultat (câți s-au creat, legat, așteaptă sau au probleme, plus numele celor noi). Îl folosește cine are dreptul de a adăuga beneficiari; acțiunea apare în Jurnal ca „Preluare manuală beneficiari ActivityApp”.
+- Meniul din stânga: „Dashboard” este deasupra „Spațiu de lucru”, de sine stătător. Eticheta „Spațiu de lucru” are culoarea temei și 20 px deasupra și dedesubt.
+- Notificarea „structura ActivityApp s-a schimbat” arată acum și ce s-a schimbat: coloanele lipsă sau cu alt tip de date (tabel, coloană, ce era așteptat și ce s-a găsit), cele necesare primele.
+- Beneficiarii introduși în ActivityApp sunt preluați și la noi când deschizi o pagină cu alegere de beneficiar (Ieșire multiplă, Bon de consum, Export consum, Ofertă, Analiză de risc, Task utilizator, lista Beneficiari): preluarea rulează în fundal, nu întârzie deschiderea paginii, iar lista se reîncarcă singură dacă a apărut un beneficiar nou. Verificarea se face cel mult o dată la 2 minute.
+
+## 0.6.4 | 20.11.2026
+### Diverse
+- Preluarea unei facturi scanate cu un șablon făcut din alt scan nu mai pierde rândurile: când OCR-ul citește altfel titlurile coloanelor, coloanele se potrivesc cu antetul găsit după poziția lor, iar reperele fără litere sau cifre (linii și chenare citite ca „|” sau „=”) nu mai strică zonele coloanelor. Șabloanele existente nu trebuie refăcute.
+
+## 0.6.3 | 20.11.2026
+### Funcționalități noi
+- PROP-0043 · În Ieșirea multiplă, lângă câmpul Proiect este butonul „+ Proiect nou”: proiectul se creează într-o fereastră, fără să pierzi ce ai completat, și rămâne ales în formular.
+- PROP-0044 · Cardul „Unde sunt bucățile” din Intrări/ieșiri arată acum doar stocul total, stocul din depozit și stocul din mașini (total), fără defalcarea pe destinații.
+- PROP-0045 · Meniul Produse are „Generează bon de consum”, un wizard: alegi beneficiarul, apoi proiectele cu echipamente (cele returnate integral apar dezactivate). Pentru un proiect bonul se vede într-o fereastră cu Descarcă, Tipărește și Închide. Pentru mai multe proiecte alegi bonuri separate (taburi pe proiect, cu „Descarcă toate bonurile”, într-un folder sau într-un ZIP, și „Tipărește toate bonurile”) sau un singur bon total.
+### Diverse
+- Fișierele PDF ale bonurilor de consum se numesc peste tot la fel: „număr beneficiar proiect generat data ora”, dintr-un singur loc din program.
+
+## 0.6.2 | 19.11.2026
+### Bugs
+- BUG-0054 · Butonul roșu de închidere din fereastra „Sesiuni deschise” nu mai rămâne fără efect: acum închide fereastra.
+
+## 0.6.1 | 18.11.2026
+### Diverse
+- Bonuri de consum: bonul nu se mai generează automat la fiecare ieșire; linkul din Ieșirea multiplă și iconița de bon de pe rândul mișcării au dispărut.
+- Fiecare proiect al unui beneficiar cu echipamente predate are iconița „Generează bon de consum”: bonul are câte un rând pe produs, cu cantitatea netă de acum (ieșiri minus retururi) și data ultimei ieșiri, se generează numai la apăsare și este legat de beneficiar și de proiect. La generare, bonurile anterioare ale proiectului rămân inactive (trasabilitate) sau se șterg, la alegere.
+- Bonurile nu se editează: se văd, se descarcă, se tipăresc sau se șterg, active sau inactive. În pagina beneficiarului, o secțiune pliabilă „Bonuri de consum” le afișează.
+- Pagina nouă Administrare → Bonuri de consum, cu toate bonurile din sistem, căutare care filtrează pe măsură ce scrii și alegere de beneficiar sau proiect. Acțiuni noi în Jurnal: Generare, Dezactivare și Ștergere bon de consum.
+- Actualizarea pornește cu zero bonuri de consum și cu numerotarea de la 1 (tabele noi).
+- Intrări/ieșiri produs: tab nou „Retur” la intrare, cu două opțiuni, Beneficiar și Vehicul. Returul din beneficiar cere proiectul și nu poate depăși cantitatea produsului din proiect; se înregistrează ca intrare pe produs, cu descriere explicită propusă (o poți rescrie). Returul din vehicul mută produsul din vehicul în depozit și nu poate depăși cantitatea din vehicul. „Primit de la beneficiar / vehicul” dispare din motivele intrării libere; retururile vechi rămân.
+- Echipamente proiect: produsele și cantitățile rezultă la deschiderea paginii din ieșirile spre proiect și retururile de pe proiect (nr. crt., subcategorie, cod produs, cantitate); o secțiune pliabilă, închisă implicit, păstrează istoricul mișcărilor proiectului, ieșiri și retururi în același tabel. O ieșire nu se mai poate storna, șterge sau micșora dacă retururile de pe proiect ar depăși ce rămâne.
+
+## 0.5.100 | 18.11.2026
+### Diverse
+- Ieșiri: destinație nouă „Alt motiv”, lângă Beneficiar, Autovehicul, Vânzare generică și Corecție stoc, în formularul de ieșire și în Ieșirea multiplă; nu cere beneficiar, proiect sau vehicul, motivul se scrie în descriere; în Jurnal apare ca „Ieșire alt motiv”.
+
+## 0.5.99 | 18.11.2026
+### Diverse
+- Setări afișare, Culori: tema aleasă se aplică imediat în toată aplicația după „Aplică modificările”, fără reîncărcarea paginii.
+
+## 0.5.98 | 18.11.2026
+### Diverse
+- Setări afișare, Culori: 6 palete noi, mai deschise, câte două pentru galben (Lămâie, Chihlimbar deschis), roșiatic (Coral, Zmeură pală) și verde (Primăvară, Măr verde); în total 20 de palete, pe lângă tema originală.
+
+## 0.5.97 | 18.11.2026
+### Functionalitati noi
+- PROP-0040 – Pe pagina de produse, când e aleasă o subcategorie, apare deasupra tabelului butonul „Adaugă produs în <subcategorie>", cu iconiță, pentru toate subcategoriile.
+- PROP-0041 – Fereastra proiectului (din Intrări/ieșiri) are butonul „Mergi la proiect", care o închide și deschide pagina proiectului.
+- PROP-0042 – Tabelul echipamentelor proiectului și secțiunea „Consum net" din beneficiar au coloanele „Nr. crt." și „Subcategorie" înaintea codului de produs.
+### Diverse
+- Setări afișare: secțiunea „Culori (tema luminoasă)" cu 14 palete calme (6 existente și 8 noi, pale: Mentă, Fistic, Gheață, Cer senin, Liliac, Trandafir pudrat, Piersică, Mușețel), pe lângă tema originală.
+- Indicator de progres în procente la citirea unui PDF de factură (Preluare factură și Șabloane facturi) și la încărcarea fișierului de ofertă (Preluare ofertă și Șabloane ofertă), ca la Preluare inventar.
+- Intrări/ieșiri produs: eticheta facturii este scrisă „Factură: nr" (PROP-0039).
+- La restrângerea unei categorii din Categorii și subcategorii, iconițele (rotița de parametri ș.a.) de pe rândurile subcategoriilor sunt ascunse înainte de colaps, deci nu mai rămâne pe ecran o iconiță fantomă peste categoria închisă.
+
+## 0.5.96 | 17.11.2026
+### Diverse
+- Pachet nou cu aceleași schimbări ca 0.5.95 (roata de setări a tabelelor în rând rezervat deasupra antetului, istoricul balanței Elcomtur), după republicarea de probă a aplicației.
+
+## 0.5.95 | 17.11.2026
+### Bugs
+- BUG-0053 – Roata de setări a unui tabel stă acum în pagină, deasupra antetului tabelului, în extremitatea dreaptă a holderului care îl ține, într-un spațiu rezervat: nu mai acoperă câmpuri, butoane sau text, nici în Categorii, nici în Beneficiari sau Registrul de vehicule. Dacă din Setări afișare ascunzi roțile, spațiul rezervat dispare odată cu ele. Roata nu apare pentru tabelele din categoriile pliate.
+
+## 0.5.94 | 17.11.2026
+### Bugs
+- BUG-0051 – Roata de setări a tabelelor din cardurile pliabile (Categorii) stă în dreapta, prima dintre iconițele rândului, nu lângă mânerul de tragere din stânga.
+- BUG-0052 – Când titlul cardului are un text lung în dreapta, roata de setări trece deasupra antetului tabelului, la margine; regula se aplică tuturor tabelelor.
+
+## 0.5.93 | 17.11.2026
+### Funcționalități noi
+- PROP-0033 – Procent de progres la analiza scanării din Preluare inventar: în timp ce se citește documentul apare cât la sută s-a făcut.
+- PROP-0035 – În Preluare date Elcomtur și în fișa beneficiarului firma apare cu numele ei, nu cu numele folderului (firma1).
+- PROP-0036 – Notificări → Balanțe restante: butonul „Arată evoluție balanță” deschide un grafic cu bare verticale cu totalul plăților restante de la fiecare preluare Elcomtur, pe anul curent, ultimele 6 sau ultimele 3 luni.
+- PROP-0037 – Setări afișare: comutatorul „Arată buton particularizare tabel” ascunde sau arată roțile de setări de pe tabele; setările fiecărui tabel se păstrează.
+- PROP-0038 – Intrări/ieșiri produs: beneficiarul și proiectul sunt pe două rânduri; proiectul deschide o fereastră cu beneficiarul, proiectul și echipamentele predate.
+- PROP-0039 – Intrări/ieșiri produs: furnizorul și „Factura: nr” sunt pe două rânduri, fără lupă; factura deschide o fereastră cu datele ei și intrările din ea.
+### Bugs
+- BUG-0045 – Tabul „Balanță Elcomtur” din fișa beneficiarului este roșu sau verde după balanță, cu suma în insignă, chiar dacă nu e tabul deschis.
+- BUG-0047 – Butonul X al ferestrei „Ieșire rapidă” închide acum fereastra.
+- BUG-0048 – Miniaturile din tabelul de produse nu mai sunt tăiate: imaginea se vede întreagă, cu chenarul după proporțiile ei.
+- BUG-0049 – Textul „Actualizat la…” stă lipit de insigna numărului de produse, la 10 px.
+- BUG-0050 – Roata de setări de pe cardurile pliabile stă pe rândul de titlu, la 15 px de margine, înaintea altor iconițe de pe rând.
+### Diverse
+- Căutarea la tastare în câmpul „Factura” din formularul intrării și din fereastra de legare a intrărilor de o factură.
+- Formularul de produs: „Adaugă categorie / subcategorie” și la editare, într-o fereastră separată.
+- Citirea facturilor scanate: numărul curent cu un semn lipit („1M”) este recunoscut și când zona tabelului pornește sub primele rânduri.
+
+## 0.5.92 | 17.11.2026
+### Diverse
+- Proiecte obligatorii ale beneficiarilor: în Nomenclator există tabul „Proiecte obligatorii”, cu tipurile de proiect pe care le are fiecare beneficiar (primul: „Reparații sisteme existente”). Beneficiarii existenți primesc proiectele la pornirea aplicației, cei noi la creare, iar un tip nou sau reactivat le creează la toți beneficiarii care nu îl au. Proiectul obligatoriu nu se redenumește și nu se șterge din pagina lui; un beneficiar care are doar proiecte obligatorii nefolosite se șterge împreună cu ele.
+- Ieșirea de stoc spre un beneficiar se face întotdeauna pe un proiect: comutatorul „Proiect” a dispărut (și din ieșirea multiplă), iar proiectul trebuie ales.
+
+## 0.5.91 | 17.11.2026
+### Funcționalități noi
+- PROP-0034 – Setări afișare extinse: pagina are 12 slidere de la 100% la 500% (titluri de pagină, text general și titluri de secțiuni, taburi, text/antet/imagini/iconițe din tabele, butoane, câmpuri de formular, meniul principal, bara de sus, ferestre), grupate în secțiuni pliabile, fiecare cu propria previzualizare, și presetările Normal, Mare și Foarte mare. Regulile se aplică tuturor elementelor de același fel din aplicație (inclusiv insignele din taburi și din titlurile de secțiune), iar roata de setări apare acum pe fiecare tabel de date, cu slidere proprii care înlocuiesc câmp cu câmp regulile globale.
+### Diverse
+- Antetul tabelelor din catalogul de produse revine la mărimea unitară a antetelor (11px) în loc de 9px.
+
+## 0.5.90 | 17.11.2026
+### Funcționalități noi
+- PROP-0034 – Setări afișare pentru fiecare cont: pagina „Setări afișare” din meniul contului reglează mărimea titlurilor, a taburilor, a textului și antetului de tabel, a imaginilor și a iconițelor (80%–160%), cu presetările Compact, Normal și Mare. Deasupra catalogului de produse, roata de setări dă valori proprii tabelului, care înlocuiesc câmp cu câmp pe cele globale. Setările se salvează pe cont și se aplică pe orice dispozitiv; schema bazei: migrarea 90.
+
+## 0.5.89 | 16.11.2026
+### Funcționalități noi
+- În pagina unui produs, fiecare mișcare are iconița „Vezi”: fereastra arată toți parametrii mișcării, butonul „Editează” în dreapta sus și, într-o secțiune pliabilă, istoricul modificărilor cu numărul lor.
+- Învățare OCR la preluarea inventarului: corecțiile făcute valorilor citite greșit (de exemplu un 1 citit ca 4) se salvează cu captura din formular, iar în pagina nouă Inventar → Învățare OCR administratorul alege din care învață citirea; un formular nou este citit ținând cont de ce s-a învățat, iar rândul corectat automat rămâne marcat „de verificat”. Se păstrează cel mult 1000 de corecții.
+### Bugs
+- Citirea foii scanate la preluarea inventarului nu mai sare peste rânduri când o linie a tabelului este întreruptă de scris de mână.
+### Diverse
+- Modulele ANAF 1.1.1, Inventar 1.3.0 și Jurnal 1.6.4.
+
+## 0.5.88 | 16.11.2026
+### Diverse
+- Preluare inventar: produsele apar în aceeași ordine ca în situația de inventar (categorii, subcategorii în ordinea arborelui, stocurile negative primele).
+- Modulul Inventar 1.1.2.
+
+## 0.5.87 | 14.11.2026
+### Funcționalități noi
+- Setări → ANAF are acum două sub-secțiuni: „Preluare date firme” (configuratorul de până acum) și „E-Factura”, cu autentificarea aplicației în ANAF (OAuth2): datele aplicației înregistrate la ANAF, autentificarea cu certificatul calificat, reînnoirea și ștergerea tokenului; secretul și tokenul se păstrează criptate, iar operațiile sunt jurnalizate.
+### Diverse
+- Ajutorul a fost actualizat pentru modificările recente: topicuri noi (preluare ActivityApp, preluare Elcomtur, preluare stoc ESPStoc, Catalog, Spațiu pe disc, Dezvoltare, Autentificare) și capturi refăcute pentru ferestrele schimbate.
+- Modulele ANAF 1.1.0 și Jurnal 1.6.3.
+
+## 0.5.86 | 13.11.2026
+### Funcționalități noi
+- PROP-0031 · Fiecare tab din Notificări arată numărul de elemente, inclusiv 0, iar listele goale au un mesaj care explică ce apare acolo.
+- PROP-0032 · Taburile inactive au aceeași formă ca cel activ, în gri neutru, cu 3 px între ele; cele care cer atenție rămân roșii.
+### Bugs
+- BUG-0042 · Pe rândul punctului de lucru principal, nota despre adresă și telefon este sub iconițe, nu lângă ele.
+- BUG-0043 · În tabelul de analize de risc, comutatorul On/Off are 10 px față de prima iconiță și este mutat spre stânga.
+### Diverse
+- Modulele Preluare ActivityApp 0.19.7, Elcomtur 1.3.4, Rapoarte de erori 1.4.5 și Notificări 1.6.4.
+
+## 0.5.85 | 13.11.2026
+### Funcționalități noi
+- PROP-0030 · Listele de categorii (Inventar, Preluare inventar, Administrare → Categorii) sunt mai compacte: 5 px între carduri și carduri închise mai joase.
+### Bugs
+- BUG-0038 · Fișa beneficiarului are secțiunile ca taburi, mai compacte (Puncte de lucru, Consum rețea, Mentenanță, Analize de risc, Taskuri, Fișiere, Proiecte), iar Balanța Elcomtur este ultimul tab.
+- BUG-0036 · În „Propune o modificare”, zona aplicației urmărește pagina de pe care o deschizi, chiar dacă există o ciornă păstrată.
+- BUG-0041 · În Ieșire multiplă, formularul este coborât cu 10 px, iar „Data ieșirii” este scrisă îngroșat.
+- BUG-0040 · Cardurile din Pagina principală au toate aceeași înălțime.
+- BUG-0039 · Când fereastra „Propune o modificare” se deschide cu o ciornă nesalvată, spune acest lucru și oferă butonul „Începe o propunere nouă”.
+- BUG-0035 / BUG-0037 · Captura automată a paginii păstrează fundalul paginii, iar titlurile secțiunilor rămân pe un singur rând, ca să nu se mai rupă contoarele sub titlu (de confirmat pe browserul tău).
+### Diverse
+- La aplicarea unei actualizări, motivul modificării este opțional; dacă rămâne gol, jurnalul notează „Fără motiv indicat”.
+- Modulul Propuneri 1.5.3.
+
+## 0.5.84 | 13.11.2026
+### Funcționalități noi
+- PROP-0028 · „Raportează o eroare” și „Propune o modificare” sunt acum în bara de sus, deci pot fi folosite de pe orice pagină și captura de ecran se poate face oricând.
+- PROP-0029 · În Notificări, listele de rapoarte de eroare și de propuneri arată doar ce este încă deschis; elementele rezolvate sau implementate dispar.
+### Bugs
+- BUG-0034 · Din cardul „Fișiere beneficiar” a fost scos butonul de ajutor care încărca antetul.
+- BUG-0035 · Captura automată a paginii desena greșit titlurile secțiunilor (butoanele cădeau sub titlu și erau tăiate); acum seamănă cu pagina reală.
+### Diverse
+- Între apăsarea butonului de raportare/propunere și deschiderea ferestrei apare un mesaj care spune că se face captura paginii.
+- Modulele Rapoarte de erori 1.4.4 și Propuneri 1.5.1.
+
+## 0.5.83 | 13.11.2026
+### Funcționalități noi
+- PROP-0025 · În Setări → Dezvoltare, pe rândul unui raport de eroare sau al unei propuneri apare o pictogramă de bifă: raportul devine „Rezolvat”, propunerea „Implementată” (în versiunea curentă), dintr-un clic, fără editare.
+- PROP-0026 · Coloana „Analiză de risc” a punctelor de lucru arată „Fără analiză de risc”, iar nota punctelor preluate din ActivityApp nu mai conține „(punct N)”.
+- PROP-0027 · În Setări → Facturi → Șabloane salvate, fiecare șablon se poate exporta într-un ZIP (definiția, informații și factura model, dacă serverul o păstrează).
+### Bugs
+- BUG-0033 · Pe ferestre late zona de conținut se lărgește până la 2400 px, ca tabelele late (de exemplu punctele de lucru) să nu mai ceară bară de derulare.
+### Diverse
+- Modulele Propuneri 1.5.0, Facturi 1.2.0 și Preluare ActivityApp 0.19.6.
+
+## 0.5.82 | 13.11.2026
+### Funcționalități noi
+- PROP-0023 · Secțiunea „Fișiere beneficiar” se actualizează imediat ce adaugi, redenumești sau ștergi un fișier în ferestrele punctelor de lucru, contractelor, intervențiilor sau analizelor de risc, fără reîncărcarea paginii.
+- PROP-0024 · În tabelul „Puncte de lucru” al beneficiarului, fiecare rând are pictograme pentru adăugarea unui proiect, a unei analize de risc (cu punctul de lucru ales) și a fișierelor punctului de lucru.
+### Diverse
+- Modulul Analize de risc trece la 1.3.5.
+
+## 0.5.81 | 12.11.2026
+### Funcționalități noi
+- PROP-0022 · În fișa beneficiarului, coloana „Descriere” a unui punct de lucru arată, câte o linie „Arondat: nume”, punctele arondate lui.
+### Bugs
+- BUG-0031 · În „Tichet exemplu”, ordonarea prin tragere a rândurilor din „Folosite” acceptă acum corect lăsarea rândului (drop-ul se face în browser, nu mai depinde de server la fiecare mișcare).
+
+## 0.5.80 | 12.11.2026
+### Bugs
+- BUG-0030 · „Deschide obiectul” din notificarea de tichete de validat nu mai rămâne fără efect când ești deja în Notificări: fereastra se închide și se deschide tab-ul „Tichete de validat” (la fel pentru „Beneficiari de validat” și „Probleme import”).
+### Diverse
+- Modulul Notificări trece la 1.6.3.
+
+## 0.5.79 | 12.11.2026
+### Bugs
+- BUG-0028 · „Deschide obiectul” din notificările „evenimente ActivityApp de validat” și „beneficiari de verificat” duce în Notificări, la tab-ul de validare, nu în Mentenanță sau Beneficiari; merge și cu modulul Mentenanță oprit.
+- BUG-0029 · Containerul „Tichete discardate” are titlul ca celelalte carduri (același font), cu numărul de tichete vizibil și când e închis.
+### Diverse
+- Modulul Preluare ActivityApp trece la 0.19.5.
+
+## 0.5.78 | 12.11.2026
+### Funcționalități noi
+- PROP-0018 · Lista „Tichete discardate” (Notificări → Tichete de validat) este un container care se deschide și se închide, închis implicit.
+### Bugs
+- BUG-0027 · Butoanele din bara ferestrelor (Raportează o eroare, Propune, Închide) nu mai ies din fereastră la editarea produsului și la celelalte ferestre cu lățime fixă; bara are mereu lățimea ferestrei.
+### Diverse
+- Tichete de validat, „Vizualizează tichetul”: se arată și numărul, ID ticket, ID eveniment, data finalizării, câmpurile extra alese în setări și observațiile pe care le va avea intervenția.
+- Modulul Preluare ActivityApp trece la 0.19.3.
+
+## 0.5.77 | 12.11.2026
+### Bugs
+- BUG-0025 · Fereastra „Tichet exemplu” este mai lată (până la 1700 px, în limita ecranului), ca să se vadă conținutul fără bară de derulare când rezoluția permite.
+- BUG-0026 · Observațiile tichetului preluat nu mai au spații goale mari: în valorile câmpurilor se elimină rândurile goale și spațiile din jurul rândurilor, iar între câmpuri rămâne un singur rând liber.
+### Diverse
+- Actualizare aplicație (Setări → Actualizare): butonul „Aplică actualizarea” se numește „Actualizează cu notificare utilizatori” și păstrează funcționarea (anunț în banner și întârziere); butonul nou „Actualizare imediată” pornește actualizarea acum, fără anunț și fără întârziere.
+- Modulul Preluare ActivityApp trece la 0.19.1.
+
+## 0.5.76 | 12.11.2026
+### Bugs
+- BUG-0024 · În fereastra „Tichet exemplu”, fiecare dintre cele două ferestre (alegerea coloanelor și „Cum arată tichetul preluat”) are propria bară de butoane; butoanele ferestrei principale nu mai sar în dreapta când se deschide cea flotantă.
+### Diverse
+- Preluare ActivityApp, „Coloane obligatorii”: s-au adăugat ID ticket, ID eveniment (afișate) și Data finalizării evenimentului (data intervenției), aleasă dintr-o coloană de tip dată.
+- Observațiile intervenției preluate din tichet: fiecare câmp apare ca „etichetă (aldin): valoare”, cu rând liber între câmpuri; câmpurile obligatorii sunt primele, iar ordinea celorlalte se schimbă prin tragerea rândurilor din „Folosite”.
+- Modulele Preluare ActivityApp (0.19.0) și Mentenanță (1.12.2).
+
+## 0.5.75 | 12.11.2026
+### Bugs
+- BUG-0021 · Previzualizarea PDF a situației de inventar se afișează din nou în dialog (era gol).
+- BUG-0022 · În meniul de produse, apăsarea pe numele unei categorii sau subcategorii cu copii o închide dacă este deschisă (nu mai e nevoie de săgeată).
+- BUG-0023 · În fereastra „Tichet exemplu”, titlul și numărul tichetului se aleg din orice coloană citibilă (text, număr, dată); numărul nu mai are valoare implicită și este obligatoriu pentru salvarea corespondenței; sumarul și observațiile apar într-o fereastră flotantă „Cum arată tichetul preluat”, actualizată la fiecare schimbare.
+### Diverse
+- Modulul Preluare ActivityApp trece la 0.18.0.
+
+## 0.5.74 | 11.11.2026
+### Funcționalități noi
+- Preluarea stocului din aplicația veche ESPStoc (Setări → Preluare stoc ESPStoc, doar administrator): analiza exportului (.sql sau .zip), lista pe categorii cu insigne clicabile (cu probleme, de verificat, înghețate, omise), alegerea parametrilor propusă din codul vechi, produse preluate înghețate (fără parametri, blocate până sunt completate) și punctul zero al gestiunii (șterge mișcările, facturile preluate, ofertele, rezervările, copiile de siguranță și jurnalul; preia stocul și imaginile din export).
+### Diverse
+- Jurnalul cunoaște entitatea „Preluare stoc ESPStoc” și operațiile punctului zero.
+
+## 0.5.73 | 11.11.2026
+### Funcționalități noi
+- PROP-0020
+- Descărcarea pachetelor de backup din Setări → Backup: iconiță pe fiecare pachet; un pachet cu fișierul de sumă de control vine într-o arhivă, unul aflat doar pe NAS este adus întâi pe server; fiecare descărcare apare în jurnal.
+- Listele paginate se pot ordona din antet (Beneficiari, Utilizatori, Notificări, Balanțe Elcomtur, Analize de risc, Facturi, Contracte și intervenții de mentenanță, Rapoarte, Propuneri, Puncte de lucru și altele); mărimea paginii și ordonarea se rețin cât rămâne deschis tabul browserului.
+### Bugs
+- BUG-0018 · Antetul tuturor tabelelor are același aspect, iar listele (Beneficiari, Utilizatori, Notificări, Balanțe Elcomtur, Analize de risc, Facturi, Contracte și intervenții de mentenanță, Rapoarte, Propuneri și altele) se pot ordona din antet; mărimea paginii și ordonarea se rețin cât rămâne deschis tabul browserului.
+- BUG-0019 · În fereastra „Tichet exemplu”, titlul și numărul tichetului se pot citi din orice coloană text a tichetului (alegere în lista „Folosite” și rolurile „Titlul/Numărul tichetului”).
+- BUG-0020 · Butonul „+” de lângă „Analizor de risc” este centrat pe linia câmpului, iar fereastra „Raportează o eroare” nu mai are taburi („Rapoartele mele” este un buton).
+### Diverse
+- Antetul tuturor tabelelor are același font și aceeași culoare (reguli globale în loc de reguli pe fiecare tabel).
+
+## 0.5.72 | 11.11.2026
+### Funcționalități noi
+- PROP-0016
+- PROP-0019
+- Șablonarea preluării tichetelor din ActivityApp (Setări → Preluare ActivityApp, „Tichet exemplu”): liste pliabile Tichet, Eveniment și Client cu toate coloanele și comutator „Folosit” (oprit implicit); lista „Folosite” cu descriere, rol, destinație și detașare; coloane de orice tip (număr, dată, da/nu) ca câmpuri libere; CUI-ul clientului se preia mereu; în observații apare „descriere: valoare”
+- Editarea unui raport de eroare sau a unei propuneri permite marcarea de zone peste imaginile salvate și adăugate; fereastra de marcare are zoom (−, +, Potrivește, Ctrl + rotița mouse-ului)
+- Changelog-ul versiunilor noi este împărțit în Funcționalități noi, Bugs și Diverse (versiunile vechi rămân neschimbate)
+- Puncte de lucru arondate (componente ale unui punct de lucru, de exemplu clădirile unei școli): popup cu nume și iconițe + pentru coordonate GPS, adresă, telefon și persoană de contact, fiecare editabilă și ștergibilă (ultima locație rămâne); căutarea extinsă a beneficiarilor le caută; pin separat pe harta mentenanței; notificare de verificare la importul ActivityApp pentru puncte cu nume asemănător; nota „Preluat din ActivityApp” pe beneficiar (migrarea 88)
+### Bugs
+- BUG-0016
+- Butonul de ajutor din bara ferestrelor este un buton dreptunghiular „Ajutor”, nu o pictogramă mică; ferestrele cu titlul scris în conținut nu mai au rând gol sus (titlul și ajutorul stau în bară)
+### Diverse
+- Baza de date a rapoartelor de eroare păstrează versiunea aplicației în care a fost rezolvat un raport (migrarea 87)
+- Fereastra „Tichet exemplu”: lista coloanelor, valorile și sumarul se actualizează imediat la fiecare schimbare
+
+## 0.5.71 | 10.11.2026
+- Taskuri: fereastra „Taskuri noi primite” (bară roșie) apare la autentificare dacă ai taskuri nepreluate și, cât timp sesiunea e deschisă, în momentul în care administratorul îți adaugă un task
+- Preluarea este obligatorie: fereastra nu se închide cu Escape, din fundal sau din buton, iar „Închide” devine activ abia după ce toate taskurile sunt preluate (preluare pe rând sau „Preia toate”)
+- Fereastra stă peste pagina curentă fără să o schimbe; cât timp e deschisă, aplicația nu te lasă să treci pe altă pagină
+- Orice fereastră poate fi blocată (parametrul Locked) și poate avea bara roșie (Tone="alert")
+
+## 0.5.70 | 10.11.2026
+- Toate ferestrele (popup-urile) au aceeași bară de titlu: verzuie discretă, lipită de marginile ferestrei, cu pictograma de mutare în stânga-sus, denumirea ferestrei și ajutorul la dreapta; ferestrele care își scriau titlul în conținut îl au acum în bară
+- Pe telefon bara se vede, iar fereastra se mută cu degetul
+
+## 0.5.69 | 10.11.2026
+- Toate ferestrele (popup-urile) au bara de mutare vizibilă: titlul pentru cele cu titlu, iar cele care își scriu titlul în conținut au o bară subțire cu puncte de prindere deasupra
+- La lărgirea unei ferestre peste dimensiunea inițială se mărește și panoul, nu doar butoanele din bara de sus
+- Fereastra de Ajutor și fereastra de marcare a zonelor pe imagini au aceeași structură și aceleași funcții ca restul ferestrelor (mutare, redimensionare, buton de închidere)
+
+## 0.5.68 | 10.11.2026
+- Conturile de utilizator pot fi marcate „Dezvoltator” (comutator pe rândul contului și pe pagina contului, sub-tab nou „Dezvoltatori” cu revocare); dala „Dezvoltare” din Setări și filele „Bugs” și „Propuneri” din Notificări se văd numai dezvoltatorilor; după actualizare nimeni nu este dezvoltator, conturile se marchează din Utilizatori
+- Notificări: fila nouă „Bugs” cu rapoartele de eroare noi, după modelul filei „Propuneri”
+- Setări → Dezvoltare → Erori / Propuneri: „Șterge toate cele rezolvate” în tabelul celor rezolvate (ștergere definitivă de pe server, fără arhivare, cu confirmare și jurnal)
+- Editarea unui raport sau a unei propuneri permite corectarea titlului și a descrierii (la propuneri și a motivării) și adăugarea de imagini
+- Fereastra „Propune o modificare” nu mai are tab-uri, ci doar formularul de propunere nouă
+- Capturile paginii din rapoarte și propuneri sunt la rezoluție mare (până la 3200 px lățime)
+- Ferestre: bara de titlu este vizibilă (mutarea), butoanele din bară stau pe marginea ferestrei și după redimensionare; filtrele listelor au spațiu sub tab-uri; secțiunile bazei de date au 12 px între ele
+
+## 0.5.67 | 10.11.2026
+- Ferestrele (popup-urile) se mută trăgând de antet și se redimensionează din colțul dreapta-jos; dublu-clic pe antet le centrează, pe mâner readuce dimensiunea implicită
+- Raportare eroare și Propunere: un clic pe o imagine o deschide într-o fereastră de marcare plutitoare, în care tragi zone dreptunghiulare numerotate (cel mult 10, se pot doar șterge, numerele se refac singure); imaginea trimisă are zonele desenate pe ea
+- Setări → Dezvoltare: detaliul unei propuneri sau al unui raport se deschide în popup, cu vizualizare (Editează, Exportă) și editare (Salvează, Renunță); pe rândurile tabelelor apar iconițele de vizualizare, editare, export (ZIP) și ștergere
+- Setări → Bază de date → Spațiu: totalul ocupat de aplicație este suma tuturor categoriilor și coincide cu cifra de pe partiție
+- Setări → Bază de date: secțiunile din Stare și Conexiune sunt lipite, fără goluri între ele, cu chenar și titlul aliniat la stânga
+
+## 0.5.66 | 10.11.2026
+- Setări → Bază de date: secțiunile din Stare și Conexiune sunt restrânse implicit; fila nouă „Spațiu” arată cât ocupă aplicația pe disc (baza de date, imagini, fișiere adăugate, backup-uri, fișierele aplicației, alte fișiere) și spațiul liber al partițiilor, cu „Recalculează”
+- Setări → Preluare date ANAF: cele cinci secțiuni sunt restrânse implicit
+- Tabelele de propuneri și de rapoarte de eroare din Setări se actualizează singure când se adaugă, se schimbă sau se șterge o intrare
+- Ferestrele (popup-urile): distanța dintre marginea de sus și butoanele din bară (Raportează, Propune, Închide) este de 3 px, prin clasa globală a ferestrei; butonul „Raportează o eroare” nu se mai rupă pe două rânduri
+- Taskuri utilizator: tabelul are număr curent, iar rândurile au mâner de tragere pentru ordinea de tratare a taskurilor
+- Setări → Dezvoltare: insigne cu numărul de rapoarte de eroare nerezolvate și de propuneri active pe tabul Dezvoltare și pe sub-tab-urile Erori și Propuneri
+
+## 0.5.65 | 10.11.2026
+- Toate ferestrele (popup-urile) aplicației folosesc aceeași structură: fundal, cadru cu bara de sus rezervată și panou cu antet, corp care derulează singur și, la nevoie, subsol. Bara cu „Raportează o eroare”, „Propune” și butonul roșu rotund de închidere stă întotdeauna deasupra panoului, niciodată peste antet, indiferent cât de înalt este panoul.
+- Pe ecrane înguste butoanele barei devin iconițe rotunde cu simbolul centrat (ca butonul roșu de închidere), cu text alternativ pentru cititoarele de ecran; pe ecran lat fereastra arată ca înainte.
+- Butoanele din bară vin de la module: „Raportează o eroare” (Raportare erori) și „Propune” (Propuneri) apar doar cât modulul funcționează; la oprirea sau pornirea unui modul în Setări → Module butonul apare sau dispare și în ferestrele deja deschise.
+- Butonul de închidere face același lucru ca „Închide” din fereastră (inclusiv întrebarea despre modificări nesalvate); Escape închide fereastra de deasupra. La ferestrele așezate una peste alta fiecare are bara ei, iar cea de sus este cea activă.
+- Scriptul vechi care plasa bara (observator pe toată pagina) a fost scos: bara este acum parte din structura ferestrei, fără urmărirea paginii.
+
+## 0.5.64 | 10.11.2026
+- Setări → Preluare ActivityApp → Tichet exemplu: alegerea corespondenței se face cu opțiuni „Tichet – nume” și „Eveniment – nume”; alegi o coloană pentru o informație deja asignată și corespondența se mută (informația obligatorie care avea coloana o preia pe cea rămasă liberă, cea opțională se oprește), cu mesaj despre ce s-a schimbat.
+- „Câmp suplimentar nou” deschide o fereastră pentru nume și destinație; numele nu trebuie să fie unic, numărul câmpurilor suplimentare nu mai este limitat, iar un câmp existent se poate muta pe altă coloană din aceeași listă. Lista câmpurilor suplimentare are paginare.
+- Sub tichetul exemplu: sumarul „Ce se preia din ActivityApp” (informație, coloana sursă, valoarea din tichet, unde ajunge) și observațiile așa cum ajung în aplicația de stoc.
+- Preluarea tichetelor se suspendă când structura tichetelor din ActivityApp se schimbă (coloană nouă, dispărută sau cu alt tip): tichetele rămân în ActivityApp, apare notificarea cu lista schimbărilor, iar preluarea se reia la următoarea sincronizare după „Corespondența verificată”, în ordinea datelor. Suspendarea intră în Jurnal.
+
+## 0.5.63 | 10.11.2026
+- Corecție importantă: ferestrele (popup-urile) nu mai blochează aplicația. Scriptul barei de deasupra popup-urilor intra într-o buclă fără sfârșit cât un popup era deschis, ceea ce făcea listele derulante să se deschidă greu, închiderea ferestrelor lentă și ducea la pierderea conexiunii cu serverul (defectul era în versiunile 0.5.60–0.5.62).
+- Setări → Dezvoltare: insigne cu numărul de rapoarte de eroare nerezolvate și de propuneri active pe tile-ul „Dezvoltare” și pe sub-taburile „Erori” și „Propuneri”; se actualizează singure când se adaugă sau se schimbă un raport ori o propunere.
+
+## 0.5.62 | 10.11.2026
+- Taskuri utilizator: tab „Nepreluate” și câte un tab pentru fiecare utilizator care are taskuri; în tab, taskurile active sunt numerotate în ordinea stabilită de administrator (se trage de mâner sau se folosesc săgețile), cele finalizate urmează dedesubt, cu un comutator care le ascunde. „Taskurile mele” arată aceeași ordine.
+- Taskurile finalizate se pot edita în continuare. Câmp nou „Stadiu / note de lucru”, pe care îl scriu utilizatorul și administratorul (și după finalizare), și secțiunea pliabilă „Jurnalul taskului” (creat, preluat, finalizat, stadiu modificat, mutat, reordonat, cu cine și când).
+- Preluarea tichetelor ActivityApp nu mai depinde de Mentenanță: tichetele se preiau și se validează și cu Mentenanța oprită; la pornirea ei intervențiile se înregistrează în ordinea datelor, iar scadențele urmează ultimele tichete preluate.
+- Tichet exemplu (Setări → Preluare ActivityApp): fiecare coloană are butonul „Alege…” în loc de o listă pe fiecare rând, iar fereastra se redesenează doar când se schimbă ceva; se derulează ușor și de pe alt calculator.
+- Migrările 84 și 85 (rezultatele tichetelor decise, ordinea și stadiul taskurilor); Jurnal: acțiunile „Modificare stadiu task” și „Reordonare taskuri utilizator”.
+
 ## 0.5.61 | 09.11.2026
 - Modul nou „Propuneri”: din meniu, „Propune o modificare” (sub „Raportează o eroare”) sau butonul „Propune” din bara de deasupra oricărei ferestre deschide un formular (tip: modificare / funcționalitate nouă / altceva, zona aplicației, titlu cu propuneri asemănătoare afișate în timp ce scrii, ce vrei și de ce, importanța pentru autor, imagini cu captura paginii, Ctrl+V și mărire). Fiecare propunere primește un număr (PROP-0042). Textul propunerilor și răspunsurile sunt vizibile tuturor utilizatorilor (fila „Toate propunerile”, cu căutare și „Doar cele deschise”); imaginile doar autorului și administratorilor. „Propunerile mele” arată starea; autorul și administratorul răspund într-un fir de răspunsuri.
 - Setări: secțiunea „Rapoarte erori” devine „Dezvoltare”, cu două file, „Erori” și „Propuneri”. Propunerile au file „Active” (Nouă, În analiză, Acceptată, Planificată) și „Închise” (Implementată, Amânată, Respinsă), filtre, stare cu versiunea în care a fost implementată și răspuns, ștergere și export ZIP. Notificări: fila nouă „Propuneri” (propuneri noi pentru administrator; stare schimbată sau răspuns pentru autor). Jurnal: acțiuni proprii pentru propuneri. Schema bazei: migrarea 83.

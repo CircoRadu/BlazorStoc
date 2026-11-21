@@ -46,6 +46,7 @@ public partial class InvoiceTemplateWorkbench
     private int currentPage = 1;
     private int drawCounter;
     private bool busy, saving, showAllFields;
+    private int readPercent = -1;   // the progress of reading a PDF (-1: nothing to show)
     private char? decimalHint;
     private InvoicePageData CurrentPageData => session!.Document.Pages.FirstOrDefault(page => page.Number == currentPage) ?? session.Document.Pages[0];
     private string SourceText => session!.Analysis.Source == InvoiceSources.Ocr ? "prin recunoașterea imaginii (OCR)" : "din textul PDF-ului";

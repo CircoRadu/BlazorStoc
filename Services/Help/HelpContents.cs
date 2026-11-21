@@ -11,11 +11,11 @@ public static class HelpContents
     public static readonly (string Title, string[] Prefixes)[] Areas =
     [
         ("Început și acces", ["acasa", "autentificare", "acces-refuzat", "schimbare-parola"]),
-        ("Produse și stoc", ["produse", "iesire-multipla", "export-consum"]),
+        ("Produse și stoc", ["produse", "iesire-multipla", "export-consum", "bon-consum"]),
         ("Inventar", ["inventar"]),
         ("Furnizori și facturi", ["furnizori", "facturi", "preluare-factura"]),
         ("Oferte", ["oferte"]),
-        ("Proiecte, beneficiari și puncte de lucru", ["proiecte", "beneficiari", "puncte-de-lucru"]),
+        ("Proiecte, beneficiari și puncte de lucru", ["proiecte", "beneficiari", "puncte-de-lucru", "bonuri-consum"]),
         ("Mentenanță", ["mentenanta"]),
         ("Analize de risc", ["analize-risc", "analizor-risc"]),
         ("Vehicule", ["vehicule"]),
@@ -23,8 +23,9 @@ public static class HelpContents
         ("Notificări și jurnal", ["notificari", "jurnal"]),
         ("Raportare erori", ["raportare-eroare"]),
         ("Propuneri de modificări", ["propunere-modificare"]),
+        ("Anunțuri", ["anunt"]),
         ("Categorii și nomenclator", ["categorii", "nomenclator"]),
-        ("Setări și utilizatori", ["setari", "utilizatori"])
+        ("Setări și utilizatori", ["setari", "setari-afisare", "personalizare-pagina-principala", "utilizatori", "actualizare", "elcomtur"])
     ];
 
     public const string Other = "Alte ferestre";

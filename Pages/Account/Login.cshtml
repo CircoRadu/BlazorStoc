@@ -8,4 +8,4 @@
 <form method="post"><input asp-for="ReturnUrl" type="hidden" /><label>Utilizator<input asp-for="Username" autocomplete="username" required autofocus /></label><label>Parolă<input asp-for="Password" type="password" autocomplete="current-password" required /></label>
 @if (Model.CodeRequired) { <label>Cod din aplicația de autentificare<input asp-for="Code" inputmode="numeric" autocomplete="one-time-code" maxlength="12" required /></label> }
 @if (Model.Error is not null) { <p role="alert" class="error-text">@Model.Error</p> }
-<button class="primary" type="submit">Intră în aplicație →</button></form><p class="muted small">BlazorStoc · versiunea @BlazorStoc.Services.AppVersion.Current</p></main><script src="/romanian-ui.js"></script><script src="/help.js"></script></body></html>
+<button class="primary" type="submit">Intră în aplicație →</button></form><p class="muted small">BlazorStoc · versiunea @BlazorStoc.Services.AppVersion.Current</p></main><script>try{sessionStorage.removeItem("blazorstoc-announcements-shown")}catch(e){}</script><script src="/romanian-ui.js"></script><script src="/help.js"></script></body></html>

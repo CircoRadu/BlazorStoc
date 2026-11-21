@@ -8,7 +8,7 @@ namespace BlazorStoc.Modules.ActivityImport;
 // new or changed in ActivityApp. Each condition starts on the day it began and goes away by itself when it is gone (the engine then closes the notification).
 
 public sealed record ActivityImportAlertState(DateTime? FailingSince, string FailureMessage, int Failures, DateTime? StructureSince, int StructureIssues, DateTime? IssuesSince, int OpenIssues, DateTime? TypesSince,
-    DateTime? TicketStructureSince = null, string TicketStructureChange = "");
+    DateTime? TicketStructureSince = null, string TicketStructureChange = "", string StructureChange = "");
 
 public interface IActivityImportAlertReader
 {
@@ -27,9 +27,23 @@ public sealed class MariaActivityImportAlertReader(IConfiguration configuration)
         if (!await reader.ReadAsync(cancellationToken).ConfigureAwait(false)) return new ActivityImportAlertState(null, "", 0, null, 0, null, 0, null);
         DateTime? At(int ordinal) => reader.IsDBNull(ordinal) ? null : DateTime.SpecifyKind(reader.GetDateTime(ordinal), DateTimeKind.Utc);
         var report = reader.IsDBNull(4) ? "" : reader.GetString(4);
-        var structureIssues = report.Length == 0 ? 0 : System.Text.Json.JsonSerializer.Deserialize<List<StructureIssue>>(report)?.Count(issue => issue.Required) ?? 0;
+        var issueList = report.Length == 0 ? [] : System.Text.Json.JsonSerializer.Deserialize<List<StructureIssue>>(report) ?? [];
+        var structureIssues = issueList.Count(issue => issue.Required);
+        var structureChange = DescribeStructure(issueList);
         var ticketChange = reader.IsDBNull(8) ? TicketStructureDiff.None : ActivityTicketStructureRules.ParseDiff(reader.GetString(8));
-        return new ActivityImportAlertState(At(0), reader.GetString(1), reader.GetInt32(2), At(3), structureIssues, At(5), (int)openIssues, At(6), At(7), ticketChange.Any ? ticketChange.Describe() : "");
+        return new ActivityImportAlertState(At(0), reader.GetString(1), reader.GetInt32(2), At(3), structureIssues, At(5), (int)openIssues, At(6), At(7), ticketChange.Any ? ticketChange.Describe() : "", structureChange);
+    }
+
+    /// <summary>What changed in the structure of ActivityApp, for the notification: the columns that are needed first, then the others, "Table.Column: what is wrong"; at most eight, the rest counted.</summary>
+    public static string DescribeStructure(IReadOnlyList<StructureIssue> issues)
+    {
+        if (issues.Count == 0) return "";
+        static string One(StructureIssue issue) => issue.Problem == "alt tip de date"
+            ? $"{issue.Table}.{issue.Column}: alt tip de date (așteptat {issue.Expected}, găsit {issue.Found})"
+            : $"{issue.Table}.{issue.Column}: {issue.Problem}";
+        var ordered = issues.OrderByDescending(issue => issue.Required).ToList();
+        var shown = string.Join("; ", ordered.Take(8).Select(One));
+        return ordered.Count > 8 ? $"{shown}; și încă {ordered.Count - 8}" : shown;
     }
 }
 
@@ -72,12 +86,12 @@ public sealed class ActivityImportAlertSource(IActivityImportAlertReader reader,
                 $"Ultimele {Math.Max(state.Failures, ActivitySyncSchedule.FailuresBeforeAlert)} sincronizări au eșuat. Cauza: {(state.FailureMessage.Length > 0 ? state.FailureMessage : "necunoscută")}"));
         if (state.StructureSince is { } structure)
             result.Add(Make(StructureId, "Structura ActivityApp", structure, "structura ActivityApp s-a schimbat",
-                $"După o actualizare a ActivityApp, {(state.StructureIssues > 0 ? state.StructureIssues + " coloane necesare lipsesc sau au alt tip" : "structura nu mai corespunde")}; datele afectate nu se preiau. Poate fi nevoie de o actualizare a modulului de preluare."));
+                $"După o actualizare a ActivityApp, {(state.StructureIssues > 0 ? state.StructureIssues + " coloane necesare lipsesc sau au alt tip" : "structura nu mai corespunde")}; datele afectate nu se preiau.{(state.StructureChange.Length > 0 ? " Ce s-a schimbat: " + state.StructureChange + "." : "")} Poate fi nevoie de o actualizare a modulului de preluare."));
         if (state.IssuesSince is { } issues && state.OpenIssues > 0)
             result.Add(Make(IssuesId, "Probleme de preluare", issues, "probleme de preluare deschise", $"Sunt {state.OpenIssues} probleme de preluare deschise (elemente care nu s-au putut prelua sau au fost șterse în ActivityApp).", IssuesUrl));
         if (state.TicketStructureSince is { } ticketStructure)
             result.Add(Make(TicketStructureId, "Structura tichetelor", ticketStructure, "structura tichetelor din ActivityApp s-a modificat",
-                $"Structura tichetelor din ActivityApp nu mai este cea față de care ai verificat corespondența câmpurilor ({(state.TicketStructureChange.Length > 0 ? state.TicketStructureChange : "coloane schimbate")}). Preluarea continuă cu corespondența actuală; verific-o în Setări → Preluare date ActivityApp, secțiunea 6 (poți deschide un tichet exemplu), adaptează-o noii scheme și apasă „Corespondența verificată”."));
+                $"Structura tichetelor din ActivityApp nu mai este cea față de care ai verificat corespondența câmpurilor ({(state.TicketStructureChange.Length > 0 ? state.TicketStructureChange : "coloane schimbate")}). Preluarea tichetelor este suspendată: tichetele rămân în ActivityApp. Verific-o în Setări → Preluare date ActivityApp, secțiunea 6 (poți deschide un tichet exemplu), adaptează-o noii scheme și apasă „Corespondența verificată”; preluarea se reia automat la următoarea sincronizare, în ordinea datelor."));
         if (state.TypesSince is { } types)
             result.Add(Make(TypesId, "Tipuri de tichete", types, "tipuri de tichete noi sau schimbate", "ActivityApp are tipuri de tichete noi sau cu alt nume decât cele alese; tipurile schimbate nu se preiau până le confirmi."));
         return result;

@@ -1,0 +1,117 @@
+@namespace BlazorStoc.Components.Shared
+@using BlazorStoc.Services.Update
+@implements IAsyncDisposable
+@inject UpdateCoordinator Coordinator
+@inject ApplicationUpdateService Updates
+@inject IAccessControl Access
+@inject IJSRuntime JS
+@inject ILogger<UpdateNoticeDialog> Logger
+@* Update with notice: every signed-in user, except the one who started the update, gets a window over the page (and over any window that is open) while the notice runs:
+   "Închide" and "Am înțeles" only close it, "Am nevoie de mai mult timp" stops the update for everybody. The one who started the update gets a window with the message that somebody
+   asked for more time (until he closes it). The banner of UpdateBanner stays as it is. *@
+@if (Warning is { } update)
+{
+    <AppDialog Native="true" Id="update-notice-dialog" Alert="true" PanelClass="update-notice-dialog" Title="@($"Aplicația se actualizează la versiunea {update.To}")" HelpTopic="actualizare-anunt" HelpAbout="Anunțul de actualizare" DescribedBy="update-notice-text" ShowModuleActions="false" OnClose="DismissAsync">
+        <p id="update-notice-text">Utilizatorul <strong>@update.RequestedBy</strong> a pornit o actualizare. Aplicația se oprește pentru câteva minute în <strong>@Remaining(update) s</strong>: salvează ce lucrezi acum. Pagina se reîncarcă singură când aplicația revine.</p>
+        @if (error is not null) { <p class="validation-message" role="alert">@error</p> }
+        <div class="editor-actions">
+            <button type="button" class="primary" id="update-notice-understood" disabled="@busy" @onclick="DismissAsync">Am înțeles</button>
+            <button type="button" class="refresh act-nav" id="update-notice-close" disabled="@busy" @onclick="DismissAsync">Închide</button>
+            <button type="button" class="refresh act-edit" id="update-notice-more-time" disabled="@busy" @onclick="MoreTimeAsync">Am nevoie de mai mult timp</button>
+        </div>
+    </AppDialog>
+}
+@if (Interrupted is { } stopped)
+{
+    <AppDialog Native="true" Id="update-interrupted-dialog" Alert="true" Tone="alert" PanelClass="update-notice-dialog" Title="Actualizare întreruptă" HelpTopic="actualizare-anunt" HelpAbout="Anunțul de actualizare" DescribedBy="update-interrupted-text" ShowModuleActions="false" OnClose="AcknowledgeAsync">
+        <p id="update-interrupted-text">Utilizatorul <strong>@stopped.InterruptedBy</strong> are nevoie de mai mult timp. Contactează utilizatorul <strong>@stopped.InterruptedBy</strong>: actualizarea la versiunea @stopped.To se întrerupe.</p>
+        <div class="editor-actions"><button type="button" class="primary" id="update-interrupted-close" @onclick="AcknowledgeAsync">Închide</button></div>
+    </AppDialog>
+}
+
+@code {
+    private string? user, dismissedId, error;
+    private bool busy, disposed, shownWarning, shownInterrupted;
+    private Timer? timer;
+
+    private UpdateAnnouncement? Warning =>
+        user is not null && Coordinator.Current is { Immediate: false, Launched: false } update && update.Id != dismissedId
+        && !string.Equals(update.RequestedBy, user, StringComparison.OrdinalIgnoreCase) ? update : null;
+
+    private UpdateInterruption? Interrupted =>
+        user is not null && Coordinator.LastInterruption is { } stopped && string.Equals(stopped.RequestedBy, user, StringComparison.OrdinalIgnoreCase) ? stopped : null;
+
+    private int Remaining(UpdateAnnouncement update) => Math.Max(0, (int)Math.Ceiling((update.StartsUtc - DateTime.UtcNow).TotalSeconds));
+
+    protected override async Task OnInitializedAsync()
+    {
+        try { user = await Access.GetUsernameAsync(); }
+        catch (Exception exception) when (exception is not OperationCanceledException) { user = null; }
+        Coordinator.Changed += OnChanged;
+        timer = new Timer(_ => Tick(), null, TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(1));
+    }
+
+    // Every second, only while the window is shown (its countdown).
+    private void Tick()
+    {
+        if (disposed || Warning is null) return;
+        _ = InvokeAsync(() => { if (!disposed) StateHasChanged(); });
+    }
+
+    private void OnChanged()
+    {
+        if (disposed) return;
+        _ = InvokeAsync(() => { if (!disposed) StateHasChanged(); });
+    }
+
+    // A window that just appeared is opened as a modal on the top layer (above the page and above the windows that are open); one that left is gone with its element.
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        var warning = Warning is not null;
+        var interrupted = Interrupted is not null;
+        try
+        {
+            if (warning && !shownWarning) await JS.InvokeVoidAsync("blazorStocUpdateNotice.show", "update-notice-dialog");
+            if (interrupted && !shownInterrupted) await JS.InvokeVoidAsync("blazorStocUpdateNotice.show", "update-interrupted-dialog");
+        }
+        catch (Exception exception) when (exception is JSException or InvalidOperationException or OperationCanceledException) { }
+        shownWarning = warning;
+        shownInterrupted = interrupted;
+    }
+
+    private Task DismissAsync()
+    {
+        if (Coordinator.Current is { } update) dismissedId = update.Id;
+        error = null;
+        return Task.CompletedTask;
+    }
+
+    private async Task MoreTimeAsync()
+    {
+        if (busy) return;
+        busy = true; error = null;
+        try { await Updates.RequestMoreTimeAsync(); }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            Logger.LogWarning("The request for more time could not be saved ({ErrorType}).", exception.GetType().Name);
+            error = "Cererea nu a putut fi trimisă. Încearcă din nou.";
+        }
+        finally { busy = false; }
+        // Too late (the updater was already asked): the window just closes with the next change of the notice.
+        if (Coordinator.Current is { } update) dismissedId = update.Id;
+    }
+
+    private Task AcknowledgeAsync()
+    {
+        if (user is not null) Coordinator.AcknowledgeInterruption(user);
+        return Task.CompletedTask;
+    }
+
+    public ValueTask DisposeAsync()
+    {
+        disposed = true;
+        Coordinator.Changed -= OnChanged;
+        timer?.Dispose();
+        return ValueTask.CompletedTask;
+    }
+}

@@ -20,9 +20,11 @@ public static class AuditEntities
     public const string DatabaseBackup = "CopieSiguranta";
     public const string ActivityImport = "PreluareActivityApp";
     public const string Elcomtur = "PreluareElcomtur";
+    public const string EspImport = "PreluareEspStoc";
     public const string JournalSettings = "SetariJurnal";
     public const string BugReport = "RaportareEroare";
     public const string Proposal = "Propunere";
+    public const string Announcement = "Anunt";
     public const string NotificationTemplate = "SablonNotificare";
     public const string Notification = "Notificare";
     public const string NotificationSettings = "SetariNotificari";
@@ -30,6 +32,8 @@ public static class AuditEntities
     // edits are recorded under the beneficiary the work point belongs to.
     public const string WorkPoint = "PunctLucru";
     public const string ServicePhoto = "FotografiePunctLucru";
+    // Only the deletion of an attached work point is recorded under this type (it is archived); its creation and edits go under the beneficiary.
+    public const string AttachedWorkPoint = "PunctArondat";
     // Only the deletion of a maintenance contract is recorded under this type (it is archived); the other operations on contracts
     // are recorded under the beneficiary the contract belongs to.
     public const string ServiceContract = "ContractMentenanta";
@@ -51,6 +55,8 @@ public static class AuditEntities
     public const string SupplierInvoice = "FacturaFurnizor";
     // Nomenclator -> Tipuri de sisteme.
     public const string SystemType = "TipSistem";
+    public const string BeneficiaryProjectType = "TipProiectObligatoriu";
+    public const string ConsumptionNote = "BonConsum";
     public const string MaintenanceComponent = "ComponentaMentenanta";
     // Nomenclator -> Analizor de risc.
     public const string RiskAnalyzer = "AnalizorRisc";
@@ -116,6 +122,9 @@ public static class AuditActions
     public const string EditWorkPointDescription = "Modificare descriere punct de lucru";
     public const string EditWorkPointCoordinates = "Modificare coordonate punct de lucru";
     public const string AddWorkPointPhoto = "Adăugare fotografie punct de lucru";
+    // Attached work points (components of a work point): adding and editing are named; deleting one is the archived "Ștergere".
+    public const string CreateAttachedWorkPoint = "Adăugare punct arondat";
+    public const string EditAttachedWorkPoint = "Modificare punct arondat";
     // Files attached to a work point, maintenance contract, intervention or risk analysis (entity_files).
     public const string AddAttachedFile = "Adăugare fișier atașat";
     public const string DeleteAttachedFile = "Ștergere fișier atașat";
@@ -229,6 +238,7 @@ public static class AuditActions
     public const string ExitToVehicle = "Ieșire spre vehicul";
     public const string GenericSale = "Vânzare generică";
     public const string StockCorrection = "Corecție stoc";
+    public const string ExitOtherReason = "Ieșire alt motiv";
     public const string DuplicateExit = "Ieșire dublată (confirmat)";
     public const string ImportOffer = "Preluare ofertă";
     public const string ReviseOffer = "Revizie ofertă";
@@ -242,6 +252,8 @@ public static class AuditActions
     public const string MoveUserTask = "Mutare task la alt utilizator";
     public const string DeleteUserTask = "Ștergere task";
     public const string ChangeUserTaskStatus = "Schimbare status task";
+    public const string EditUserTaskNote = "Modificare stadiu task";
+    public const string ReorderUserTasks = "Reordonare taskuri utilizator";
     public const string AcceptUserTask = "Preluare task";
     public const string AddUserTaskFile = "Adăugare fișier task";
     public const string DeleteUserTaskFile = "Ștergere fișier task";
@@ -263,6 +275,7 @@ public static class AuditActions
     public const string SetBackupSettings = "Modificare setări backup";
     public const string RetentionDelete = "Ștergere automată pachet backup vechi";
     public const string FetchBackupFromNas = "Aducere pachet backup de pe NAS";
+    public const string DownloadBackup = "Descărcare pachet backup";
     public const string TestNasBackup = "Testare conexiune NAS";
     public const string SetActivityImport = "Modificare setări preluare ActivityApp";
     public const string SetJournalDisplay = "Modificare evenimente afișate în jurnal";
@@ -272,13 +285,24 @@ public static class AuditActions
     public const string DeleteServiceContractAddendum = "Ștergere act adițional contract";
     public const string CreateBugReport = "Raportare eroare creată";
     public const string ChangeBugReportState = "Raportare eroare: stare schimbată";
+    public const string EditBugReportContent = "Raportare eroare: conținut modificat";
     public const string DeleteBugReport = "Raportare eroare ștearsă";
+    public const string DeleteAllClosedBugReports = "Raportare eroare: toate cele rezolvate șterse";
     public const string ExportBugReport = "Raportare eroare exportată";
     public const string CreateProposal = "Propunere creată";
     public const string ChangeProposalState = "Propunere: stare schimbată";
+    public const string EditProposalContent = "Propunere: conținut modificat";
     public const string AddProposalNote = "Propunere: răspuns adăugat";
     public const string DeleteProposal = "Propunere ștearsă";
+    public const string DeleteAllClosedProposals = "Propunere: toate cele închise șterse";
     public const string ExportProposal = "Propunere exportată";
+    public const string CreateAnnouncement = "Anunț creat";
+    public const string PublishAnnouncement = "Anunț publicat";
+    public const string EditAnnouncement = "Anunț modificat";
+    public const string ArchiveAnnouncement = "Anunț arhivat";
+    public const string RepublishAnnouncement = "Anunț republicat";
+    public const string DeleteAnnouncement = "Anunț șters definitiv";
+    public const string ConfirmAnnouncementRead = "Anunț: confirmare citire";
     public const string TestActivityImport = "Testare conexiune ActivityApp";
     public const string SetActivityImportTypes = "Modificare tipuri tichete preluate ActivityApp";
     public const string SetActivityFieldMap = "Modificare corespondență câmpuri ActivityApp";
@@ -289,6 +313,19 @@ public static class AuditActions
     public const string CheckElcomturAuto = "Verificare backup Elcomtur";
     public const string ImportElcomturAuto = "Preluare automată backup Elcomtur";
     public const string FailElcomturAuto = "Eșec preluare automată Elcomtur";
+    // The stock import from the old ESPStoc (Modules/EspImport): the point zero of the stock keeping. Each step is its own operation.
+    public const string EspAnalyze = "Analiză export ESPStoc";
+    public const string EspStart = "Punct zero gestiune: început";
+    public const string EspDeleteMovements = "Punct zero gestiune: ștergere mișcări de stoc";
+    public const string EspDeleteInvoices = "Punct zero gestiune: ștergere facturi preluate";
+    public const string EspDeleteOffers = "Punct zero gestiune: ștergere oferte";
+    public const string EspDeleteReservations = "Punct zero gestiune: ștergere rezervări";
+    public const string EspResetQuantities = "Punct zero gestiune: resetare cantități";
+    public const string EspImportStock = "Preluare ESPStoc: stoc inițial";
+    public const string EspDeleteBackups = "Punct zero gestiune: ștergere copii de siguranță";
+    public const string EspPurgeJournal = "Punct zero gestiune: golire jurnal";
+    public const string EspFinish = "Punct zero gestiune: terminat";
+    public const string EspFail = "Punct zero gestiune: eșec";
     public const string AddActivityKeyword = "Adăugare cuvânt cheie mentenanță ActivityApp";
     public const string EditActivityKeyword = "Modificare cuvânt cheie mentenanță ActivityApp";
     public const string DeleteActivityKeyword = "Ștergere cuvânt cheie mentenanță ActivityApp";
@@ -298,8 +335,10 @@ public static class AuditActions
     public const string DiscardActivityTicket = "Discard tichet ActivityApp";
     public const string ReactivateActivityTicket = "Reactivare tichet ActivityApp discardat";
     public const string ResetActivityWatermark = "Recitire completă tichete ActivityApp";
+    public const string SuspendActivityImport = "Suspendare preluare ActivityApp: structură schimbată";
     public const string SimulateActivityImport = "Simulare import ActivityApp";
     public const string ImportActivityPartners = "Import beneficiari ActivityApp";
+    public const string TakeActivityPartnersManual = "Preluare manuală beneficiari ActivityApp";
     public const string ImportActivityTickets = "Import tichete ActivityApp";
     public const string SyncActivityImport = "Sincronizare ActivityApp";
     public const string ResolveActivityImportIssue = "Rezolvare problemă import ActivityApp";
@@ -360,6 +399,8 @@ public static class AuditActions
     public const string GrantPermission = "Acordare permisiune";
     public const string RevokePermission = "Revocare permisiune";
     public const string DeleteUserType = "Ștergere tip utilizator";
+    public const string GrantDeveloper = "Utilizator: drept de dezvoltator acordat";
+    public const string RevokeDeveloper = "Utilizator: drept de dezvoltator revocat";
     public const string ChangeUserType = "Schimbare tip utilizator";
     // The first administrator account, made by the installer (BlazorStoc.dll --create-administrator), recorded as made by the system.
     public const string CreateInstallerAdministrator = "Creare cont administrator la instalare";
@@ -381,6 +422,15 @@ public static class AuditActions
     public const string ChangeMaintenanceComponentFamily = "Schimbare familie componentă mentenanță";
     public const string AddMaintenanceComponentAlias = "Adăugare denumire alternativă componentă mentenanță";
     public const string RemoveMaintenanceComponentAlias = "Ștergere denumire alternativă componentă mentenanță";
+    public const string AddMandatoryProjectType = "Adăugare tip de proiect obligatoriu";
+    public const string GenerateConsumptionNote = "Generare bon de consum";
+    public const string DeactivateConsumptionNote = "Dezactivare bon de consum";
+    public const string DeleteConsumptionNote = "Ștergere bon de consum";
+    public const string RenameMandatoryProjectType = "Modificare denumire tip de proiect obligatoriu";
+    public const string ActivateMandatoryProjectType = "Activare tip de proiect obligatoriu";
+    public const string DeactivateMandatoryProjectType = "Dezactivare tip de proiect obligatoriu";
+    public const string MoveMandatoryProjectType = "Schimbare ordine tip de proiect obligatoriu";
+    public const string EnsureMandatoryProjects = "Creare proiecte obligatorii la beneficiari";
     public const string AddSystemType = "Adăugare tip de sistem";
     public const string RenameSystemType = "Modificare denumire tip de sistem";
     public const string ActivateSystemType = "Activare tip de sistem";
@@ -388,10 +438,15 @@ public static class AuditActions
     public const string MoveSystemType = "Schimbare ordine tip de sistem";
     public const string AddSystemTypeAlias = "Adăugare denumire alternativă tip de sistem";
     public const string RemoveSystemTypeAlias = "Ștergere denumire alternativă tip de sistem";
+    public const string EditAnafAuthSettings = "Modificare setări autentificare ANAF";
+    public const string ConnectAnafAuth = "Autentificare în ANAF";
+    public const string RefreshAnafAuth = "Reînnoire token ANAF";
+    public const string DisconnectAnafAuth = "Deconectare autentificare ANAF";
     public const string DeleteAnafVersion = "Ștergere versiune configurație ANAF";
     public const string ActivateAnafVersion = "Activare versiune configurație ANAF";
     public const string VoidExitOperation = "Stornare operație de ieșire";
     public const string ReturnFromBeneficiary = "Retur de la beneficiar";
+    public const string ReturnFromProject = "Retur din proiect";
     // The system records when a module is taken out of service after repeated failures and when it comes back; the administrator's "try again" is recorded under his name.
     public const string ModuleDisabled = "Oprire modul";
     public const string ModuleRecovered = "Revenire modul";
@@ -405,22 +460,29 @@ public static class AuditActions
     // the history of the updater at the next start, also for an update made by the installer on the server) and the administrator taking note of a failed one.
     public const string ApplicationUpdate = "Actualizare aplicație";
     public const string ApplicationUpdateCancelled = "Anulare actualizare aplicație";
+    public const string ApplicationUpdateInterrupted = "Întrerupere actualizare aplicație";
     public const string ApplicationUpdateSucceeded = "Actualizare reușită";
     public const string ApplicationUpdateInstaller = "Actualizare aplicație (installer)";
     public const string ApplicationUpdateFailed = "Actualizare eșuată";
     public const string ApplicationUpdateRefused = "Actualizare refuzată";
     public const string ApplicationRollback = "Revenire la versiunea anterioară";
     public const string ApplicationUpdateAcknowledged = "Confirmare eșec actualizare";
+    // OCR learning of the inventory take-over (Inventar -> Invatare OCR): the corrections of a confirmed take-over are saved, the user then chooses what the reading learns from, ignores a correction or resets what was learned.
+    public const string SaveOcrCorrections = "Salvare corecții OCR";
+    public const string LearnOcr = "Învățare OCR";
+    public const string IgnoreOcrCorrection = "Ignorare corecție OCR";
+    public const string ResetOcrLearning = "Resetare învățare OCR";
 
     // Operations that remove their object: earlier events about it stop linking to its page.
     public static bool IsDeletion(string? action) => action is Delete or DeleteInvoiceTemplate or DeleteUserTask;
 
     // Events whose object still has a live page (a plain edit or one of the specific edit operations).
     public static bool IsCreateOrEdit(string? action) =>
-        action is Create or Edit or EditProductTags or ExpiryItp or ExpiryInsurance or ExpiryRovinieta or MoveEquipment or ReturnEquipment
+        action is CreateAnnouncement or PublishAnnouncement or EditAnnouncement or ArchiveAnnouncement or RepublishAnnouncement or ConfirmAnnouncementRead or
+            Create or Edit or EditProductTags or ExpiryItp or ExpiryInsurance or ExpiryRovinieta or MoveEquipment or ReturnEquipment
             or CreateNotificationTemplate or EditNotificationTemplate or NotificationCreated or AcknowledgeNotification or SnoozeNotification
             or ResolveNotification or AutoResolveNotification or ReopenNotification or EditNotificationSettings
-            or CreateWorkPoint or EditWorkPoint or EditWorkPointDescription or EditWorkPointCoordinates or AddWorkPointPhoto or AddAttachedFile or DeleteAttachedFile or RenameAttachedFile
+            or CreateWorkPoint or EditWorkPoint or EditWorkPointDescription or EditWorkPointCoordinates or AddWorkPointPhoto or CreateAttachedWorkPoint or EditAttachedWorkPoint or AddAttachedFile or DeleteAttachedFile or RenameAttachedFile
             or CreateServiceContract or EditServiceContract or CreateServiceContractAddendum or EditServiceContractAddendum or CancelServiceContractAddendum or EditServiceContractExpiry or ActivateServiceContract or DeactivateServiceContract
             or AddContractPoint or RemoveContractPoint or EditMaintenanceCycle or RescheduleMaintenance or MoveContractPoint
             or EditContractReferenceDate or EditContractComponents or FreezeServiceContract or UnfreezeServiceContract
@@ -430,13 +492,13 @@ public static class AuditActions
             or CreateInvoiceTemplate or EditInvoiceTemplate or EditInvoiceTemplateDetails or ActivateInvoiceTemplate or DeactivateInvoiceTemplate or RenameInvoiceTemplateSupplier or LinkInvoiceTemplateSupplier
             or CreateSupplier or EditSupplier or RecheckSupplier or RecordSupplierInvoice or EditSupplierInvoiceNumber or EditSupplierInvoiceDate or MoveSupplierInvoice or AddSupplierAlias or RemoveSupplierAlias or LinkSupplierProductCode or ChangeSupplierProductCode
             or RecordFreeEntry or AttachEntryToInvoice or DetachEntryFromInvoice or DuplicateEntryOnInvoice or RegularizeNegativeStock or ExitOverStock
-            or ExitToBeneficiary or ExitToVehicle or GenericSale or StockCorrection or DuplicateExit or VoidExitOperation or ReturnFromBeneficiary
+            or ExitToBeneficiary or ExitToVehicle or GenericSale or StockCorrection or ExitOtherReason or DuplicateExit or VoidExitOperation or ReturnFromBeneficiary or ReturnFromProject
             or ImportOffer or ReviseOffer or LinkOfferLine or AddBeneficiaryAlias
-            or CreateUserTask or EditUserTask or EditUserTaskDueDate or EditUserTaskPriority or MoveUserTask or ChangeUserTaskStatus or AcceptUserTask or AddUserTaskFile or DeleteUserTaskFile
+            or CreateUserTask or EditUserTask or EditUserTaskDueDate or EditUserTaskPriority or MoveUserTask or ChangeUserTaskStatus or EditUserTaskNote or ReorderUserTasks or AcceptUserTask or AddUserTaskFile or DeleteUserTaskFile
             or CreateOfferTemplate or EditOfferTemplate or ActivateOfferTemplate or DeactivateOfferTemplate
             or AddProjectComponent or ChangeProjectComponentState or ArchiveProjectComponent or ReactivateProjectComponent or SetVehicleTarget or RemoveVehicleTarget or SetMinStock or RemoveMinStock or SetProjectDeadline or RemoveProjectDeadline or ReserveStock or ReduceReservation or ReleaseReservation or ReservationConsumed or ReservationReducedByExit or ReservationReleasedByComponent or ComponentExitReturned or ComponentExitLeft or ComponentExitMoved or ComponentExitConsumed
             or AddMaintenanceFamily or RenameMaintenanceFamily or ActivateMaintenanceFamily or DeactivateMaintenanceFamily or MoveMaintenanceFamily or AddMaintenanceComponent or RenameMaintenanceComponent or ActivateMaintenanceComponent or DeactivateMaintenanceComponent or MoveMaintenanceComponent or ChangeMaintenanceComponentFamily or AddMaintenanceComponentAlias or RemoveMaintenanceComponentAlias
-            or AddRiskAnalyzer or EditRiskAnalyzer or CreateInstallerAdministrator or AddSystemType or RenameSystemType or ActivateSystemType or DeactivateSystemType or MoveSystemType or AddSystemTypeAlias or RemoveSystemTypeAlias or DeleteAnafVersion or ActivateAnafVersion;
+            or GenerateConsumptionNote or AddRiskAnalyzer or EditRiskAnalyzer or CreateInstallerAdministrator or AddSystemType or RenameSystemType or ActivateSystemType or DeactivateSystemType or AddMandatoryProjectType or RenameMandatoryProjectType or ActivateMandatoryProjectType or DeactivateMandatoryProjectType or MoveMandatoryProjectType or EnsureMandatoryProjects or MoveSystemType or AddSystemTypeAlias or RemoveSystemTypeAlias or DeleteAnafVersion or ActivateAnafVersion or EditAnafAuthSettings or ConnectAnafAuth or RefreshAnafAuth or DisconnectAnafAuth;
 
     public static string Normalize(string? action) =>
         string.Equals(action, "Modificare", StringComparison.OrdinalIgnoreCase) ? Edit : action ?? string.Empty;
@@ -478,6 +540,7 @@ public static class AuditNavigation
     // is built from the entity type and the stable identifier only, never from the display text of the target.
     private static readonly IReadOnlyDictionary<string, Func<int, string>> Routes = new Dictionary<string, Func<int, string>>
     {
+        [AuditEntities.Announcement] = _ => "/setari?tab=anunturi",
         [AuditEntities.Product] = ProductNavigation.ProductUrl,
         [AuditEntities.Beneficiary] = BeneficiaryProjectListState.BeneficiaryUrl,
         [AuditEntities.User] = UserNavigation.UserUrl,
@@ -503,6 +566,8 @@ public static class AuditNavigation
         // The supplier page (its data and invoices). An invoice event stores the invoice id, which has no page of its own: plain text.
         [AuditEntities.Supplier] = SupplierNavigation.SupplierUrl,
         [AuditEntities.SystemType] = SystemTypeNavigation.PageUrl,
+        [AuditEntities.BeneficiaryProjectType] = _ => "/nomenclator?tab=proiecte-obligatorii",
+        [AuditEntities.ConsumptionNote] = _ => "/bonuri-consum",
         [AuditEntities.RiskAnalyzer] = RiskAnalyzerNavigation.PageUrl,
         [AuditEntities.OfferTemplate] = OfferNavigation.TemplateUrl
     };

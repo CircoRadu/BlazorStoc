@@ -51,6 +51,8 @@ Directorul contine, pentru fiecare componenta a aplicatiei, un fisier cu pasii p
 | 20_Raportare_erori.md | Raportare erori: intrarea din meniu, captura automata, Ctrl+V, rapoartele mele, administrare si export ZIP | meniu (deasupra de Ajutor), /setari (Rapoarte erori) |
 | 21_Taskuri_utilizatori.md | Taskuri date unui utilizator pe un beneficiar, Taskurile mele, fila Taskuri din Notificari | /taskuri/adauga, /taskurile-mele, /notificari, /beneficiari/{id} |
 | 22_Propuneri.md | Propuneri de modificari: formularul, Propunerile mele, Toate propunerile, administrare in Setari -> Dezvoltare, fila Propuneri din Notificari | meniul principal, /setari, /notificari |
+| 24_Anunturi.md | Anunturi: editor, poze, ZIP, publicare, republicare, fereastra dupa autentificare, "Am citit", preferinta | /setari (tile Anunturi), dupa autentificare |
+| 25_Dashboard_personalizat.md | Personalizare dashboard: culoare la spatii, zone pe randuri diferite (Asezare), slidere | meniul numelui -> Personalizare dashboard, Dashboard |
 
 ## Rularea testelor dintr-o pagina de lucru (unealta `tools/teste-utilizator.mjs`)
 

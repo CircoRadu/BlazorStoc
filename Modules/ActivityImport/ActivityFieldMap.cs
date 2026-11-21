@@ -27,18 +27,20 @@ public sealed record ActivityExtraField(string Table, string Column, string Labe
 public sealed class ActivityFieldMap
 {
     public const string Notes = "notes", Separate = "separate", Both = "both";
-    public const string Title = "title", Number = "number", Problem = "problem", Resolution = "resolution", Report = "report", Executor = "executor";
-    public const int MaximumExtras = 10, MaximumLabel = 60;
+    public const string Title = "title", Number = "number", Finished = "finished", Problem = "problem", Resolution = "resolution", Report = "report", Executor = "executor";
+    public const int MaximumLabel = 60;
     public static readonly string[] ExtraTables = ["Tickete", "EvenimenteAgent"];
 
     public ActivityFieldMap(IReadOnlyDictionary<string, string>? columns = null, IEnumerable<string>? off = null, IReadOnlyDictionary<string, string>? targets = null, IEnumerable<ActivityExtraField>? extras = null,
-        IReadOnlyDictionary<string, string>? labels = null)
+        IReadOnlyDictionary<string, string>? labels = null, bool numberChosen = false, IEnumerable<string>? order = null)
     {
+        NumberChosen = numberChosen;
         Columns = columns ?? new Dictionary<string, string>();
         Off = new HashSet<string>(off ?? [], StringComparer.Ordinal);
         Targets = targets ?? new Dictionary<string, string>();
         Extras = [.. extras ?? []];
         Labels = labels ?? new Dictionary<string, string>();
+        Order = CleanOrder(order, Extras);
     }
 
     public static ActivityFieldMap Empty { get; } = new();
@@ -49,7 +51,8 @@ public sealed class ActivityFieldMap
         new("Tickete", "DescriptionInternal", "Problema (textul tichetului la deschidere)", "Din ea și din raport se despart „Problemă” și „Rezolvare”."),
         new("EvenimenteAgent", "DescriptionInternal", "Raportul evenimentului de rezolvare", "Același text urmat de ce s-a făcut; din el iese „Rezolvare”."),
         new("Tickete", "ProcesatDe", "Executantul", "Apare în observații ca „Executant”."),
-        new("Tickete", "NumeTicket", "Numărul tichetului", "Apare în observații, la „tichet …”.")
+        new("Tickete", "NumeTicket", "Numărul tichetului", "Apare în observații, la „tichet …”."),
+        new("EvenimenteAgent", "EndTime", "Data finalizării evenimentului", "Data intervenției: ziua (și ora) în care s-a terminat evenimentul de rezolvare.")
     ];
 
     /// <summary>The pieces of information of a ticket, in the order they are shown.</summary>
@@ -57,6 +60,7 @@ public sealed class ActivityFieldMap
     [
         new(Title, "Titlul tichetului", Key("Tickete", "Subject"), true, "Devine titlul intervenției și începutul observațiilor. Se preia întotdeauna.", Notes),
         new(Number, "Numărul tichetului", Key("Tickete", "NumeTicket"), true, "Apare în observații, la „tichet …”. Se preia întotdeauna.", Notes),
+        new(Finished, "Data finalizării evenimentului", Key("EvenimenteAgent", "EndTime"), true, "Devine data intervenției (dată și oră). Se preia întotdeauna.", Notes),
         new(Problem, "Problema", Key("Tickete", "DescriptionInternal"), false, "Textul tichetului la deschidere.", Both),
         new(Resolution, "Rezolvarea", null, false, "Ce s-a făcut: se obține din raportul evenimentului, fără textul problemei.", Both),
         new(Report, "Raportul original", Key("EvenimenteAgent", "DescriptionInternal"), false, "Raportul complet al evenimentului de rezolvare, așa cum este în ActivityApp.", Separate),
@@ -64,6 +68,57 @@ public sealed class ActivityFieldMap
     ];
 
     public IReadOnlyDictionary<string, string> Columns { get; }
+
+    /// <summary>The order the optional lines (problem, resolution, report, executor and the extra fields) have in the notes, chosen by dragging (BUG-0023). Empty = the usual order. The required lines
+    /// (title, number, ticket and event ids, end of the event) are always first and have no place in it.</summary>
+    public IReadOnlyList<string> Order { get; }
+
+    /// <summary>The usual order of the optional lines: problem, resolution, report, executor, then the extra fields in the order they were added.</summary>
+    public static IReadOnlyList<string> DefaultOrder(IEnumerable<ActivityExtraField> extras) => [Problem, Resolution, Report, Executor, .. extras.Select(extra => extra.Key)];
+
+    // Only keys that exist, none twice, and the keys not named keep their usual place after the named ones; the usual order itself is kept as "empty".
+    private static IReadOnlyList<string> CleanOrder(IEnumerable<string>? order, IReadOnlyList<ActivityExtraField> extras)
+    {
+        var usual = DefaultOrder(extras);
+        var named = (order ?? []).Where(usual.Contains).Distinct(StringComparer.Ordinal).ToList();
+        var full = named.Concat(usual.Where(key => !named.Contains(key))).ToList();
+        return full.SequenceEqual(usual) ? [] : full;
+    }
+
+    /// <summary>The same settings with another order of the optional lines of the notes.</summary>
+    public ActivityFieldMap WithOrder(IEnumerable<string>? order) => new(Columns, Off, Targets, Extras, Labels, NumberChosen, order);
+
+    /// <summary>The place of an optional line in the notes (smaller = earlier).</summary>
+    public int PlaceOf(string key)
+    {
+        var sequence = Order.Count > 0 ? Order : DefaultOrder(Extras);
+        var index = sequence.ToList().IndexOf(key);
+        return index < 0 ? int.MaxValue : index;
+    }
+    /// <summary>The administrator chose the column of the ticket number (BUG-0023): there is no default for it. Settings never saved, or reset to the defaults, have it false; the import still reads
+    /// the usual column then, but the settings cannot be saved until the column is chosen.</summary>
+    public bool NumberChosen { get; }
+
+    /// <summary>The title and the number may be read from a column of any readable kind (text, number, date, flag), shown as text; the other pieces only from text columns.</summary>
+    public const string NumberRequiredMessage = "Alege coloana din care se citește numărul tichetului: fără ea corespondența nu se salvează.";
+
+    public static bool ReadsAnyKind(ActivityMappableField field) => field.Table == "Tickete" && field.Column is "Subject" or "NumeTicket";
+
+    /// <summary>The date and time of the end of the event (the date of the intervention): read from a date column of the events.</summary>
+    public static bool ReadsDate(ActivityMappableField field) => field.Table == "EvenimenteAgent" && field.Column == "EndTime";
+
+    /// <summary>The field of the end of the event.</summary>
+    public static ActivityMappableField FinishedField { get; } = Fields.First(field => field.Table == "EvenimenteAgent" && field.Column == "EndTime");
+
+    /// <summary>The columns of a table the administrator can choose for a field, as the structure read found them: any readable column for the title and the number, a date column for the end of the event, a text column for the rest.</summary>
+    public static IReadOnlyList<string> ChoiceColumns(IReadOnlyList<ActivityColumn> actual, ActivityMappableField field) =>
+        ReadsAnyKind(field) ? ReadableColumns(actual, field.Table)
+        : ReadsDate(field) ? [.. actual.Where(column => column.Table.Equals(field.Table, StringComparison.OrdinalIgnoreCase) && ActivityContract.KindOf(column.DataType) == ColumnKind.Date).Select(column => column.Column).Order(StringComparer.OrdinalIgnoreCase)]
+        : TextColumns(actual, field.Table);
+
+    /// <summary>Whether a column of this type can be read for the field.</summary>
+    public static bool AcceptsType(ActivityMappableField field, string dataType) =>
+        ActivityContract.KindOf(dataType) is { } kind && (ReadsAnyKind(field) || (ReadsDate(field) ? kind == ColumnKind.Date : kind == ColumnKind.Text));
     /// <summary>The optional pieces of information that are switched off (a piece not named here is on).</summary>
     public IReadOnlySet<string> Off { get; }
     /// <summary>The destination chosen for a piece of information that differs from its default.</summary>
@@ -80,6 +135,20 @@ public sealed class ActivityFieldMap
 
     /// <summary>The name in front of a piece of information in the notes of an intervention before names could be chosen.</summary>
     public static string DefaultNoteLabel(string key) => key switch { Problem => "Problemă", Resolution => "Rezolvare", Report => "Raport original", Executor => "Executant", _ => ItemOf(key)?.Label ?? key };
+
+    /// <summary>How the windows name the table of a column: "Tichet" (the ticket as opened) or "Eveniment" (the event that closed it).</summary>
+    public static string TablePrefix(string table) => table.Equals("EvenimenteAgent", StringComparison.OrdinalIgnoreCase) ? "Eveniment" : "Tichet";
+
+    /// <summary>"Tichet – Subject": a column as the windows name it.</summary>
+    public static string ColumnName(string table, string column) => $"{TablePrefix(table)} – {column}";
+
+    /// <summary>The column a piece of information is read from, "Tichet – Subject" (null: derived, or not read from a column).</summary>
+    public string? SourceOf(string key)
+    {
+        if (ExtraOf(key) is { } extra) return ColumnName(extra.Table, extra.Column);
+        var field = Fields.FirstOrDefault(item => item.Key == ItemOf(key)?.FieldKey);
+        return field is null ? null : ColumnName(field.Table, ColumnOf(field));
+    }
 
     public static string Key(string table, string column) => $"{table}.{column}";
     public static string ExtraKey(string table, string column) => $"x:{table}.{column}";
@@ -116,6 +185,7 @@ public sealed class ActivityFieldMap
         get
         {
             var set = new HashSet<string>(StringComparer.Ordinal) { Title, Number };
+            if (!IsDefault(FinishedField)) set.Add(Finished);   // read again only when another column is chosen (or was, see ActivityTicketFields.Missing)
             if (IsEnabled(Executor)) set.Add(Executor);
             if (IsEnabled(Problem) || IsEnabled(Resolution)) set.Add(Problem);
             if (IsEnabled(Report) || IsEnabled(Resolution)) set.Add(Report);
@@ -139,7 +209,10 @@ public sealed class ActivityFieldMap
         Create(chosen, off, targets, extras, null, out error);
 
     public static ActivityFieldMap? Create(IReadOnlyDictionary<string, string> chosen, IEnumerable<string>? off, IReadOnlyDictionary<string, string>? targets, IEnumerable<ActivityExtraField>? extras,
-        IReadOnlyDictionary<string, string>? labels, out string? error)
+        IReadOnlyDictionary<string, string>? labels, out string? error) => Create(chosen, off, targets, extras, labels, false, out error);
+
+    public static ActivityFieldMap? Create(IReadOnlyDictionary<string, string> chosen, IEnumerable<string>? off, IReadOnlyDictionary<string, string>? targets, IEnumerable<ActivityExtraField>? extras,
+        IReadOnlyDictionary<string, string>? labels, bool numberChosen, out string? error)
     {
         error = null;
         var result = new Dictionary<string, string>(StringComparer.Ordinal);
@@ -179,11 +252,9 @@ public sealed class ActivityFieldMap
             if (label.Length == 0 || label.Length > MaximumLabel || label.Any(char.IsControl)) { error = $"Numele unui câmp suplimentar are între 1 și {MaximumLabel} de caractere."; return null; }
             if (!IsTarget(extra.Target)) { error = "Destinația aleasă pentru „" + label + "” nu este validă."; return null; }
             if (list.Any(item => item.Table == table && item.Column.Equals(column, StringComparison.OrdinalIgnoreCase))) { error = "Coloana „" + column + "” a fost adăugată de două ori."; return null; }
-            if (list.Any(item => item.Label.Equals(label, StringComparison.OrdinalIgnoreCase)) || Info.Any(item => item.Label.Equals(label, StringComparison.OrdinalIgnoreCase)))
-            { error = "Numele „" + label + "” este deja folosit."; return null; }
+            // The name of an extra field is only a label: the field is told apart by its table and column, so a name may repeat (also a name of a piece of information).
             list.Add(new ActivityExtraField(table, column, label, extra.Target));
         }
-        if (list.Count > MaximumExtras) { error = $"Cel mult {MaximumExtras} câmpuri suplimentare."; return null; }
         // The names chosen for the optional pieces: 1 to 60 characters, none used twice (also not by the pieces that keep their usual name, nor by an extra field).
         var chosenLabels = new Dictionary<string, string>(StringComparer.Ordinal);
         foreach (var (key, value) in labels ?? new Dictionary<string, string>())
@@ -195,9 +266,9 @@ public sealed class ActivityFieldMap
             if (label.Length > MaximumLabel || label.Any(char.IsControl)) { error = $"Numele unei informații are între 1 și {MaximumLabel} de caractere."; return null; }
             chosenLabels[key] = label;
         }
-        var names = Info.Select(item => chosenLabels.TryGetValue(item.Key, out var custom) ? custom : item.Label).Concat(list.Select(extra => extra.Label)).ToList();
+        var names = Info.Select(item => chosenLabels.TryGetValue(item.Key, out var custom) ? custom : item.Label).ToList();
         if (names.GroupBy(name => name, StringComparer.OrdinalIgnoreCase).FirstOrDefault(group => group.Count() > 1) is { } twice) { error = "Numele „" + twice.Key + "” este folosit de două ori."; return null; }
-        return new ActivityFieldMap(result, disabled, chosenTargets, list, chosenLabels);
+        return new ActivityFieldMap(result, disabled, chosenTargets, list, chosenLabels, numberChosen);
     }
 
     private static bool ValidColumn(string column) => column.Length is > 0 and <= 128 && column.All(c => char.IsLetterOrDigit(c) || c is '_');
@@ -205,14 +276,14 @@ public sealed class ActivityFieldMap
     // The old format is the dictionary of the columns alone; the new one (version 2) is an object, written only when something besides the columns differs from the default.
     public string ToJson()
     {
-        if (Columns.Count == 0 && Off.Count == 0 && Targets.Count == 0 && Extras.Count == 0 && Labels.Count == 0) return "";
+        if (!NumberChosen && Columns.Count == 0 && Off.Count == 0 && Targets.Count == 0 && Extras.Count == 0 && Labels.Count == 0 && Order.Count == 0) return "";
         var columns = Columns.OrderBy(pair => pair.Key, StringComparer.Ordinal).ToDictionary(pair => pair.Key, pair => pair.Value);
-        if (Off.Count == 0 && Targets.Count == 0 && Extras.Count == 0 && Labels.Count == 0) return JsonSerializer.Serialize(columns);
-        return JsonSerializer.Serialize(new Stored(2, columns, [.. Off.Order(StringComparer.Ordinal)], Targets.OrderBy(pair => pair.Key, StringComparer.Ordinal).ToDictionary(pair => pair.Key, pair => pair.Value),
-            [.. Extras.Select(extra => new StoredExtra(extra.Table, extra.Column, extra.Label, extra.Target))], Labels.OrderBy(pair => pair.Key, StringComparer.Ordinal).ToDictionary(pair => pair.Key, pair => pair.Value)));
+        if (!NumberChosen && Off.Count == 0 && Targets.Count == 0 && Extras.Count == 0 && Labels.Count == 0 && Order.Count == 0) return JsonSerializer.Serialize(columns);
+        return JsonSerializer.Serialize(new Stored(3, columns, [.. Off.Order(StringComparer.Ordinal)], Targets.OrderBy(pair => pair.Key, StringComparer.Ordinal).ToDictionary(pair => pair.Key, pair => pair.Value),
+            [.. Extras.Select(extra => new StoredExtra(extra.Table, extra.Column, extra.Label, extra.Target))], Labels.OrderBy(pair => pair.Key, StringComparer.Ordinal).ToDictionary(pair => pair.Key, pair => pair.Value), NumberChosen, [.. Order]));
     }
 
-    private sealed record Stored(int V, Dictionary<string, string> Columns, List<string> Off, Dictionary<string, string> Targets, List<StoredExtra> Extras, Dictionary<string, string>? Labels = null);
+    private sealed record Stored(int V, Dictionary<string, string> Columns, List<string> Off, Dictionary<string, string> Targets, List<StoredExtra> Extras, Dictionary<string, string>? Labels = null, bool? NumberChosen = null, List<string>? Order = null);
     private sealed record StoredExtra(string Table, string Column, string Label, string Target);
 
     public static ActivityFieldMap FromJson(string? json)
@@ -226,10 +297,10 @@ public sealed class ActivityFieldMap
             {
                 var stored = JsonSerializer.Deserialize<Stored>(json, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
                 if (stored is null) return Empty;
-                return Create(stored.Columns ?? [], stored.Off ?? [], stored.Targets ?? [], (stored.Extras ?? []).Select(extra => new ActivityExtraField(extra.Table, extra.Column, extra.Label, extra.Target)), stored.Labels ?? [], out _) ?? Empty;
+                return Create(stored.Columns ?? [], stored.Off ?? [], stored.Targets ?? [], (stored.Extras ?? []).Select(extra => new ActivityExtraField(extra.Table, extra.Column, extra.Label, extra.Target)), stored.Labels ?? [], stored.NumberChosen ?? true, out _)?.WithOrder(stored.Order) ?? Empty;
             }
             var values = JsonSerializer.Deserialize<Dictionary<string, string>>(json);
-            return values is null ? Empty : Create(values, out _) ?? Empty;
+            return values is null ? Empty : Create(values, null, null, null, null, true, out _) ?? Empty;
         }
         catch (JsonException) { return Empty; }
     }
@@ -237,6 +308,10 @@ public sealed class ActivityFieldMap
     /// <summary>The text columns of a table of ActivityApp, as the structure read found them (what the administrator can choose from).</summary>
     public static IReadOnlyList<string> TextColumns(IReadOnlyList<ActivityColumn> actual, string table) =>
         [.. actual.Where(column => column.Table.Equals(table, StringComparison.OrdinalIgnoreCase) && ActivityContract.KindOf(column.DataType) == ColumnKind.Text).Select(column => column.Column).Order(StringComparer.OrdinalIgnoreCase)];
+
+    /// <summary>The columns of a table that can be a free field (text, number, date or flag), as the structure read found them.</summary>
+    public static IReadOnlyList<string> ReadableColumns(IReadOnlyList<ActivityColumn> actual, string table) =>
+        [.. actual.Where(column => column.Table.Equals(table, StringComparison.OrdinalIgnoreCase) && ActivityContract.KindOf(column.DataType) is not null).Select(column => column.Column).Order(StringComparer.OrdinalIgnoreCase)];
 
     /// <summary>A short text for the journal: what differs from the default, or "—" (all default).</summary>
     public string Describe()
