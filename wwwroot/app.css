@@ -2305,3 +2305,4 @@ th.announcement-seen-head button, th.announcement-seen-head > * { justify-conten
 .dash-band-left, .dashboard-band-left { justify-content:flex-start; }
 .dash-band-right, .dashboard-band-right { justify-content:flex-end; }
 .dashboard-zone-placement { display:flex; align-items:center; gap:6px; font-size:12px; }
+.dashboard-zone-widthrow { display:flex; align-items:center; gap:14px; flex-wrap:wrap; margin:6px 0 10px; }

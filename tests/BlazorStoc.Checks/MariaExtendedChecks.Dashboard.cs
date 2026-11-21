@@ -23,20 +23,20 @@ public static partial class MariaExtendedChecks
             var layout = DashboardLayout.From(DashboardState.Empty);
             layout.Zones[0].Title = "Vanzari";
             layout.AddZone("Stoc");
-            layout.SetColumns(1, 2); layout.SetPlacement(1, DashboardZone.Right);
+            layout.SetColumns(1, 2); layout.SetPlacement(1, DashboardZone.Right); layout.SetZoneWidth(1, 560);
             layout.AddRow(0, DashboardLayout.TilesKind, 0); layout.AddRow(0, DashboardRow.Spacer, 1); layout.AddRow(0, DashboardRow.Label, 2); layout.Zones[0].Rows[2].Text = "Eticheta"; layout.Zones[0].Rows[1].Color = "#00aa00"; layout.Zones[0].Rows[2].Color = "#AA0000";
             layout.AddRow(1, DashboardLayout.TilesKind, 0);
             foreach (var key in keys.Take(4)) layout.AddTile(key);
             layout.MoveTile(keys[0], 0, 0, 0); layout.MoveTile(keys[1], 0, 0, 3); layout.MoveTile(keys[2], 1, 0, 1);
-            layout.Sizes = new DashboardSizes(320, 100, 30);
+            layout.Sizes = new DashboardSizes(320, 100, 30, 900);
             await repositoryA.SaveAsync(layout.ToState());
 
             var read = await repositoryA.GetAsync();
             var back = DashboardLayout.From(read);
-            Check(read.Custom && read.ZoneList.Count == 2 && read.ZoneList[0].Title == "Vanzari" && read.ZoneList[1].Title == "Stoc" && read.ZoneList[1].Columns == 2 && read.ZoneList[0].Placement == DashboardZone.Beside && read.ZoneList[1].Placement == DashboardZone.Right, "Dashboard: the zones are saved with their title, order and columns");
+            Check(read.Custom && read.ZoneList.Count == 2 && read.ZoneList[0].Title == "Vanzari" && read.ZoneList[1].Title == "Stoc" && read.ZoneList[1].Columns == 2 && read.ZoneList[0].Placement == DashboardZone.Beside && read.ZoneList[1].Placement == DashboardZone.Right && read.ZoneList[1].Width == 560 && read.ZoneList[0].Width == 0, "Dashboard: the zones are saved with their title, order and columns");
             Check(back.KeyAt(0, 0, 0) == keys[0] && back.KeyAt(0, 0, 3) == keys[1] && back.KeyAt(1, 0, 1) == keys[2] && back.Buffer.SequenceEqual([keys[3]]), "Dashboard: the tiles come back in their zone, row and column, the waiting one in the buffer");
             Check(back.Zones[0].Rows[1].Kind == DashboardRow.Spacer && back.Zones[0].Rows[1].Color == "#00aa00" && back.Zones[0].Rows[2].Text == "Eticheta" && back.Zones[0].Rows[2].Color == "#aa0000", "Dashboard: labels and spaces are saved per zone (the colour in lower case)");
-            Check(read.SizeSettings == new DashboardSizes(320, 100, 30), "Dashboard: the sizes of the sliders are saved with the display settings of the user");
+            Check(read.SizeSettings == new DashboardSizes(320, 100, 30, 900), "Dashboard: the sizes of the sliders are saved with the display settings of the user");
 
             // Another user keeps their own page.
             Check(!(await repositoryB.GetAsync()).Custom, "Dashboard: the arrangement belongs to its user alone");

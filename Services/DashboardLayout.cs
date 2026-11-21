@@ -27,6 +27,8 @@ public sealed class DashboardLayout
         public string Title { get; set; } = "";
         public int Columns { get; set; } = MariaUserDashboardRepository.DefaultColumns;
         public string Placement { get; set; } = DashboardZone.Beside;
+        /// <summary>The width chosen for this zone in pixels; 0 = the global width of the zones.</summary>
+        public int Width { get; set; }
         public List<LayoutRow> Rows { get; } = [];
         public bool HasContent => Rows.Any(row => !row.IsEmpty && row.IsTiles || !row.IsTiles && (row.Kind == DashboardRow.Spacer || row.Text.Length > 0));
         public bool IsEmptyOfTiles => Rows.All(row => !row.IsTiles || row.IsEmpty);
@@ -47,7 +49,7 @@ public sealed class DashboardLayout
     {
         var layout = new DashboardLayout { Sizes = state.SizeSettings.Valid() };
         foreach (var zone in state.ZoneList.OrderBy(zone => zone.Index).Take(DashboardZone.MaxZones))
-            layout.Zones.Add(new LayoutZone { Title = zone.Title, Columns = MariaUserDashboardRepository.ValidColumns(zone.Columns), Placement = DashboardZone.ValidPlacement(zone.Placement) });
+            layout.Zones.Add(new LayoutZone { Title = zone.Title, Columns = MariaUserDashboardRepository.ValidColumns(zone.Columns), Placement = DashboardZone.ValidPlacement(zone.Placement), Width = DashboardZone.ValidWidth(zone.Width) });
         var known = state.ZoneList.OrderBy(zone => zone.Index).Take(DashboardZone.MaxZones).Select(zone => zone.Index).ToList();
         int ZoneOf(int saved) { var at = known.IndexOf(saved); return at >= 0 ? at : 0; }
         for (var z = 0; z < layout.Zones.Count; z++)
@@ -96,7 +98,7 @@ public sealed class DashboardLayout
         for (var z = 0; z < Zones.Count; z++)
         {
             var zone = Zones[z];
-            zones.Add(new DashboardZone(z, zone.Title.Trim(), zone.Columns, z == 0 ? DashboardZone.Beside : DashboardZone.ValidPlacement(zone.Placement)));
+            zones.Add(new DashboardZone(z, zone.Title.Trim(), zone.Columns, z == 0 ? DashboardZone.Beside : DashboardZone.ValidPlacement(zone.Placement), DashboardZone.ValidWidth(zone.Width)));
             var count = zone.Rows.Count;
             while (count > 0 && zone.Rows[count - 1].IsEmpty) count--;
             for (var index = 0; index < count; index++)
@@ -284,6 +286,16 @@ public sealed class DashboardLayout
         return true;
     }
 
+    /// <summary>The width of one zone in pixels: its own, else the global width of the zones; 0 = automatic (no width chosen).</summary>
+    public int EffectiveWidth(LayoutZone zone) => zone.Width > 0 ? DashboardZone.ValidWidth(zone.Width) : Sizes.ZoneWidth;
+
+    public bool SetZoneWidth(int zone, int width)
+    {
+        if (!InZone(zone)) return false;
+        Zones[zone].Width = DashboardZone.ValidWidth(width);
+        return true;
+    }
+
     /// <summary>The zones grouped in bands, one band for each row of the page: the first zone starts the first band and every zone that is not "beside" starts a new one; the zones beside follow in the band of the zone before them.</summary>
     public IReadOnlyList<IReadOnlyList<int>> Bands()
     {
@@ -297,8 +309,11 @@ public sealed class DashboardLayout
         return bands;
     }
 
-    /// <summary>The alignment of the zones of a band: the placement of its first zone (the first band fills the page).</summary>
-    public string BandAlign(IReadOnlyList<int> band) => band.Count == 0 || band[0] == 0 ? DashboardZone.Beside : DashboardZone.ValidPlacement(Zones[band[0]].Placement);
+    /// <summary>The alignment of the zones of a band: the placement of its first zone; the first band fills the page, unless a width is chosen for a zone of it (then its zones are as wide as chosen and centred).</summary>
+    public string BandAlign(IReadOnlyList<int> band) =>
+        band.Count == 0 ? DashboardZone.Beside
+        : band[0] == 0 ? (band.Any(z => EffectiveWidth(Zones[z]) > 0) ? DashboardZone.Center : DashboardZone.Beside)
+        : DashboardZone.ValidPlacement(Zones[band[0]].Placement);
 
     public bool SetZoneTitle(int zone, string? title)
     {

@@ -16,7 +16,7 @@ Modulul "Anunturi" (versiunea 1.0.0, 21.11.2026). Tile-ul exista numai pentru Ad
 | 5 | Alege audienta "Utilizatori selectati", cauta un utilizator, porneste comutatorul lui, bifeaza "Obligatoriu", pune "Valabil pana" in viitor (dd.mm.yyyy), "Publica" | Starea devine Activ; tabelul arata tipul, audienta ("1 selectati") si data | |
 | 6 | Autentifica-te ca utilizatorul ales | Dupa logare apare fereastra cu anuntul, "Am citit" activ; inchisa cu "Inchide" revine la urmatoarea logare | |
 | 7 | Apasa "Am citit" | Anuntul nu mai apare pentru acel utilizator | |
-| 8 | Anunt general: ca utilizator, cand se vede un anunt general, porneste "Nu mai afisa anunturile la pornire" (la un anunt obligatoriu comutatorul nu apare) si inchide; logheaza-te din nou | Anunturile generale nu mai apar (preferinta ramane salvata); cele obligatorii apar in continuare | |
+| 8 | Anunt general (apare o singura data, chiar daca fereastra nu a fost inchisa): ca utilizator, cand se vede un anunt general, porneste "Nu mai afisa anunturile la pornire" (la un anunt obligatoriu comutatorul nu apare) si inchide; logheaza-te din nou | Anunturile generale nu mai apar (preferinta ramane salvata); cele obligatorii apar in continuare | |
 | 9 | In tabel iconita de modificare pe anuntul obligatoriu, schimba textul, "Republica" | Notificare de republicare; tabelul arata "publicat de 2 ori"; utilizatorul il primeste din nou | |
 | 10 | Pune "Valabil pana" in trecut direct in baza sau asteapta data | Anuntul apare ca "Arhivat (expirat)" si nu se mai afiseaza | |
 | 11 | Iconita "Descarca ca ZIP" pe un rand, apoi "Incarca anunt" cu acelasi ZIP | Se creeaza un draft nou cu aceeasi continut si poze; utilizatorii inexistenti sau pozele lipsa apar ca avertismente | |

@@ -1062,3 +1062,8 @@ Cerut de utilizator la 06.10.2026 (verificarea fluxului, apoi deciziile: facturi
 
 - Spatiile libere din caroiaj au culoare aleasa de utilizator; zonele au campul Asezare (langa zona dinainte, pe rand nou centrata/stanga/dreapta) cu latimea necesara tile-urilor; migrarea 100 (user_dashboard_zones.placement)
 - Verificari: teste DashboardChecks + sectiunea MariaDB Dashboard, browser pe instanta proprie
+
+## Finalizat la 21.11.2026 17:02 - Zone dashboard: asezare si latime (0.6.18-0.6.19); anunt general o singura data
+
+- Zonele au camp Asezare si slidere de latime (global si pe zona, migrarile 100-101); culoare la spatii; un anunt general se marcheaza vazut in clipa afisarii (modulul Anunturi 1.3.2)
+- Verificari: teste DashboardChecks si MariaDB Dashboard, grupurile announcements/help/package/moduleversions, browser pe instanta proprie; pachet 0.6.19

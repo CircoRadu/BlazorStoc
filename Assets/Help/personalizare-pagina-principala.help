@@ -25,6 +25,8 @@ Aici îți faci propriul dashboard: alegi opțiunile care apar ca tile-uri, le �
 - Mânerul rândului | mâner | Trage rândul, cu tile-urile lui, în aceeași zonă sau în alta.
 - Celulă | zonă | Trage un tile într-o celulă liberă sau peste alt tile ca să le schimbi locurile.
 - + Etichetă, + Spațiu, + Rând | butoane | Apar între rânduri, la trecerea mouse-ului.
+- Lățime zone | slider | Lățimea tuturor zonelor: la capăt este automată (prima zonă umple pagina, zonele de pe rând nou au lățimea tile-urilor lor), altfel zonele au exact lățimea aleasă și stau centrate.
+- Lățime zonă (la o zonă) | slider | Lățimea unei singure zone; are prioritate peste lățimea globală. „Lățime globală” readuce zona la valoarea globală.
 - Așezare (la o zonă) | listă | Lângă zona dinainte (implicit), pe rând nou centrată, pe rând nou la stânga sau pe rând nou la dreapta. O zonă de pe rând nou are lățimea de care au nevoie tile-urile ei și nu se întinde pe toată pagina; zonele așezate „lângă” ea o urmează pe același rând. Prima zonă nu are acest câmp.
 - Culoare (la un spațiu) | câmp | Alege o culoare pentru spațiul liber dintre rânduri: pe dashboard spațiul apare ca o bandă colorată. „Fără culoare” îl lasă transparent.
 - Salvează | buton | Salvează aranjarea; o zonă fără titlu nu se salvează.

@@ -10,7 +10,7 @@ public sealed class AnnouncementsModule : IModule
 
     public string Id => ModuleId;
     public string Name => "Anunțuri";
-    public Version Version { get; } = new(1, 3, 1);
+    public Version Version { get; } = new(1, 3, 2);
     // The window opens by itself after the sign-in and the settings tile is written in Settings.razor; no item of its own here.
     public IReadOnlyList<ModuleNavItem> Nav { get; } = [];
 

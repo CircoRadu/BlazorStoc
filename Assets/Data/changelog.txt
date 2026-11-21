@@ -1,3 +1,11 @@
+## 0.6.19 | 21.11.2026
+### Funcționalități noi
+- Personalizare dashboard: lățimea zonelor. Un slider „Lățime zone” stabilește lățimea tuturor zonelor (la capăt este automată), iar fiecare zonă are propriul slider „Lățime zonă”, care are prioritate peste cel global; „Lățime globală” o readuce la valoarea globală. Zonele fără lățime proprie urmează lățimea globală. Cu o lățime aleasă, zonele au exact acea lățime și stau centrate pe pagină, inclusiv prima zonă.
+### Bugs
+- Anunțuri: un anunț general se arată o singură dată unui utilizator: este marcat văzut în clipa afișării, nu la închiderea ferestrei (înainte putea reapărea dacă pagina era reîncărcată sau sesiunea se încheia cu fereastra deschisă).
+### Diverse
+- Actualizarea adaugă o coloană în tabelul zonelor dashboard-ului (lățimea zonei).
+
 ## 0.6.18 | 21.11.2026
 ### Funcționalități noi
 - Personalizare dashboard: zonele pot sta și pe rânduri diferite ale paginii. Fiecare zonă (în afară de prima) are câmpul „Așezare”: lângă zona dinainte, pe rând nou centrată, pe rând nou la stânga sau pe rând nou la dreapta. O zonă de pe rând nou păstrează lățimea de care au nevoie tile-urile ei, cu același padding, și nu se întinde pe toată pagina.

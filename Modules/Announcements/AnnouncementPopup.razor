@@ -8,7 +8,7 @@
    A normal announcement is marked seen when the window closes; a mandatory one comes again at every sign-in until "Am citit". *@
 @if (open && items.Count > 0)
 {
-    <AnnouncementDialog Items="items" HideNormal="hideNormal" Busy="busy" HideNormalChanged="HideChangedAsync" Acknowledged="AcknowledgeAsync" Closed="CloseAsync" />
+    <AnnouncementDialog Items="items" HideNormal="hideNormal" Busy="busy" HideNormalChanged="HideChangedAsync" Acknowledged="AcknowledgeAsync" Shown="ShownAsync" Closed="CloseAsync" />
 }
 
 @code {
@@ -50,6 +50,14 @@
         try { await Announcements.AcknowledgeAsync(item.Id, lifetime.Token); }
         catch (Exception exception) when (exception is not OperationCanceledException) { Logger.LogWarning("An announcement could not be confirmed ({ErrorType}).", exception.GetType().Name); }
         finally { busy = false; }
+    }
+
+    // A general announcement is marked seen the moment it is shown (not when the window is closed): it comes once for a user, also when the page is reloaded or the session ends with the window open.
+    private async Task ShownAsync(AnnouncementView item)
+    {
+        if (item.Mandatory) return;
+        try { await Announcements.MarkSeenAsync(item.Id, lifetime.Token); }
+        catch (Exception exception) when (exception is not OperationCanceledException) { Logger.LogDebug("An announcement was not marked seen ({ErrorType}).", exception.GetType().Name); }
     }
 
     private async Task CloseAsync(int shown)

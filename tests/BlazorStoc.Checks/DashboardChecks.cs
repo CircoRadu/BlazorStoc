@@ -28,6 +28,17 @@ public static class DashboardChecks
         check(placed.Bands().Count == 3 && placed.Zones[1].Placement == DashboardZone.Beside && placed.BandAlign(placed.Bands()[2]) == DashboardZone.Left, "Dashboard zones: an unknown placement means beside; every zone on a new row has its own band");
         var roundTrip = DashboardLayout.From(placed.ToState());
         check(roundTrip.Zones.Select(zone => zone.Placement).SequenceEqual([DashboardZone.Beside, DashboardZone.Beside, DashboardZone.Center, DashboardZone.Left]), "Dashboard zones: the placement of every zone is kept in the state that is saved");
+        // The width of the zones: one for each zone over the global one; a zone without its own width follows the global width; none = automatic.
+        var widths = DashboardLayout.From(DashboardState.Empty);
+        widths.AddZone("B");
+        check(widths.EffectiveWidth(widths.Zones[0]) == 0 && widths.BandAlign(widths.Bands()[0]) == DashboardZone.Beside, "Dashboard zones: with no width chosen the zones are automatic and the first row fills the page");
+        widths.Sizes = widths.Sizes with { ZoneWidth = 700 };
+        check(widths.EffectiveWidth(widths.Zones[0]) == 700 && widths.EffectiveWidth(widths.Zones[1]) == 700 && widths.BandAlign(widths.Bands()[0]) == DashboardZone.Center, "Dashboard zones: the global width reaches every zone that has no width of its own, and the row is centred");
+        check(widths.SetZoneWidth(1, 520) && widths.EffectiveWidth(widths.Zones[1]) == 520 && widths.EffectiveWidth(widths.Zones[0]) == 700 && !widths.SetZoneWidth(7, 500), "Dashboard zones: the width of one zone overrides the global width and only that zone changes");
+        check(widths.SetZoneWidth(1, 10) && widths.Zones[1].Width == DashboardZone.MinWidth && widths.SetZoneWidth(1, 99999) && widths.Zones[1].Width == DashboardZone.MaxWidth && widths.SetZoneWidth(1, 0) && widths.EffectiveWidth(widths.Zones[1]) == 700, "Dashboard zones: a width is kept between the minimum and the maximum and 0 gives the zone back to the global width");
+        widths.SetZoneWidth(0, 640); widths.Sizes = widths.Sizes with { ZoneWidth = 0 };
+        var widthsBack = DashboardLayout.From(widths.ToState());
+        check(widthsBack.Zones[0].Width == 640 && widthsBack.Zones[1].Width == 0 && widthsBack.EffectiveWidth(widthsBack.Zones[1]) == 0 && new DashboardSizes(0, 0, 0, 800).Text.Contains(";zw=800") && new DashboardSizes(0, 0, 0, 50).Valid().ZoneWidth == DashboardZone.MinWidth, "Dashboard zones: the widths are kept in the state that is saved, the global one in the sizes text");
         check(DashboardLayout.From(new DashboardState(4, [], [], true, [new DashboardZone(0, "A", 4), new DashboardZone(1, "B", 4)])).Zones[1].Placement == DashboardZone.Beside, "Dashboard zones: an arrangement saved before the placement has every zone beside");
         check(layout.AddZone("Stoc") && layout.Zones.Count == 2 && layout.Zones[1].Title == "Stoc", "Dashboard zones: a zone is added at the end with its title");
         layout.SetColumns(1, 2);

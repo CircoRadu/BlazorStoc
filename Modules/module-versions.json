@@ -1386,8 +1386,8 @@
                                                   ]
                                   },
                     "Announcements":  {
-                                          "version":  "1.3.1",
-                                          "hash":  "817199c64d57fcbd0e600e2162affd7a9dfc4ca2fecb5a2e434a382c5e86f710",
+                                          "version":  "1.3.2",
+                                          "hash":  "14e07cdbebcea5723fd4e4880370cb96bb50f5a7a4379aba0d3e00283c996938",
                                           "history":  [
                                                           {
                                                               "version":  "1.0.0",
@@ -1428,6 +1428,11 @@
                                                               "version":  "1.3.1",
                                                               "date":  "21.11.2026",
                                                               "note":  "Coloana Vazut / citit: valorile centrate sub antet, iconita cine a citit la 5 px de valoare"
+                                                          },
+                                                          {
+                                                              "version":  "1.3.2",
+                                                              "date":  "21.11.2026",
+                                                              "note":  "Anunt general marcat vazut in clipa afisarii: se arata o singura data pentru un utilizator"
                                                           }
                                                       ]
                                       }

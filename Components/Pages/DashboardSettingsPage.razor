@@ -76,6 +76,10 @@
                     <input id="dashboard-row-gap" type="range" min="@DashboardSizes.MinGap" max="@DashboardSizes.MaxGap" step="1" value="@plan.Sizes.GapOrDefault" @oninput="GapChanged" />
                     <output>@(plan.Sizes.GapOrDefault) px</output>
                 </label>
+                <label class="dashboard-slider" for="dashboard-zone-width">Lățime zone
+                    <input id="dashboard-zone-width" type="range" min="@DashboardZone.MinWidth" max="@ZoneWidthMax" step="10" value="@(plan.Sizes.ZoneWidth > 0 ? Math.Min(plan.Sizes.ZoneWidth, ZoneWidthMax) : ZoneWidthMax)" @oninput="ZoneWidthGlobalChanged" />
+                    <output>@(plan.Sizes.ZoneWidth > 0 ? Math.Min(plan.Sizes.ZoneWidth, ZoneWidthMax) + " px" : "automată")</output>
+                </label>
                 <button type="button" class="refresh act-nav" disabled="@(plan.Sizes == DashboardSizes.Standard)" title="Revine la dimensiunile standard ale tile-urilor și ale spațiilor" @onclick="ResetSizes">Dimensiuni standard</button>
             </div>
             <div class="dashboard-toolbar">
@@ -130,6 +134,13 @@
                             </label>
                             <button type="button" class="row-icon delete" disabled="@(plan.Zones.Count <= 1)" title="@(plan.Zones.Count <= 1 ? "Dashboard-ul are cel puțin o zonă" : $"Șterge zona {zone.Title}; tile-urile ei merg în zona de așteptare")" aria-label="@($"Șterge zona {z + 1}")" @onclick="() => RemoveZone(z)"></button>
                         </header>
+                        <div class="dashboard-zone-widthrow">
+                            <label class="dashboard-slider" for="@($"dashboard-zone-width-{z}")">Lățime zonă
+                                <input id="@($"dashboard-zone-width-{z}")" type="range" min="@DashboardZone.MinWidth" max="@ZoneWidthMax" step="10" value="@ZoneSliderValue(zone)" @oninput="e => ZoneWidthChanged(z, e)" />
+                                <output>@ZoneWidthText(zone)</output>
+                            </label>
+                            <button type="button" class="refresh act-nav" disabled="@(zone.Width == 0)" title="@(zone.Width == 0 ? "Zona urmează deja lățimea globală" : "Revine la lățimea globală a zonelor")" @onclick="() => ZoneWidthChanged(z, null)">Lățime globală</button>
+                        </div>
                         @if (missingTitle) { <small class="dashboard-zone-error" role="alert">Titlul zonei este obligatoriu.</small> }
                         <div class="dashboard-zonebody">
                         @for (var index = 0; index < zone.Rows.Count; index++)
@@ -287,7 +298,16 @@
     private void ColumnsChanged(int zone, ChangeEventArgs e) { notice = null; plan.SetColumns(zone, int.TryParse(e.Value?.ToString(), out var value) ? value : MariaUserDashboardRepository.DefaultColumns); }
     // A zone on a row of its own is as wide as its tiles need (the chosen tile width or 250 px), never stretched; the editor keeps room for the controls of its header.
     private string? OwnRowStyle(DashboardLayout.LayoutZone zone, bool ownRow) =>
-        ownRow ? $"flex:0 0 auto;width:{zone.Columns * (plan.Sizes.TileWidth > 0 ? plan.Sizes.TileWidth : 250) + (zone.Columns - 1) * 14 + 35}px;min-width:min(100%,600px);max-width:100%" : null;
+        plan.EffectiveWidth(zone) is > 0 and var chosen ? $"flex:0 0 auto;width:{chosen}px;min-width:min(100%,600px);max-width:100%"
+        : ownRow ? $"flex:0 0 auto;width:{zone.Columns * (plan.Sizes.TileWidth > 0 ? plan.Sizes.TileWidth : 250) + (zone.Columns - 1) * 14 + 35}px;min-width:min(100%,600px);max-width:100%" : null;
+    // The sliders of the width of the zones end at the width the editor row of zones has now (measured in the page); at the end of the global slider the width is automatic. A width chosen for one zone
+    // overrides the global one; a zone without its own width follows the global width.
+    private int zonesAvailable;
+    private int ZoneWidthMax => zonesAvailable >= DashboardZone.MinWidth + 10 ? Math.Min(DashboardZone.MaxWidth, zonesAvailable / 10 * 10) : 1600;
+    private int ZoneSliderValue(DashboardLayout.LayoutZone zone) => Math.Min(zone.Width > 0 ? zone.Width : plan.Sizes.ZoneWidth > 0 ? plan.Sizes.ZoneWidth : ZoneWidthMax, ZoneWidthMax);
+    private string ZoneWidthText(DashboardLayout.LayoutZone zone) => zone.Width > 0 ? Math.Min(zone.Width, ZoneWidthMax) + " px" : plan.Sizes.ZoneWidth > 0 ? $"globală, {Math.Min(plan.Sizes.ZoneWidth, ZoneWidthMax)} px" : "globală, automată";
+    private void ZoneWidthGlobalChanged(ChangeEventArgs e) { notice = null; var width = Parse(e); plan.Sizes = (plan.Sizes with { ZoneWidth = width >= ZoneWidthMax ? 0 : width }).Valid(); }
+    private void ZoneWidthChanged(int zone, ChangeEventArgs? e) { notice = null; plan.SetZoneWidth(zone, e is null ? 0 : Parse(e)); }
     private void PlacementChanged(int zone, ChangeEventArgs e) { notice = null; plan.SetPlacement(zone, e.Value?.ToString()); }
     private void AddZone() { notice = null; error = plan.AddZone($"Zona {plan.Zones.Count + 1}") ? null : $"Dashboard-ul poate avea cel mult {DashboardZone.MaxZones} zone."; }
     private void RemoveZone(int zone) { notice = null; plan.RemoveZone(zone); }
@@ -326,6 +346,12 @@
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
+        try
+        {
+            var measuredZones = await JS.InvokeAsync<int>("dashboardSizes.zonesAvailable");
+            if (measuredZones > 0 && Math.Abs(measuredZones - zonesAvailable) >= 10) { zonesAvailable = measuredZones; StateHasChanged(); }
+        }
+        catch (Exception exception) when (exception is JSException or InvalidOperationException or OperationCanceledException) { }
         // The available width is read after every render while no width is set (a set width narrows the tiles and hides what the zone gives them).
         if (plan.Sizes.TileWidth <= 0)
         {

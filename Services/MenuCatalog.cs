@@ -100,8 +100,11 @@ public static class MenuCatalog
 public sealed record DashboardTile(string Key, int Row, int Col, int Zone = 0);
 
 /// <summary>A zone of the main page: zones stand side by side, each with a required title and its own grid (Columns tiles per row); Index = the order from left to right.</summary>
-public sealed record DashboardZone(int Index, string Title, int Columns, string Placement = DashboardZone.Beside)
+public sealed record DashboardZone(int Index, string Title, int Columns, string Placement = DashboardZone.Beside, int Width = 0)
 {
+    // The width of one zone in pixels (0 = the global width of the zones applies; none = automatic).
+    public const int MinWidth = 300, MaxWidth = 2400;
+    public static int ValidWidth(int value) => value <= 0 ? 0 : Math.Clamp(value, MinWidth, MaxWidth);
     public const string DefaultTitle = "Dashboard";
     public const int MaxTitle = 60, MaxZones = 6;
     // Where a zone stands: beside = next to the zone before it (the first zone is always beside); center, left and right = on a new row of the page, aligned that way, as wide as its tiles need.
@@ -112,13 +115,13 @@ public sealed record DashboardZone(int Index, string Title, int Columns, string 
 }
 
 /// <summary>The sizes the user chose for every tile and every space of the page (0 = the standard look): the widest a tile may be, its height, and the height of the spaces between rows.</summary>
-public sealed record DashboardSizes(int TileWidth, int TileHeight, int RowGap)
+public sealed record DashboardSizes(int TileWidth, int TileHeight, int RowGap, int ZoneWidth = 0)
 {
     public const int MinWidth = 140, MaxWidth = 600, MinHeight = 56, MaxHeight = 240, MinGap = 5, MaxGap = 60, DefaultGap = 15;
     public static DashboardSizes Standard { get; } = new(0, 0, 0);
     public int GapOrDefault => RowGap > 0 ? RowGap : DefaultGap;
-    public DashboardSizes Valid() => new(TileWidth <= 0 ? 0 : Math.Clamp(TileWidth, MinWidth, MaxWidth), TileHeight <= 0 ? 0 : Math.Clamp(TileHeight, MinHeight, MaxHeight), RowGap <= 0 ? 0 : Math.Clamp(RowGap, MinGap, MaxGap));
-    public string Text => (TileWidth > 0 ? ";tw=" + TileWidth : "") + (TileHeight > 0 ? ";th=" + TileHeight : "") + (RowGap > 0 ? ";gap=" + RowGap : "");
+    public DashboardSizes Valid() => new(TileWidth <= 0 ? 0 : Math.Clamp(TileWidth, MinWidth, MaxWidth), TileHeight <= 0 ? 0 : Math.Clamp(TileHeight, MinHeight, MaxHeight), RowGap <= 0 ? 0 : Math.Clamp(RowGap, MinGap, MaxGap), DashboardZone.ValidWidth(ZoneWidth));
+    public string Text => (TileWidth > 0 ? ";tw=" + TileWidth : "") + (TileHeight > 0 ? ";th=" + TileHeight : "") + (RowGap > 0 ? ";gap=" + RowGap : "") + (ZoneWidth > 0 ? ";zw=" + ZoneWidth : "");
 }
 
 /// <summary>A row of the main page that holds no tiles: a label (text with an optional colour) or a space of fixed height. Index = the place among all the rows.</summary>
@@ -168,7 +171,7 @@ public sealed class MariaUserDashboardRepository(IConfiguration configuration, I
         await using var connection = await OpenAsync(configuration, cancellationToken).ConfigureAwait(false);
         var columns = DefaultColumns;
         var custom = false;
-        int tileWidth = 0, tileHeight = 0, rowGap = 0;
+        int tileWidth = 0, tileHeight = 0, rowGap = 0, zoneWidth = 0;
         await using (var command = Command(connection, "SELECT settings FROM user_display_settings WHERE user_id=@user AND scope=@scope", ("@user", userId), ("@scope", SettingsScope)))
         {
             // "columns=N" and, once the user saved an arrangement (even an empty one), ";custom=1".
@@ -180,6 +183,7 @@ public sealed class MariaUserDashboardRepository(IConfiguration configuration, I
                 else if (part.StartsWith("tw=", StringComparison.Ordinal) && int.TryParse(part[3..], out var width)) tileWidth = width;
                 else if (part.StartsWith("th=", StringComparison.Ordinal) && int.TryParse(part[3..], out var height)) tileHeight = height;
                 else if (part.StartsWith("gap=", StringComparison.Ordinal) && int.TryParse(part[4..], out var gap)) rowGap = gap;
+                else if (part.StartsWith("zw=", StringComparison.Ordinal) && int.TryParse(part[3..], out var zw)) zoneWidth = zw;
             }
         }
         var tiles = new List<DashboardTile>();
@@ -193,18 +197,18 @@ public sealed class MariaUserDashboardRepository(IConfiguration configuration, I
         await using (var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false))
             while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false)) rows.Add(new DashboardRow(reader.GetInt32(0), reader.GetString(1), reader.GetString(2), reader.GetString(3), reader.GetInt32(4)));
         var zones = new List<DashboardZone>();
-        await using (var command = Command(connection, "SELECT zone_index, title, columns_count, placement FROM user_dashboard_zones WHERE user_id=@user ORDER BY zone_index", ("@user", userId)))
+        await using (var command = Command(connection, "SELECT zone_index, title, columns_count, placement, width_px FROM user_dashboard_zones WHERE user_id=@user ORDER BY zone_index", ("@user", userId)))
         await using (var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false))
-            while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false)) zones.Add(new DashboardZone(reader.GetInt32(0), reader.GetString(1), ValidColumns(reader.GetInt32(2)), reader.GetInt32(0) == 0 ? DashboardZone.Beside : DashboardZone.ValidPlacement(reader.GetString(3))));
+            while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false)) zones.Add(new DashboardZone(reader.GetInt32(0), reader.GetString(1), ValidColumns(reader.GetInt32(2)), reader.GetInt32(0) == 0 ? DashboardZone.Beside : DashboardZone.ValidPlacement(reader.GetString(3)), DashboardZone.ValidWidth(reader.GetInt32(4))));
         // An arrangement saved before the flag existed has tiles or rows: it is the user's own.
-        return new DashboardState(columns, tiles, rows, custom || tiles.Count > 0 || rows.Count > 0, zones, new DashboardSizes(tileWidth, tileHeight, rowGap).Valid());
+        return new DashboardState(columns, tiles, rows, custom || tiles.Count > 0 || rows.Count > 0, zones, new DashboardSizes(tileWidth, tileHeight, rowGap, zoneWidth).Valid());
     }
 
     public async Task SaveAsync(DashboardState state, CancellationToken cancellationToken = default)
     {
         var userId = await UserIdAsync(cancellationToken).ConfigureAwait(false) ?? throw new AccessDeniedException("Dashboard-ul se personalizează numai pentru un utilizator autentificat.");
         var columns = ValidColumns(state.Columns);
-        var zones = state.ZoneList.OrderBy(zone => zone.Index).Select((zone, order) => (Old: zone.Index, Zone: new DashboardZone(order, (zone.Title ?? "").Trim(), ValidColumns(zone.Columns), order == 0 ? DashboardZone.Beside : DashboardZone.ValidPlacement(zone.Placement)))).ToList();
+        var zones = state.ZoneList.OrderBy(zone => zone.Index).Select((zone, order) => (Old: zone.Index, Zone: new DashboardZone(order, (zone.Title ?? "").Trim(), ValidColumns(zone.Columns), order == 0 ? DashboardZone.Beside : DashboardZone.ValidPlacement(zone.Placement), DashboardZone.ValidWidth(zone.Width)))).ToList();
         if (zones.Count > DashboardZone.MaxZones) throw new InvalidOperationException("Dashboard-ul poate avea cel mult " + DashboardZone.MaxZones + " zone.");
         if (state.Custom && zones.Any(item => item.Zone.Title.Length == 0 || item.Zone.Title.Length > DashboardZone.MaxTitle)) throw new InvalidOperationException("Fiecare zonă are un titlu obligatoriu (cel mult " + DashboardZone.MaxTitle + " de caractere).");
         var zoneColumns = zones.ToDictionary(item => item.Old, item => item.Zone.Columns);
@@ -225,8 +229,8 @@ public sealed class MariaUserDashboardRepository(IConfiguration configuration, I
         if (state.Custom)
             foreach (var (_, zone) in zones)
             {
-                await using var insert = Command(connection, "INSERT INTO user_dashboard_zones (user_id, zone_index, title, columns_count, placement, updated_utc) VALUES (@user, @zone, @title, @columns, @placement, @now)",
-                    ("@user", userId), ("@zone", zone.Index), ("@title", zone.Title), ("@columns", zone.Columns), ("@placement", zone.Placement), ("@now", now));
+                await using var insert = Command(connection, "INSERT INTO user_dashboard_zones (user_id, zone_index, title, columns_count, placement, width_px, updated_utc) VALUES (@user, @zone, @title, @columns, @placement, @width, @now)",
+                    ("@user", userId), ("@zone", zone.Index), ("@title", zone.Title), ("@columns", zone.Columns), ("@placement", zone.Placement), ("@width", zone.Width), ("@now", now));
                 insert.Transaction = transaction;
                 await insert.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
             }

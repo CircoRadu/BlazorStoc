@@ -141,6 +141,8 @@ else
     private string ZoneStyle(DashboardLayout.LayoutZone zone, bool ownRow = false)
     {
         var width = layout?.Sizes.TileWidth ?? 0;
+        // A width chosen for the zone, or the global width of the zones, makes it exactly that wide (never wider than the page).
+        if (layout?.EffectiveWidth(zone) is > 0 and var chosen) return $"flex:0 0 auto;width:{chosen}px;max-width:100%";
         if (ownRow) return $"flex:0 0 auto;width:{zone.Columns * (width > 0 ? width : DefaultTileWidth) + (zone.Columns - 1) * 14 + 35}px;max-width:100%";
         return width > 0 ? $"flex:0 1 {zone.Columns * width + (zone.Columns - 1) * 14 + 32}px" : $"flex:{zone.Columns} 1 {zone.Columns * 120}px";
     }

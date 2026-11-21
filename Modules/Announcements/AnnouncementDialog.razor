@@ -48,6 +48,8 @@
     [Parameter] public EventCallback<AnnouncementView> Acknowledged { get; set; }
     /// <summary>Called when the window closes; the argument is how many announcements were shown (the first N of the list).</summary>
     [Parameter] public EventCallback<int> Closed { get; set; }
+    /// <summary>Called when an announcement is shown (the first one when the window opens, the next ones at "Următorul"): a general announcement is marked seen then, so it is shown only once.</summary>
+    [Parameter] public EventCallback<AnnouncementView> Shown { get; set; }
 
     [Inject] private IJSRuntime JS { get; set; } = default!;
     private DotNetObjectReference<AnnouncementDialog>? self;
@@ -61,6 +63,7 @@
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         if (!firstRender) return;
+        if (!Preview && Items.Count > 0) await Shown.InvokeAsync(Items[index]);
         self = DotNetObjectReference.Create(this);
         try { await JS.InvokeVoidAsync("announcementEditor.watchZoom", self); } catch (Exception exception) when (exception is JSException or InvalidOperationException) { }
     }
@@ -85,7 +88,12 @@
     private int index;
     private int shown = 1;
 
-    private void Next() { if (index < Items.Count - 1) { index++; shown = Math.Max(shown, index + 1); } }
+    private async Task Next()
+    {
+        if (index >= Items.Count - 1) return;
+        index++; shown = Math.Max(shown, index + 1);
+        if (!Preview) await Shown.InvokeAsync(Items[index]);
+    }
 
     private Task HideChangedAsync(bool value) => HideNormalChanged.InvokeAsync(value);
 
@@ -93,7 +101,7 @@
     {
         if (Preview || Items.Count == 0) return;
         await Acknowledged.InvokeAsync(Items[index]);
-        if (index < Items.Count - 1) Next(); else await CloseAsync();
+        if (index < Items.Count - 1) await Next(); else await CloseAsync();
     }
 
     private Task CloseAsync() => Closed.InvokeAsync(shown);

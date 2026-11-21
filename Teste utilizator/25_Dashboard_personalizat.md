@@ -13,3 +13,5 @@
 | 4 | Prima zona nu are campul "Asezare"; muta o zona asezata pe rand nou in prima pozitie | Zona din prima pozitie ramane pe primul rand, pe toata latimea | |
 | 5 | Muta sliderul "Latime tile" | Sliderul se opreste la latimea unei coloane; fiecare pas schimba latimea tile-urilor; la capat latimea e automata | |
 | 6 | Muta sliderul "Inaltime spatiu" | Se schimba spatiul dintre randurile de tile-uri, in editor si pe Dashboard | |
+| 7 | Muta sliderul "Latime zone" (global) | Toate zonele iau latimea aleasa si stau centrate, inclusiv prima; la capatul sliderului latimea e automata | |
+| 8 | La o zona muta sliderul "Latime zona" | Doar acea zona isi schimba latimea (peste cea globala); "Latime globala" o aduce inapoi la cea globala | |
