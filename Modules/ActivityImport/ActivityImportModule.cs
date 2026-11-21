@@ -12,7 +12,7 @@ public sealed class ActivityImportModule : IModule
 
     public string Id => ModuleId;
     public string Name => "Preluare tichete ActivityApp";
-    public Version Version { get; } = new(0, 19, 7);
+    public Version Version { get; } = new(0, 20, 2);
     public IReadOnlyList<ModuleNavItem> Nav { get; } = [];
 
     public void Register(IServiceCollection services, IConfiguration configuration)
@@ -35,6 +35,8 @@ public sealed class ActivityImportModule : IModule
         services.AddScoped<IBeneficiaryCheckService>(provider => new GuardedBeneficiaryCheckService(ActivatorUtilities.CreateInstance<MariaBeneficiaryCheckService>(provider), provider.GetRequiredService<ModuleRegistry>()));
         services.AddScoped<IValidationQueues, MariaValidationQueues>();
         services.AddHostedService<ActivitySyncWorker>();
+        services.AddSingleton<IBeneficiarySyncOnOpen, PartnerSyncOnOpen>();
+        services.AddScoped<IBeneficiaryTakeService, BeneficiaryTakeService>();
         services.AddScoped<ITicketOutcomeProcessor, TicketOutcomeProcessor>();
     }
 

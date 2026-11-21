@@ -16,7 +16,7 @@
 
 <PageTitle>Beneficiari · BlazorStoc</PageTitle>
 <UnsavedChangesHost />
-<div class="page-heading"><div><p class="eyebrow">PARTENERI STOC</p><h1>Beneficiari</h1><p class="muted">Gestionează persoanele fizice și juridice către care vor fi operate mișcările de stoc.</p></div><div class="heading-actions">@if (permAdd) { <button class="primary" disabled="@(loading || editing || deleting is not null)" @onclick="() => OpenEditorAsync(null)">+ Adaugă beneficiar</button> }</div></div>
+<div class="page-heading"><div><p class="eyebrow">PARTENERI STOC</p><h1>Beneficiari</h1><p class="muted">Gestionează persoanele fizice și juridice către care vor fi operate mișcările de stoc.</p></div><div class="heading-actions"><ActivityTakeButton OnTaken="ReloadBeneficiariesAsync" />@if (permAdd) { <button class="primary" disabled="@(loading || editing || deleting is not null)" @onclick="() => OpenEditorAsync(null)">+ Adaugă beneficiar</button> }</div></div>
 @if (error is not null) { <div class="error-banner" role="alert">@error <button class="primary" @onclick="RetryLoadAsync">Reîncearcă</button></div> }
 @if (notice is not null) { <div class="success-banner" role="status">@notice</div> }
 @if (editing && editingBeneficiary is null)
@@ -69,7 +69,25 @@ else if (editing) { <BeneficiaryEditor @key="editorKey" Original="editingBenefic
 
 </PageBoundary>
 
+<BeneficiarySyncOnOpen OnNewBeneficiaries="ReloadBeneficiariesAsync" />
+
+@if (pickerAction is not null)
+{
+    <AppDialog Title="@PickerTitle(pickerAction)" TitleId="benef-picker-title" HelpTopic="beneficiari-alegere-actiune" HelpAbout="Alegerea beneficiarului pentru o acțiune" PanelClass="benef-picker-dialog" OnClose="ClosePicker">
+        <p>Alege beneficiarul pentru care continui; se deschide pagina lui, cu formularul acțiunii.</p>
+        <SearchableSelect Id="benef-picker" Label="Beneficiar" Placeholder="Caută sau alege beneficiarul…" EmptyText="Niciun beneficiar găsit."
+                          Options="@(beneficiaries.Select(item => new SelectOption(item.Id, item.Name)).ToArray())" SelectedId="pickerBeneficiaryId" SelectedIdChanged="id => { pickerBeneficiaryId = id; return Task.CompletedTask; }" />
+        <div class="editor-actions">
+            <button type="button" class="primary" disabled="@(pickerBeneficiaryId is null)" @onclick="ContinuePicker">Continuă</button>
+            <button type="button" class="refresh act-close" @onclick="ClosePicker">Renunță</button>
+        </div>
+    </AppDialog>
+}
+
 @code {
+    // Beneficiaries entered in ActivityApp a moment ago are taken in the background after the page opened; the list is loaded again when there are new ones.
+    private async Task ReloadBeneficiariesAsync() { if (!loaded) return; await LoadAsync(false); StateHasChanged(); }
+
     private bool permAdd, permEdit, permDelete;
     private async Task LoadPermissionsAsync()
     {
@@ -80,6 +98,19 @@ else if (editing) { <BeneficiaryEditor @key="editorKey" Original="editingBenefic
     [SupplyParameterFromQuery(Name = "edit")] public int? EditId { get; set; }
     // /beneficiari?adauga=1&inapoi=<page>: opened from a form (the exit form of a product) that continues afterwards.
     [SupplyParameterFromQuery(Name = "adauga")] public string? AddFlag { get; set; }
+    // /beneficiari?actiune=adauga-proiect|adauga-punct|adauga-contract|adauga-analiza: the tile asks for the beneficiary first, then opens the form on his page.
+    [SupplyParameterFromQuery(Name = MenuCatalog.ActionQuery)] public string? ActionParameter { get; set; }
+    private string? pickerAction;
+    private int? pickerBeneficiaryId;
+    private static readonly string[] PickerActions = ["adauga-proiect", "adauga-punct", "adauga-contract", "adauga-analiza"];
+    private static string PickerTitle(string? action) => action switch { "adauga-proiect" => "Adaugă proiect", "adauga-punct" => "Adaugă punct de lucru", "adauga-contract" => "Adaugă contract de mentenanță", "adauga-analiza" => "Adaugă analiză de risc", _ => "Alege beneficiarul" };
+    private void ClosePicker() { pickerAction = null; pickerBeneficiaryId = null; }
+    private void ContinuePicker()
+    {
+        if (pickerAction is null || pickerBeneficiaryId is not { } id) return;
+        var query = pickerAction == "adauga-proiect" ? "adauga-proiect=1" : $"{MenuCatalog.ActionQuery}={pickerAction}";
+        Navigation.NavigateTo($"/beneficiari/{id}?{query}");
+    }
     [SupplyParameterFromQuery(Name = ReturnNavigation.QueryName)] public string? ReturnParameter { get; set; }
     private string? returnTo;
     private bool addFlagHandled;
@@ -134,6 +165,12 @@ else if (editing) { <BeneficiaryEditor @key="editorKey" Original="editingBenefic
 
     protected override async Task OnParametersSetAsync()
     {
+        if (pickerAction is null && ActionParameter is not null && PickerActions.Contains(ActionParameter) && loaded)
+        {
+            pickerAction = ActionParameter;
+            Navigation.NavigateTo(Navigation.GetUriWithQueryParameter(MenuCatalog.ActionQuery, (string?)null), replace: true);
+            return;
+        }
         if (!addFlagHandled && AddFlag == "1" && loaded)
         {
             addFlagHandled = true;

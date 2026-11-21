@@ -68,6 +68,7 @@ public static class Permissions
         new("setari-jurnal", "Setari: Jurnal activitate", "Setari", [new(View, "Vizualizare", false), new(Edit, "Modificare", false)]),
         new("setari-bug-raport", "Setari: Rapoarte erori", "Setari", [new(View, "Vizualizare", false), new(Edit, "Schimbare stare / stergere raport", false), new(Export, "Export ZIP", false)]),
         new("setari-propuneri", "Setari: Propuneri", "Setari", [new(View, "Vizualizare", false), new(Edit, "Schimbare stare / raspuns / stergere propunere", false), new(Export, "Export ZIP", false)]),
+        new("setari-anunturi", "Setari: Anunturi", "Setari", [new(View, "Vizualizare", false), new(Edit, "Creare / modificare / publicare / stergere anunt", false)]),
         new("setari-actualizare", "Setari: Actualizare aplicatie", "Setari", [new(View, "Vizualizare", false), new("apply", "Incarcare si aplicare pachet de actualizare", false)]),
         new("utilizatori", "Utilizatori", "Administrare sistem", Crud(admin: true)),
         new("tipuri-utilizatori", "Tipuri de utilizatori", "Administrare sistem", Crud(admin: true)),
@@ -120,11 +121,11 @@ public static class Permissions
     public static bool IsKnown(string key) => AllKeys.Contains(key, StringComparer.Ordinal);
 
     // Modules reserved to the administrator: never offered to, saved for, or honoured for any other user type.
-    public static readonly IReadOnlySet<string> AdminOnlyModules = new HashSet<string>(StringComparer.Ordinal) { "setari-anaf", "setari-backup", "setari-module", "setari-actualizare", "setari-bug-raport", "setari-propuneri", "setari-import-activityapp", "setari-import-elcomtur", "setari-import-espstoc", "setari-jurnal" };
+    public static readonly IReadOnlySet<string> AdminOnlyModules = new HashSet<string>(StringComparer.Ordinal) { "setari-anaf", "setari-backup", "setari-module", "setari-actualizare", "setari-bug-raport", "setari-propuneri", "setari-anunturi", "setari-import-activityapp", "setari-import-elcomtur", "setari-import-espstoc", "setari-jurnal" };
 
     public static bool IsAdminOnly(string key) => AdminOnlyModules.Contains(key[..Math.Max(key.IndexOf('.'), 0)]);
     /// <summary>The keys of the reports of errors and of the proposals of Setari -> Dezvoltare: honoured only for the accounts marked as developers (Utilizatori).</summary>
-    public static bool IsDeveloperOnly(string key) => key.StartsWith("setari-bug-raport.", StringComparison.Ordinal) || key.StartsWith("setari-propuneri.", StringComparison.Ordinal);
+    public static bool IsDeveloperOnly(string key) => key.StartsWith("setari-bug-raport.", StringComparison.Ordinal) || key.StartsWith("setari-propuneri.", StringComparison.Ordinal) || key.StartsWith("setari-anunturi.", StringComparison.Ordinal);
 
     // Every key a type other than the administrator may hold.
     public static IReadOnlyList<string> GrantableKeys { get; } = [.. AllKeys.Where(key => !IsAdminOnly(key))];

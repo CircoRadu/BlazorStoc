@@ -13,8 +13,8 @@ window.displaySettings = {
 // (page + the heading of its card), the buttons live in a layer of their own outside the page markup (the page is drawn by Blazor, which must not meet foreign nodes), and the
 // table settings of the user are put on the tables as CSS custom properties. The panel itself is drawn by the Blazor component TableGearHost.
 window.tableGears = (function () {
-    var NAMES = ['table', 'header', 'images', 'icons', 'titles', 'tabs'];
-    var ref = null, styles = {}, layer = null, observer = null, scheduled = false, shown = true;
+    var NAMES = ['table', 'header', 'images', 'icons', 'titles', 'tabs', 'text'];
+    var ref = null, styles = {}, layer = null, observer = null, sizeObserver = null, placeTimer = 0, placing = false, scheduled = false, shown = true;
     var gears = new Map();   // table element -> { scope, label, button }
 
     function slug(text, max) {
@@ -29,7 +29,9 @@ window.tableGears = (function () {
         var heading = holder && holder.querySelector('.catalog-heading h2, h2, h3');
         return heading ? heading.textContent.replace(/\s+/g, ' ').replace(/(\s+\d+)+\s*$/, '').trim() : '';
     }
+    // The personalised dashboard (data-gear-target) has a gear like a table: its own sizes of text, header (the band of a tile) and icons over the global ones.
     function eligible(table) {
+        if (table.hasAttribute('data-gear-target')) return !table.closest('dialog, details:not([open])') && table.offsetWidth >= 260 && table.offsetHeight > 0;
         if (table.closest('dialog, #display-sample, .display-gear-panel, .table-gear-panel, [data-display-own], .table-gear-layer')) return false;
         if (table.parentElement && table.parentElement.closest('table')) return false;
         if (!table.querySelector('thead th')) return false;
@@ -70,13 +72,16 @@ window.tableGears = (function () {
             gear.button.style.top = Math.round(rect.top - LIFT) + 'px';
         });
     }
+    // A change of layout that touches no node (a text box resized by the user, a font or a picture that loads, a window that shrinks the content) moves the table without any mutation: the gear is placed
+    // again, once per frame, whenever the workspace changes its size.
+    function placeSoon() { if (placing) return; placing = true; requestAnimationFrame(function () { placing = false; place(); }); }
     function scan() {
         scheduled = false;
         if (!ref) return;
         var seen = {}, present = new Set();
-        document.querySelectorAll('.workspace table').forEach(function (table) {
+        document.querySelectorAll('.workspace table, .workspace [data-gear-target]').forEach(function (table) {
             if (!eligible(table)) return;
-            var label = headingOf(table);
+            var label = table.hasAttribute('data-gear-target') ? (table.getAttribute('data-gear-label') || 'dashboard') : headingOf(table);
             var base = ('t.' + pathSlug() + '.' + (slug(label, 30) || 'tabel')).slice(0, 72);
             var n = seen[base] = (seen[base] || 0) + 1;
             var scope = n > 1 ? base + '-' + n : base;
@@ -122,6 +127,10 @@ window.tableGears = (function () {
                 observer.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['class', 'open'] });
                 window.addEventListener('scroll', place, true);
                 window.addEventListener('resize', schedule);
+                if (window.ResizeObserver) { sizeObserver = new ResizeObserver(placeSoon); var area = document.querySelector('.workspace') || document.body; sizeObserver.observe(area); sizeObserver.observe(document.body); }
+                window.addEventListener('load', placeSoon);
+                // A banner that appears or goes away moves the table without a node of the table changing and without a change of the size of the workspace: a light check keeps the gear on the header.
+                placeTimer = setInterval(place, 300);
             }
             schedule();
         },
@@ -131,6 +140,8 @@ window.tableGears = (function () {
         dispose: function () {
             ref = null;
             if (observer) { observer.disconnect(); observer = null; }
+            if (sizeObserver) { sizeObserver.disconnect(); sizeObserver = null; }
+            if (placeTimer) { clearInterval(placeTimer); placeTimer = 0; }
             window.removeEventListener('scroll', place, true);
             window.removeEventListener('resize', schedule);
             gears.forEach(function (gear, table) { gear.button.remove(); reserve(holderOf(table), false); });

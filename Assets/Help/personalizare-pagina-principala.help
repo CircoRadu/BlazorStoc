@@ -1,0 +1,37 @@
+# Personalizare dashboard
+Ruta: /personalizare-pagina-principala
+Cautare: personalizare dashboard pagina principala tile caroiaj zone titlu slider latime inaltime spatiu eticheta rand zona de asteptare
+
+Aici îți faci propriul dashboard: alegi opțiunile care apar ca tile-uri, le împarți în zone așezate una lângă alta și le aranjezi în caroiaj. Fiecare zonă are titlu obligatoriu și propriul caroiaj. Alegerea se păstrează pentru contul tău; fără nicio aranjare salvată se afișează dashboard-ul standard.
+
+## Elemente
+### Opțiuni
+- Pe dashboard | comutator | Pornește sau oprește tile-ul unei opțiuni; o opțiune nou pornită apare în zona de așteptare.
+- Opțiunile pe categorii | listă | Intrările din meniu, paginile din Setări și acțiunile principale, grupate pe categorii pliabile.
+### Dimensiuni
+- Lățime tile | slider | Cât de lat poate fi cel mult un tile; se aplică la toate tile-urile. În poziția maximă lățimea este automată.
+- Înălțime tile | slider | Înălțimea tuturor tile-urilor.
+- Înălțime spațiu | slider | Spațiul dintre rânduri și înălțimea tuturor rândurilor „+ Spațiu” (standard 15 px).
+- Dimensiuni standard | buton | Revine la dimensiunile standard.
+### Zone și caroiaj
+- + Zonă | buton | Adaugă o zonă nouă, în dreapta; o pagină are cel mult 6 zone.
+- Golește dashboard | buton | Scoate toate tile-urile, etichetele și spațiile; zonele rămân. După salvare dashboard-ul rămâne gol.
+- Revino la dashboard-ul standard | buton | Renunță la aranjarea ta.
+- Zonă de așteptare | zonă | Aici ajung opțiunile pornite; le tragi în caroiaj. Un tile tras înapoi aici este pus deoparte.
+- Mânerul zonei | mâner | Trage zona ca s-o muți.
+- Titlul zonei | câmp | Obligatoriu; apare deasupra zonei pe dashboard.
+- Pe rând | listă | Câte tile-uri are un rând al zonei.
+- Șterge zona | iconita:delete | Șterge zona; tile-urile ei merg în zona de așteptare. Ultima zonă nu se șterge.
+- Mânerul rândului | mâner | Trage rândul, cu tile-urile lui, în aceeași zonă sau în alta.
+- Celulă | zonă | Trage un tile într-o celulă liberă sau peste alt tile ca să le schimbi locurile.
+- + Etichetă, + Spațiu, + Rând | butoane | Apar între rânduri, la trecerea mouse-ului.
+- Așezare (la o zonă) | listă | Lângă zona dinainte (implicit), pe rând nou centrată, pe rând nou la stânga sau pe rând nou la dreapta. O zonă de pe rând nou are lățimea de care au nevoie tile-urile ei și nu se întinde pe toată pagina; zonele așezate „lângă” ea o urmează pe același rând. Prima zonă nu are acest câmp.
+- Culoare (la un spațiu) | câmp | Alege o culoare pentru spațiul liber dintre rânduri: pe dashboard spațiul apare ca o bandă colorată. „Fără culoare” îl lasă transparent.
+- Salvează | buton | Salvează aranjarea; o zonă fără titlu nu se salvează.
+
+## Flux: Cum îți faci dashboard-ul
+1. Pornește comutatoarele opțiunilor dorite; ele apar în zona de așteptare.
+2. Adaugă zone cu „+ Zonă” și dă fiecăreia un titlu.
+3. Trage tile-urile în celulele zonelor; mută rândurile și zonele cu mânerele.
+4. Reglează lățimea, înălțimea tile-urilor și spațiul cu sliderele.
+5. Apasă „Salvează”.

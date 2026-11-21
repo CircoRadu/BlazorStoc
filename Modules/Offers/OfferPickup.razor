@@ -107,6 +107,7 @@ else if (step == 2)
             <span class="relation-check">Alt beneficiar</span>
             <SearchableSelect Id="offer-beneficiary-search" Label="Beneficiar" Placeholder="Caută sau alege beneficiarul…" EmptyText="Niciun beneficiar găsit."
                               Options="BeneficiaryOptions" SelectedId="beneficiaryId" SelectedIdChanged="id => { SelectBeneficiary(id); return Task.CompletedTask; }" />
+                    <ActivityTakeButton OnTaken="ReloadBeneficiariesAsync" />
             <button type="button" class="refresh act-confirm add-related" disabled="@busy" @onclick="() => addingBeneficiary = true">+ Beneficiar nou</button>
         </div>
         @if (beneficiaryId is not null && OfferRules.Key(beneficiaryText).Length > 0 && OfferRules.Key(beneficiaryText) != OfferRules.Key(ChosenBeneficiary?.Name))
@@ -221,7 +222,12 @@ else if (step == 5)
 
 </PageBoundary>
 
+<BeneficiarySyncOnOpen OnNewBeneficiaries="ReloadBeneficiariesAsync" />
+
 @code {
+    // Beneficiaries entered in ActivityApp a moment ago are taken in the background after the page opened; the list is loaded again when there are new ones.
+    private async Task ReloadBeneficiariesAsync() { try { beneficiaries = [.. (await Beneficiaries.GetBeneficiariesAsync(lifetime.Token)).OrderBy(item => item.Name, StringComparer.CurrentCultureIgnoreCase)]; } catch (Exception) { } StateHasChanged(); }
+
     private sealed class PickLine
     {
         public int Key { get; init; }

@@ -84,6 +84,7 @@ internal static class ServiceRegistration
         services.AddScoped<IUserRepository, MariaUserRepository>();
         services.AddScoped<IOwnAccountService, OwnAccountService>();
         services.AddScoped<IUserDisplayRepository, MariaUserDisplayRepository>();
+        services.AddScoped<IUserDashboardRepository, MariaUserDashboardRepository>();
         services.AddScoped<IUserDisplayService, UserDisplayService>();
         services.AddScoped<IUserTypeRepository, MariaUserTypeRepository>();
         services.AddScoped<IUserAuthenticator>(provider => (IUserAuthenticator)provider.GetRequiredService<IUserRepository>());
@@ -154,6 +155,7 @@ internal static class ServiceRegistration
         registry.Add(new BlazorStoc.Modules.BugReports.BugReportsModule(), services, configuration);
         registry.Add(new BlazorStoc.Modules.Proposals.ProposalsModule(), services, configuration);
         registry.Add(new BlazorStoc.Modules.Tasks.TasksModule(), services, configuration);
+        registry.Add(new BlazorStoc.Modules.Announcements.AnnouncementsModule(), services, configuration);
         return services;
     }
 

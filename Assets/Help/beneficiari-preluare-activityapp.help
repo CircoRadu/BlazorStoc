@@ -1,0 +1,15 @@
+# Preluare beneficiari din ActivityApp
+Cautare: preia din activityapp beneficiar nou partener preluare progres rezultat
+
+Fereastra care se deschide când apeși „Preia din ActivityApp”, lângă alegerea beneficiarului. Preia acum beneficiarii introduși în ActivityApp și încă absenți la noi, fără să aștepți sincronizarea programată. Ai nevoie de dreptul de a adăuga beneficiari.
+
+## Elemente
+### Fereastra
+- Etapa și bara de progres | informații | Ce face preluarea acum (citirea ActivityApp, beneficiarii, punctele de lucru) și cât a ajuns. | sel: #take-progress
+- Rezultatul | informații | La final: câți beneficiari s-au creat, câți s-au legat de cei existenți, câți așteaptă verificare, câte probleme au apărut și numele beneficiarilor noi. | sel: #take-result
+- Închide | buton | Închide fereastra; lista beneficiarilor din pagină se reîncarcă dacă au apărut beneficiari noi. În timpul preluării fereastra nu se poate închide.
+
+## Flux: Cum preiau un beneficiar nou din ActivityApp
+1. În pagina cu alegerea beneficiarului apasă „Preia din ActivityApp”.
+2. Urmărește progresul; dacă rulează deja o altă preluare, se așteaptă încheierea ei.
+3. Citește rezultatul și apasă „Închide”; beneficiarul nou apare în lista de alegere.

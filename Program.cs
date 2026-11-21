@@ -93,7 +93,7 @@ app.UseStatusCodePages(async context =>
         _ => ("Cererea nu a putut fi procesată.", "Încearcă din nou. Dacă problema persistă, contactează administratorul.")
     };
     response.ContentType = "text/html; charset=utf-8";
-    await response.WriteAsync($"<!DOCTYPE html><html lang=\"ro\"><head><meta charset=\"utf-8\" /><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\" /><title>{title} · BlazorStoc</title><link rel=\"stylesheet\" href=\"/app.css\" /></head><body class=\"login-body\"><main class=\"login-card\"><h1>{title}</h1><p class=\"muted\">{text}</p><a class=\"refresh\" href=\"/\">Înapoi la pagina principală</a></main></body></html>");
+    await response.WriteAsync($"<!DOCTYPE html><html lang=\"ro\"><head><meta charset=\"utf-8\" /><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\" /><title>{title} · BlazorStoc</title><link rel=\"stylesheet\" href=\"/app.css\" /></head><body class=\"login-body\"><main class=\"login-card\"><h1>{title}</h1><p class=\"muted\">{text}</p><a class=\"refresh\" href=\"/\">Înapoi la dashboard</a></main></body></html>");
 });
 app.UseStaticFiles();
 app.UseRouting();
@@ -317,6 +317,19 @@ app.MapGet("/media/products/{productId:int}", async (int productId, IProductImag
         ? Results.Redirect(ProductImageRules.PlaceholderUrl)
         : Results.File(image.Content, image.ContentType, enableRangeProcessing: true);
 }).RequireAuthorization(PermissionPolicy.For("stoc.view"));
+// A picture of an announcement: shown inside the announcements, only to signed-in users (the type comes from the bytes, nosniff).
+app.MapGet("/media/anunturi/{imageId:int}", async (int imageId, HttpContext context, BlazorStoc.Modules.Announcements.IAnnouncementService announcements, CancellationToken token) =>
+{
+    try
+    {
+        var image = await announcements.GetImageAsync(imageId, token);
+        if (image is null) return Results.NotFound();
+        context.Response.Headers["X-Content-Type-Options"] = "nosniff";
+        return Results.File(image.Content, image.ContentType);
+    }
+    catch (BlazorStoc.Modules.ModuleUnavailableException) { return Results.StatusCode(StatusCodes.Status503ServiceUnavailable); }
+    catch (AccessDeniedException) { return Results.Unauthorized(); }
+}).RequireAuthorization();
 app.MapGet("/media/project-files/{fileId:int}", async (int fileId, IObservationFiles files, CancellationToken token) =>
 {
     try

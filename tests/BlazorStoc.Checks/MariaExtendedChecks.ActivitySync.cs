@@ -191,6 +191,24 @@ public static partial class MariaExtendedChecks
             fake.Failure = null;
             Check(unexpected is { Ok: false } && (await settings.GetSettingsAsync()).LastSyncOk == false, "Activity sync: an unexpected error in a scheduled run does not escape the worker; it is remembered as a failure");
             fake.Failure = null;
+
+            // "Preia din ActivityApp": the taking on request creates the new partner with progress, is journaled once, and the call made right after (open page) is skipped by the gap.
+            fake.Partners = [.. fake.Partners, new(7303, $"Ext Take Now {suffix} SRL", "RO" + (long.Parse(cui) + 2), "Str. Noua 3", "Arad", "Arad", "0733111333", "")];
+            var takeEventsBefore = await Events(AuditActions.TakeActivityPartnersManual);
+            var take = new BeneficiaryTakeService(provider.GetRequiredService<IServiceScopeFactory>(), registry, new SystemAccess(), audit);
+            var stages = new List<PartnerTakeProgress>();
+            var taken = await take.TakeAsync(new Progress<PartnerTakeProgress>(stages.Add));
+            await Task.Delay(200);
+            Check(await take.CanTakeAsync() && taken is { Completed: true, Created: 1 } && taken.NewNames.Any(name => name.Contains($"Ext Take Now {suffix}", StringComparison.Ordinal))
+                && (await beneficiaries.GetBeneficiariesAsync()).Any(item => item.Name == $"Ext Take Now {suffix} SRL") && stages.Count > 0,
+                "Take from ActivityApp: the button creates the partner that is new in ActivityApp, reports its stages and returns the new name");
+            Check(await Events(AuditActions.TakeActivityPartnersManual) == takeEventsBefore + 1, "Take from ActivityApp: the taking on request is in the journal once, with its own action");
+            var takeAgain = await take.TakeAsync(null);
+            Check(takeAgain is { Completed: true, Created: 0 }, "Take from ActivityApp: a second taking right after finds nothing new and creates nothing");
+            var openPage = new PartnerSyncOnOpen(provider.GetRequiredService<IServiceScopeFactory>(), registry, NullLogger<PartnerSyncOnOpen>.Instance);
+            var openFirst = await openPage.RequestAsync();
+            var openSecond = await openPage.RequestAsync();
+            Check(!openFirst && !openSecond, "Take from ActivityApp: the taking at page open creates nothing when nothing is new, and a call within the gap is skipped");
         }
         finally
         {

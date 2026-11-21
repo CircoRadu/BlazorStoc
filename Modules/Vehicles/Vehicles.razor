@@ -39,7 +39,7 @@ else if (editing) { <VehicleEditor @key="editorKey" Original="editingVehicle" Sa
         <div class="table-scroll"><table><thead><tr><th>NUMĂR DE ÎNMATRICULARE</th><th>DESCRIERE</th><th class="number">MIȘCĂRI</th><th><span class="sr-only">Acțiuni</span></th></tr></thead><tbody>
         @foreach (var vehicle in Filtered)
         {
-            <tr @key="vehicle.Id"><td><a class="category-table-link" href="@VehicleNavigation.PageUrl(vehicle.Id)" aria-label="Deschide vehiculul @vehicle.PlateNumber"><span class="role-badge limited">@vehicle.PlateNumber</span></a></td><td class="movement-text"><strong>@vehicle.Description</strong></td><td class="number">@if (movementCounts.GetValueOrDefault(vehicle.Id) is > 0 and var used) { <a class="category-table-link" href="@VehicleNavigation.PageUrl(vehicle.Id)">@used</a> } else { <text>0</text> }</td><td><div class="row-buttons"><a class="row-icon view" href="@VehicleNavigation.PageUrl(vehicle.Id)" aria-label="Deschide pagina vehiculului @vehicle.PlateNumber" title="Deschide pagina vehiculului @vehicle.PlateNumber"></a>@if (permEdit) { <button class="row-icon edit" aria-label="Editează vehiculul @vehicle.PlateNumber" @onclick="() => OpenEditorAsync(vehicle)" title="Editează vehiculul @vehicle.PlateNumber"></button> }@if (permDelete) { <button class="row-icon delete" aria-label="Șterge vehiculul @vehicle.PlateNumber" @onclick="() => RequestDeleteAsync(vehicle)" title="Șterge vehiculul @vehicle.PlateNumber"></button> }</div></td></tr>
+            <tr @key="vehicle.Id"><td><a class="category-table-link vehicle-plate-link" href="@VehicleNavigation.PageUrl(vehicle.Id)" aria-label="Deschide vehiculul @vehicle.PlateNumber"><span class="role-badge limited">@vehicle.PlateNumber</span></a></td><td class="movement-text"><strong>@vehicle.Description</strong></td><td class="number">@if (movementCounts.GetValueOrDefault(vehicle.Id) is > 0 and var used) { <a class="category-table-link" href="@VehicleNavigation.PageUrl(vehicle.Id)">@used</a> } else { <text>0</text> }</td><td><div class="row-buttons"><a class="row-icon view" href="@VehicleNavigation.PageUrl(vehicle.Id)" aria-label="Deschide pagina vehiculului @vehicle.PlateNumber" title="Deschide pagina vehiculului @vehicle.PlateNumber"></a>@if (permEdit) { <button class="row-icon edit" aria-label="Editează vehiculul @vehicle.PlateNumber" @onclick="() => OpenEditorAsync(vehicle)" title="Editează vehiculul @vehicle.PlateNumber"></button> }@if (permDelete) { <button class="row-icon delete" aria-label="Șterge vehiculul @vehicle.PlateNumber" @onclick="() => RequestDeleteAsync(vehicle)" title="Șterge vehiculul @vehicle.PlateNumber"></button> }</div></td></tr>
         }
         </tbody></table></div>
     }
@@ -65,6 +65,9 @@ else if (editing) { <VehicleEditor @key="editorKey" Original="editingVehicle" Sa
         permDelete = await Access.HasAsync("vehicule.delete");
     }
     [SupplyParameterFromQuery(Name = "edit")] public int? EditId { get; set; }
+    // /vehicule?actiune=adauga-vehicul: the tile "Adaugă vehicul" of the main page opens the form of a new vehicle.
+    [SupplyParameterFromQuery(Name = MenuCatalog.ActionQuery)] public string? ActionParameter { get; set; }
+    private bool actionHandled;
     private IReadOnlyList<Vehicle> vehicles = Array.Empty<Vehicle>();
     // Number of movements that use each vehicle (a vehicle with movements cannot be deleted).
     private IReadOnlyDictionary<int, int> movementCounts = new Dictionary<int, int>();
@@ -86,6 +89,13 @@ else if (editing) { <VehicleEditor @key="editorKey" Original="editingVehicle" Sa
 
     protected override async Task OnParametersSetAsync()
     {
+        if (!actionHandled && ActionParameter == "adauga-vehicul" && loaded)
+        {
+            actionHandled = true;
+            if (permAdd) await OpenEditorAsync(null);
+            Navigation.NavigateTo(Navigation.GetUriWithQueryParameter(MenuCatalog.ActionQuery, (string?)null), replace: true);
+            return;
+        }
         if (EditId is > 0 && loaded && (!editing || editingVehicle?.Id != EditId.Value))
         {
             var requested = vehicles.FirstOrDefault(vehicle => vehicle.Id == EditId.Value);

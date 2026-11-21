@@ -1,0 +1,15 @@
+# Alegerea beneficiarului pentru o acțiune
+Cautare: alege beneficiar proiect punct de lucru contract analiza de risc dashboard
+
+Fereastra care se deschide când apeși pe dashboard un tile de acțiune care are nevoie de un beneficiar (Adaugă proiect, Adaugă punct de lucru, Adaugă contract de mentenanță, Adaugă analiză de risc). După ce alegi beneficiarul, se deschide pagina lui, cu formularul acțiunii.
+
+## Elemente
+### Fereastra
+- Beneficiar | listă cu căutare | Scrii o parte din nume ca să găsești beneficiarul. | sel: #benef-picker
+- Continuă | buton | Deschide pagina beneficiarului cu formularul acțiunii; rămâne inactiv până alegi un beneficiar.
+- Renunță | buton | Închide fereastra fără să deschidă nimic.
+
+## Flux: Cum adaug un proiect dintr-un tile de pe dashboard
+1. Apasă tile-ul „Adaugă proiect” de pe dashboard.
+2. Alege beneficiarul și apasă „Continuă”.
+3. Completează formularul care se deschide pe pagina beneficiarului.

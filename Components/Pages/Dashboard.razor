@@ -6,18 +6,87 @@
 @inject IRiskAnalysisRepository RiskAnalyses
 @inject BlazorStoc.Modules.ModuleRegistry Modules
 @inject TimeProvider Clock
+@inject IUserDashboardRepository DashboardChoice
+@inject IAccessControl Access
 <PageBoundary>
 
-<PageTitle>Pagina principală · BlazorStoc</PageTitle>
+<PageTitle>Dashboard · BlazorStoc</PageTitle>
 
 <div class="page-heading">
     <div>
         <p class="eyebrow">SPAȚIU DE LUCRU</p>
-        <h1>Pagina principală</h1>
+        <h1><text>Dashboard</text>@if (userName.Length > 0) { <span class="dashboard-user" data-dashboard-user> @userName</span> }</h1>
         <p class="muted">Alege secțiunea în care dorești să lucrezi.</p>
     </div>
+    <div class="heading-actions"><a class="refresh act-edit" href="/personalizare-pagina-principala">Personalizează dashboard-ul</a></div>
 </div>
 
+@if (layout is not null && custom)
+{
+<div class="dashboard-placed" data-custom-dashboard aria-label="Secțiunile alese de utilizator" style="@PageStyle()">
+    @if (!layout.GridKeys.Any() && !layout.Zones.Any(zone => zone.HasContent))
+    {
+        <p class="muted" data-empty-dashboard>Dashboard-ul tău este gol, așa cum ai ales. Adaugă tile-uri din „Personalizează dashboard-ul”.</p>
+    }
+    <div class="dash-zones" data-gear-target data-gear-label="dashboard">
+    @foreach (var band in layout.Bands())
+    {
+    var align = layout.BandAlign(band);
+    <div class="@($"dash-band dash-band-{align}")" data-band-align="@align">
+    @foreach (var zoneIndex in band)
+    {
+        var zone = layout.Zones[zoneIndex];
+        <section class="dash-zone" data-zone="@zoneIndex" style="@ZoneStyle(zone, align != DashboardZone.Beside)" aria-label="@zone.Title">
+            <h2 class="dash-zone-title">@zone.Title</h2>
+        @for (var rowIndex = 0; rowIndex < zone.Rows.Count; rowIndex++)
+        {
+            var row = zone.Rows[rowIndex];
+            @if (row.IsTiles)
+            {
+                @if (!row.IsEmpty)
+                {
+                    <section class="main-menu-grid dash-row" style="@($"grid-template-columns:repeat({zone.Columns}, minmax(0, var(--dash-tw, 1fr)))")" data-row="@rowIndex">
+                        @for (var col = 0; col < row.Cells.Length; col++)
+                        {
+                            @if (row.Cells[col] is { } key && MenuCatalog.Find(key) is { } entry)
+                            {
+                                var place = $"grid-column:{col + 1}";
+                                var text = entry.IsAction ? $"Pornește: {entry.Title}." : $"Deschide {entry.Title}.";
+                                @if (entry.AdminOnly)
+                                {
+                                    <AuthorizeView @key="key" Roles="@AccessRoles.Administrator"><Authorized><a href="@entry.Href" class="dash-tile" style="@place"><div class="dash-tile-head"><span class="main-menu-icon" aria-hidden="true">@entry.Icon</span><span class="dash-tile-category">@entry.Group</span></div><div class="dash-tile-body"><h2>@entry.Title</h2><p>@text</p></div></a></Authorized></AuthorizeView>
+                                }
+                                else if (entry.ModuleId.Length == 0)
+                                {
+                                    <AuthorizeView @key="key" Policy="@entry.Policy"><Authorized><a href="@entry.Href" class="dash-tile" style="@place"><div class="dash-tile-head"><span class="main-menu-icon" aria-hidden="true">@entry.Icon</span><span class="dash-tile-category">@entry.Group</span></div><div class="dash-tile-body"><h2>@entry.Title</h2><p>@text</p></div></a></Authorized></AuthorizeView>
+                                }
+                                else
+                                {
+                                    <ModuleTile @key="key" ModuleId="@entry.ModuleId" Policy="@entry.Policy" Href="@entry.Href" Icon="@entry.Icon" Title="@entry.Title" Category="@entry.Group" Description="@text" style="@place" />
+                                }
+                            }
+                        }
+                    </section>
+                }
+            }
+            else if (row.Kind == DashboardRow.Label)
+            {
+                @if (row.Text.Length > 0) { <h2 class="dashboard-label" style="@(row.Color.Length > 0 ? $"color:{row.Color}" : null)">@row.Text</h2> }
+            }
+            else
+            {
+                <div class="dashboard-spacer" aria-hidden="true" style="@(row.Color.Length > 0 ? $"background:{row.Color}" : null)"></div>
+            }
+        }
+        </section>
+    }
+    </div>
+    }
+    </div>
+</div>
+}
+else
+{
 <section class="main-menu-grid" aria-label="Secțiunile aplicației">
     <AuthorizeView Policy="perm:stoc.view"><Authorized><a href="/produse"><span class="main-menu-icon">▦</span><div><h2>Produse și stocuri</h2><p>Consultă inventarul și gestionează produsele pe categorii.@if (toRegularize > 0) { <text> </text><strong class="awaiting-count" title="Produse cu stoc negativ după ieșiri peste stoc (tabul De regularizat)">@toRegularize @(toRegularize == 1 ? "produs de regularizat" : "produse de regularizat")</strong> }</p></div><span class="main-menu-arrow">→</span></a></Authorized></AuthorizeView>
     <ModuleTile ModuleId="preluare-factura" Policy="perm:preluare-factura.view" Href="/produse/preluare-factura" Icon="▤" Title="Preluare factură" Description="Preia în stoc facturile furnizorilor (PDF, XML sau ZIP)." />
@@ -39,6 +108,7 @@
             <ModuleTile ModuleId="jurnal" Policy="perm:jurnal.view" Href="/jurnal" Icon="≡" Title="Jurnal activitate" Description="Urmărește operațiunile efectuate în sistem." />
             <a href="#ajutor" id="dashboard-help" data-help-index aria-haspopup="dialog"><span class="main-menu-icon">?</span><div><h2>Ajutor</h2><p>Descrierea tuturor ferestrelor aplicației, cu căutare.</p></div><span class="main-menu-arrow">→</span></a>
 </section>
+}
 
 </PageBoundary>
 
@@ -52,8 +122,38 @@
     // Active risk analyses that are expired or expire within the threshold of their notification template.
     private int riskDue;
 
+    // Entries chosen by the user (loaded from the database); none = the standard page.
+    private DashboardLayout? layout;
+    private bool custom;
+
+    private static string Capitalize(string? name) => string.IsNullOrWhiteSpace(name) ? "" : char.ToUpperInvariant(name.Trim()[0]) + name.Trim()[1..];
+
+    // The sizes the user chose (sliders of the editor) reach the stylesheet as CSS variables; what is not chosen keeps the standard look.
+    private string PageStyle()
+    {
+        var sizes = layout?.Sizes ?? DashboardSizes.Standard;
+        return (sizes.TileWidth > 0 ? $"--dash-tw:{sizes.TileWidth}px;" : "") + (sizes.TileHeight > 0 ? $"--dash-th:{sizes.TileHeight}px;" : "") + $"--dash-gap:{sizes.GapOrDefault}px";
+    }
+
+    // Zones share the width by their number of tiles per row; with a tile width chosen a zone is as wide as its tiles (never wider than the page), so the tiles never leave the zone.
+    // A zone on a row of its own (placement center, left or right) keeps the width its tiles need (the chosen tile width, or 250 px) and is aligned by its band, never stretched over the page.
+    private const int DefaultTileWidth = 250;
+    private string ZoneStyle(DashboardLayout.LayoutZone zone, bool ownRow = false)
+    {
+        var width = layout?.Sizes.TileWidth ?? 0;
+        if (ownRow) return $"flex:0 0 auto;width:{zone.Columns * (width > 0 ? width : DefaultTileWidth) + (zone.Columns - 1) * 14 + 35}px;max-width:100%";
+        return width > 0 ? $"flex:0 1 {zone.Columns * width + (zone.Columns - 1) * 14 + 32}px" : $"flex:{zone.Columns} 1 {zone.Columns * 120}px";
+    }
+
+    // The name of the signed-in user, first letter capital (account names are lower case): shown after the title.
+    private string userName = "";
+
     protected override async Task OnInitializedAsync()
     {
+        try { userName = Capitalize(await Access.GetUsernameAsync()); }
+        catch (Exception) { userName = ""; }
+        try { var state = await DashboardChoice.GetAsync(); custom = state.Custom; layout = DashboardLayout.From(state); }
+        catch (Exception) { layout = null; }
         try { awaiting = (await Movements.GetFreeEntriesAsync(new FreeEntryQuery(FreeEntryType.AwaitedInvoice))).Count; }
         catch (Exception) { awaiting = 0; }
         try { toRegularize = (await Movements.GetToRegularizeAsync()).Count; }

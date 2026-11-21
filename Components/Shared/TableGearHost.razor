@@ -11,14 +11,24 @@
     <span class="display-gear-backdrop" @onclick="Close"></span>
     <div class="display-gear-panel table-gear-panel" role="group" aria-label="Setări de afișare pentru @label" style="left:@(left)px;top:@(top)px" @onkeydown="KeyDown">
         <h3>Afișare: @label</h3>
-        <p class="form-note muted">Valorile alese aici se aplică numai acestui tabel și înlocuiesc setările globale.</p>
-        <PercentSlider TableMode="true" Title="Text din tabel" AriaLabel="Mărimea textului din tabel" Value="table.TableText" Inherited="global.TableText" ValueChanged="v => Set(table with { TableText = v })" />
-        <PercentSlider TableMode="true" Title="Antet tabel" AriaLabel="Mărimea antetului tabelului" Value="table.HeaderText" Inherited="global.HeaderText" ValueChanged="v => Set(table with { HeaderText = v })" />
-        <PercentSlider TableMode="true" Title="Imagini" AriaLabel="Mărimea imaginilor din tabel" Value="table.Images" Inherited="global.Images" ValueChanged="v => Set(table with { Images = v })" />
-        <PercentSlider TableMode="true" Title="Iconițe" AriaLabel="Mărimea iconițelor din tabel" Value="table.Icons" Inherited="global.Icons" ValueChanged="v => Set(table with { Icons = v })" />
+        @if (IsDashboard)
+        {
+            <p class="form-note muted">Valorile alese aici se aplică numai dashboard-ului și înlocuiesc setările globale.</p>
+            <PercentSlider TableMode="true" Title="Text" AriaLabel="Mărimea textului din dashboard" Value="table.Text" Inherited="global.Text" ValueChanged="v => Set(table with { Text = v })" />
+            <PercentSlider TableMode="true" Title="Antet tile" AriaLabel="Mărimea antetului tile-urilor (iconița și categoria)" Value="table.HeaderText" Inherited="global.HeaderText" ValueChanged="v => Set(table with { HeaderText = v })" />
+            <PercentSlider TableMode="true" Title="Iconițe" AriaLabel="Mărimea iconițelor din antetul tile-urilor" Value="table.Icons" Inherited="global.Icons" ValueChanged="v => Set(table with { Icons = v })" />
+        }
+        else
+        {
+            <p class="form-note muted">Valorile alese aici se aplică numai acestui tabel și înlocuiesc setările globale.</p>
+            <PercentSlider TableMode="true" Title="Text din tabel" AriaLabel="Mărimea textului din tabel" Value="table.TableText" Inherited="global.TableText" ValueChanged="v => Set(table with { TableText = v })" />
+            <PercentSlider TableMode="true" Title="Antet tabel" AriaLabel="Mărimea antetului tabelului" Value="table.HeaderText" Inherited="global.HeaderText" ValueChanged="v => Set(table with { HeaderText = v })" />
+            <PercentSlider TableMode="true" Title="Imagini" AriaLabel="Mărimea imaginilor din tabel" Value="table.Images" Inherited="global.Images" ValueChanged="v => Set(table with { Images = v })" />
+            <PercentSlider TableMode="true" Title="Iconițe" AriaLabel="Mărimea iconițelor din tabel" Value="table.Icons" Inherited="global.Icons" ValueChanged="v => Set(table with { Icons = v })" />
+        }
         @if (!string.IsNullOrEmpty(error)) { <span class="validation-message" role="alert">@error</span> }
         <div class="editor-actions">
-            <button type="button" class="refresh act-reload" disabled="@table.IsEmpty" title="@(table.IsEmpty ? "Tabelul folosește deja setările globale" : "Revine la setările globale pentru acest tabel")" @onclick="Reset">Resetează tabelul</button>
+            <button type="button" class="refresh act-reload" disabled="@table.IsEmpty" title="@(table.IsEmpty ? "Folosește deja setările globale" : "Revine la setările globale")" @onclick="Reset">@(IsDashboard ? "Resetează dashboard-ul" : "Resetează tabelul")</button>
             <button type="button" class="refresh act-close" @onclick="Close">Închide</button>
         </div>
     </div>
@@ -29,6 +39,8 @@
     private bool open, disposed;
     private string scope = "", label = "tabel", error = "";
     private double left, top;
+    // The gear of the personalised dashboard (its scope ends with .dashboard) sets text, header of the tiles and icons instead of the sizes of a table.
+    private bool IsDashboard => scope.EndsWith(".dashboard", StringComparison.Ordinal);
     private DisplaySettings global = new(), table = new();
 
     protected override void OnInitialized() => Display.Changed += OnChanged;

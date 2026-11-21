@@ -1,0 +1,18 @@
+# Anunțuri după autentificare
+Cautare: anunt anunturi am citit obligatoriu nu mai afisa pornire urmatorul inchide
+
+Fereastra apare o singură dată pe sesiune, după autentificare, dacă există anunțuri active pe care nu le-ai văzut. Anunțurile se arată pe rând („1 din 3”). Aceeași fereastră se folosește și la „Previzualizează” în Setări · Anunțuri.
+
+## Elemente
+### Fereastra
+- Bara ferestrei | text | Spune „ANUNȚ GENERAL”, în culoarea temei, la un anunț general și „ANUNȚ IMPORTANT”, cu roșu, la unul obligatoriu.
+- Titlul și textul | text | Anunțul curent, cu formatarea și pozele lui. | sel: #announcement-popup-body
+- Următorul | buton | Trece la următorul anunț din serie (doar peste anunțurile generale).
+- Am citit | buton | Doar la un anunț obligatoriu: confirmă citirea; anunțul nu mai apare pentru tine. Un anunț obligatoriu nu are „Închide” și nici „Următorul”: fereastra se închide doar cu „Am citit”.
+- Nu mai afișa anunțurile la pornire | comutator | Apare doar la un anunț general (nu și la unul obligatoriu) și oprește afișarea anunțurilor generale la autentificare (se păstrează în setările tale). Anunțurile obligatorii nu pot fi oprite. Afișarea o repornești din meniul numelui tău (bara de sus) → „Vizibilitate anunțuri generale”. | sel: #announcement-popup-hide
+- Închide | buton | Doar la anunțurile generale: închide fereastra și le marchează ca văzute. La un anunț obligatoriu nu există.
+
+## Flux: Cum citesc anunțurile
+1. Citește anunțul și, dacă e nevoie, apasă „Următorul”.
+2. La un anunț obligatoriu apasă „Am citit”.
+3. Apasă „Închide”; dacă nu vrei să mai primești anunțuri generale, pornește comutatorul.

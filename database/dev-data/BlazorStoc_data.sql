@@ -61,6 +61,26 @@ LOCK TABLES `activity_ticket_outcomes` WRITE;
 /*!40000 ALTER TABLE `activity_ticket_outcomes` ENABLE KEYS */;
 UNLOCK TABLES;
 
+LOCK TABLES `announcement_images` WRITE;
+/*!40000 ALTER TABLE `announcement_images` DISABLE KEYS */;
+/*!40000 ALTER TABLE `announcement_images` ENABLE KEYS */;
+UNLOCK TABLES;
+
+LOCK TABLES `announcement_seen` WRITE;
+/*!40000 ALTER TABLE `announcement_seen` DISABLE KEYS */;
+/*!40000 ALTER TABLE `announcement_seen` ENABLE KEYS */;
+UNLOCK TABLES;
+
+LOCK TABLES `announcement_users` WRITE;
+/*!40000 ALTER TABLE `announcement_users` DISABLE KEYS */;
+/*!40000 ALTER TABLE `announcement_users` ENABLE KEYS */;
+UNLOCK TABLES;
+
+LOCK TABLES `announcements` WRITE;
+/*!40000 ALTER TABLE `announcements` DISABLE KEYS */;
+/*!40000 ALTER TABLE `announcements` ENABLE KEYS */;
+UNLOCK TABLES;
+
 LOCK TABLES `app_metadata` WRITE;
 /*!40000 ALTER TABLE `app_metadata` DISABLE KEYS */;
 REPLACE INTO `app_metadata` (`key`, `value`) VALUES ('diacritics_normalized','2026-09-28T09:30:13.7557522Z'),
@@ -277,6 +297,16 @@ REPLACE INTO `categories` (`id`, `name`, `normalized_name`, `sort_order`) VALUES
 (18,'Diverse','DIVERSE',8),
 (19,'IT&C','IT&C',9);
 /*!40000 ALTER TABLE `categories` ENABLE KEYS */;
+UNLOCK TABLES;
+
+LOCK TABLES `consumption_note_lines` WRITE;
+/*!40000 ALTER TABLE `consumption_note_lines` DISABLE KEYS */;
+/*!40000 ALTER TABLE `consumption_note_lines` ENABLE KEYS */;
+UNLOCK TABLES;
+
+LOCK TABLES `consumption_notes` WRITE;
+/*!40000 ALTER TABLE `consumption_notes` DISABLE KEYS */;
+/*!40000 ALTER TABLE `consumption_notes` ENABLE KEYS */;
 UNLOCK TABLES;
 
 LOCK TABLES `elcomtur_auto_settings` WRITE;
@@ -1050,7 +1080,14 @@ REPLACE INTO `schema_migrations` (`version`, `description`, `checksum`, `origin`
 (89,'Invatare OCR la preluarea inventarului: sesiuni de preluare si esantioane (cifre citite gresit si corectate de utilizator)','c03417fb694f897d63703c5cc3dbd12d70390c49b4d0758385601dfd76f0863d','applied','2026-11-17 07:31:29','0.5.91'),
 (90,'Setari de afisare per utilizator (global si pe tabel)','07f3e882ccf81202a0afe95db3f8ec9150688f268dd51fe9d19b633144dcad11','applied','2026-11-17 07:31:29','0.5.91'),
 (91,'Nomenclator: tipuri obligatorii de proiecte ale beneficiarilor','2d60d21dbb138b1a5372ee7abb77ce208707972a6ce7f0cb8160757a852e8baf','applied','2026-11-17 13:56:03','0.5.95'),
-(92,'Elcomtur: istoricul totalului platilor restante, o valoare la fiecare preluare','c1e8a82b5f6dbeeed92e0dc765f04be5cb0922bfc2a7ad4c390f51095ec498a2','applied','2026-11-17 13:56:03','0.5.95');
+(92,'Elcomtur: istoricul totalului platilor restante, o valoare la fiecare preluare','c1e8a82b5f6dbeeed92e0dc765f04be5cb0922bfc2a7ad4c390f51095ec498a2','applied','2026-11-17 13:56:03','0.5.95'),
+(93,'Bonuri de consum ale proiectelor beneficiarilor (generate la cerere, active sau inactive, sterse de utilizator)','9e7cce0500577d53abebe52e49cea83c47c35e378abd104ce96595ed1978b302','applied','2026-11-21 06:27:45','0.6.5'),
+(94,'Personalizarea paginii principale per utilizator (intrarile de meniu afisate ca tile-uri)','3ad82b9d62bc31f8501ac47b39a20d3eca9b3780c811a435ee5bddb25823d7d2','applied','2026-11-21 06:27:45','0.6.5'),
+(95,'Dashboard personalizat: pozitia fiecarui tile in caroiaj (rand si coloana)','8e5af5dcfdb031732a67d46d088aff02d68a680bb2db47180cce8274d4842d26','applied','2026-11-21 06:27:45','0.6.5'),
+(96,'Dashboard personalizat: etichete si spatii intre randurile de tile-uri','25181d63d582e3d032214746008f1e9680449e115069964f5f153a4500a9a1d3','applied','2026-11-21 07:38:21','0.6.5'),
+(97,'Dashboard personalizat: zone una langa alta, fiecare cu titlu si caroiaj propriu','3ea416ce12408ae6c7fb8667cfd8cf243c87ef0409457ace505708b097054011','applied','2026-11-21 12:23:16','0.6.13'),
+(98,'Modulul Anunturi: anunturi cu text formatat si poze, audienta, stare vazut/citit si preferinta utilizatorului','daad9d749953b011990a9b7ffcf91fdf2cec0981380991c40e69d0c8d8a8cd52','applied','2026-11-21 12:23:16','0.6.13'),
+(99,'Anunturi: cine a publicat anuntul','d382e9fdd2f9752a662cd3bee7484d72796f18dd21d5fbce177fd8c8009bffd0','applied','2026-11-21 12:23:16','0.6.13');
 /*!40000 ALTER TABLE `schema_migrations` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -1653,9 +1690,30 @@ LOCK TABLES `task_settings` WRITE;
 /*!40000 ALTER TABLE `task_settings` ENABLE KEYS */;
 UNLOCK TABLES;
 
+LOCK TABLES `user_announcement_settings` WRITE;
+/*!40000 ALTER TABLE `user_announcement_settings` DISABLE KEYS */;
+/*!40000 ALTER TABLE `user_announcement_settings` ENABLE KEYS */;
+UNLOCK TABLES;
+
+LOCK TABLES `user_dashboard_entries` WRITE;
+/*!40000 ALTER TABLE `user_dashboard_entries` DISABLE KEYS */;
+/*!40000 ALTER TABLE `user_dashboard_entries` ENABLE KEYS */;
+UNLOCK TABLES;
+
+LOCK TABLES `user_dashboard_rows` WRITE;
+/*!40000 ALTER TABLE `user_dashboard_rows` DISABLE KEYS */;
+/*!40000 ALTER TABLE `user_dashboard_rows` ENABLE KEYS */;
+UNLOCK TABLES;
+
+LOCK TABLES `user_dashboard_zones` WRITE;
+/*!40000 ALTER TABLE `user_dashboard_zones` DISABLE KEYS */;
+/*!40000 ALTER TABLE `user_dashboard_zones` ENABLE KEYS */;
+UNLOCK TABLES;
+
 LOCK TABLES `user_display_settings` WRITE;
 /*!40000 ALTER TABLE `user_display_settings` DISABLE KEYS */;
-REPLACE INTO `user_display_settings` (`user_id`, `scope`, `settings`, `updated_utc`) VALUES (3,'global','{\"TableText\":null,\"HeaderText\":null,\"Images\":null,\"Icons\":null,\"Titles\":null,\"Tabs\":null,\"Menu\":135,\"Text\":null,\"Buttons\":115,\"Fields\":130,\"Topbar\":115,\"Dialogs\":165,\"Palette\":null,\"IsEmpty\":false}','2026-11-17T07:32:49.838Z');
+REPLACE INTO `user_display_settings` (`user_id`, `scope`, `settings`, `updated_utc`) VALUES (3,'global','{\"TableText\":null,\"HeaderText\":null,\"Images\":null,\"Icons\":null,\"Titles\":null,\"Tabs\":null,\"Menu\":135,\"Text\":null,\"Buttons\":115,\"Fields\":130,\"Topbar\":115,\"Dialogs\":165,\"Palette\":null,\"IsEmpty\":false}','2026-11-17T07:32:49.838Z'),
+(7,'dashboard','columns=3','2026-11-21T08:17:55.232Z');
 /*!40000 ALTER TABLE `user_display_settings` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -1725,6 +1783,8 @@ REPLACE INTO `user_type_permissions` (`user_type_id`, `permission_key`) VALUES (
 (1,'setari-actualizare.view'),
 (1,'setari-anaf.edit'),
 (1,'setari-anaf.view'),
+(1,'setari-anunturi.edit'),
+(1,'setari-anunturi.view'),
 (1,'setari-backup.backup'),
 (1,'setari-backup.edit'),
 (1,'setari-backup.restore'),
@@ -1881,7 +1941,8 @@ LOCK TABLES `web_users` WRITE;
 /*!40000 ALTER TABLE `web_users` DISABLE KEYS */;
 REPLACE INTO `web_users` (`id`, `username`, `normalized_username`, `display_name`, `password_hash`, `role`, `is_active`, `version`, `user_type_id`, `must_change_password`, `is_developer`) VALUES (1,'administrator.demo','ADMINISTRATOR.DEMO','Administrator demonstratie','AQAAAAIAAYagAAAAEIeR3dzbxxPEXnPWJ2h6E1QnJg7VWSxKvvZFsk1/hylP26VxVBIILKj/Fr3b6PgsNA==','Administrator',1,0,1,1,0),
 (2,'utilizator.demo','UTILIZATOR.DEMO','Utilizator demonstratie','AQAAAAIAAYagAAAAEG6GfKQW+dSJCuHG4T16Zl9QvtaQHTwtCCh2KIHJ9kP9C37eKheuYMQLSONzkTzCpg==','Utilizator',1,0,2,1,0),
-(3,'claude.dev','CLAUDE.DEV','Claude dezvoltare','AQAAAAIAAYagAAAAEESqUBAG36THU/WhsRqsC2ZMgMkUTkFdG1AbUShu6Vk2UABSSi96auup9Sf/uUweyg==','Administrator',1,2,1,0,0);
+(3,'claude.dev','CLAUDE.DEV','Claude dezvoltare','AQAAAAIAAYagAAAAEESqUBAG36THU/WhsRqsC2ZMgMkUTkFdG1AbUShu6Vk2UABSSi96auup9Sf/uUweyg==','Administrator',1,2,1,0,0),
+(7,'claude.verify','CLAUDE.VERIFY','Claude verificare','AQAAAAIAAYagAAAAEIwF4lti6C2RmRKOy2H6rd9S14K3N/+XjdMA/8c3x+7f6U5sqa1tPd0uf6DY5Is+aw==','Administrator',1,1,1,0,0);
 /*!40000 ALTER TABLE `web_users` ENABLE KEYS */;
 UNLOCK TABLES;
 

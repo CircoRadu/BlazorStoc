@@ -23,6 +23,7 @@
             <SearchableSelect Id="@($"{Prefix}-beneficiary")" Label="Beneficiar" Placeholder="Caută sau alege beneficiarul…"
                               EmptyText="Niciun beneficiar găsit." Options="BeneficiaryOptions" SelectedId="Model.BeneficiaryId"
                               SelectedIdChanged="SelectBeneficiaryAsync" Disabled="Disabled" />
+            @if (BeneficiariesTaken.HasDelegate) { <ActivityTakeButton OnTaken="BeneficiariesTaken" /> }
             @if (AllowAdd)
             {
                 <button type="button" class="refresh act-confirm add-related" id="@($"{Prefix}-add-beneficiary")" disabled="@Disabled"
@@ -141,6 +142,8 @@
     // Only the project button ("Proiect nou"), for a page that creates the project in a popup without leaving the form.
     [Parameter] public bool AllowAddProject { get; set; }
     [Parameter] public EventCallback AddBeneficiaryRequested { get; set; }
+    /// <summary>When set, the button "Preia din ActivityApp" is shown beside the beneficiary choice; the callback loads the list of beneficiaries again after new ones were taken.</summary>
+    [Parameter] public EventCallback BeneficiariesTaken { get; set; }
     [Parameter] public EventCallback AddProjectRequested { get; set; }
     private bool sourceIsVehicle;
     private bool initialized;

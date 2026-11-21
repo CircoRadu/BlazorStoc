@@ -1,5 +1,5 @@
 ﻿@page "/setari"
-@attribute [Authorize(Policy = "perm:setari-facturi.view|setari-anaf.view|setari-notificari.view|setari-harta.view|setari-backup.view|setari-module.view|setari-jurnal.view|setari-bug-raport.view|setari-actualizare.view|setari-import-activityapp.view|setari-import-elcomtur.view|setari-import-espstoc.view|utilizatori.view|tipuri-utilizatori.view")]
+@attribute [Authorize(Policy = "perm:setari-facturi.view|setari-anaf.view|setari-notificari.view|setari-harta.view|setari-backup.view|setari-module.view|setari-jurnal.view|setari-bug-raport.view|setari-anunturi.view|setari-actualizare.view|setari-import-activityapp.view|setari-import-elcomtur.view|setari-import-espstoc.view|utilizatori.view|tipuri-utilizatori.view")]
 @rendermode @(new InteractiveServerRenderMode(prerender: false))
 @using BlazorStoc.Services
 @inject BlazorStoc.Services.IDatabaseAccountService DatabaseAccountsGate
@@ -171,6 +171,12 @@
             <ModuleGate ModuleId="@BlazorStoc.Modules.Journal.JournalModule.ModuleId" Section="Jurnal activitate"><JournalSettingsPanel /></ModuleGate>
         </div>
     }
+    else if (activeTab == AnnouncementsTab && allowedTabs.Contains(AnnouncementsTab))
+    {
+        <div role="tabpanel" id="panel-@AnnouncementsTab" aria-labelledby="tab-@AnnouncementsTab" class="settings-body">
+            <ModuleGate ModuleId="@BlazorStoc.Modules.Announcements.AnnouncementsModule.ModuleId" Section="Anunțuri"><BlazorStoc.Modules.Announcements.AnnouncementsPanel /></ModuleGate>
+        </div>
+    }
     else if (activeTab == BugTab && allowedTabs.Contains(BugTab))
     {
         <div role="tabpanel" id="panel-@BugTab" aria-labelledby="tab-@BugTab" class="settings-body">
@@ -241,6 +247,7 @@
     private const string BackupTab = "backup";
     private const string JournalTab = "jurnal";
     private const string BugTab = "dezvoltare";
+    private const string AnnouncementsTab = "anunturi";
     private const string DevErrorsSubtab = "erori", DevProposalsSubtab = "propuneri";
     private static readonly (string Id, string Title)[] DevSubtabs = [(DevErrorsSubtab, "Erori"), (DevProposalsSubtab, "Propuneri")];
     private string devSubtab = DevErrorsSubtab;
@@ -275,12 +282,12 @@
     private const string BackupTimeSubtab = "backup-time";
     private static readonly (string Id, string Title)[] BackupSubtabs = [(BackupMainSubtab, "Backup și restaurare"), (NasTab, "Backup NAS"), (BackupTimeSubtab, "Verificare oră")];
     private string backupSubtab = BackupMainSubtab;
-    private static readonly (string Id, string Title)[] Tabs = [(AnafTab, "ANAF"), (ActivityImportTab, "Preluare date ActivityApp"), (ElcomturTab, "Preluare date Elcomtur"), (EspImportTab, "Preluare stoc ESPStoc"), (NotificationsTab, "Notificări"), (MapTab, "Hartă"), (InvoicesTab, "Facturi"), (BackupTab, "Backup"), (JournalTab, "Jurnal activitate"), (BugTab, "Dezvoltare"), (CatalogTab, "Catalog"), (ModulesTab, "Module"), (UpdateTab, "Actualizare"), (UsersTab, "Utilizatori"), (AuthTab, "Autentificare"), (DatabaseTab, "Bază de date")];
+    private static readonly (string Id, string Title)[] Tabs = [(AnafTab, "ANAF"), (ActivityImportTab, "Preluare date ActivityApp"), (ElcomturTab, "Preluare date Elcomtur"), (EspImportTab, "Preluare stoc ESPStoc"), (NotificationsTab, "Notificări"), (MapTab, "Hartă"), (InvoicesTab, "Facturi"), (BackupTab, "Backup"), (JournalTab, "Jurnal activitate"), (BugTab, "Dezvoltare"), (AnnouncementsTab, "Anunțuri"), (CatalogTab, "Catalog"), (ModulesTab, "Module"), (UpdateTab, "Actualizare"), (UsersTab, "Utilizatori"), (AuthTab, "Autentificare"), (DatabaseTab, "Bază de date")];
     // The key that opens each tab (what the user type of the signed-in user allows).
     private static readonly Dictionary<string, string> TabKeys = new()
     {
         [AnafTab] = "setari-anaf.view", [ActivityImportTab] = "setari-import-activityapp.view", [ElcomturTab] = "setari-import-elcomtur.view", [EspImportTab] = "setari-import-espstoc.view", [NotificationsTab] = "setari-notificari.view", [MapTab] = "setari-harta.view",
-        [InvoicesTab] = "setari-facturi.view", [BackupTab] = "setari-backup.view", [ModulesTab] = "setari-module.view", [JournalTab] = "setari-jurnal.view", [BugTab] = "setari-bug-raport.view", [UpdateTab] = "setari-actualizare.view"
+        [InvoicesTab] = "setari-facturi.view", [BackupTab] = "setari-backup.view", [ModulesTab] = "setari-module.view", [JournalTab] = "setari-jurnal.view", [BugTab] = "setari-bug-raport.view", [AnnouncementsTab] = "setari-anunturi.view", [UpdateTab] = "setari-actualizare.view"
     };
     private readonly HashSet<string> allowedTabs = [];
     // The open section; null shows the dashboard of the sections.
@@ -299,6 +306,7 @@
         BackupTab => "⤓",
         JournalTab => "≡",
         BugTab => "⚑",
+        AnnouncementsTab => "✉",
         CatalogTab => "⊞",
         ModulesTab => "▦",
         UpdateTab => "↻",
@@ -321,6 +329,7 @@
         ModulesTab => "Starea modulelor și oprirea sau pornirea lor.",
         JournalTab => "Câte evenimente recente arată implicit pagina Jurnal activitate.",
         BugTab => "Rapoartele de eroare și propunerile de modificări trimise de utilizatori: stare, răspunsuri și export ZIP.",
+        AnnouncementsTab => "Anunțuri pentru utilizatori: editor cu formatare și poze, previzualizare, ciorne, publicare, republicare și ștergere.",
         CatalogTab => "Adâncimea maximă a arborelui de subcategorii.",
         UpdateTab => "Versiunea aplicației, pachetele de actualizare și istoricul lor.",
         UsersTab => "Conturile utilizatorilor și drepturile fiecărui tip de utilizator.",

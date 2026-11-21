@@ -8,13 +8,28 @@
     <Authorized>
         @if (Modules.IsAvailable(ModuleId))
         {
-            <a href="@Href" class="@AnchorClass" @attributes="Attributes"><span class="main-menu-icon">@Icon</span><div><h2>@Title@TitleExtra</h2><p>@Description@Extra</p></div><span class="main-menu-arrow">→</span></a>
+            @if (Category.Length > 0)
+            {
+                <a href="@Href" class="@("dash-tile " + AnchorClass)" @attributes="Attributes"><div class="dash-tile-head"><span class="main-menu-icon" aria-hidden="true">@Icon</span><span class="dash-tile-category">@Category</span></div><div class="dash-tile-body"><h2>@Title@TitleExtra</h2><p>@Description@Extra</p></div></a>
+            }
+            else
+            {
+                <a href="@Href" class="@AnchorClass" @attributes="Attributes"><span class="main-menu-icon">@Icon</span><div><h2>@Title@TitleExtra</h2><p>@Description@Extra</p></div><span class="main-menu-arrow">→</span></a>
+            }
         }
         else
         {
-            <div class="main-menu-off" role="group" aria-disabled="true" aria-label="@($"{Title} - {Note}")" data-module-off="@ModuleId">
-                <span class="main-menu-icon">@Icon</span>
-                <div><h2>@Title</h2><p>@Description</p><p class="module-off-note">@Note</p></div>
+            <div class="@("main-menu-off" + (Category.Length > 0 ? " dash-tile" : ""))" role="group" aria-disabled="true" @attributes="Attributes" aria-label="@($"{Title} - {Note}")" data-module-off="@ModuleId">
+                @if (Category.Length > 0)
+                {
+                    <div class="dash-tile-head"><span class="main-menu-icon" aria-hidden="true">@Icon</span><span class="dash-tile-category">@Category</span></div>
+                    <div class="dash-tile-body"><h2>@Title</h2><p>@Description</p><p class="module-off-note">@Note</p></div>
+                }
+                else
+                {
+                    <span class="main-menu-icon">@Icon</span>
+                    <div><h2>@Title</h2><p>@Description</p><p class="module-off-note">@Note</p></div>
+                }
             </div>
         }
     </Authorized>
@@ -28,6 +43,8 @@
     [Parameter, EditorRequired] public string Title { get; set; } = "";
     [Parameter, EditorRequired] public string Description { get; set; } = "";
     [Parameter] public string? AnchorClass { get; set; }
+    /// <summary>The category of the option (Setări, Produse...): when set the tile has a header with the icon and the category and the title in its body (the tiles of the personalised page).</summary>
+    [Parameter] public string Category { get; set; } = "";
     /// <summary>Added after the title inside the heading (the warning triangle of the notifications).</summary>
     [Parameter] public RenderFragment? TitleExtra { get; set; }
     /// <summary>Added after the description (a count that needs attention); not shown while the module is out.</summary>

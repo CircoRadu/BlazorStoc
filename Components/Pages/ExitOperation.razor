@@ -55,7 +55,7 @@ else
             <ExitDestinationPicker @ref="picker" Prefix="op" Model="common" Beneficiaries="beneficiaries" Projects="projects" Vehicles="vehicles"
                                    ShowSource="false" Disabled="busy || preview is not null"
                                    AllowAddProject="true" AddProjectRequested="@(() => { addingProject = true; return Task.CompletedTask; })"
-                                   DestinationChanged="DestinationChangedAsync" BeneficiaryChanged="BeneficiaryChangedAsync"
+                                   DestinationChanged="DestinationChangedAsync" BeneficiaryChanged="BeneficiaryChangedAsync" BeneficiariesTaken="ReloadBeneficiariesAsync"
                                    ProjectChanged="id => { common.ProjectId = id; return Task.CompletedTask; }" />
             <label class="movement-description" for="op-description">Descriere comună (se folosește la liniile fără descriere proprie)
                 <InputTextArea id="op-description" @bind-Value="common.Description" rows="2" maxlength="@StockMovementRules.MaxDescriptionLength" /></label>
@@ -155,7 +155,12 @@ else
 
 </PageBoundary>
 
+<BeneficiarySyncOnOpen OnNewBeneficiaries="ReloadBeneficiariesAsync" />
+
 @code {
+    // Beneficiaries entered in ActivityApp a moment ago are taken in the background after the page opened; the list is loaded again when there are new ones.
+    private async Task ReloadBeneficiariesAsync() { try { beneficiaries = (await Beneficiaries.GetBeneficiariesAsync(lifetime.Token)).OrderBy(b => b.Name, StringComparer.CurrentCultureIgnoreCase).ToArray(); } catch (Exception) { } StateHasChanged(); }
+
     /// <summary>Used as dialog content (quick exit from the product list): no page heading, optional starting product, close callback.</summary>
     // From the vehicle page ("Completeaza la nivel"): the exit to this vehicle is prepared with the pieces missing from its target levels.
     [SupplyParameterFromQuery(Name = "vehicul")] public int? FillVehicleId { get; set; }

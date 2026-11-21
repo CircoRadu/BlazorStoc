@@ -1,10 +1,10 @@
-# Pagina principală
+# Dashboard
 Ruta: /
 Cautare: meniu principal module placi sectiuni acasa cautare ajutor
-Captura: pagina | / |  | Pagina principală
-Captura: oprit | /setari | click Module; click sel:label.row-toggle[title*='Vehicule']; wait 600; type #module-stop-reason=Verificări programate pe server; click Oprește modulul; wait 1200; visit sel:a[href='/']; wait 800; full; then; visit sel:a[href='/setari']; click Module; click sel:label.row-toggle[title*='Pornește modulul Vehicule']; wait 1500 | Pagina principală cu un modul oprit
+Captura: pagina | / |  | Dashboard
+Captura: oprit | /setari | click Module; click sel:label.row-toggle[title*='Vehicule']; wait 600; type #module-stop-reason=Verificări programate pe server; click Oprește modulul; wait 1200; visit sel:a[href='/']; wait 800; full; then; visit sel:a[href='/setari']; click Module; click sel:label.row-toggle[title*='Pornește modulul Vehicule']; wait 1500 | Dashboard cu un modul oprit
 
-Pagina principală este punctul de plecare: fiecare placă deschide o secțiune a aplicației. Vezi doar plăcile pentru care ai drept de acces. Ajutorul se deschide din meniul „Ajutor”, din placa „Ajutor” sau din iconița din bara de sus, iar în orice fereastră de ajutor ai o **căutare în tot ajutorul** și cuprinsul ferestrelor.
+Dashboard-ul este punctul de plecare: fiecare placă deschide o secțiune a aplicației. Vezi doar plăcile pentru care ai drept de acces. Ajutorul se deschide din meniul „Ajutor”, din placa „Ajutor” sau din iconița din bara de sus, iar în orice fereastră de ajutor ai o **căutare în tot ajutorul** și cuprinsul ferestrelor.
 
 **Ferestrele peste pagină**: se mută de antet (tragere) și se redimensionează din colțul dreapta-jos (dublu-clic = resetare); bara cu „Raportează o eroare”, „Propune o modificare” și închidere are loc propriu deasupra panoului, iar pe ecran îngust butoanele sunt iconițe rotunde.
 **Bara de sus**: arată ruta paginii (Meniu principal › secțiune › subsecțiune › pagină); numele utilizatorului conectat deschide meniul (Autentificatorul meu, Schimbă parola, Deconectare); „Raportează o eroare” și „Propune o modificare” se află tot aici.
@@ -31,7 +31,7 @@ Pagina principală este punctul de plecare: fiecare placă deschide o secțiune 
 
 ## Flux: Cum ajung la o secțiune
 1. Apasă placa secțiunii sau alege-o din meniul din stânga.
-2. Ca să te întorci, folosește butonul „← Meniu principal” din antetul paginii sau „Pagina principală” din meniu.
+2. Ca să te întorci, folosește butonul „← Meniu principal” din antetul paginii sau „Dashboard” din meniu.
 Nota: dacă o secțiune nu apare, contul tău nu are dreptul de acces la ea; cere administratorului să îți modifice tipul de utilizator.
 
 ## Flux: Cum găsesc descrierea unei ferestre
@@ -41,7 +41,7 @@ Nota: dacă o secțiune nu apare, contul tău nu are dreptul de acces la ea; cer
 Nota: iconița de ajutor din bara de sus deschide direct descrierea ferestrei în care ești.
 
 ## Flux: Cum caut în ajutor
-1. Apasă „Ajutor” din meniul din stânga sau placa „Ajutor” de pe pagina principală (sau iconița de ajutor din bara de sus).
+1. Apasă „Ajutor” din meniul din stânga sau placa „Ajutor” de pe dashboard (sau iconița de ajutor din bara de sus).
 2. Scrie în câmpul „Caută în tot ajutorul” cel puțin două litere; rezultatele apar sub câmp.
 3. Apasă un rezultat ca să citești descrierea ferestrei respective; „Înapoi” te întoarce la lista anterioară.
 4. Câmpul de căutare este în partea de sus a oricărui ajutor deschis, deci poți căuta din orice fereastră, fără să revii la cuprins.

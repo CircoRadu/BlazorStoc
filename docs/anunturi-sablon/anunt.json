@@ -1,0 +1,8 @@
+{
+  "versiune": 1,
+  "titlu": "Titlul anuntului (cel mult 200 de caractere)",
+  "obligatoriu": false,
+  "audienta": "toti",
+  "utilizatori": [],
+  "validPana": "31.12.2099"
+}

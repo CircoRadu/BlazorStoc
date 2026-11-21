@@ -1,0 +1,480 @@
+@using Microsoft.AspNetCore.Components.Forms
+@using BlazorStoc.Components.Shared
+@inject IAnnouncementService Announcements
+@inject IAccessControl Access
+@inject IJSRuntime JS
+@inject ILogger<AnnouncementsPanel> Logger
+@implements IAsyncDisposable
+@* Setari -> Anunturi (administrator and developers): the editor (text with formatting written for the application, pictures, audience, validity), the preview (the same window the users get),
+   drafts, publishing and republishing, and the table of the announcements with its icons (view, edit/republish, ZIP, archive, delete). "Incarca anunt" takes a ZIP (anunt.json, continut.html,
+   imagini/) and opens it in the editor as a new draft. *@
+<section class="catalog" aria-labelledby="announcements-title">
+    <div class="catalog-heading"><h2 id="announcements-title">Anunțuri <span class="count-badge">@rows.Count</span></h2></div>
+    <div class="catalog-body">
+        @if (notice is not null) { <div class="notice-banner" role="status" id="announcements-notice">@notice</div> }
+        @if (error is not null) { <div class="error-banner" role="alert" id="announcements-error">@error</div> }
+        @foreach (var warning in warnings) { <div class="notice-banner announcement-warning" role="status">@warning</div> }
+        <div class="editor-actions announcement-start">
+            <button type="button" id="announcement-new" class="primary" disabled="@busy" @onclick="NewAnnouncement">Creare anunț</button>
+            <label class="refresh act-confirm bug-file-button" id="announcement-upload" title="Încarcă o arhivă ZIP cu anunț (anunt.json, continut.html, imagini/)">Încarcă anunț<InputFile OnChange="OnZipAsync" accept=".zip,application/zip" disabled="@busy" /></label>
+        </div>
+
+        @if (editing)
+        {
+            <div class="announcement-editor" id="announcement-editor">
+                <h3>@(draft.Id == 0 ? "Anunț nou" : $"Anunț #{draft.Id}")@if (state is not "" and not AnnouncementRules.StateDraft) { <span class="muted"> · @StateTextOf(state)</span> }</h3>
+                <div class="editor-grid">
+                    <label>Titlu<input id="announcement-title" type="text" maxlength="@AnnouncementRules.MaxTitle" @bind="draft.Title" @bind:event="oninput" /></label>
+                </div>
+                <div class="announcement-toolbar" id="announcement-toolbar" role="toolbar" aria-label="Formatare text">
+                    <button type="button" class="refresh act-nav" title="Aldin" aria-label="Aldin" @onmousedown:preventDefault @onclick='() => Exec("bold")'><b>B</b></button>
+                    <button type="button" class="refresh act-nav" title="Cursiv" aria-label="Cursiv" @onmousedown:preventDefault @onclick='() => Exec("italic")'><i>I</i></button>
+                    <button type="button" class="refresh act-nav" title="Subliniat" aria-label="Subliniat" @onmousedown:preventDefault @onclick='() => Exec("underline")'><u>S</u></button>
+                    <button type="button" class="refresh act-nav" title="Titlu mare" aria-label="Titlu mare" @onmousedown:preventDefault @onclick='() => Exec("formatBlock", "h2")'>Titlu</button>
+                    <button type="button" class="refresh act-nav" title="Subtitlu" aria-label="Subtitlu" @onmousedown:preventDefault @onclick='() => Exec("formatBlock", "h3")'>Subtitlu</button>
+                    <button type="button" class="refresh act-nav" title="Paragraf" aria-label="Paragraf" @onmousedown:preventDefault @onclick='() => Exec("formatBlock", "p")'>Paragraf</button>
+                    <button type="button" class="refresh act-nav" title="Listă cu buline" aria-label="Listă cu buline" @onmousedown:preventDefault @onclick='() => Exec("insertUnorderedList")'>• Listă</button>
+                    <button type="button" class="refresh act-nav" title="Listă numerotată" aria-label="Listă numerotată" @onmousedown:preventDefault @onclick='() => Exec("insertOrderedList")'>1. Listă</button>
+                    <button type="button" class="refresh act-nav" title="Aliniere la stânga" aria-label="Aliniere la stânga" @onmousedown:preventDefault @onclick='() => Exec("justifyLeft")'>⬅</button>
+                    <button type="button" class="refresh act-nav" title="Centrat" aria-label="Centrat" @onmousedown:preventDefault @onclick='() => Exec("justifyCenter")'>↔</button>
+                    <button type="button" class="refresh act-nav" title="Aliniere la dreapta" aria-label="Aliniere la dreapta" @onmousedown:preventDefault @onclick='() => Exec("justifyRight")'>➡</button>
+                    <label class="announcement-color" title="Culoarea textului">Culoare<input type="color" id="announcement-color" value="#1f2d2a" @onchange="ColorChanged" /></label>
+                    <span class="announcement-link-group">
+                        <input id="announcement-link" type="text" placeholder="https://…" aria-label="Adresa linkului" @bind="linkAddress" @bind:event="oninput" />
+                        <button type="button" class="refresh act-nav" title="Pune linkul pe textul selectat" @onmousedown:preventDefault @onclick="ApplyLinkAsync">Link</button>
+                        <button type="button" class="refresh act-nav" title="Scoate linkul" @onmousedown:preventDefault @onclick="RemoveLinkAsync">Fără link</button>
+                    </span>
+                    <label class="refresh act-confirm bug-file-button" title="Adaugă o poză în text (PNG, JPEG, GIF, WebP)">Poză<InputFile OnChange="OnPicturesAsync" multiple accept="image/png,image/jpeg,image/gif,image/webp" disabled="@busy" /></label>
+                </div>
+                <div id="announcement-body" class="announcement-box ui-scale-text" contenteditable="true" role="textbox" aria-multiline="true" aria-label="Textul anunțului" spellcheck="true"></div>
+                <p class="muted announcement-hint">Poți lipi poze direct în text (Ctrl+V) sau le poți trage peste el. Textul lipit își pierde formatarea străină.</p>
+
+                <div class="editor-grid announcement-options">
+                    <div class="row-toggle"><ToggleSwitch Id="announcement-mandatory" @bind-Value="draft.Mandatory" OnText="Obligatoriu" OffText="General" AriaLabel="Anunț obligatoriu">Anunț obligatoriu</ToggleSwitch></div>
+                    <label>Audiența
+                        <select id="announcement-audience" @bind="draft.Audience">
+                            <option value="@AnnouncementRules.AudienceAll">Toți utilizatorii</option>
+                            <option value="@AnnouncementRules.AudienceSelected">Utilizatori selectați</option>
+                        </select>
+                    </label>
+                    <label>Valabil până (dd.mm.yyyy)<input id="announcement-until" type="text" inputmode="numeric" placeholder="gol = fără sfârșit" maxlength="10" @bind="draft.ValidUntil" @bind:event="oninput" /></label>
+                </div>
+                @if (draft.Mandatory) { <p class="muted">Un anunț obligatoriu apare la fiecare autentificare până când utilizatorul apasă „Am citit”; comutatorul „Nu mai afișa anunțurile la pornire” nu îl oprește.</p> }
+                @if (draft.Audience == AnnouncementRules.AudienceSelected)
+                {
+                    <div class="announcement-users" id="announcement-users">
+                        <label>Caută utilizator<input id="announcement-user-search" type="search" placeholder="nume sau utilizator" @bind="userSearch" @bind:event="oninput" /></label>
+                        <p class="muted">@draft.Users.Count selectați din @userChoices.Count</p>
+                        <div class="announcement-user-list">
+                            @foreach (var choice in FilteredUsers)
+                            {
+                                <div class="announcement-user-row" @key="choice.UserName">
+                                    <ToggleSwitch Compact="true" Value="draft.Users.Contains(choice.UserName)" ValueChanged="value => SetUser(choice.UserName, value)" AriaLabel="@($"Trimite lui {choice.UserName}")" />
+                                    <span><strong>@choice.UserName</strong>@if (choice.DisplayName.Length > 0 && choice.DisplayName != choice.UserName) { <small class="muted"> · @choice.DisplayName</small> }</span>
+                                </div>
+                            }
+                        </div>
+                    </div>
+                }
+                <div class="editor-actions">
+                    <button type="button" id="announcement-preview" class="refresh act-reload" disabled="@busy" @onclick="PreviewAsync">Previzualizează</button>
+                    <button type="button" id="announcement-save" class="refresh act-confirm" disabled="@busy" @onclick="SaveAsync">@(state is "" or AnnouncementRules.StateDraft ? "Salvează ca draft" : "Salvează modificările")</button>
+                    <button type="button" id="announcement-publish" class="primary" disabled="@busy" @onclick="PublishAsync">@(state is "" or AnnouncementRules.StateDraft ? "Publică" : "Republică")</button>
+                    <button type="button" id="announcement-cancel" class="refresh act-close" disabled="@busy" @onclick="CancelEditAsync">Renunță</button>
+                </div>
+            </div>
+        }
+
+        <h3 class="announcement-table-title">Toate anunțurile</h3>
+        @if (rows.Count == 0)
+        {
+            <p class="muted" id="announcements-empty">Nu există încă niciun anunț.</p>
+        }
+        else
+        {
+            <Paged Items="rows" Id="announcements-table-size" Sorts="Sorts" DefaultSortKey="id" DefaultDescending="true" Context="pageRows">
+                <div class="table-scroll"><table id="announcements-table">
+                    <thead><tr>
+                        <SortTh Key="title">Titlu</SortTh><SortTh Key="type">Tip și audiență</SortTh><SortTh Key="state">Stare</SortTh><SortTh Key="active">Activ</SortTh>
+                        <SortTh Key="until">Valabil până</SortTh><SortTh Key="seen" Class="announcement-seen-head">Văzut / citit</SortTh><SortTh Key="published">Publicat</SortTh><th><span class="sr-only">Acțiuni</span></th>
+                    </tr></thead>
+                    <tbody>
+                    @foreach (var row in pageRows)
+                    {
+                        <tr @key="row.Id" class="announcement-row">
+                            <td><strong>@row.Title</strong>@if (row.PublicationNo > 1) { <small class="muted"> · publicat de @row.PublicationNo ori</small> }</td>
+                            <td>@(row.Mandatory ? "Obligatoriu" : "General")<br /><small class="muted">@row.AudienceText</small></td>
+                            <td><span class="announcement-state announcement-state-@(row.Expired ? "expirat" : row.State)">@row.StateText</span></td>
+                            <td><ToggleSwitch Compact="true" Value="@(row.State == AnnouncementRules.StateActive && !row.Expired)" ValueChanged="on => SetActiveAsync(row, on)" Disabled="busy" AriaLabel="@($"Anunțul {row.Title} este activ")" Title="@(row.State == AnnouncementRules.StateActive && !row.Expired ? $"Dezactivează anunțul {row.Title} (îl arhivează)" : $"Activează anunțul {row.Title}")" /></td>
+                            <td>@(row.ValidUntil.Length == 0 ? "—" : AnnouncementRules.DisplayDate(row.ValidUntil))</td>
+                            <td class="announcement-seen-cell"><span class="announcement-seen-value">@(row.Mandatory ? row.Acknowledged : row.Seen)@if (row.Mandatory) { <button type="button" class="row-icon view" aria-label="@($"Vezi cine a citit anunțul {row.Title}")" title="@($"Vezi cine a citit anunțul {row.Title}")" @onclick="() => ShowSeenAsync(row)"></button> }</span></td>
+                            <td>@(row.PublishedUtc is { } published ? published.ToLocalTime().ToString("dd.MM.yyyy HH:mm") : "—")</td>
+                            <td class="row-actions">
+                                <button type="button" class="row-icon view" aria-label="@($"Vizualizează anunțul {row.Title}")" title="@($"Vizualizează anunțul {row.Title}")" @onclick="() => ViewAsync(row)"></button>
+                                <button type="button" class="row-icon edit" aria-label="@($"Modifică sau republică anunțul {row.Title}")" title="@($"Modifică sau republică anunțul {row.Title}")" @onclick="() => EditAsync(row)"></button>
+                                <button type="button" class="row-icon export" aria-label="@($"Descarcă anunțul {row.Title} ca ZIP")" title="@($"Descarcă anunțul {row.Title} ca ZIP")" @onclick="() => DownloadAsync(row)"></button>
+                                <button type="button" class="row-icon renew" disabled="@(busy || row.State == AnnouncementRules.StateDraft)" aria-label="@($"Republică anunțul {row.Title} fără modificări")" title="@(row.State == AnnouncementRules.StateDraft ? "Un draft se activează din coloana Activ" : $"Republică anunțul {row.Title} așa cum e salvat: cei vizați îl primesc din nou")" @onclick="() => RepublishAsync(row)"></button>
+                                <button type="button" class="row-icon delete" aria-label="@($"Șterge definitiv anunțul {row.Title}")" title="@($"Șterge definitiv anunțul {row.Title}")" @onclick="() => confirmDelete = row"></button>
+                            </td>
+                        </tr>
+                    }
+                    </tbody>
+                </table></div>
+            </Paged>
+        }
+    </div>
+</section>
+
+@if (previewItems is not null)
+{
+    <AnnouncementDialog Items="previewItems" Preview="true" Title="Previzualizare anunț" Closed="ClosePreview" />
+}
+
+@if (seenFor is not null)
+{
+    <AppDialog Title="@($"Cine a citit: {seenFor.Title}")" Size="AppDialogSize.L" ShowModuleActions="false" OnClose="CloseSeen">
+        <ChildContent>
+            @if (seenList.Count == 0)
+            {
+                <p class="muted" id="announcement-seen-empty">Încă nu l-a citit nimeni.</p>
+            }
+            else
+            {
+                <Paged Items="seenList" Id="announcement-seen-size" DefaultSize="10" Sorts="SeenSorts" DefaultSortKey="when" DefaultDescending="true" Context="seenRows">
+                    <div class="table-scroll"><table id="announcement-seen-table">
+                        <thead><tr><SortTh Key="user">Utilizator</SortTh><SortTh Key="name">Nume</SortTh><SortTh Key="when">Data și ora</SortTh><SortTh Key="read">Am citit</SortTh></tr></thead>
+                        <tbody>
+                        @foreach (var item in seenRows)
+                        {
+                            <tr @key="item.UserName"><td><strong>@AnnouncementRules.Capitalize(item.UserName)</strong></td><td>@item.DisplayName</td><td>@(item.SeenUtc is { } when ? when.ToLocalTime().ToString("dd.MM.yyyy HH:mm") : "—")</td><td>@(item.Acknowledged ? "Da" : "Nu")</td></tr>
+                        }
+                        </tbody>
+                    </table></div>
+                </Paged>
+            }
+        </ChildContent>
+        <Footer><div class="editor-actions"><button type="button" id="announcement-seen-close" class="refresh act-close" @onclick="CloseSeen">Închide</button></div></Footer>
+    </AppDialog>
+}
+
+@if (confirmDelete is not null)
+{
+    <AppDialog Title="Ștergere definitivă" Size="AppDialogSize.M" Alert="true" Tone="alert" ShowModuleActions="false" OnClose="CancelDelete">
+        <ChildContent>
+            <p>Anunțul „<strong>@confirmDelete.Title</strong>” va fi șters definitiv, împreună cu pozele lui și cu starea „văzut / citit” a utilizatorilor. Operația nu poate fi anulată.</p>
+        </ChildContent>
+        <Footer>
+            <div class="editor-actions">
+                <button type="button" id="announcement-delete-confirm" class="danger" disabled="@busy" @onclick="DeleteAsync">Șterge definitiv</button>
+                <button type="button" id="announcement-delete-cancel" class="refresh act-close" @onclick="CancelDelete">Renunță</button>
+            </div>
+        </Footer>
+    </AppDialog>
+}
+
+@code {
+    private const string BoxId = "announcement-body";
+    private readonly CancellationTokenSource lifetime = new();
+    private IReadOnlyList<AnnouncementRow> rows = [];
+    private IReadOnlyList<AnnouncementUserChoice> userChoices = [];
+    private readonly List<string> warnings = [];
+    private DraftModel draft = new();
+    private string state = "";
+    private bool editing, busy, boxPending;
+    private string? error, notice, linkAddress, userSearch;
+    private string pendingHtml = "";
+    private IReadOnlyList<AnnouncementView>? previewItems;
+    private AnnouncementRow? confirmDelete, seenFor;
+    private IReadOnlyList<AnnouncementSeen> seenList = [];
+    private static readonly IReadOnlyDictionary<string, Func<AnnouncementSeen, IComparable?>> SeenSorts = new Dictionary<string, Func<AnnouncementSeen, IComparable?>>
+    {
+        ["user"] = item => item.UserName, ["name"] = item => item.DisplayName, ["when"] = item => item.SeenUtc, ["read"] = item => item.Acknowledged ? 1 : 0
+    };
+    private DotNetObjectReference<AnnouncementsPanel>? self;
+    private IJSObjectReference? downloads;
+
+    private sealed class DraftModel
+    {
+        public int Id { get; set; }
+        public string Title { get; set; } = "";
+        public bool Mandatory { get; set; }
+        public string Audience { get; set; } = AnnouncementRules.AudienceAll;
+        public string ValidUntil { get; set; } = "";
+        public List<string> Users { get; set; } = [];
+    }
+
+    private static readonly IReadOnlyDictionary<string, Func<AnnouncementRow, IComparable?>> Sorts = new Dictionary<string, Func<AnnouncementRow, IComparable?>>
+    {
+        ["id"] = row => row.Id, ["title"] = row => row.Title, ["type"] = row => (row.Mandatory ? "1" : "0") + row.AudienceText, ["state"] = row => row.StateText, ["active"] = row => row.State == AnnouncementRules.StateActive && !row.Expired ? 1 : 0,
+        ["until"] = row => row.ValidUntil.Length == 0 ? null : row.ValidUntil, ["seen"] = row => row.Seen, ["published"] = row => row.PublishedUtc
+    };
+
+    private IEnumerable<AnnouncementUserChoice> FilteredUsers => string.IsNullOrWhiteSpace(userSearch) ? userChoices
+        : userChoices.Where(choice => choice.UserName.Contains(userSearch.Trim(), StringComparison.OrdinalIgnoreCase) || choice.DisplayName.Contains(userSearch.Trim(), StringComparison.OrdinalIgnoreCase));
+
+    private static string StateTextOf(string state) => AnnouncementRules.StateLabel(state, false);
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        try { rows = await Announcements.ListAsync(lifetime.Token); }
+        catch (OperationCanceledException) { }
+        catch (Exception exception) when (exception is not OperationCanceledException) { Fail(exception, "Lista anunțurilor nu a putut fi citită."); }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!boxPending || !editing) return;
+        boxPending = false;
+        self ??= DotNetObjectReference.Create(this);
+        await JS.InvokeVoidAsync("announcementEditor.init", BoxId, self, pendingHtml);
+    }
+
+    private void Fail(Exception exception, string fallback)
+    {
+        if (exception is AnnouncementException or AccessDeniedException) { error = exception.Message; return; }
+        Logger.LogError("An announcements operation failed ({ErrorType}).", exception.GetType().Name);
+        error = fallback;
+    }
+
+    private void ResetMessages() { error = null; notice = null; warnings.Clear(); }
+
+    private async Task OpenEditorAsync(DraftModel model, string html, string currentState)
+    {
+        ResetMessages();
+        draft = model; state = currentState; pendingHtml = html; userSearch = null; linkAddress = null;
+        try { userChoices = await Announcements.GetUserChoicesAsync(lifetime.Token); }
+        catch (Exception exception) when (exception is not OperationCanceledException) { Fail(exception, "Lista utilizatorilor nu a putut fi citită."); }
+        editing = true; boxPending = true;
+    }
+
+    private Task NewAnnouncement() => OpenEditorAsync(new DraftModel(), "", "");
+
+    private async Task EditAsync(AnnouncementRow row)
+    {
+        ResetMessages();
+        try
+        {
+            var detail = await Announcements.GetAsync(row.Id, lifetime.Token);
+            if (detail is null) { error = "Anunțul nu mai există."; await LoadAsync(); return; }
+            await OpenEditorAsync(new DraftModel { Id = detail.Id, Title = detail.Title, Mandatory = detail.Mandatory, Audience = detail.Audience, ValidUntil = detail.ValidUntil, Users = [.. detail.Users] }, detail.BodyHtml, detail.State);
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException) { Fail(exception, "Anunțul nu a putut fi deschis."); }
+    }
+
+    private async Task ViewAsync(AnnouncementRow row)
+    {
+        ResetMessages();
+        try
+        {
+            var detail = await Announcements.GetAsync(row.Id, lifetime.Token);
+            if (detail is null) { error = "Anunțul nu mai există."; return; }
+            previewItems = [new AnnouncementView(detail.Id, detail.Title, detail.BodyHtml, detail.Mandatory, detail.PublishedBy, detail.PublishedUtc)];
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException) { Fail(exception, "Anunțul nu a putut fi deschis."); }
+    }
+
+    private async Task PreviewAsync()
+    {
+        var html = await JS.InvokeAsync<string>("announcementEditor.getHtml", BoxId);
+        previewItems = [new AnnouncementView(draft.Id, string.IsNullOrWhiteSpace(draft.Title) ? "(fără titlu)" : draft.Title.Trim(), html, draft.Mandatory, await Access.GetUsernameAsync(lifetime.Token) ?? "", DateTime.UtcNow)];
+    }
+
+    private void ClosePreview() => previewItems = null;
+
+    private void SetUser(string name, bool on)
+    {
+        if (on) { if (!draft.Users.Contains(name)) draft.Users.Add(name); } else draft.Users.Remove(name);
+    }
+
+    private async Task<AnnouncementInput> CurrentInputAsync() =>
+        new(draft.Id, draft.Title, await JS.InvokeAsync<string>("announcementEditor.getHtml", BoxId), draft.Mandatory, draft.Audience, [.. draft.Users], draft.ValidUntil);
+
+    private async Task SaveAsync() => await RunAsync(async () =>
+    {
+        var wasNew = draft.Id == 0;
+        var id = await Announcements.SaveAsync(await CurrentInputAsync(), lifetime.Token);
+        await ReopenAsync(id);
+        notice = wasNew ? "Anunțul a fost salvat ca draft." : "Modificările au fost salvate.";
+    }, "Anunțul nu a putut fi salvat.");
+
+    private async Task PublishAsync() => await RunAsync(async () =>
+    {
+        var again = state is not "" and not AnnouncementRules.StateDraft;
+        var id = await Announcements.PublishAsync(await CurrentInputAsync(), lifetime.Token);
+        await CloseEditorAsync();
+        notice = again ? "Anunțul a fost republicat: toți cei vizați îl vor primi din nou." : "Anunțul a fost publicat.";
+        _ = id;
+    }, "Anunțul nu a putut fi publicat.");
+
+    // After saving, the editor shows the saved announcement (a new draft gets its identifier, the pictures their final place).
+    private async Task ReopenAsync(int id)
+    {
+        var detail = await Announcements.GetAsync(id, lifetime.Token);
+        await LoadAsync();
+        if (detail is null) return;
+        draft = new DraftModel { Id = detail.Id, Title = detail.Title, Mandatory = detail.Mandatory, Audience = detail.Audience, ValidUntil = detail.ValidUntil, Users = [.. detail.Users] };
+        state = detail.State;
+        await JS.InvokeVoidAsync("announcementEditor.setHtml", BoxId, detail.BodyHtml);
+    }
+
+    private async Task CancelEditAsync() { ResetMessages(); await CloseEditorAsync(); }
+
+    private async Task CloseEditorAsync()
+    {
+        editing = false;
+        try { await JS.InvokeVoidAsync("announcementEditor.dispose", BoxId); } catch (JSException) { } catch (InvalidOperationException) { }
+        await LoadAsync();
+    }
+
+    // Republishing without editing: the announcement is published again as it is saved, so everybody targeted receives it again (the seen/read state is erased).
+    private async Task RepublishAsync(AnnouncementRow row) => await RunAsync(async () =>
+    {
+        await Announcements.ActivateAsync(row.Id, lifetime.Token);
+        await LoadAsync();
+        notice = $"Anunțul „{row.Title}” a fost republicat: toți cei vizați îl vor primi din nou.";
+    }, "Anunțul nu a putut fi republicat.");
+
+    // The On/Off switch of the column Activ: On publishes the announcement as it is saved (a draft, an archived or an expired one), Off archives the active one.
+    private async Task SetActiveAsync(AnnouncementRow row, bool on) => await RunAsync(async () =>
+    {
+        if (on) { await Announcements.ActivateAsync(row.Id, lifetime.Token); notice = $"Anunțul „{row.Title}” a fost activat."; }
+        else { await Announcements.ArchiveAsync(row.Id, lifetime.Token); notice = $"Anunțul „{row.Title}” a fost dezactivat (arhivat)."; }
+        await LoadAsync();
+    }, "Starea anunțului nu a putut fi schimbată.");
+
+    private async Task ArchiveAsync(AnnouncementRow row) => await RunAsync(async () =>
+    {
+        await Announcements.ArchiveAsync(row.Id, lifetime.Token);
+        await LoadAsync();
+        notice = $"Anunțul „{row.Title}” a fost arhivat.";
+    }, "Anunțul nu a putut fi arhivat.");
+
+    private async Task ShowSeenAsync(AnnouncementRow row)
+    {
+        ResetMessages();
+        try { seenList = await Announcements.GetSeenByAsync(row.Id, lifetime.Token); seenFor = row; }
+        catch (Exception exception) when (exception is not OperationCanceledException) { Fail(exception, "Lista nu a putut fi citită."); }
+    }
+
+    private void CloseSeen() { seenFor = null; seenList = []; }
+
+    private void CancelDelete() => confirmDelete = null;
+
+    private async Task DeleteAsync()
+    {
+        var row = confirmDelete;
+        confirmDelete = null;
+        if (row is null) return;
+        await RunAsync(async () =>
+        {
+            await Announcements.DeleteAsync(row.Id, lifetime.Token);
+            if (editing && draft.Id == row.Id) await CloseEditorAsync();
+            await LoadAsync();
+            notice = $"Anunțul „{row.Title}” a fost șters definitiv.";
+        }, "Anunțul nu a putut fi șters.");
+    }
+
+    private async Task DownloadAsync(AnnouncementRow row) => await RunAsync(async () =>
+    {
+        var zip = await Announcements.ExportZipAsync(row.Id, lifetime.Token);
+        downloads ??= await JS.InvokeAsync<IJSObjectReference>("import", "./file-download.js");
+        using var stream = new MemoryStream(zip.Content);
+        using var reference = new DotNetStreamReference(stream);
+        await downloads.InvokeVoidAsync("downloadBinary", zip.FileName, reference, "application/zip");
+        notice = $"Fișierul {zip.FileName} a fost descărcat.";
+    }, "Arhiva nu a putut fi făcută.");
+
+    private async Task OnZipAsync(InputFileChangeEventArgs args)
+    {
+        ResetMessages();
+        busy = true;
+        try
+        {
+            await using var stream = args.File.OpenReadStream(AnnouncementRules.MaxZipBytes, lifetime.Token);
+            var result = await Announcements.ImportZipAsync(stream, lifetime.Token);
+            warnings.AddRange(result.Warnings);
+            await LoadAsync();
+            var detail = await Announcements.GetAsync(result.Id, lifetime.Token);
+            if (detail is not null)
+                await OpenEditorAsync(new DraftModel { Id = detail.Id, Title = detail.Title, Mandatory = detail.Mandatory, Audience = detail.Audience, ValidUntil = detail.ValidUntil, Users = [.. detail.Users] }, detail.BodyHtml, detail.State);
+            notice = "Arhiva a fost încărcată ca draft nou. Verifică anunțul și publică-l.";
+        }
+        catch (IOException) { error = $"Arhiva poate avea cel mult {AnnouncementRules.MaxZipBytes / 1024 / 1024} MB."; }
+        catch (Exception exception) when (exception is not OperationCanceledException) { Fail(exception, "Arhiva nu a putut fi încărcată."); }
+        finally { busy = false; }
+    }
+
+    private async Task OnPicturesAsync(InputFileChangeEventArgs args)
+    {
+        error = null;
+        foreach (var file in args.GetMultipleFiles(ReportImageRules.MaxImages))
+        {
+            try
+            {
+                await using var stream = file.OpenReadStream(ReportImageRules.MaxImageBytes, lifetime.Token);
+                using var buffer = new MemoryStream();
+                await stream.CopyToAsync(buffer, lifetime.Token);
+                var uploaded = await Announcements.UploadImageAsync(new ReportImage(ReportImageRules.KindFile, file.Name, buffer.ToArray()), lifetime.Token);
+                await JS.InvokeVoidAsync("announcementEditor.insertImage", BoxId, uploaded.Url);
+            }
+            catch (IOException) { error = $"Fișierul „{file.Name}” depășește {ReportImageRules.MaxImageBytes / 1024 / 1024} MB."; }
+            catch (Exception exception) when (exception is not OperationCanceledException) { Fail(exception, "Poza nu a putut fi adăugată."); }
+        }
+    }
+
+    private async Task Exec(string command, string? value = null) => await JS.InvokeVoidAsync("announcementEditor.exec", BoxId, command, value);
+    private async Task ColorChanged(ChangeEventArgs args) => await Exec("foreColor", args.Value?.ToString());
+    private async Task ApplyLinkAsync()
+    {
+        if (string.IsNullOrWhiteSpace(linkAddress)) { error = "Scrie adresa linkului (https://…)."; return; }
+        error = null;
+        await JS.InvokeVoidAsync("announcementEditor.link", BoxId, linkAddress.Trim());
+    }
+    private async Task RemoveLinkAsync() => await JS.InvokeVoidAsync("announcementEditor.link", BoxId, "");
+
+    // Called by the script: a picture pasted or dropped into the box is stored and its address goes into the text.
+    [JSInvokable]
+    public async Task<string?> OnPastedImage(IJSStreamReference picture, string name)
+    {
+        try
+        {
+            await using var stream = await picture.OpenReadStreamAsync(ReportImageRules.MaxImageBytes + 1);
+            using var buffer = new MemoryStream();
+            await stream.CopyToAsync(buffer);
+            var uploaded = await Announcements.UploadImageAsync(new ReportImage(ReportImageRules.KindPasted, name, buffer.ToArray()));
+            return uploaded.Url;
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            await InvokeAsync(() => { Fail(exception, "Poza lipită nu a putut fi adăugată."); StateHasChanged(); });
+            return null;
+        }
+    }
+
+    [JSInvokable]
+    public Task OnEdited() => Task.CompletedTask;
+
+    private async Task RunAsync(Func<Task> action, string fallback)
+    {
+        if (busy) return;
+        busy = true; error = null; notice = null;
+        try { await action(); }
+        catch (OperationCanceledException) { }
+        catch (Exception exception) { Fail(exception, fallback); }
+        finally { busy = false; }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        lifetime.Cancel();
+        try { await JS.InvokeVoidAsync("announcementEditor.dispose", BoxId); } catch (Exception) { }
+        if (downloads is not null) { try { await downloads.DisposeAsync(); } catch (Exception) { } }
+        self?.Dispose();
+        lifetime.Dispose();
+    }
+}

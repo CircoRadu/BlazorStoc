@@ -30,7 +30,7 @@ Bannerul „Modul oprit temporar” și rândul din tabel numesc utilizatorul ș
 ## Flux: Cum opresc temporar un modul
 1. Oprește comutatorul „Pornit” de pe rândul modulului.
 2. Citește consecințele, scrie motivul și apasă „Oprește modulul”.
-3. Pagina principală arată placa modulului ca „Modul oprit temporar”.
+3. Dashboard-ul arată placa modulului ca „Modul oprit temporar”.
 
 ## Flux: Cum reiau un modul oprit
 1. Pornește comutatorul de pe rândul lui.

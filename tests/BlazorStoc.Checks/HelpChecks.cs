@@ -214,11 +214,13 @@ public static class HelpChecks
     // The list only shrinks: a topic that gets a "Captura:" must be taken out, a new topic without capture must be added (or get one).
     private static readonly HashSet<string> WithoutCapture = new(StringComparer.OrdinalIgnoreCase)
     {
-        "propunere-modificare", "notificari-propuneri", "facturi-informatii", "proiecte-informatii", "bonuri-consum", "bonuri-consum-generare", "elcomtur-evolutie", "taskuri-noi", "actualizare-anunt",
+        "propunere-modificare", "notificari-propuneri", "facturi-informatii", "beneficiari-alegere-actiune", "beneficiari-preluare-activityapp", "proiecte-informatii", "bonuri-consum", "bonuri-consum-generare", "elcomtur-evolutie", "taskuri-noi", "actualizare-anunt",
         // The window was restructured on 27.10.2026 (three sections); the old picture was removed and is made again on request (docs/HELP_DE_REGENERAT.md), then the key leaves this list.
         "categorii-parametri", "schimbare-parola",
         // Wizard "Generează bon de consum" (20.11.2026, PROP-0045): the pictures are made on request (docs/HELP_DE_REGENERAT.md), then the key leaves this list.
         "bon-consum",
+        // New 21.11.2026 (module Anunturi): the pictures are made on request (docs/HELP_DE_REGENERAT.md).
+        "setari-anunturi", "anunt-popup",
         // New 30.10.2026: the pictures are made on request (docs/HELP_DE_REGENERAT.md).
         "nomenclator-analizor-risc", "analizor-risc-editor", "beneficiari-fisiere",
         // New 06.11.2026: needs an ActivityApp connection to be photographed; the picture is made on request (docs/HELP_DE_REGENERAT.md).
@@ -238,7 +240,9 @@ public static class HelpChecks
         // New 14.11.2026: topics of the settings sections and the Elcomtur page written from the interface; the pictures are made on request (docs/HELP_DE_REGENERAT.md).
         "setari-preluare-activityapp", "setari-preluare-elcomtur", "elcomtur-preluare", "setari-espstoc", "setari-catalog", "setari-baza-spatiu", "setari-dezvoltare", "setari-autentificare",
         // New 16.11.2026: user display settings (PROP-0034); the picture is made on request (docs/HELP_DE_REGENERAT.md).
-        "setari-afisare"
+        "setari-afisare",
+        // New 20.11.2026: personalisation of the main page (PROP-0048); the picture is made on request.
+        "personalizare-pagina-principala"
     };
 
     // Elements that the demo environment cannot show in the state they describe (topic key|element name); the list only shrinks.
@@ -375,7 +379,7 @@ public static class HelpChecks
         // The editors of the beneficiary page open in a window made here around forms that have their own help button; the file panel has a delete confirmation and a plain file preview.
         "EntityFilePreview.razor", "BeneficiaryDetail.razor", "ServiceContractsSection.razor", "ServiceInterventionsSection.razor", "RiskAnalysesSection.razor", "EntityFilesPanel.razor",
         // Module Taskuri: the page wraps the existing beneficiary editor, the tables wrap the task form (own help button), the file panel only confirms a deletion and previews a file.
-        "AddUserTaskPage.razor", "TaskTables.razor", "UserTaskTabs.razor", "TaskFilesPanel.razor",
+        "AnnouncementsPanel.razor" /* delete confirmation; the page has its help topic setari-anunturi */, "AddUserTaskPage.razor", "TaskTables.razor", "UserTaskTabs.razor", "TaskFilesPanel.razor",
         // The popups of the validation queue of the tickets (view, edit + take, discard confirmation) and the view of a discarded ticket: their topic is to be written (listed in docs/HELP_DE_REGENERAT.md).
         "ActivityReviewSection.razor", "ActivityDiscardedSection.razor"
     };

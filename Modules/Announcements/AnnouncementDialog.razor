@@ -1,0 +1,100 @@
+@using BlazorStoc.Components.Shared
+@* The window of the announcements, one at a time ("1 din 3"): used by the window after the sign-in (AnnouncementPopup) and by "Previzualizeaza" of Setari -> Anunturi (Preview = true: same look,
+   nothing is saved). The text is cleaned here once more before it is shown, so what comes from an editor box that was not saved yet is safe too. *@
+@implements IAsyncDisposable
+<AppDialog Title="@HeaderTitle" Tone="@(CurrentMandatory ? "alert" : null)" Alert="@CurrentMandatory" Size="AppDialogSize.L" ShowModuleActions="false" PanelClass="announcement-dialog" HelpTopic="anunt-popup" Locked="@MandatoryShown" ShowClose="@(!MandatoryShown)" OnClose="CloseAsync">
+    <ChildContent>
+        @if (Items.Count > 0)
+        {
+            var item = Items[index];
+            <div class="announcement-counter muted" id="announcement-popup-counter">@(Items.Count > 1 ? $"{index + 1} din {Items.Count}" : "1 din 1")@if (item.Mandatory) { <span class="announcement-mandatory-badge">Obligatoriu</span> }</div>
+            @if (item.PublishedBy.Length > 0 || item.PublishedUtc is not null)
+            {
+                <div class="announcement-meta muted" id="announcement-popup-meta"><span class="announcement-meta-label">Publicat de:</span><strong>@AnnouncementRules.Capitalize(item.PublishedBy)</strong>@if (item.PublishedUtc is { } published) { <span> · @published.ToLocalTime().ToString("dd.MM.yyyy HH:mm", System.Globalization.CultureInfo.InvariantCulture)</span> }</div>
+            }
+            <h3 class="announcement-title" id="announcement-popup-title">@item.Title</h3>
+            <div class="announcement-body ui-scale-text" id="announcement-popup-body">@((MarkupString)Thumbnails(AnnouncementHtml.Clean(item.BodyHtml)))</div>
+        }
+    </ChildContent>
+    <Footer>
+        <div class="announcement-footer">
+            @* The preference concerns only the general announcements: it is offered while a general announcement is shown, never over a mandatory one. *@
+            @if (!Preview && Items.Count > 0 && !Items[index].Mandatory)
+            {
+                <div class="announcement-footer-pref"><ToggleSwitch Id="announcement-popup-hide" Value="HideNormal" ValueChanged="HideChangedAsync" OnText="On" OffText="Off" AriaLabel="Nu mai afișa anunțurile la pornire">Nu mai afișa anunțurile la pornire</ToggleSwitch>
+                <small class="muted announcement-footer-note">Îl repornești din meniul contului tău: „Vizibilitate anunțuri generale”.</small></div>
+            }
+            <div class="editor-actions">
+                @if (!MandatoryShown && Items.Count > 1 && index < Items.Count - 1) { <button type="button" id="announcement-popup-next" class="refresh act-nav" @onclick="Next">Următorul ›</button> }
+                @if (Items.Count > 0 && Items[index].Mandatory) { <button type="button" id="announcement-popup-ack" class="primary" disabled="@(Busy || Preview)" title="@(Preview ? "În previzualizare nu se confirmă citirea" : "Confirmă că ai citit anunțul")" @onclick="AcknowledgeAsync">Am citit</button> }
+                @if (!MandatoryShown) { <button type="button" id="announcement-popup-close" class="refresh act-close" @onclick="CloseAsync">Închide</button> }
+            </div>
+        </div>
+    </Footer>
+</AppDialog>
+@if (zoomSrc is not null)
+{
+    <ImageLightbox Src="@zoomSrc" Title="@zoomTitle" Closed="CloseZoom" />
+}
+
+@code {
+    [Parameter] public IReadOnlyList<AnnouncementView> Items { get; set; } = [];
+    [Parameter] public bool Preview { get; set; }
+    [Parameter] public string Title { get; set; } = "Anunț";
+    [Parameter] public bool HideNormal { get; set; }
+    [Parameter] public bool Busy { get; set; }
+    [Parameter] public EventCallback<bool> HideNormalChanged { get; set; }
+    /// <summary>Called when "Am citit" is pressed on a mandatory announcement (not in the preview).</summary>
+    [Parameter] public EventCallback<AnnouncementView> Acknowledged { get; set; }
+    /// <summary>Called when the window closes; the argument is how many announcements were shown (the first N of the list).</summary>
+    [Parameter] public EventCallback<int> Closed { get; set; }
+
+    [Inject] private IJSRuntime JS { get; set; } = default!;
+    private DotNetObjectReference<AnnouncementDialog>? self;
+    private string? zoomSrc, zoomTitle;
+
+    // The pictures of the text are shown small, each with an enlarge icon (a click on the picture does the same); the full picture opens in the lightbox over the window.
+    private static string Thumbnails(string html) => System.Text.RegularExpressions.Regex.Replace(html, "<img src=\"(/media/anunturi/[0-9]+)\" alt=\"([^\"]*)\">",
+        "<span class=\"announcement-thumb\"><img src=\"$1\" alt=\"$2\"><button type=\"button\" class=\"announcement-zoom\" data-src=\"$1\" data-alt=\"$2\" aria-label=\"Mărește poza\" title=\"Mărește poza\">" +
+        "<svg viewBox=\"0 0 24 24\" width=\"18\" height=\"18\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" aria-hidden=\"true\"><circle cx=\"10\" cy=\"10\" r=\"6\"/><path d=\"M15 15l5 5M10 7v6M7 10h6\"/></svg></button></span>");
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+        self = DotNetObjectReference.Create(this);
+        try { await JS.InvokeVoidAsync("announcementEditor.watchZoom", self); } catch (Exception exception) when (exception is JSException or InvalidOperationException) { }
+    }
+
+    [JSInvokable]
+    public Task OpenZoom(string source, string title) { zoomSrc = source; zoomTitle = string.IsNullOrWhiteSpace(title) ? "Poză din anunț" : title; return InvokeAsync(StateHasChanged); }
+
+    private void CloseZoom() => zoomSrc = null;
+
+    public async ValueTask DisposeAsync()
+    {
+        try { await JS.InvokeVoidAsync("announcementEditor.unwatchZoom", self); } catch (Exception exception) when (exception is JSException or InvalidOperationException) { }
+        self?.Dispose();
+    }
+
+    // A mandatory announcement has no way to close: the window closes only with "Am citit" (never in the preview of the administrator).
+    // The bar of the window says ANUNȚ GENERAL in the color of the theme, or ANUNȚ IMPORTANT in red for a mandatory announcement (also in the preview of the administrator).
+    private bool CurrentMandatory => Items.Count > 0 && Items[index].Mandatory;
+    private string HeaderTitle => CurrentMandatory ? "ANUNȚ IMPORTANT" : "ANUNȚ GENERAL";
+    private bool MandatoryShown => !Preview && Items.Count > 0 && Items[index].Mandatory;
+
+    private int index;
+    private int shown = 1;
+
+    private void Next() { if (index < Items.Count - 1) { index++; shown = Math.Max(shown, index + 1); } }
+
+    private Task HideChangedAsync(bool value) => HideNormalChanged.InvokeAsync(value);
+
+    private async Task AcknowledgeAsync()
+    {
+        if (Preview || Items.Count == 0) return;
+        await Acknowledged.InvokeAsync(Items[index]);
+        if (index < Items.Count - 1) Next(); else await CloseAsync();
+    }
+
+    private Task CloseAsync() => Closed.InvokeAsync(shown);
+}

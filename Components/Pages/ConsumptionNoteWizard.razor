@@ -48,6 +48,7 @@ else
                     <span class="relation-check">Beneficiar</span>
                     <SearchableSelect Id="note-beneficiary" Label="Beneficiar" Placeholder="Caută sau alege beneficiarul…" EmptyText="Niciun beneficiar găsit."
                                       Options="BeneficiaryOptions" SelectedId="beneficiaryId" SelectedIdChanged="id => { beneficiaryId = id; return Task.CompletedTask; }" />
+                    <ActivityTakeButton OnTaken="ReloadBeneficiariesAsync" />
                 </div>
                 <div class="editor-actions"><button type="button" class="primary" disabled="@(beneficiaryId is null || busy)" @onclick="ToProjectsAsync">@(busy ? "Se încarcă…" : "Înainte")</button></div>
             }
@@ -145,7 +146,12 @@ else
 }
 </PageBoundary>
 
+<BeneficiarySyncOnOpen OnNewBeneficiaries="ReloadBeneficiariesAsync" />
+
 @code {
+    // Beneficiaries entered in ActivityApp a moment ago are taken in the background after the page opened; the list is loaded again when there are new ones.
+    private async Task ReloadBeneficiariesAsync() { if (!canManage) return; try { beneficiaries = (await Beneficiaries.GetBeneficiariesAsync(lifetime.Token)).OrderBy(item => item.Name, StringComparer.CurrentCultureIgnoreCase).ToArray(); } catch (Exception) { } StateHasChanged(); }
+
     private readonly CancellationTokenSource lifetime = new();
     private bool loading = true, canManage, busy, separate = true, isTotal;
     private int step = 1;

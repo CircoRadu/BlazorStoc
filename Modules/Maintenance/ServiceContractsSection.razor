@@ -251,6 +251,14 @@
 
     private void Toggle(int contractId) { if (!expanded.Remove(contractId)) expanded.Add(contractId); }
 
+    // Called by the parent when the tile "Adaugă contract de mentenanță" of the main page brought the user to this beneficiary.
+    public void StartAdd()
+    {
+        if (!CanManage || Locked) return;
+        OpenAdd();
+        StateHasChanged();
+    }
+
     private void OpenAdd() { adding = true; editing = null; editorKey = Guid.NewGuid(); notice = error = null; }
     private void OpenEdit(ServiceContractDetails details) { adding = false; editing = details; editorKey = Guid.NewGuid(); notice = error = null; }
     private Task CloseEditorAsync() { adding = false; editing = null; return Task.CompletedTask; }

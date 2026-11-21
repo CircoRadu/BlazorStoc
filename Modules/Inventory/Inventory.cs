@@ -97,6 +97,8 @@ public sealed class InventoryReportBuilder(IProductRepository products, IStockMo
         var chosen = expanded.Select(item => InventoryRules.Key(item.Category, item.Subcategory)).Distinct(StringComparer.Ordinal)
             .Where(canonical.ContainsKey).Select(key => canonical[key]).ToList();
         string Label(ProductGroup group) => labels.GetValueOrDefault(InventoryRules.Key(group.Category, group.Subcategory), group.Subcategory);
+        // The categories follow the order of the Stoc menu (the order of the tree of categories); one the tree does not know goes last, alphabetically.
+        int CategoryPlace(string category) { var at = nodes.ToList().FindIndex(node => string.Equals(node.Category, category, StringComparison.OrdinalIgnoreCase)); return at >= 0 ? at : int.MaxValue; }
         int Place(ProductGroup group) => order.GetValueOrDefault(InventoryRules.Key(group.Category, group.Subcategory), int.MaxValue);
 
         var productsBySubcategory = allProducts.ToLookup(product => InventoryRules.Key(product.Category, product.Subcategory));
@@ -106,7 +108,7 @@ public sealed class InventoryReportBuilder(IProductRepository products, IStockMo
 
         foreach (var categoryGroup in chosen
             .GroupBy(group => group.Category, StringComparer.OrdinalIgnoreCase)
-            .OrderBy(group => group.Key, StringComparer.CurrentCultureIgnoreCase))
+            .OrderBy(group => CategoryPlace(group.Key)).ThenBy(group => group.Key, StringComparer.CurrentCultureIgnoreCase))
         {
             var subcategorySections = new List<InventorySubcategorySection>();
             foreach (var group in categoryGroup.OrderBy(Place).ThenBy(group => group.Subcategory, StringComparer.CurrentCultureIgnoreCase))

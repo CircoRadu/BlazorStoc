@@ -38,6 +38,7 @@ public static class ActivityImportChecks
         ActivityFieldSettingsChecks.Run(check);
         await ActivityImportPanelChecks.RunAsync(check);
         await ActivityKeywordsPanelChecks.RunAsync(check);
+        await TakeNowAsync(check);
         await BeneficiaryChecksSectionChecks.RunAsync(check);
         await PagedChecks.RunAsync(check);
         await LiveAsync(check);
@@ -536,6 +537,10 @@ public static class ActivityImportChecks
             && alerts[0].Values[ActivityImportAlertSource.DetailsName].Contains("nu a răspuns", StringComparison.Ordinal) && alerts[1].Values[ActivityImportAlertSource.DetailsName].Contains("2 coloane", StringComparison.Ordinal)
             && alerts[2].Values[ActivityImportAlertSource.DetailsName].Contains("5 probleme", StringComparison.Ordinal) && alerts.All(item => item.Url == (item.ObjectId == ActivityImportAlertSource.IssuesId ? ActivityImportAlertSource.IssuesUrl : "/setari?tab=preluare-activityapp") && item.Expiry == DateOnly.FromDateTime(since.ToLocalTime())),
             "Activity alerts: one notification per lasting condition (sync failing, structure changed, open problems, new types), on the day it began, with the cause");
+        var changed = ActivityImportAlertSource.Instances(new ActivityImportAlertState(null, "", 0, since, 1, null, 0, null, null, "", MariaActivityImportAlertReader.DescribeStructure(
+            [new("Tickete", "Descriere", "tickete", "coloana lipsește", "text", "—", true), new("Parteneri", "Nume", "parteneri", "alt tip de date", "text", "int", false)])))[0].Values[ActivityImportAlertSource.DetailsName];
+        check(changed.Contains("Tickete.Descriere: coloana lipsește", StringComparison.Ordinal) && changed.Contains("Parteneri.Nume: alt tip de date (așteptat text, găsit int)", StringComparison.Ordinal) && changed.IndexOf("Tickete.Descriere", StringComparison.Ordinal) < changed.IndexOf("Parteneri.Nume", StringComparison.Ordinal),
+            "Activity alerts: the structure notification says what changed, the needed columns first, with what was expected and found");
         check(ActivityImportAlertSource.Instances(new ActivityImportAlertState(null, "", 0, null, 0, since, 0, null)).Count == 0, "Activity alerts: open problems that were all resolved no longer raise the notification");
         var source = new ActivityImportAlertSource(null!);
         check(source.Key == "sistem.preluare-activityapp" && source.Category == "Sistem" && source.DefaultThresholdDays == 0 && source.DefaultSubject.Contains("<problema preluare>", StringComparison.Ordinal)
@@ -558,6 +563,49 @@ public static class ActivityImportChecks
         check(source.Contains("LOCK_TIMEOUT", StringComparison.Ordinal) && source.Contains("READ UNCOMMITTED", StringComparison.Ordinal),
             "Activity import: the session waits little for a lock and reads without shared locks (it cannot hold up the users of ActivityApp)");
         check(!source.Contains("SqlBulkCopy", StringComparison.Ordinal) && !source.Contains("BeginTransaction", StringComparison.Ordinal), "Activity import: the source never writes (no bulk copy, no transaction)");
+    }
+
+    // "Preia din ActivityApp" (no server needed): the percentage of the progress, the right beneficiari.add, the wiring of the services, the exact journal action and the module that is out.
+    private sealed class FixedAccess(bool allowed) : IAccessControl
+    {
+        public Task<bool> IsAdministratorAsync(CancellationToken cancellationToken = default) => Task.FromResult(allowed);
+        public Task<bool> CanManageProductsAsync(CancellationToken cancellationToken = default) => Task.FromResult(allowed);
+        public Task<bool> CanManageBeneficiariesAsync(CancellationToken cancellationToken = default) => Task.FromResult(allowed);
+        public Task<string?> GetUsernameAsync(CancellationToken cancellationToken = default) => Task.FromResult<string?>("test");
+        public Task EnsureAdministratorAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
+        public Task EnsureProductOperatorAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
+        public Task EnsureBeneficiaryOperatorAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
+        public Task<bool> HasAsync(string permission, CancellationToken cancellationToken = default) => Task.FromResult(allowed && permission == "beneficiari.add");
+    }
+
+    private static async Task TakeNowAsync(Action<bool, string> check)
+    {
+        check(new PartnerTakeProgress("x", 40, 120).Percent == 33 && new PartnerTakeProgress("x", 0, 0).Percent == 0 && new PartnerTakeProgress("x", 150, 120).Percent == 100,
+            "Take from ActivityApp: the progress is a percentage of what is done, 0 while the total is not known, never above 100");
+        var wired = new ServiceCollection();
+        new ActivityImportModule().Register(wired, new ConfigurationBuilder().Build());
+        var unavailable = new ServiceCollection();
+        new ActivityImportModule().RegisterUnavailable(unavailable);
+        check(wired.Any(d => d.ServiceType == typeof(IBeneficiaryTakeService) && d.Lifetime == ServiceLifetime.Scoped) && wired.Any(d => d.ServiceType == typeof(IBeneficiarySyncOnOpen) && d.Lifetime == ServiceLifetime.Singleton)
+            && !unavailable.Any(d => d.ServiceType == typeof(IBeneficiaryTakeService) || d.ServiceType == typeof(IBeneficiarySyncOnOpen)),
+            "Take from ActivityApp: the module registers the button service and the open-page service; while it is not started the pages find neither and show no button");
+        check(AuditFilterOptions.Actions.Any(item => item.Value == AuditActions.TakeActivityPartnersManual) && AuditActions.TakeActivityPartnersManual.Contains("manuală", StringComparison.Ordinal),
+            "Take from ActivityApp: the taking on request has its own exact journal action, in the filter of the journal");
+        var registry = new ModuleRegistry();
+        registry.Add(new ActivityImportModule(), new ServiceCollection(), new ConfigurationBuilder().Build());
+        await using var provider = new ServiceCollection().BuildServiceProvider();
+        var scopes = provider.GetRequiredService<IServiceScopeFactory>();
+        var denied = new BeneficiaryTakeService(scopes, registry, new FixedAccess(false), null!);
+        var refused = false;
+        try { await denied.TakeAsync(null); } catch (AccessDeniedException) { refused = true; }
+        check(!await denied.CanTakeAsync() && refused, "Take from ActivityApp: without the right to add beneficiaries there is no button and the taking is refused");
+        var out_ = new ModuleRegistry();
+        out_.Add(new ActivityImportModule(), new ServiceCollection(), new ConfigurationBuilder().Build());
+        for (var index = 0; index < ModuleRegistry.FailureThreshold; index++) out_.ReportFailure(ActivityImportModule.ModuleId, new InvalidOperationException("x"));
+        var paused = new BeneficiaryTakeService(scopes, out_, new FixedAccess(true), null!);
+        var pausedResult = await paused.TakeAsync(null);
+        check(!await paused.CanTakeAsync() && !pausedResult.Completed && !string.IsNullOrEmpty(pausedResult.Message) && !await new PartnerSyncOnOpen(scopes, out_, Microsoft.Extensions.Logging.Abstractions.NullLogger<PartnerSyncOnOpen>.Instance).RequestAsync(),
+            "Take from ActivityApp: while the module is out the button is hidden, the taking says so, and the open-page taking does nothing");
     }
 
     private static void Wiring(Action<bool, string> check)

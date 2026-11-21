@@ -1,0 +1,21 @@
+@implements IDisposable
+@inject IServiceProvider Services
+@* Put on a page that has a beneficiary choice: after the first render it asks, in the background, for the partners new in ActivityApp to be taken as beneficiaries. The page is
+   never held back; when something new was taken, OnNewBeneficiaries runs (the page loads its list again). Without the import module nothing happens. *@
+@code {
+    [Parameter] public EventCallback OnNewBeneficiaries { get; set; }
+    private readonly CancellationTokenSource lifetime = new();
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender || Services.GetService<IBeneficiarySyncOnOpen>() is not { } sync) return;
+        try
+        {
+            if (await sync.RequestAsync().ConfigureAwait(false) && !lifetime.IsCancellationRequested)
+                await InvokeAsync(OnNewBeneficiaries.InvokeAsync).ConfigureAwait(false);
+        }
+        catch (Exception) { }
+    }
+
+    public void Dispose() { lifetime.Cancel(); lifetime.Dispose(); }
+}

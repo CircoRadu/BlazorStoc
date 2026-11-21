@@ -26,6 +26,7 @@
                 {
                     <SearchableSelect Id="risk-beneficiary" Label="Beneficiar *" Placeholder="Caută sau alege beneficiarul…" EmptyText="Niciun beneficiar găsit."
                                       Options="BeneficiaryOptions" SelectedId="beneficiaryId" SelectedIdChanged="BeneficiaryChangedAsync" Disabled="saving" />
+                    <ActivityTakeButton OnTaken="ReloadBeneficiariesAsync" />
                 }
                 @if (Original is null)
                 {
@@ -65,7 +66,12 @@
     <EntityFilesPanel OwnerKind="@EntityFileOwners.Risk" OwnerId="@(Original?.Analysis.Id ?? 0)" />
 </section>
 
+<BeneficiarySyncOnOpen OnNewBeneficiaries="ReloadBeneficiariesAsync" />
+
 @code {
+    // Beneficiaries entered in ActivityApp a moment ago are taken in the background after the page opened; the list is loaded again when there are new ones.
+    private async Task ReloadBeneficiariesAsync() { if (BeneficiaryId != 0) return; try { BeneficiaryOptions = (await BeneficiaryStore.GetBeneficiariesAsync(lifetime.Token)).Select(item => new SelectOption(item.Id, item.Name)).ToArray(); } catch (Exception) { } StateHasChanged(); }
+
     // 0 = the beneficiary is chosen in the form (the page of all analyses); otherwise the analysis is for this beneficiary.
     [Parameter] public int BeneficiaryId { get; set; }
     [Parameter] public RiskAnalysisView? Original { get; set; }

@@ -110,7 +110,7 @@ else if (beneficiary is not null)
         @foreach (var (tabId, tabTitle) in SectionTabs)
         {
             var current = tabId;
-            <button type="button" role="tab" id="subtab-bf-@tabId" data-tab-target="@tabId" class="settings-subtab @(sectionTab == tabId ? "active" : "") @BalanceTabClass(tabId)" aria-selected="@(sectionTab == tabId ? "true" : "false")" aria-controls="subpanel-bf-@tabId" tabindex="@(sectionTab == tabId ? 0 : -1)" @onclick="() => sectionTab = current">@tabTitle@if (tabId == "balanta" && tabBalance is not null) { <span class="count-badge" id="balance-tab-badge" title="@(tabBalance.IsOwed ? "Plăți restante" : "Fără plăți restante")">@ElcomturFormat.Money(tabBalance.Balance)</span> }</button>
+            <button type="button" role="tab" id="subtab-bf-@tabId" data-tab-target="@tabId" class="settings-subtab @(sectionTab == tabId ? "active" : "") @BalanceTabClass(tabId)" aria-selected="@(sectionTab == tabId ? "true" : "false")" aria-controls="subpanel-bf-@tabId" tabindex="@(sectionTab == tabId ? 0 : -1)" @onclick="() => sectionTab = current">@tabTitle@if (tabId == "balanta" && tabBalance is not null) { <span class="count-badge" id="balance-tab-badge" title="@(tabBalance.IsOwed ? "Plăți restante" : "Fără plăți restante")">@ElcomturFormat.Money(tabBalance.Balance)</span> }@if (tabId == "proiecte") { <span class="count-badge" id="projects-tab-badge" title="Numărul de proiecte">@projects.Count</span> }</button>
         }
     </div>
 
@@ -168,7 +168,7 @@ else if (beneficiary is not null)
     </div>
 
     <div class="section-tab-panel" id="subpanel-bf-mentenanta" role="tabpanel" aria-labelledby="subtab-bf-mentenanta" data-tab="mentenanta" hidden="@(sectionTab != "mentenanta")">
-    <ModuleGate ModuleId="@BlazorStoc.Modules.Maintenance.MaintenanceModule.ModuleId" Section="Contracte de mentenanță"><ServiceContractsSection BeneficiaryId="Id" BeneficiaryName="@beneficiary.Name" WorkPoints="workPoints" Contracts="contracts" CanManage="canMaintenance" ThresholdDays="thresholdDays" Changed="ReloadContractsAsync" />
+    <ModuleGate ModuleId="@BlazorStoc.Modules.Maintenance.MaintenanceModule.ModuleId" Section="Contracte de mentenanță"><ServiceContractsSection @ref="contractSection" BeneficiaryId="Id" BeneficiaryName="@beneficiary.Name" WorkPoints="workPoints" Contracts="contracts" CanManage="canMaintenance" ThresholdDays="thresholdDays" Changed="ReloadContractsAsync" />
 
     <ServiceInterventionsSection BeneficiaryId="Id" BeneficiaryName="@beneficiary.Name" WorkPoints="workPoints" Contracts="contracts" CanManage="canMaintenance" OpenForWorkPointId="AddInterventionPoint ?? 0" Changed="ReloadContractsAsync" /></ModuleGate>
     </div>
@@ -235,6 +235,10 @@ else if (beneficiary is not null)
     [SupplyParameterFromQuery(Name = BeneficiaryProjectListState.PageParameter)] public int? PageParameter { get; set; }
     // /beneficiari/<id>?adauga-proiect=1&inapoi=<page>: opened from a form (the exit form of a product) that continues afterwards.
     [SupplyParameterFromQuery(Name = "adauga-proiect")] public string? AddProjectFlag { get; set; }
+    // /beneficiari/<id>?actiune=adauga-punct|adauga-contract|adauga-analiza|adauga-proiect: the tiles of the main page that need a beneficiary (chosen first on the page of the beneficiaries).
+    [SupplyParameterFromQuery(Name = MenuCatalog.ActionQuery)] public string? ActionParameter { get; set; }
+    private string? pendingSectionAction;
+    private ServiceContractsSection? contractSection;
     // ?balanta=1: opened from the Balante restante tab of the Notifications page; the Elcomtur balance section opens and is brought into view.
     [SupplyParameterFromQuery(Name = "balanta")] public string? BalanceFlag { get; set; }
     private bool BalanceRequested => BalanceFlag == "1";
@@ -342,6 +346,7 @@ else if (beneficiary is not null)
             returnTo = ReturnNavigation.Safe(ReturnParameter);
             await OpenAddProjectAsync();
         }
+        if (ActionParameter is not null && beneficiary is not null) await RunActionAsync(ActionParameter);
     }
 
     protected override async Task OnParametersSetAsync()
@@ -354,8 +359,26 @@ else if (beneficiary is not null)
         }
     }
 
+    // The action of a tile of the main page: opens the tab of its section and then its form (the sections are drawn by this page, so the form of a contract or of a risk analysis opens after the render).
+    private async Task RunActionAsync(string action)
+    {
+        switch (action)
+        {
+            case "adauga-proiect": if (permAdd) await OpenAddProjectAsync(); break;
+            case "adauga-punct": sectionTab = "puncte"; if (canManage) OpenAddWorkPoint(); break;
+            case "adauga-contract": sectionTab = "mentenanta"; pendingSectionAction = action; break;
+            case "adauga-analiza": sectionTab = "analize"; pendingSectionAction = action; break;
+        }
+        Navigation.NavigateTo(Navigation.GetUriWithQueryParameter(MenuCatalog.ActionQuery, (string?)null), replace: true);
+    }
+
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
+        if (pendingSectionAction is { } pending && !loading && beneficiary is not null)
+        {
+            if (pending == "adauga-contract" && contractSection is not null) { pendingSectionAction = null; contractSection.StartAdd(); }
+            else if (pending == "adauga-analiza" && riskSection is not null) { pendingSectionAction = null; riskSection.OpenAddFor(0); }
+        }
         if (!scrollRestorePending || loading || projectsLoading || beneficiary is null) return;
         scrollRestorePending = false;
         try { await JS.InvokeVoidAsync("blazorStocNavigationContext.restoreScroll"); }

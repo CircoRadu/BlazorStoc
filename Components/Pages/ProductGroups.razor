@@ -10,6 +10,7 @@
 @inject IAccessControl Access
 @inject ILogger<ProductGroups> Logger
 @inject IJSRuntime JS
+@inject NavigationManager Navigation
 @implements IDisposable
 <PageBoundary>
 
@@ -347,6 +348,18 @@ else
         </div>
         <div class="editor-actions"><button class="primary" disabled="@saving" @onclick="RequestSaveSubcategoryAsync">@(creatingChildOf is not null && ProductCount(creatingChildOf) > 0 ? "Adaugă și mută produsele" : creatingSubcategory ? "Adaugă subcategoria" : "Salvează subcategoria")</button><button class="danger" disabled="@saving" @onclick="RequestCancelEditAsync">Anulează</button></div>
 </AppDialog>;
+
+    // /categorii?actiune=adauga-categorie: the tile "Adaugă categorie" of the main page opens the form of a new category.
+    [SupplyParameterFromQuery(Name = MenuCatalog.ActionQuery)] public string? ActionParameter { get; set; }
+    private bool actionHandled;
+
+    protected override void OnParametersSet()
+    {
+        if (actionHandled || ActionParameter != "adauga-categorie" || !permAdd || error is not null) return;
+        actionHandled = true;
+        CreateCategory();
+        Navigation.NavigateTo(Navigation.GetUriWithQueryParameter(MenuCatalog.ActionQuery, (string?)null), replace: true);
+    }
 
     protected override async Task OnInitializedAsync()
     {

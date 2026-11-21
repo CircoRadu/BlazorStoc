@@ -24,6 +24,7 @@ public static class AuditEntities
     public const string JournalSettings = "SetariJurnal";
     public const string BugReport = "RaportareEroare";
     public const string Proposal = "Propunere";
+    public const string Announcement = "Anunt";
     public const string NotificationTemplate = "SablonNotificare";
     public const string Notification = "Notificare";
     public const string NotificationSettings = "SetariNotificari";
@@ -295,6 +296,13 @@ public static class AuditActions
     public const string DeleteProposal = "Propunere ștearsă";
     public const string DeleteAllClosedProposals = "Propunere: toate cele închise șterse";
     public const string ExportProposal = "Propunere exportată";
+    public const string CreateAnnouncement = "Anunț creat";
+    public const string PublishAnnouncement = "Anunț publicat";
+    public const string EditAnnouncement = "Anunț modificat";
+    public const string ArchiveAnnouncement = "Anunț arhivat";
+    public const string RepublishAnnouncement = "Anunț republicat";
+    public const string DeleteAnnouncement = "Anunț șters definitiv";
+    public const string ConfirmAnnouncementRead = "Anunț: confirmare citire";
     public const string TestActivityImport = "Testare conexiune ActivityApp";
     public const string SetActivityImportTypes = "Modificare tipuri tichete preluate ActivityApp";
     public const string SetActivityFieldMap = "Modificare corespondență câmpuri ActivityApp";
@@ -330,6 +338,7 @@ public static class AuditActions
     public const string SuspendActivityImport = "Suspendare preluare ActivityApp: structură schimbată";
     public const string SimulateActivityImport = "Simulare import ActivityApp";
     public const string ImportActivityPartners = "Import beneficiari ActivityApp";
+    public const string TakeActivityPartnersManual = "Preluare manuală beneficiari ActivityApp";
     public const string ImportActivityTickets = "Import tichete ActivityApp";
     public const string SyncActivityImport = "Sincronizare ActivityApp";
     public const string ResolveActivityImportIssue = "Rezolvare problemă import ActivityApp";
@@ -469,7 +478,8 @@ public static class AuditActions
 
     // Events whose object still has a live page (a plain edit or one of the specific edit operations).
     public static bool IsCreateOrEdit(string? action) =>
-        action is Create or Edit or EditProductTags or ExpiryItp or ExpiryInsurance or ExpiryRovinieta or MoveEquipment or ReturnEquipment
+        action is CreateAnnouncement or PublishAnnouncement or EditAnnouncement or ArchiveAnnouncement or RepublishAnnouncement or ConfirmAnnouncementRead or
+            Create or Edit or EditProductTags or ExpiryItp or ExpiryInsurance or ExpiryRovinieta or MoveEquipment or ReturnEquipment
             or CreateNotificationTemplate or EditNotificationTemplate or NotificationCreated or AcknowledgeNotification or SnoozeNotification
             or ResolveNotification or AutoResolveNotification or ReopenNotification or EditNotificationSettings
             or CreateWorkPoint or EditWorkPoint or EditWorkPointDescription or EditWorkPointCoordinates or AddWorkPointPhoto or CreateAttachedWorkPoint or EditAttachedWorkPoint or AddAttachedFile or DeleteAttachedFile or RenameAttachedFile
@@ -530,6 +540,7 @@ public static class AuditNavigation
     // is built from the entity type and the stable identifier only, never from the display text of the target.
     private static readonly IReadOnlyDictionary<string, Func<int, string>> Routes = new Dictionary<string, Func<int, string>>
     {
+        [AuditEntities.Announcement] = _ => "/setari?tab=anunturi",
         [AuditEntities.Product] = ProductNavigation.ProductUrl,
         [AuditEntities.Beneficiary] = BeneficiaryProjectListState.BeneficiaryUrl,
         [AuditEntities.User] = UserNavigation.UserUrl,

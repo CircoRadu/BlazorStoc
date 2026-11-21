@@ -15,7 +15,7 @@ Catalogul arată toate produsele cu stocul lor. Poți căuta, filtra după categ
 
 ## Elemente
 ### Antet
-- ← Meniu principal | buton | Revine la pagina principală.
+- ← Meniu principal | buton | Revine la dashboard.
 - Ieșire multiplă | buton | Deschide ieșirea mai multor produse deodată (doar cu dreptul necesar).
 - Administrează categorii | buton | Deschide categoriile și subcategoriile.
 - + Adaugă produs | buton | Deschide formularul de produs nou deasupra catalogului.

@@ -1,3 +1,113 @@
+## 0.6.18 | 21.11.2026
+### Funcționalități noi
+- Personalizare dashboard: zonele pot sta și pe rânduri diferite ale paginii. Fiecare zonă (în afară de prima) are câmpul „Așezare”: lângă zona dinainte, pe rând nou centrată, pe rând nou la stânga sau pe rând nou la dreapta. O zonă de pe rând nou păstrează lățimea de care au nevoie tile-urile ei, cu același padding, și nu se întinde pe toată pagina.
+### Diverse
+- Actualizarea adaugă o coloană în tabelul zonelor dashboard-ului (așezarea zonei).
+
+## 0.6.17 | 21.11.2026
+### Funcționalități noi
+- Personalizare dashboard: la un spațiu liber din caroiaj poți alege o culoare (câmpul „Culoare” de pe rândul spațiului, „Fără culoare” îl lasă transparent); pe dashboard spațiul apare ca o bandă colorată.
+
+## 0.6.16 | 21.11.2026
+### Bugs
+- Personalizare dashboard: sliderul „Înălțime spațiu” modifică acum spațiul dintre rândurile de tile-uri (în editor și pe dashboard), nu doar rândurile „+ Spațiu”, deci orice valoare se vede imediat.
+
+## 0.6.15 | 21.11.2026
+### Bugs
+- Personalizare dashboard: sliderul „Lățime tile” se oprește la lățimea pe care o poate avea o coloană în zona cea mai îngustă, ca fiecare pas să schimbe ceva (înainte valorile mai mari decât spațiul nu aveau efect); la capăt lățimea este automată.
+- Rotița de setări a tabelelor rămâne deasupra antetului și când un banner apare sau dispare deasupra tabelului (înainte putea ajunge în primul rând).
+### Diverse
+- Personalizare dashboard: sub slidere apare o notă când nu există niciun „+ Spațiu” în caroiaj, pentru că înălțimea spațiului se vede doar la rândurile de spațiu.
+- Ieșire multiplă: coloana „Produs” este cu 40% mai îngustă, „Descriere” stă la 10 px de „Sursa”, iar câmpul de descriere de pe rând este de 2,5 ori mai lung.
+
+## 0.6.14 | 21.11.2026
+### Diverse
+- Anunțuri: în tabel, valorile din coloana „Văzut / citit” sunt centrate sub antet, iar iconița „cine a citit” stă la 5 px de valoare.
+
+## 0.6.13 | 21.11.2026
+### Funcționalități noi
+- Anunțuri: tabelul are coloană separată „Activ” cu comutator (activează un draft sau un anunț arhivat, dezactivează unul activ) și iconiță de republicare fără modificări, care trimite din nou anunțul celor vizați.
+- Anunțuri: un anunț obligatoriu nu mai are „Închide”, „Următorul” sau închidere cu Escape; fereastra se închide doar cu „Am citit”. „Am citit” există doar la anunțurile obligatorii.
+- Anunțuri: în tabel, la un anunț obligatoriu, iconița din coloana „Văzut / citit” arată cine l-a citit, cu data și ora; la cele generale coloana arată doar câți l-au văzut.
+- Anunțuri: bara ferestrei spune „ANUNȚ GENERAL” (în culoarea temei) la un anunț general și „ANUNȚ IMPORTANT” (roșu) la unul obligatoriu.
+- Anunțuri: în meniul numelui tău există „Vizibilitate anunțuri generale”, cu comutator On/Off: dacă ai oprit anunțurile din fereastră, de aici le repornești.
+- Anunțuri: cele două categorii se numesc „General” și „Obligatoriu”; comutatorul „Nu mai afișa anunțurile la pornire” apare doar peste un anunț general, nu și peste unul obligatoriu.
+### Diverse
+- Anunțuri: tabelul are „Tip și audiență” într-o singură coloană și nu mai arată numărul anunțului, ca să încapă pe lățimea paginii.
+
+## 0.6.12 | 21.11.2026
+### Bugs
+- Anunțuri: după delogare și relogare în același tab, anunțurile active nevăzute apar din nou la autentificare (înainte fereastra nu mai apărea).
+
+## 0.6.11 | 21.11.2026
+### Funcționalități noi
+- Anunțuri: pe fiecare rând din tabel există un comutator Activ/Inactiv: On activează un draft sau un anunț arhivat așa cum e salvat (cei vizați îl primesc din nou), Off îl dezactivează.
+- Anunțuri: fereastra de anunț arată deasupra titlului „Publicat de:” cu numele utilizatorului (prima literă mare), data și ora publicării.
+### Diverse
+- Actualizarea adaugă o coloană în tabelul de anunțuri (cine a publicat).
+
+## 0.6.10 | 21.11.2026
+### Funcționalități noi
+- Anunțuri: administratorii pot scrie anunțuri cu text formatat (aldin, cursiv, titluri, liste, link, culoare, aliniere) și poze, le previzualizează, le salvează ca draft, le publică și le republică. Anunțul ajunge la toți utilizatorii sau la cei selectați, cu dată opțională „valabil până”.
+- Anunțuri: după autentificare, o singură dată pe sesiune, utilizatorul vede anunțurile active nevăzute, pe rând („1 din 3”). Un anunț normal se poate opri din comutatorul „Nu mai afișa anunțurile la pornire”; unul obligatoriu revine la fiecare autentificare până apeși „Am citit”. Pozele din anunț apar mici, cu iconiță de mărire.
+- Anunțuri: „Încarcă anunț” primește o arhivă ZIP (anunt.json, continut.html, imagini) și o deschide ca draft nou; „Descarcă ca ZIP” pe un rând dă anunțul în același format.
+### Bugs
+- Dashboard: titlul paginii principale nu mai arată textul `@if (userName.Length > 0)`, ci „Dashboard” și numele utilizatorului, cu 10 px între ele. Meniul lateral: „Dashboard” este fix în partea de sus pe toate paginile (și deasupra meniului de categorii de produse), cu 15 px față de antet și 15 px față de meniul de sub el.
+### Diverse
+- Jurnalul are acțiuni proprii pentru anunțuri: creare, publicare, modificare, arhivare, republicare, ștergere și confirmare citire.
+
+## 0.6.9 | 21.11.2026
+### Funcționalități noi
+- Dashboard: tile-urile au antet cu iconița și categoria din care face parte opțiunea, iar titlul și descrierea stau în corpul tile-ului (Baza de date pe un singur rând, nu „Setări - Baza de date”); înălțimea lor e restrânsă, ca la categorii.
+- Dashboard: numele utilizatorului apare lângă titlu, cu prima literă mare.
+- Dashboard: moștenește setările globale de afișare (text, antet, iconițe) și are rotiță proprie ca tabelele, pentru text, antetul tile-urilor și iconițe.
+### Bugs
+- Dashboard: după salvare, tile-urile din zone diferite nu își mai pierd locul în caroiaj.
+### Diverse
+- Dashboard: zonele au aceeași înălțime, cea a zonei celei mai înalte.
+- Inventar: categoriile din selecție și din raportul de inventar urmează ordinea din meniul Stoc, nu alfabetul.
+
+## 0.6.8 | 21.11.2026
+### Funcționalități noi
+- Personalizare dashboard: o opțiune pornită nu mai intră direct în caroiaj, ci într-o zonă de așteptare deasupra rândurilor; de acolo o tragi unde vrei (și poți pune înapoi un tile din caroiaj). Ce rămâne în zona de așteptare se salvează, dar nu apare pe dashboard.
+- Personalizare dashboard: dashboard-ul se poate împărți în zone așezate una lângă alta; fiecare zonă are titlu obligatoriu și propriul caroiaj (număr de tile-uri pe rând, rânduri, etichete și spații). Tile-urile, rândurile și zonele se mută cu drag and drop, iar o zonă ștearsă își trimite tile-urile în zona de așteptare.
+- Personalizare dashboard: trei slidere, lățimea tile-urilor, înălțimea tile-urilor și înălțimea spațiilor dintre rânduri, se aplică unitar la tot dashboard-ul; „Dimensiuni standard” le resetează.
+- Dashboard: fiecare zonă are chenar rotunjit cu umbră 3D, iar tile-urile au umbră; tile-urile rămân în zonă.
+
+## 0.6.7 | 21.11.2026
+### Funcționalități noi
+- Personalizare dashboard: cine nu și-a aranjat încă un dashboard începe de la cel activ, cel standard (tile-urile lui sunt deja în aranjare), iar în secțiunea de caroiaj există butonul „Golește dashboard” (un dashboard gol salvat rămâne gol, e alegerea utilizatorului) și „Revino la dashboard-ul standard”.
+- Personalizare dashboard: „Preluare ofertă” este acum o acțiune a categoriei Oferte (subsecțiunea „Acțiuni”), nu o intrare de meniu.
+### Diverse
+- Personalizare dashboard: tragerea tile-urilor și a rândurilor în caroiaj funcționează acum în browser, ca la categorii: celula țintă se evidențiază, iar tile-ul se mută sau schimbă locul cu altul.
+- Personalizare dashboard: rotița de afișare a tabelelor nu mai apare peste antetul secțiunilor.
+
+## 0.6.6 | 21.11.2026
+### Funcționalități noi
+- Personalizare dashboard: poți alege câte tile-uri stau pe un rând, de la 2 la 8 (implicit 4); alegerea se salvează pe contul tău.
+- Personalizare dashboard: opțiunile sunt pe categorii pliabile, cu insigne (câte sunt pe dashboard și câte libere), fiecare categorie având „Intrări meniu principal” și „Acțiuni”. Tile-uri noi: paginile din Setări și acțiunile principale (Adaugă produs, beneficiar, furnizor, vehicul, categorie, proiect, punct de lucru, contract de mentenanță, analiză de risc); fiecare are iconiță proprie și deschide direct formularul respectiv (acolo unde trebuie un beneficiar, ți-l cere întâi).
+- Personalizare dashboard: în caroiaj poți adăuga etichete (cu text și culoare de font la alegere) și spații de 15 px între rânduri, poți muta rânduri întregi și scoate un tile cu iconița de ștergere (comutatorul lui trece pe Off).
+- Personalizare dashboard: la secțiunea Oferte poți alege și „Preluare ofertă” ca tile, cu iconiță proprie, chiar dacă în meniul din stânga nu e un copil separat.
+### Diverse
+- Meniul din stânga: eticheta „Spațiu de lucru” are culoarea temei, cu 20 px deasupra și 20 px dedesubt față de „Dashboard” și de prima intrare.
+
+## 0.6.5 | 21.11.2026
+### Funcționalități noi
+- Dashboard personalizabil: din meniul numelui tău, „Personalizare dashboard” te lasă să alegi opțiunile de meniu care apar ca tile-uri pe pagina principală (cu iconița lor) și să le așezi cu drag and drop într-un caroiaj, pe rândurile și coloanele dorite; alegerea se păstrează pe contul tău. Fără nicio alegere, rămâne dashboard-ul standard.
+### Diverse
+- Opțiunile din meniul lateral au acum iconițe, iar „Pagina principală” se numește „Dashboard”.
+- Butonul „Actualizează aplicația” apare în bara de sus pentru conturile cu drept de actualizare.
+- Actualizarea adaugă un tabel nou (pornește gol) și două coloane pentru locul tile-urilor.
+- Butonul „Dezvoltare” apare în bara de sus, înaintea „Actualizează aplicația”, pentru conturile de dezvoltator și duce în pagina de dezvoltare.
+- Intrări/ieșiri produs: lupele de lângă beneficiar și vehicul au dispărut; filtrarea se face din bara de filtre.
+- Fișa beneficiarului: toate taburile au aceeași înălțime, iar tabul „Proiecte” arată numărul de proiecte.
+- Administrare vehicule: numărul vehiculului este mai mare și își schimbă aspectul la trecerea mouse-ului, ca să se vadă că se poate apăsa.
+- Setări → Backup: pragul minim de păstrare a pachetelor vechi este acum 4 zile (înainte 7).
+- Lângă alegerea beneficiarului (Ieșire multiplă, adăugarea unei ieșiri din Intrări/ieșiri produs, Bon de consum, Export consum, Ofertă, Analiză de risc, Task utilizator) și în lista Beneficiari apare butonul „Preia din ActivityApp”: preia imediat beneficiarii introduși în ActivityApp și încă absenți, într-o fereastră cu progres și rezultat (câți s-au creat, legat, așteaptă sau au probleme, plus numele celor noi). Îl folosește cine are dreptul de a adăuga beneficiari; acțiunea apare în Jurnal ca „Preluare manuală beneficiari ActivityApp”.
+- Meniul din stânga: „Dashboard” este deasupra „Spațiu de lucru”, de sine stătător. Eticheta „Spațiu de lucru” are culoarea temei și 20 px deasupra și dedesubt.
+- Notificarea „structura ActivityApp s-a schimbat” arată acum și ce s-a schimbat: coloanele lipsă sau cu alt tip de date (tabel, coloană, ce era așteptat și ce s-a găsit), cele necesare primele.
+- Beneficiarii introduși în ActivityApp sunt preluați și la noi când deschizi o pagină cu alegere de beneficiar (Ieșire multiplă, Bon de consum, Export consum, Ofertă, Analiză de risc, Task utilizator, lista Beneficiari): preluarea rulează în fundal, nu întârzie deschiderea paginii, iar lista se reîncarcă singură dacă a apărut un beneficiar nou. Verificarea se face cel mult o dată la 2 minute.
+
 ## 0.6.4 | 20.11.2026
 ### Diverse
 - Preluarea unei facturi scanate cu un șablon făcut din alt scan nu mai pierde rândurile: când OCR-ul citește altfel titlurile coloanelor, coloanele se potrivesc cu antetul găsit după poziția lor, iar reperele fără litere sau cifre (linii și chenare citite ca „|” sau „=”) nu mai strică zonele coloanelor. Șabloanele existente nu trebuie refăcute.

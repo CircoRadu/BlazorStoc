@@ -1,0 +1,67 @@
+@implements IDisposable
+@inject IAnnouncementService Announcements
+@inject IAccessControl Access
+@inject ModuleRegistry Modules
+@inject IJSRuntime JS
+@inject ILogger<AnnouncementPopup> Logger
+@* In the layout of every page (an interactive island): once per browser session, after the sign-in, the active announcements the user did not see yet open in a window, one at a time.
+   A normal announcement is marked seen when the window closes; a mandatory one comes again at every sign-in until "Am citit". *@
+@if (open && items.Count > 0)
+{
+    <AnnouncementDialog Items="items" HideNormal="hideNormal" Busy="busy" HideNormalChanged="HideChangedAsync" Acknowledged="AcknowledgeAsync" Closed="CloseAsync" />
+}
+
+@code {
+    private const string SessionKey = "blazorstoc-announcements-shown";
+    private readonly CancellationTokenSource lifetime = new();
+    private IReadOnlyList<AnnouncementView> items = [];
+    private bool open, hideNormal, busy;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+        try
+        {
+            if (!Modules.IsAvailable(AnnouncementsModule.ModuleId) || await Access.GetUsernameAsync(lifetime.Token) is not { Length: > 0 }) return;
+            // Once per browser session (the tab), not at every page change or reconnection.
+            if (await JS.InvokeAsync<bool>("eval", "(function(){try{if(sessionStorage.getItem('" + SessionKey + "'))return true;sessionStorage.setItem('" + SessionKey + "','1');}catch(e){}return false;})()")) return;
+            hideNormal = await Announcements.GetHideNormalAsync(lifetime.Token);
+            items = await Announcements.GetPendingAsync(lifetime.Token);
+            open = items.Count > 0;
+            if (open) StateHasChanged();
+        }
+        catch (OperationCanceledException) { }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            Logger.LogDebug("Announcements loading failed ({ErrorType}).", exception.GetType().Name);
+        }
+    }
+
+    private async Task HideChangedAsync(bool value)
+    {
+        try { await Announcements.SetHideNormalAsync(value, lifetime.Token); hideNormal = value; }
+        catch (Exception exception) when (exception is not OperationCanceledException) { Logger.LogWarning("The announcements preference was not saved ({ErrorType}).", exception.GetType().Name); }
+    }
+
+    private async Task AcknowledgeAsync(AnnouncementView item)
+    {
+        if (busy) return;
+        busy = true;
+        try { await Announcements.AcknowledgeAsync(item.Id, lifetime.Token); }
+        catch (Exception exception) when (exception is not OperationCanceledException) { Logger.LogWarning("An announcement could not be confirmed ({ErrorType}).", exception.GetType().Name); }
+        finally { busy = false; }
+    }
+
+    private async Task CloseAsync(int shown)
+    {
+        var seen = items.Take(shown).Where(item => !item.Mandatory).ToList();
+        open = false;
+        foreach (var item in seen)
+        {
+            try { await Announcements.MarkSeenAsync(item.Id, lifetime.Token); }
+            catch (Exception exception) when (exception is not OperationCanceledException) { Logger.LogDebug("An announcement was not marked seen ({ErrorType}).", exception.GetType().Name); }
+        }
+    }
+
+    public void Dispose() { lifetime.Cancel(); lifetime.Dispose(); }
+}

@@ -1051,3 +1051,14 @@ Cerut de utilizator la 06.10.2026 (verificarea fluxului, apoi deciziile: facturi
 - Cauza: (1) ancorele zonelor de coloana ale sablonului erau caractere OCR (| = -) care se potriveau cu zgomot din alt scan si dadeau zone cu sfarsit deasupra inceputului; (2) titlurile citite diferit de OCR nu se potriveau cu cele din sablon, motorul cadea pe pozitia absoluta a antetului din fisierul model si randurile 1-2 ramaneau deasupra.
 - Remediere in Services/Invoices/InvoiceTemplates.cs: ancorele fara litere/cifre nu mai sunt ancore (InvoiceTemplateEngine.HasContent, AnchorAbove/AnchorBelow le sar), zonele incoerente sunt respinse, iar coloanele fara eticheta potrivita se potrivesc dupa pozitie cu celulele antetului gasit in fisier.
 - Verificari: raportul corpus pe factura 827 cu sablonul exportat citeste cele 7 randuri (ca analiza automata); 3 teste noi in InvoiceChecks.cs; grupul pdf 223 verificari trecute; raportul corpus arata si zonele coloanelor.
+
+## Finalizat la 21.11.2026 15:49 - Modulul Anunturi 1.3.1 si pachetele 0.6.5-0.6.16
+
+- Modul nou Anunturi (Setari -> Anunturi): editor cu formatare si poze, previzualizare, draft, publicare/republicare, coloana Activ, lista cine a citit, ZIP import/export; fereastra dupa logare cu categorii General/Obligatoriu, Am citit, Publicat de; preferinta in meniul contului; migrarile 98-99; curatare HTML pe server si teste de securitate
+- Dashboard fix in meniul lateral, rotita tabelelor deasupra antetului, Iesire multipla (latimi coloane), slidere dashboard (latime disponibila, spatiu intre randuri)
+- Verificari: suita completa, sectiunea MariaDB Announcements, browser pe instanta proprie; pachete 0.6.5-0.6.16
+
+## Finalizat la 21.11.2026 16:09 - Dashboard personalizat: culoare la spatii si zone pe randuri diferite (0.6.17-0.6.18)
+
+- Spatiile libere din caroiaj au culoare aleasa de utilizator; zonele au campul Asezare (langa zona dinainte, pe rand nou centrata/stanga/dreapta) cu latimea necesara tile-urilor; migrarea 100 (user_dashboard_zones.placement)
+- Verificari: teste DashboardChecks + sectiunea MariaDB Dashboard, browser pe instanta proprie

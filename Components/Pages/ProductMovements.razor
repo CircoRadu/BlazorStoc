@@ -123,7 +123,7 @@ else
                         {
                             <ExitDestinationPicker @ref="addPicker" Prefix="add" Model="form" Beneficiaries="beneficiaries" Projects="projects"
                                                    Vehicles="vehicles" VehicleStocks="vehicleStocks" Disabled="saving"
-                                                   AllowAdd="true" AddBeneficiaryRequested="AddBeneficiaryAsync" AddProjectRequested="AddProjectAsync"
+                                                   AllowAdd="true" AddBeneficiaryRequested="AddBeneficiaryAsync" BeneficiariesTaken="ReloadBeneficiariesAsync" AddProjectRequested="AddProjectAsync"
                                                    DestinationChanged="() => DestinationChangedAsync(false)"
                                                    VehicleChanged="() => { ApplySuggestion(false); return Task.CompletedTask; }"
                                                    BeneficiaryChanged="id => SelectBeneficiaryAsync(form, id, false)"
@@ -301,7 +301,7 @@ else
                                 <td>
                                     @if (m.BeneficiaryName is not null)
                                     {
-                                        <div><a class="category-table-link" href="@($"/beneficiari/{m.BeneficiaryId}")">@m.BeneficiaryName</a> <button type="button" class="audit-filter-link filter-hint" title="Filtrează după acest beneficiar" aria-label="Filtrează după acest beneficiar" @onclick="() => FilterByBeneficiaryAsync(m.BeneficiaryId!.Value)">⌕</button></div>
+                                        <div><a class="category-table-link" href="@($"/beneficiari/{m.BeneficiaryId}")">@m.BeneficiaryName</a></div>
                                         @if (m.ProjectName is not null && m.ProjectId is { } infoProjectId) { <div><button type="button" class="audit-filter-link category-table-link project-info-link" title="Vezi informațiile proiectului" @onclick="() => projectInfo = (m.BeneficiaryId!.Value, m.BeneficiaryName!, infoProjectId, m.ProjectName)">@m.ProjectName</button></div> }
                                     }
                                     else if (m.Destination is ExitDestination.GenericSale or ExitDestination.StockCorrection or ExitDestination.OtherReason or ExitDestination.WarehouseReturn)
@@ -310,8 +310,8 @@ else
                                     }
                                 </td>
                                 <td>
-                                    @if (m.VehiclePlate is not null) { <span class="movement-project">în <a class="category-table-link" href="@VehicleNavigation.PageUrl(m.VehicleId!.Value)">@m.VehiclePlate</a> <button type="button" class="audit-filter-link filter-hint" title="Filtrează după acest vehicul" aria-label="Filtrează după acest vehicul" @onclick="() => FilterByVehicleAsync(m.VehicleId!.Value)">⌕</button></span> }
-                                    @if (m.SourceVehiclePlate is not null) { <span class="movement-project">din <a class="category-table-link" href="@VehicleNavigation.PageUrl(m.SourceVehicleId!.Value)">@m.SourceVehiclePlate</a> <button type="button" class="audit-filter-link filter-hint" title="Filtrează după acest vehicul" aria-label="Filtrează după acest vehicul" @onclick="() => FilterByVehicleAsync(m.SourceVehicleId!.Value)">⌕</button></span> }
+                                    @if (m.VehiclePlate is not null) { <span class="movement-project">în <a class="category-table-link" href="@VehicleNavigation.PageUrl(m.VehicleId!.Value)">@m.VehiclePlate</a></span> }
+                                    @if (m.SourceVehiclePlate is not null) { <span class="movement-project">din <a class="category-table-link" href="@VehicleNavigation.PageUrl(m.SourceVehicleId!.Value)">@m.SourceVehiclePlate</a></span> }
                                 </td>
                                 <td class="movement-actions">
                                     <button type="button" class="row-icon view" aria-label="Vezi mișcarea din @StockMovementRules.DisplayDate(m.Date)" title="Vezi mișcarea din @StockMovementRules.DisplayDate(m.Date)" @onclick="() => OpenViewAsync(m)"></button>

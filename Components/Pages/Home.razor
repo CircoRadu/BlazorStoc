@@ -95,6 +95,9 @@ else { @ActiveTagsBar()<div class="table-tools">@if (permAdd && !string.IsNullOr
     [SupplyParameterFromQuery(Name = "subcategorie")] public string? SubcategoryQuery { get; set; }
     [SupplyParameterFromQuery(Name = "incomplete")] public string? IncompleteQuery { get; set; }
     [SupplyParameterFromQuery(Name = "edit")] public int? EditId { get; set; }
+    // /produse?actiune=adauga-produs: the tile "Adaugă produs" of the main page opens the form of a new product.
+    [SupplyParameterFromQuery(Name = MenuCatalog.ActionQuery)] public string? ActionParameter { get; set; }
+    private bool actionHandled;
     [SupplyParameterFromQuery(Name = "sterge")] public int? DeleteId { get; set; }
     [SupplyParameterFromQuery(Name = ReturnNavigation.QueryName)] public string? ReturnQuery { get; set; }
     private IReadOnlyList<Product> products = Array.Empty<Product>();
@@ -387,6 +390,13 @@ else { @ActiveTagsBar()<div class="table-tools">@if (permAdd && !string.IsNullOr
         onlyIncomplete = IncompleteQuery == "1";
         var scope = category + "001f" + subcategory; if (scope != scopeKey) { scopeKey = scope; activeTags.Clear(); activeParams.Clear(); activeLabels.Clear(); }
         ResetPage();
+        if (!actionHandled && ActionParameter == "adauga-produs" && loaded)
+        {
+            actionHandled = true;
+            if (permAdd) await OpenEditorAsync(null);
+            Navigation.NavigateTo(Navigation.GetUriWithQueryParameter(MenuCatalog.ActionQuery, (string?)null), replace: true);
+            return;
+        }
         if (EditId is > 0 && loaded && (!editing || editingProduct?.Id != EditId.Value))
         {
             var requested = products.FirstOrDefault(product => product.Id == EditId.Value);

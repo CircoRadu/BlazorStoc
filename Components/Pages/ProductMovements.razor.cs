@@ -54,6 +54,13 @@ public partial class ProductMovements
     private bool linkDetach;
     private bool useProject;
     private IReadOnlyList<Beneficiary> beneficiaries = Array.Empty<Beneficiary>();
+
+    // New beneficiaries taken from ActivityApp (button "Preia din ActivityApp" of the exit form): the list of the choice is loaded again.
+    private async Task ReloadBeneficiariesAsync()
+    {
+        try { beneficiaries = (await Beneficiaries.GetBeneficiariesAsync(lifetime.Token)).OrderBy(b => b.Name, StringComparer.CurrentCultureIgnoreCase).ToArray(); } catch (Exception) { }
+        await InvokeAsync(StateHasChanged);
+    }
     private IReadOnlyList<Vehicle> vehicles = Array.Empty<Vehicle>();
     private IReadOnlyList<VehicleStock> vehicleStocks = Array.Empty<VehicleStock>();
     private bool vehiclesLoaded;
